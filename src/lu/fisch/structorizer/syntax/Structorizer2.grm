@@ -1,0 +1,252 @@
+﻿"Name"    = 'StructorizerExpr'
+"Version" = '0.1'
+"Author"  = 'Dmitry Gazko, Kay Gürtzig'
+"About"   = 'LALR(1) Structorizer expression grammar, derived from Java grammar based on partial conversion of Sun Java 1.0-2.0 specification'
+
+! -------------------------------------------------
+! Character Sets
+! -------------------------------------------------
+
+{String Char} = {Printable} - ["]
+{Quote} = ['']
+{IdLetter} = {Letter} + [_$]
+{IdAlphaNumeric} = {Alphanumeric} + [_$]
+{HexDigit} = {Digit} + [abcdefABCDEF]
+{OctalCharSet} = [01234567]
+{NoZeroDigit} = [123456789]
+{LongTypeSuffix} =[lL]
+{FloatTypeSuffix} =[dfDF]
+{ExponentPartIndicator} = [eE]
+{Sign} = [-+]
+{CharSign} = [abtnfr"\] + {Quote}
+{CharSign1} = {String Char} - [\]
+{HexEscapeSign} =[uUxX]
+
+! -------------------------------------------------
+! Terminals
+! -------------------------------------------------
+
+Identifier     = {IdLetter}{IdAlphaNumeric}*
+StringLiteral  = '"'{String Char}*'"'
+FloatingPointLiteral   = {Digit}+'.'{Digit}+{FloatTypeSuffix}? | {Digit}+{FloatTypeSuffix} | '.'{Digit}+{FloatTypeSuffix}?
+FloatingPointLiteralExponent = {Digit}+'.'{Digit}+{ExponentPartIndicator}{Sign}?{Digit}+{FloatTypeSuffix}? | {Digit}+{ExponentPartIndicator}{Sign}?{Digit}+{FloatTypeSuffix}? | '.'{Digit}+{ExponentPartIndicator}{Sign}?{Digit}+{FloatTypeSuffix}?
+BooleanLiteral = 'true' | 'false'
+IndirectCharLiteral = {Quote}{CharSign1}{Quote}
+StandardEscapeCharLiteral = {Quote}'\'{CharSign}{Quote}
+OctalEscapeCharLiteral ={Quote}'\'{OctalCharSet}+{Quote}
+HexEscapeCharLiteral ={Quote}'\'{HexEscapeSign}{HexDigit}+{Quote}
+NullLiteral = 'null'
+StartWithNoZeroDecimalIntegerLiteral = {NoZeroDigit}{Digit}*{LongTypeSuffix}?
+StartWithZeroDecimalIntegerLiteral = '0'{LongTypeSuffix}?
+HexIntegerLiteral = '0'('x'|'X'){HexDigit}+{LongTypeSuffix}?
+OctalIntegerLiteral = '0'{OctalCharSet}+{LongTypeSuffix}?
+
+"Case Sensitive" = 'True'
+"Start Symbol"   = <Expression>
+
+! ===================================================================
+! Rules
+! ===================================================================
+
+<CharacterLiteral> 
+        ::= IndirectCharLiteral
+         |  StandardEscapeCharLiteral
+         |  OctalEscapeCharLiteral
+         |  HexEscapeCharLiteral
+
+<DecimalIntegerLiteral> 
+        ::= StartWithZeroDecimalIntegerLiteral
+         |  StartWithNoZeroDecimalIntegerLiteral
+
+<FloatPointLiteral> 
+        ::= FloatingPointLiteral
+         |  FloatingPointLiteralExponent
+
+<IntegerLiteral> 
+        ::= <DecimalIntegerLiteral>
+         |  HexIntegerLiteral  
+         |  OctalIntegerLiteral
+
+
+<Literal> 
+        ::= <IntegerLiteral>
+         |  <FloatPointLiteral>
+         |  BooleanLiteral
+         |  <CharacterLiteral>
+         |  StringLiteral
+         |  NullLiteral
+
+
+<Name>
+        ::= <SimpleName>
+         |  <QualifiedName>
+
+<SimpleName> ::= Identifier
+
+<QualifiedName> ::= <Name> '.' Identifier
+
+<ArrayInitializer>
+        ::= '{' <ExpressionList> '}'
+         |  '{' '}'
+
+<RecordInitializer>
+        ::= Identifier '{' <ComponentInitializers> '}'
+         | Identifier '{' '}'
+
+<ExpressionList> ::= <Expression>
+                        | <ExpressionList> ',' <Expression>
+
+<ComponentInitializers> ::= <ComponentInitializer>
+                        | <ComponentInitializers> ',' <ComponentInitializer>
+
+<ComponentInitializer> 
+        ::= Identifier ':' <Expression>
+         |  <Expression>
+
+<Primary> 
+        ::= <Literal>
+         |  '(' <Expression> ')'
+         |  <FieldAccess>
+         |  <MethodInvocation>
+         |  <ArrayAccess>
+
+<FieldAccess> 
+        ::= <Primary> '.' Identifier
+
+<MethodInvocation>
+        ::= <Name> '(' <ExpressionList> ')'
+         |  <Name> '(' ')'
+         |  <Primary> '.' Identifier '(' <ExpressionList> ')'
+         |  <Primary> '.' Identifier '(' ')'
+
+<ArrayAccess> 
+        ::= <Name> '[' <Expression> ']'
+         |  <Primary> '[' <Expression> ']'
+
+<PostfixExpression>
+        ::= <Primary>
+         |  <Name>
+         |  <PostIncrementExpression>
+         |  <PostDecrementExpression>
+
+<PostIncrementExpression>
+        ::= <PostfixExpression> '++'
+
+<PostDecrementExpression>
+        ::= <PostfixExpression> '--'
+
+<UnaryExpression>
+        ::= <PreIncrementExpression>
+         |  <PreDecrementExpression>
+         |  '+' <UnaryExpression>
+         |  '-' <UnaryExpression>
+         |  <UnaryExpressionNotPlusMinus>
+
+<PreIncrementExpression> 
+        ::= '++' <UnaryExpression>
+
+<PreDecrementExpression>
+        ::= '--' <UnaryExpression>
+
+<UnaryExpressionNotPlusMinus> 
+        ::= <PostfixExpression>
+         |  '~' <UnaryExpression>
+         |  '!' <UnaryExpression>
+         |  no <UnaryExpression>
+
+<MultiplicativeExpression>
+        ::= <UnaryExpression>
+         |  <MultiplicativeExpression> '*' <UnaryExpression>
+         |  <MultiplicativeExpression> '/' <UnaryExpression>
+         |  <MultiplicativeExpression> div <UnaryExpression>
+         |  <MultiplicativeExpression> mod <UnaryExpression>
+         |  <MultiplicativeExpression> '%' <UnaryExpression>
+
+<AdditiveExpression>
+        ::= <MultiplicativeExpression>
+         |  <AdditiveExpression> '+' <MultiplicativeExpression>
+         |  <AdditiveExpression> '-' <MultiplicativeExpression>
+
+<ShiftExpression>
+        ::= <AdditiveExpression>
+         |  <ShiftExpression> '<<' <AdditiveExpression>
+         |  <ShiftExpression> '>>' <AdditiveExpression>
+         |  <ShiftExpression> '>>>' <AdditiveExpression>
+         |  <ShiftExpression> shl <AdditiveExpression>
+         |  <ShiftExpression> shr <AdditiveExpression>
+
+<RelationalExpression>
+        ::= <ShiftExpression>
+         |  <RelationalExpression> '<' <ShiftExpression>
+         |  <RelationalExpression> '>' <ShiftExpression>
+         |  <RelationalExpression> '<=' <ShiftExpression>
+         |  <RelationalExpression> '>=' <ShiftExpression>
+!         |  <RelationalExpression> 'instanceof' <ReferenceType>
+
+<EqualityExpression>
+        ::= <RelationalExpression>
+         |  <EqualityExpression> '==' <RelationalExpression>
+         |  <EqualityExpression> '=' <RelationalExpression>
+         |  <EqualityExpression> '!=' <RelationalExpression>
+         |  <EqualityExpression> '<>' <RelationalExpression>
+
+<AndExpression>
+        ::= <EqualityExpression>
+         |  <AndExpression> '&' <EqualityExpression>
+
+<ExclusiveOrExpression>
+        ::= <AndExpression>
+         |  <ExclusiveOrExpression> '^' <AndExpression>
+
+<InclusiveOrExpression> 
+        ::= <ExclusiveOrExpression>
+         |  <InclusiveOrExpression> '|' <ExclusiveOrExpression>
+
+<ConditionalAndExpression>
+        ::= <InclusiveOrExpression>
+         |  <ConditionalAndExpression> '&&' <InclusiveOrExpression>
+         |  <ConditionalAndExpression> and <InclusiveOrExpression>
+
+<ConditionalOrExpression>
+        ::= <ConditionalAndExpression>
+         |  <ConditionalOrExpression> '||' <ConditionalAndExpression>
+         |  <ConditionalAndExpression> or <InclusiveOrExpression>
+
+<ConditionalExpression> 
+        ::= <ConditionalOrExpression>
+         |  <ConditionalOrExpression> '?' <Expression> ':' <ConditionalExpression>
+
+<AssignmentExpression> 
+        ::= <ConditionalExpression>
+!         |  <Assignment>
+
+!<Assignment>
+!        ::= <LeftHandSide> <AssignmentOperator> <AssignmentExpression>
+
+!<LeftHandSide> 
+!        ::= <Name>
+!         |  <FieldAccess>
+!         |  <ArrayAccess>
+
+!<AssignmentOperator> 
+!         ::= '<-'
+!          | ':='
+!        ::= '='
+!         |  '*='
+!         |  '/='
+!         |  '%='
+!         |  '+='
+!         |  '-='
+!         |  '<<='
+!         |  '>>='
+!         |  '>>>='
+!         |  '&='
+!         |  '^='
+!         |  '|='
+
+<Expression> ::= <AssignmentExpression>
+              | <ArrayInitializer>
+              | <RecordInitializer>
+
+!<ConstantExpression> ::= <Expression>
+

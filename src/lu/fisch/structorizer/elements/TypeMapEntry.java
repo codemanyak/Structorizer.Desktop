@@ -31,16 +31,17 @@ package lu.fisch.structorizer.elements;
  *
  *      Author          Date            Description
  *      ------          ----            -----------
- *      Kay Gürtzig     2017.01.19      First Issue (enh. #259)
- *      Kay Gürtzig     2017.03.05      Method isArray(boolean) added and JavaDoc updated
- *      Kay Gürtzig     2017.04.14      Issue #394: Method variants of getCanonicalType() and getTypes(),
+ *      Kay Gürtzig     2017-01-19      First Issue (enh. #259)
+ *      Kay Gürtzig     2017-03-05      Method isArray(boolean) added and JavaDoc updated
+ *      Kay Gürtzig     2017-04-14      Issue #394: Method variants of getCanonicalType() and getTypes(),
  *                                      argument mixup fixed, type assimilation support 
- *      Kay Gürtzig     2017.07.04      Issue #423: Structure changes to support record types and named
+ *      Kay Gürtzig     2017-07-04      Issue #423: Structure changes to support record types and named
  *                                      type definitions
- *      Kay Gürtzig     2017.09.18      Enh. #423: dummy singleton introduced (impacts poorly tested!)
- *      Kay Gürtzig     2017.09.22      Bugfix #428 Defective replacement pattern for "short" in canonicalizeType(String)
- *      Kay Gürtzig     2017.09.29      Regex stuff revised (final Strings -> final Patterns)
- *      Kay Gürtzig     2018.07.12      Canonicalisation of type name "unsigned short" added.
+ *      Kay Gürtzig     2017-09-18      Enh. #423: dummy singleton introduced (impacts poorly tested!)
+ *      Kay Gürtzig     2017-09-22      Bugfix #428 Defective replacement pattern for "short" in canonicalizeType(String)
+ *      Kay Gürtzig     2017-09-29      Regex stuff revised (final Strings -> final Patterns)
+ *      Kay Gürtzig     2018-07-12      Canonicalisation of type name "unsigned short" added.
+ *      Kay Gürtzig     2019-11-11      Method isNumeric() introduced for convenience
  *      Kay Gürtzig     2019-11-17      Field isCStyle removed, several method signatures accordingly reduced,
  *                                      Enh. #739: Support for enum types
  *
@@ -586,6 +587,27 @@ public class TypeMapEntry {
 		String canonicalType = canonicalizeType(typeName);
 		if (canonicalType.equals("string") || canonicalType.equals("char") || canonicalType.equals("boolean")) {
 			return true;
+		}
+		for (String canon: canonicalNumericTypes) {
+			if (canonicalType.equals(canon)) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	/**
+	 * Checks if the type entry represents a scalar numerical standard type.
+	 * @param trueInCaseOfDoubt - specifies if a dubious (ambivalent or unspecified) type is to be
+	 * regarded as a (potential) numeric type or the contrary.
+	 * @return true iff the type is definitely a canonical numeric type or (partially) unknown but
+	 * tolerated accordiung to {@code trueInCaseOfDoubt}.
+	 */
+	public boolean isNumeric(boolean trueInCaseOfDoubt)
+	{
+		String canonicalType = getCanonicalType(true, true);
+		if (canonicalType == null || canonicalType.equals("???")) {
+			return trueInCaseOfDoubt;
 		}
 		for (String canon: canonicalNumericTypes) {
 			if (canonicalType.equals(canon)) {
