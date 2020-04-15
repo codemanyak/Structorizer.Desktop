@@ -333,7 +333,7 @@ Comment Line  = '//'
                    |  switch '(' <Expression> ')' '{' <Case Stmts> '}'
 
 <Case Stmts>      ::= case <Selector> ':' <StmtList> <Case Stmts>
-                   | default ':' <StmtList>                  
+                   | default ':' <StmtList>
                    |
 
 <Selector>        ::= <Literal>

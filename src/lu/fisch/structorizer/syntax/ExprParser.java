@@ -59,23 +59,12 @@ package lu.fisch.structorizer.syntax;
  *
  ******************************************************************************************************/
 
-import java.io.*;
-
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map.Entry;
-import java.util.Stack;
-import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.regex.Matcher;
 
 import com.creativewidgetworks.goldparser.engine.*;
 import com.creativewidgetworks.goldparser.engine.enums.SymbolType;
 
 import lu.fisch.structorizer.parsers.AuParser;
-import lu.fisch.structorizer.parsers.CodeParser;
-import lu.fisch.utils.BString;
 
 /**
  * Code import parser class of Structorizer 3.27, based on GOLDParser 5.0 for the LALR(1) Structorizer expression grammar, derived from Java grammar language.

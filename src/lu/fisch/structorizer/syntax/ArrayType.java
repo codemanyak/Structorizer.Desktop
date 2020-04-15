@@ -19,8 +19,6 @@
  */
 package lu.fisch.structorizer.syntax;
 
-import lu.fisch.utils.StringList;
-
 /******************************************************************************************************
  *
  *      Author:         Kay Gürtzig
