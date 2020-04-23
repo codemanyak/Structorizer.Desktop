@@ -107,7 +107,7 @@ public class TypeMapEntry {
 	//private static final Pattern RANGE_PATTERN = Pattern.compile("^([0-9]+)[.][.][.]?([0-9]+)$");
 	private static final Pattern RANGE_PATTERN = Pattern.compile("^([0-9]+)\\s*?[.][.][.]?\\s*?([0-9]+)$");
 	// START KGU#542 2019-11-17: Enh. #739
-	public static final Matcher MATCHER_ENUM = Pattern.compile("^" + BString.breakup("enum") 
+	public static final Matcher MATCHER_ENUM = Pattern.compile("^" + BString.breakup("enum", true) 
 	+ "\\s*[{]\\s*[A-Za-z_][A-Za-z_0-9]*\\s*([=]\\s*[^=,}]*?)?(,\\s*[A-Za-z_][A-Za-z_0-9]*(\\s*[=]\\s*[^=,}]*?)?)*\\s*[}]$").matcher("");
 	// END KGU#542 2019-11-17
 	
@@ -154,7 +154,7 @@ public class TypeMapEntry {
 			definingElement = _element;
 			lineNo = _lineNo;
 			// FIXME: shouldn't we apply the ARRAY_PATTERNs here?
-			boolean isArray = (typeDescriptor.matches(".+\\[.*\\].*") || typeDescriptor.matches("(^|\\W.*)" + BString.breakup("array") + "($|\\W.*)"));
+			boolean isArray = (typeDescriptor.matches(".+\\[.*\\].*") || typeDescriptor.matches("(^|\\W.*)" + BString.breakup("array", true) + "($|\\W.*)"));
 			if (isArray) {
 				this.setElementType();
 				this.setIndexRanges();
@@ -280,10 +280,10 @@ public class TypeMapEntry {
 		 * possible, i.e. type names like "integer", "real" etc. apparently designating
 		 * standard types will be replaced by corresponding Java type names), all
 		 * prefixed with as many '&#64;' characters as there are index levels if it
-		 * is an array type. If it is a record type then it will enumerate semicolon-
-		 * separated name:type_name pairs within braces after a '$' prefix. An enumerator
-		 * type will enumerate the value names (constant ids) separated by commas within
-		 * braces following an '€' prefix.
+		 * is an array type. If it is a record type then it will enumerate
+		 * semicolon-separated {@code name:type_name} pairs within braces after a
+		 * '$' prefix. An enumerator type will enumerate the value names (constant
+		 * ids) separated by commas within braces following an '€' prefix.
 		 * @param canonicalizeTypeNames - specifies whether type names are to be unified, too
 		 * @see TypeMapEntry#getTypes()
 		 * @return type string, possibly prefixed with one or more '&#64;' characters. 
@@ -513,11 +513,15 @@ public class TypeMapEntry {
 	 * possible, i.e. type names like "integer", "real" etc. apparently designating
 	 * standard types will be replaced by corresponding Java type names), all
 	 * prefixed with as many '&#64;' characters as there are index levels if it
-	 * is an array type or embedded in a "${...}" if it is a record/struct type.
+	 * is an array type, or embedded in a "${...}" if it is a record/struct type
+	 * and {@code _asName} is not {@code true}. An enumerator type will enumerate
+	 * the value names (constant ids) separated by commas within braces following
+	 * to an '€' prefix.<br/>
 	 * If the type information is too ambiguous then an empty string is returned.
-	 * @param _canonicalizeTypeNames - if contained element types are to be canonicalized, too.
-	 * @param _asName - set this true if in case of a named type the name is to be returned (otherwise
-	 * the structural description would be returned)
+	 * @param _canonicalizeTypeNames - if contained element types are to be
+	 * canonicalized, too.
+	 * @param _asName - set this true if in case of a named type the name is to be
+	 * returned (otherwise the structural description would be returned)
 	 * @return name or structural description
 	 */
 	public String getCanonicalType(boolean _canonicalizeTypeNames, boolean _asName) {
@@ -546,33 +550,33 @@ public class TypeMapEntry {
 	 */
 	public static String canonicalizeType(String type) {
 		// (copied from JavaGenerator.transformType()
-		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("short int") + ")($|\\W.*)", "$1short$3");
-		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("long int") + ")($|\\W.*)", "$1long$3");
-		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("long long") + ")($|\\W.*)", "$1long$3");
-		type = type.replaceAll("(^|.*\\W)(S" + BString.breakup("hort") + ")($|\\W.*)", "$1short$3");
-		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("unsigned int") + ")($|\\W.*)", "$1int$3");
-		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("unsigned long") + ")($|\\W.*)", "$1long$3");
+		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("short int", true) + ")($|\\W.*)", "$1short$3");
+		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("long int", true) + ")($|\\W.*)", "$1long$3");
+		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("long long", true) + ")($|\\W.*)", "$1long$3");
+		type = type.replaceAll("(^|.*\\W)(S" + BString.breakup("hort", true) + ")($|\\W.*)", "$1short$3");
+		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("unsigned int", true) + ")($|\\W.*)", "$1int$3");
+		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("unsigned long", true) + ")($|\\W.*)", "$1long$3");
 		// START KGU 2018-07-12
-		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("unsigned short") + ")($|\\W.*)", "$1short$3");
+		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("unsigned short", true) + ")($|\\W.*)", "$1short$3");
 		// END KGU 2018-07-12
-		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("unsigned char") + ")($|\\W.*)", "$1byte$3");
-		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("signed char") + ")($|\\W.*)", "$1byte$3");
-		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("unsigned") + ")($|\\W.*)", "$1int$3");
-		type = type.replaceAll("(^|.*\\W)(I" + BString.breakup("nt") + ")($|\\W.*)", "$1int$3");
-		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("integer") + ")($|\\W.*)", "$1int$3");
-		type = type.replaceAll("(^|.*\\W)(L" + BString.breakup("ong") + ")($|\\W.*)", "$1long$3");
-		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("longint") + ")($|\\W.*)", "$1long$3");
-		type = type.replaceAll("(^|.*\\W)(D" + BString.breakup("ouble") + ")($|\\W.*)", "$1double$3");
-		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("longreal") + ")($|\\W.*)", "$1double$3");
-		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("real") + ")($|\\W.*)", "$1double$3");
-		type = type.replaceAll("(^|.*\\W)(F" + BString.breakup("loat") + ")($|\\W.*)", "$1float$3");
-		type = type.replaceAll("(^|.*\\W)(C" + BString.breakup("har") + ")($|\\W.*)", "$1char$3");
-		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("character") + ")($|\\W.*)", "$1char$3");
-		type = type.replaceAll("(^|.*\\W)(B" + BString.breakup("oolean") + ")($|\\W.*)", "$1boolean$3");
-		if (type.matches("(^|.*\\W)(" + BString.breakup("bool") + "[eE]?)(\\W.*|$)")) {
-			type = type.replaceAll("(^|.*\\W)(" + BString.breakup("bool") + "[eE]?)(\\W.*|$)", "$1boolean$3");
+		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("unsigned char", true) + ")($|\\W.*)", "$1byte$3");
+		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("signed char", true) + ")($|\\W.*)", "$1byte$3");
+		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("unsigned", true) + ")($|\\W.*)", "$1int$3");
+		type = type.replaceAll("(^|.*\\W)(I" + BString.breakup("nt", true) + ")($|\\W.*)", "$1int$3");
+		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("integer", true) + ")($|\\W.*)", "$1int$3");
+		type = type.replaceAll("(^|.*\\W)(L" + BString.breakup("ong", true) + ")($|\\W.*)", "$1long$3");
+		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("longint", true) + ")($|\\W.*)", "$1long$3");
+		type = type.replaceAll("(^|.*\\W)(D" + BString.breakup("ouble", true) + ")($|\\W.*)", "$1double$3");
+		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("longreal", true) + ")($|\\W.*)", "$1double$3");
+		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("real", true) + ")($|\\W.*)", "$1double$3");
+		type = type.replaceAll("(^|.*\\W)(F" + BString.breakup("loat", true) + ")($|\\W.*)", "$1float$3");
+		type = type.replaceAll("(^|.*\\W)(C" + BString.breakup("har", true) + ")($|\\W.*)", "$1char$3");
+		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("character", true) + ")($|\\W.*)", "$1char$3");
+		type = type.replaceAll("(^|.*\\W)(B" + BString.breakup("oolean", true) + ")($|\\W.*)", "$1boolean$3");
+		if (type.matches("(^|.*\\W)(" + BString.breakup("bool", true) + "[eE]?)(\\W.*|$)")) {
+			type = type.replaceAll("(^|.*\\W)(" + BString.breakup("bool", true) + "[eE]?)(\\W.*|$)", "$1boolean$3");
 		}
-		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("string") + ")($|\\W.*)", "$1string$3");
+		type = type.replaceAll("(^|.*\\W)(" + BString.breakup("string", true) + ")($|\\W.*)", "$1string$3");
 		return type;
 	}
 	
@@ -672,10 +676,12 @@ public class TypeMapEntry {
 	
 	/**
 	 * Returns a StringList containing the type specifications of all detected
-	 * declarations or assignments in canonicalized form (a prefix "&#64;" stands
-	 * for one array dimension level, a prefix "$" symbolizes a record/struct).
-	 * Type names are preserved as declared.
+	 * declarations or assignments with symbolic structure (a prefix "&#64;"
+	 * stands for one array dimension level, a prefix "${" symbolizes a
+	 * record/struct), a prefix "€{" an enumerator type.<br/>
+	 * Type names are preserved as declared (non-canonicalized).
 	 * @return StringList of differing canonicalized type descriptions
+	 * @see #getTypes(boolean)
 	 */
 	public StringList getTypes()
 	{
@@ -686,7 +692,8 @@ public class TypeMapEntry {
 	/**
 	 * Returns a StringList containing the type specifications of all detected
 	 * declarations or assignments in canonicalized form (a prefix "&#64;" stands
-	 * for one array dimension level, a prefix "$" symbolizes a record/struct).<br/>
+	 * for one array dimension level, a prefix "${" symbolizes a record/struct),
+	 * a prefix "€{" an enumerator type.<br/>
 	 * If {@code canonicalizeTypeNames} is true then type identifiers apparently
 	 * designating standard types (like "integer", "real" etc.) will be replaced
 	 * by corresponding Java type names. 
@@ -764,6 +771,10 @@ public class TypeMapEntry {
 	// END KGU#388 2017-09-13
 	
 	// START KGU#542 2019-11-17: Enh. #739 - Support for enum types
+	/**
+	 * @return null or the list of constant names belonging to the enumeration type
+	 * (the values can be retrieved from {@link Root#constants})
+	 */
 	public StringList getEnumerationInfo()
 	{
 		if (this.isEnum()) {
@@ -940,11 +951,11 @@ public class TypeMapEntry {
 	 * @see java.lang.Object#toString()
 	 */
 	@Override
-    public String toString()
-    {
+	public String toString()
+	{
 		String name = typeName == null ? "" : typeName + "=";
 		return getClass().getSimpleName() + "(" + name + this.getTypes().concatenate(" | ") + ")";
-    }
+	}
 
 	/**
 	 * Tries to find a common compatible canonical type for {@code type1} and {@code type2}

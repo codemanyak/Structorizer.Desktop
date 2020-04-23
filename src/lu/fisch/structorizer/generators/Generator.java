@@ -107,6 +107,7 @@ package lu.fisch.structorizer.generators;
  *                                      subtrees armed despite of a potential conflict of aims.
  *      Kay Gürtzig     2020-03-30      Issue #828: Averted topological sorting in library modules mended
  *      Kay Gürtzig     2020-04-01      Enh. #440, #828: Support for Group export to PapGenerator
+ *      Kay Gürtzig     2020-04-22      Enh. #855: New options for default array / string size
  *
  ******************************************************************************************************
  *
@@ -295,7 +296,11 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	// END KGU#363 2017-05-11
 	// START KGU#816 2020-03-17: Enh. #837 - allow two different strategies to propose the directory
 	private boolean proposeDirectoryFromNsd = true;
-	// START KGU#816 2020-03-17
+	// END KGU#816 2020-03-17
+	// START KGU#854 2020-04-22: Enh. #855 - defaults for array and string sizes
+	private int defaultArraySize = 0;
+	private int defaultStringLength = 0;
+	// END KGU#854 2020-04-22
 	// START KGU#395 2017-05-11: Enh. #357 - generator-specific options
 	private final HashMap<String, Object> optionMap = new HashMap<String, Object>();
 	// END KGU#395 2017-05-11
@@ -695,6 +700,27 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		return this.exportAuthorLicense;
 	}
 	// END KGU#395 2017-05-11
+
+	// START KGU#854 2020-04-22: Enh. #855 new optional defaults for array/string sizes
+	/**
+	 * Returns the default for the array size (where 0 means no default,
+	 * such that "??" might be placed if syntactically required, otherwise
+	 * some workaround might have to be used).
+	 * @return the default size for arrays of unknown dimensions or 0.
+	 */
+	protected int optionDefaultArraySize() {
+		return this.defaultArraySize;
+	}
+	/**
+	 * Returns the default for the string length (where 0 means no default,
+	 * such that "??" might be placed if syntactically required, otherwise
+	 * some workaround might have to be used).
+	 * @return the default length for strings having to be declared or 0.
+	 */
+	protected int optionDefaultStringLength() {
+		return this.defaultStringLength;
+	}
+	// END KGU#854 2020-04-22
 	
 	/**
 	 * Returns a Generator-specific option value if available (otherwise null)
@@ -1979,7 +2005,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		String pattern = Matcher.quoteReplacement(keyword);
 		if (CodeParser.ignoreCase)
 		{
-			pattern = BString.breakup(pattern);
+			pattern = BString.breakup(pattern, true);
 		}
 		return pattern;
 	}
@@ -2624,6 +2650,58 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	}
 	// END KGU#236 2016-08-10
 
+	// START KGU#395 2020-04-19: Enh. #357 Introduced for COBOLGenerator but of more general use
+	/**
+	 * Checks whether the given tokens represent a variable (i.e. some sort of
+	 * "lvalue"). If _mayBeQualified is true then a list of all sorts of access
+	 * qualifiers to the right are allowed (i.e. index access [...], component
+	 * access .&lt;name&gt;).<br/>
+	 * This is a mere syntactic check i.e. whether the occurring qualifiers meet
+	 * the structure of the variable is not verified!
+	 * @param _tokens - the tokenized expression (without blanks!)
+	 * @param _mayBeQualified - whether qualifiers are allowed (see above)
+	 * @return true if the expression is a variable
+	 */
+	protected boolean isVariable(StringList _tokens, boolean _mayBeQualified, HashMap<String, TypeMapEntry> _typeMap) {
+		boolean isVar = false;
+		String token0 = null;
+		if (!_tokens.isEmpty() && Function.testIdentifier(token0 = _tokens.get(0), null)
+				&& (varNames.contains(token0) || _typeMap != null && _typeMap.containsKey(token0))) {
+			if (_mayBeQualified) {
+				isVar = true;
+				_tokens = _tokens.subSequence(1, _tokens.count());
+				while (isVar && _tokens.count() > 1 && ".[".contains(token0 = _tokens.get(0))) {
+					if (token0.equals(".") && Function.testIdentifier(_tokens.get(1), null)) {
+						// Okay, is a component access qualifier
+						_tokens.remove(0, 2);
+					}
+					else if (token0.equals("[") && _tokens.contains("]")) {
+						// Should be an index access
+						StringList indices = Element.splitExpressionList(_tokens.subSequence(1, _tokens.count()), ",", true);
+						String tail = indices.get(indices.count()-1);
+						// FIXME do we allow more than one index expression?
+						if (!tail.startsWith("]")) {
+							isVar = false;
+						}
+						else {
+							_tokens = Element.splitLexically(tail.substring(1), true);
+						}
+					}
+					else {
+						isVar = false;
+					}
+				}
+				// Okay if completely consumed
+				isVar = _tokens.isEmpty();
+			}
+			else {
+				isVar = _tokens.count() == 1;
+			}
+		}
+		return isVar;
+	}
+	// END KGU#395 2020-04-19
+	
 	/**
 	 * This method is responsible for generating the code of an {@code Instruction} element.<br/>
 	 * This dummy version is to be overridden by each inheriting generator class.
@@ -3837,7 +3915,16 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 			// START KGU#816 2020-03-17: Enh. #837
 			proposeDirectoryFromNsd = ini.getProperty("genExportDirFromNsd", "true").equals("true");
 			// END KGU#816 2020-03-17
-
+			// START KGU#854 2020-04-22: Enh. #855
+			defaultArraySize = Integer.parseUnsignedInt(ini.getProperty("genExportArraySizeDefault", "0"));
+			if (ini.getProperty("genExportUseArraySize", "false").equals("false")) {
+				defaultArraySize = 0;
+			}
+			defaultStringLength = Integer.parseUnsignedInt(ini.getProperty("genExportStringLenDefault", "0"));
+			if (ini.getProperty("genExportUseStringLen", "false").equals("false")) {
+				defaultStringLength = 0;
+			}
+			// END KGU#854 2020-04-22
 		} 
 		catch (IOException ex)
 		{
