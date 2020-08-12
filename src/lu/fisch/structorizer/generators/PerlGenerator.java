@@ -83,6 +83,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig         2019-12-03  Bugfix #793: var initializations like "var v: type <- val" were incorrectly translated
  *      Kay Gürtzig         2020-03-20  Enh. #828, bugfix #836: Prepared for group and improved batch export
  *      Kay Gürtzig         2020-03-23  Bugfix #840 Conditions for code transformation w.r.t File API modified
+ *      Kay Gürtzig         2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *
  ******************************************************************************************************
  *
@@ -118,6 +119,7 @@ import lu.fisch.structorizer.elements.While;
 import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
 import lu.fisch.structorizer.parsers.CodeParser;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.StringList;
 
 public class PerlGenerator extends Generator {
@@ -596,7 +598,7 @@ public class PerlGenerator extends Generator {
 
 				String text = null;
 				if (isAsgn) {
-					StringList tokens = Element.splitLexically(line, true);
+					StringList tokens = Syntax.splitLexically(line, true);
 					tokens.removeAll(" ");
 					Element.unifyOperators(tokens, true);
 					int posAsgn = tokens.indexOf("<-");

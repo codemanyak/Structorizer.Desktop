@@ -111,6 +111,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig     2020-04-24      Bugfix #862/2: Prevent duplicate export of an entry point root
  *      Kay Gürtzig     2020-04-25      Bugfix #863/1: Duplicate routine export to PapDesigner and StrukTex
  *      Kay Gürtzig     2020-04-28      Bugfix #828: Unreferenced subroutines were missing on group export with 1 main
+ *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *
  ******************************************************************************************************
  *
@@ -206,6 +207,7 @@ import lu.fisch.structorizer.helpers.IPluginClass;
 import lu.fisch.structorizer.io.Ini;
 import lu.fisch.structorizer.io.LicFilter;
 import lu.fisch.structorizer.parsers.CodeParser;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.BString;
 import lu.fisch.utils.BTextfile;
 import lu.fisch.utils.StringList;
@@ -1675,7 +1677,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		if (this.suppressTransformation)
 		{
 			// Suppress all syntax changes, just split to tokens.
-			tokens = Element.splitLexically(_input, true);
+			tokens = Syntax.splitLexically(_input, true);
 			Element.cutOutRedundantMarkers(tokens);
 		}
 		else
@@ -2687,7 +2689,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 							isVar = false;
 						}
 						else {
-							_tokens = Element.splitLexically(tail.substring(1), true);
+							_tokens = Syntax.splitLexically(tail.substring(1), true);
 						}
 					}
 					else {
@@ -3863,7 +3865,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		String[] keywords = CodeParser.getAllProperties();
 		for (int k = 0; k < keywords.length; k++)
 		{
-			this.splitKeywords.add(Element.splitLexically(keywords[k], false));
+			this.splitKeywords.add(Syntax.splitLexically(keywords[k], false));
 		}
 
 		//=============== Now do the code generation ======================
@@ -4511,7 +4513,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		String[] keywords = CodeParser.getAllProperties();
 		for (int k = 0; k < keywords.length; k++)
 		{
-			this.splitKeywords.add(Element.splitLexically(keywords[k], false));
+			this.splitKeywords.add(Syntax.splitLexically(keywords[k], false));
 		}
 
 		/* START KGU#676 2019-03-13: Enh. #696 Now that we can export archives
@@ -4658,7 +4660,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 			String[] keywords = CodeParser.getAllProperties();
 			for (int k = 0; k < keywords.length; k++)
 			{
-				this.splitKeywords.add(Element.splitLexically(keywords[k], false));
+				this.splitKeywords.add(Syntax.splitLexically(keywords[k], false));
 			}
 			// END KGU 2016-03-29
 

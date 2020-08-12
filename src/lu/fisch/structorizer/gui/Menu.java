@@ -116,6 +116,7 @@ package lu.fisch.structorizer.gui;
  *      Bob Fisch       2020-05-25      New "restricted" flag to suppress GUI elements offering code import/export
  *      Kay Gürtzig     2020-06-03      Bugfix #868: Suppression of export / import now works without side-effect
  *      Kay Gürtzig     2020-06-06      Issue #440: Submenu items for PapDesigner export now also with icon
+ *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *
  ******************************************************************************************************
  *
@@ -147,6 +148,7 @@ import lu.fisch.structorizer.locales.Locale;
 import lu.fisch.structorizer.locales.Locales;
 import lu.fisch.structorizer.locales.Translator;
 import lu.fisch.structorizer.parsers.*;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.BString;
 import lu.fisch.utils.StringList;
 
@@ -2329,7 +2331,7 @@ public class Menu extends LangMenuBar implements NSDController, LangEventListene
 			if (!keyword.trim().isEmpty())
 			{
 				// Complete strings aren't likely to be found in a key, so don't bother
-				refactoringData.put(key, Element.splitLexically(keyword,  false));
+				refactoringData.put(key, Syntax.splitLexically(keyword,  false));
 			}
 			// An empty preForIn keyword is a synonym for the preFor keyword
 			else if (key.equals("preForIn"))

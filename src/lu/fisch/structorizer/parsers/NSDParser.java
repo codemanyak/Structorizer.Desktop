@@ -55,6 +55,7 @@ package lu.fisch.structorizer.parsers;
  *      Kay Gürtzig     2018.07.17      Bugfix #562: Attribute "origin" must be set (overwritten) in any case
  *      Kay Gürtzig     2018.09.11      Refines #372: More sensible attributes for Roots from an arrz file.
  *      Kay Gürtzig     2019-03-17      Enh. #56: Import of new Try element implemented
+ *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *
  ******************************************************************************************************
  *
@@ -83,6 +84,7 @@ import java.util.logging.Logger;
 import lu.fisch.utils.*;
 import lu.fisch.structorizer.elements.*;
 import lu.fisch.structorizer.io.Ini;
+import lu.fisch.structorizer.syntax.Syntax;
 
 public class NSDParser extends DefaultHandler {
 	
@@ -183,7 +185,7 @@ public class NSDParser extends DefaultHandler {
 					if (attributes.getIndex(key) != -1)
 					{
 						String keyword = attributes.getValue(key);
-						savedParserPrefs.put(key, Element.splitLexically(keyword, false));
+						savedParserPrefs.put(key, Syntax.splitLexically(keyword, false));
 					}
 				}
 				if (!savedParserPrefs.containsKey("preForIn") && savedParserPrefs.containsKey("preFor")) {

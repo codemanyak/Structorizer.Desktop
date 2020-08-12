@@ -47,6 +47,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2017-06-09      Enh. #416: Adaptations for execution line continuation
  *      Kay Gürtzig     2019-03-13      Issues #518, #544, #557: Element drawing now restricted to visible rect.
  *      Kay Gürtzig     2019-03-18      Issue #56: New throw flavour implemented
+ *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *
  ******************************************************************************************************
  *
@@ -124,6 +125,7 @@ import lu.fisch.utils.*;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
 import lu.fisch.structorizer.parsers.CodeParser;
+import lu.fisch.structorizer.syntax.Syntax;
 
 public class Jump extends Instruction {
 
@@ -273,7 +275,7 @@ public class Jump extends Instruction {
 	 */
 	public static boolean isReturn(String line)
 	{
-		StringList tokens = Element.splitLexically(line, true);
+		StringList tokens = Syntax.splitLexically(line, true);
 		return (tokens.indexOf(CodeParser.getKeyword("preReturn"), !CodeParser.ignoreCase) == 0);
 	}
 	/**
@@ -295,7 +297,7 @@ public class Jump extends Instruction {
 	 */
 	public static boolean isLeave(String line)
 	{
-		StringList tokens = Element.splitLexically(line, true);
+		StringList tokens = Syntax.splitLexically(line, true);
 		return (tokens.indexOf(CodeParser.getKeyword("preLeave"), !CodeParser.ignoreCase) == 0);
 	}
 	/**
@@ -317,7 +319,7 @@ public class Jump extends Instruction {
 	 */
 	public static boolean isExit(String line)
 	{
-		StringList tokens = Element.splitLexically(line, true);
+		StringList tokens = Syntax.splitLexically(line, true);
 		return (tokens.indexOf(CodeParser.getKeyword("preExit"), !CodeParser.ignoreCase) == 0);
 	}
 	/**
@@ -342,7 +344,7 @@ public class Jump extends Instruction {
 	 */
 	public static boolean isThrow(String line)
 	{
-		StringList tokens = Element.splitLexically(line, true);
+		StringList tokens = Syntax.splitLexically(line, true);
 		return (tokens.indexOf(CodeParser.getKeyword("preThrow"), !CodeParser.ignoreCase) == 0);
 	}
 	/**
@@ -370,7 +372,7 @@ public class Jump extends Instruction {
 		if (this.isLeave()) {
 			// START KGU#413 2017-06-09: Enh. #416 - cope with user-broken lines
 			//StringList tokens = Element.splitLexically(getText().get(0), true);
-			StringList tokens = Element.splitLexically(getUnbrokenText().get(0), true);
+			StringList tokens = Syntax.splitLexically(getUnbrokenText().get(0), true);
 			// END KGU#413 2017-06-09
 			if (tokens.count() > 0) {
 				tokens.remove(0);

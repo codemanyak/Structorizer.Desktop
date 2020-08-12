@@ -67,6 +67,7 @@ package lu.fisch.structorizer.generators;
  *                                          bugfix #790 line continuation according to #416 hadn't been considered,
  *                                          array initializers and record types hadn't been handled correctly
  *      Kay Gürtzig         2020-04-08      Issue #828 modifications supporting group export
+ *      Kay Gürtzig         2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *
  ******************************************************************************************************
  *
@@ -106,6 +107,7 @@ import lu.fisch.structorizer.elements.While;
 import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
 import lu.fisch.structorizer.parsers.CodeParser;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.StringList;
 
 
@@ -519,7 +521,7 @@ public class BasGenerator extends Generator
 			{
 				// START KGU#779 2019-12-01: Bugfix #790 (enh. #416)
 				String line = lines.get(i);
-				StringList tokens = Element.splitLexically(line, true);
+				StringList tokens = Syntax.splitLexically(line, true);
 				Element.unifyOperators(tokens, false);
 				boolean isRecordInit = false;
 				// END KGU#779 2019-12-01

@@ -113,6 +113,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2020-01-30      Missing newlines in E_THANKS (About > Implicated persons) inserted.
  *      Kay Gürtzig     2020-02-04      Bugfix #805 - method saveToINI decomposed
  *      Kay Gürtzig     2020-04-12      Bugfix #847 inconsistent handling of upper and lowercase in operator names (esp. DIV)
+ *      Kay Gürtzig     2020-08-12      Enh. #800: Started to delegate syntactic analysis to class Syntax
  *
  ******************************************************************************************************
  *
@@ -203,6 +204,7 @@ import java.awt.FontMetrics;
 import lu.fisch.utils.*;
 import lu.fisch.graphics.*;
 import lu.fisch.structorizer.parsers.*;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.structorizer.executor.Executor;
 import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.gui.FindAndReplace;
@@ -542,62 +544,20 @@ public abstract class Element {
 	// END KGU#401 2017-05-17
 	
 	// START KGU 2017-09-19: Performance tuning for syntax analysis
-	private static final Pattern FLOAT_PATTERN1 = Pattern.compile("[0-9]+([eE][0-9]+)?");
-	private static final Pattern FLOAT_PATTERN2 = Pattern.compile("[0-9]+[eE]");
-	private static final Pattern INT_PATTERN = Pattern.compile("[0-9]+");
 	private static final Pattern BIN_PATTERN = Pattern.compile("0b[01]+");
 	private static final Pattern OCT_PATTERN = Pattern.compile("0[0-7]+");
 	private static final Pattern HEX_PATTERN = Pattern.compile("0x[0-9A-Fa-f]+");
-	private static final Pattern SIGN_PATTERN = Pattern.compile("[+-]");
 	//private static final java.util.regex.Pattern ARRAY_PATTERN = java.util.regex.Pattern.compile("(\\w.*)(\\[.*\\])$"); // seems to have been wrong
 	private static final Matcher RECORD_MATCHER = java.util.regex.Pattern.compile("([A-Za-z]\\w*)\\s*\\{.*\\}").matcher("");
 	// END KGU 2017-09-19
 	// START KGU#575 2018-09-17: Issue #594 - replace an obsolete 3rd-party Regex library
 	// Remark: It would not be a good idea to define the Matchers here because these aren't really constant but must be
 	// reset for any new string which is likely to cause severe concurrency trouble as the patterns are used on drawing etc.
-	private static final Pattern STRING_PATTERN = Pattern.compile("(^\\\".*\\\"$)|(^\\\'.*\\\'$)");
 	private static final Pattern INC_PATTERN1 = Pattern.compile(BString.breakup("inc", true)+"[(](.*?)[,](.*?)[)](.*?)");
 	private static final Pattern INC_PATTERN2 = Pattern.compile(BString.breakup("inc", true)+"[(](.*?)[)](.*?)");
 	private static final Pattern DEC_PATTERN1 = Pattern.compile(BString.breakup("dec", true)+"[(](.*?)[,](.*?)[)](.*?)");
 	private static final Pattern DEC_PATTERN2 = Pattern.compile(BString.breakup("dec", true)+"[(](.*?)[)](.*?)");
 	// END KGU#575 2018-09-17
-
-	// START KGU#425 2017-09-29: Lexical core mechanisms revised
-	private static final String[] LEXICAL_DELIMITERS = new String[] {
-			" ",
-			"\t",
-			"\n",
-			".",
-			",",
-			";",
-			"(",
-			")",
-			"[",
-			"]",
-			// START KGU#100 2016-01-14: We must also catch the initialiser delimiters
-			"{",
-			"}",
-			// END KGU#100 2016-01-14
-			"-",
-			"+",
-			"/",
-			"*",
-			">",
-			"<",
-			"=",
-			":",
-			"!",
-			"'",
-			"\"",
-			"\\",
-			"%",
-			// START KGU#331 2017-01-13: Enh. #333 Precaution against unicode comparison operators
-			"\u2260",
-			"\u2264",
-			"\u2265"
-			// END KGU#331 2017-01-13
-	};
-	// END KGU#425 2017-09-29
 
 	// START KGU#156 2016-03-10; Enh. #124
 	/** Maximum number of executions of any element while runEventTracking has been on */
@@ -1191,7 +1151,7 @@ public abstract class Element {
 					line = line.substring(0, line.length()-1);
 				}
 				this.text.remove(i);
-				StringList tokens = Element.splitLexically(line, true);
+				StringList tokens = Syntax.splitLexically(line, true);
 				StringBuilder sb = new StringBuilder();
 				for (int j = 0; j < tokens.count(); j++) {
 					String token = tokens.get(j);
@@ -1316,7 +1276,7 @@ public abstract class Element {
 		}
 		HashMap<String, String> substitutions = 
 				names2aliases ? controllerName2Alias : controllerAlias2Name;
-		StringList tokens = splitLexically(text, true);
+		StringList tokens = Syntax.splitLexically(text, true);
 		for (int i = 0; i < tokens.count(); i++) {
 			String token = tokens.get(i).trim();
 			if (!token.isEmpty() && Function.testIdentifier(token, null)) {
@@ -2554,332 +2514,6 @@ public abstract class Element {
 //		return _s;
 //	}
 	
-	// START KGU#18/KGU#23 2015-11-04: Lexical splitter extracted from writeOutVariables
-	/**
-	 * Splits the given _text into lexical morphemes (lexemes). This will possibly overdo
-	 * somewhat (e. g. signs of number literals will be separated, but floating-point literals
-	 * like 123.45 or .09e-8 will properly be preserved as contiguous tokens).<br>
-	 * By setting {@code _restoreStrings} true, string literals will be re-assembled, too, consuming
-	 * a little more time, of course.<br>
-	 * Note that inter-lexeme whitespace will NOT be eliminated but forms elements of the result,
-	 * more precisely: a sequence of whitespace characters (like {@code "    "}) will form a series of
-	 * 1-character whitespace strings (here: " ", " ", " ", " "). So they can easily be removed
-	 * with removeAll(" ").
-	 * @param _text - String to be exploded into lexical units
-	 * @param _restoreLiterals - if true then accidently split numeric and string literals will be reassembled 
-	 * @return StringList consisting of the separated lexemes including isolated spaces etc.
-	 */
-	public static StringList splitLexically(String _text, boolean _restoreStrings)
-	{
-		StringList parts = new StringList();
-		parts.add(_text);
-		
-		// split
-		// START KGU#425 2017-09-29: Code revision
-		//parts=StringList.explodeWithDelimiter(parts," ");
-		//parts=StringList.explodeWithDelimiter(parts,"\t");
-		//parts=StringList.explodeWithDelimiter(parts,"\n");
-		//parts=StringList.explodeWithDelimiter(parts,".");
-		//parts=StringList.explodeWithDelimiter(parts,",");
-		//parts=StringList.explodeWithDelimiter(parts,";");
-		//parts=StringList.explodeWithDelimiter(parts,"(");
-		//parts=StringList.explodeWithDelimiter(parts,")");
-		//parts=StringList.explodeWithDelimiter(parts,"[");
-		//parts=StringList.explodeWithDelimiter(parts,"]");
-		//parts=StringList.explodeWithDelimiter(parts,"{");
-		//parts=StringList.explodeWithDelimiter(parts,"}");
-		//parts=StringList.explodeWithDelimiter(parts,"-");
-		//parts=StringList.explodeWithDelimiter(parts,"+");
-		//parts=StringList.explodeWithDelimiter(parts,"/");
-		//parts=StringList.explodeWithDelimiter(parts,"*");
-		//parts=StringList.explodeWithDelimiter(parts,">");
-		//parts=StringList.explodeWithDelimiter(parts,"<");
-		//parts=StringList.explodeWithDelimiter(parts,"=");
-		//parts=StringList.explodeWithDelimiter(parts,":");
-		//parts=StringList.explodeWithDelimiter(parts,"!");
-		//parts=StringList.explodeWithDelimiter(parts,"'");
-		//parts=StringList.explodeWithDelimiter(parts,"\"");
-		//parts=StringList.explodeWithDelimiter(parts,"\\");
-		//parts=StringList.explodeWithDelimiter(parts,"%");
-		//parts=StringList.explodeWithDelimiter(parts,"\u2260");
-		//parts=StringList.explodeWithDelimiter(parts,"\u2264");
-		//parts=StringList.explodeWithDelimiter(parts,"\u2265");
-		for (int i = 0; i < LEXICAL_DELIMITERS.length; i++) {
-			parts = StringList.explodeWithDelimiter(parts, LEXICAL_DELIMITERS[i]);
-		}
-		// END KGU#425 2017-09-29
-
-		// reassemble symbols
-		int i = 0;
-		while (i < parts.count())
-		{
-			String thisPart = parts.get(i);
-			if (i < parts.count()-1)
-			{
-				String nextPart = parts.get(i+1);
-				boolean isInt = false;
-				boolean isSign = false;
-				boolean isEllipse = false;
-				if (thisPart.equals("<") && nextPart.equals("-"))
-				{
-					parts.set(i,"<-");
-					parts.delete(i+1);
-					// START KGU 2014-10-18 potential three-character assignment symbol?
-					if (i < parts.count()-1 && parts.get(i+1).equals("-"))
-					{
-						parts.delete(i+1);
-					}
-					// END KGU 2014-10-18
-				}
-				else if (thisPart.equals(":") && nextPart.equals("="))
-				{
-					parts.set(i,":=");
-					parts.delete(i+1);
-				}
-				else if (thisPart.equals("!") && nextPart.equals("="))
-				{
-					parts.set(i,"!=");
-					parts.delete(i+1);
-				}
-				// START KGU 2015-11-04
-				else if (thisPart.equals("=") && nextPart.equals("="))
-				{
-					parts.set(i,"==");
-					parts.delete(i+1);
-				}
-				// END KGU 2015-11-04
-				else if (thisPart.equals("<"))
-				{
-					if (nextPart.equals(">"))
-					{
-						parts.set(i,"<>");
-						parts.delete(i+1);
-					}
-					else if (nextPart.equals("="))
-					{
-						parts.set(i,"<=");
-						parts.delete(i+1);
-					}
-					// START KGU#92 2015-12-01: Bugfix #41
-					else if (nextPart.equals("<"))
-					{
-						parts.set(i,"<<");
-						parts.delete(i+1);
-					}					
-					// END KGU#92 2015-12-01
-				}
-				else if (thisPart.equals(">"))
-				{
-					if (nextPart.equals("="))
-					{
-						parts.set(i,">=");
-						parts.delete(i+1);
-					}
-					// START KGU#92 2015-12-01: Bugfix #41
-					else if (nextPart.equals(">"))
-					{
-						parts.set(i,">>");
-						parts.delete(i+1);
-					}					
-					// END KGU#92 2015-12-01
-				}
-				// START KGU#24 2014-10-18: Logical two-character operators should be detected, too ...
-				else if (thisPart.equals("&") && nextPart.equals("&"))
-				{
-					parts.set(i,"&&");
-					parts.delete(i+1);
-				}
-				else if (thisPart.equals("|") && nextPart.equals("|"))
-				{
-					parts.set(i,"||");
-					parts.delete(i+1);
-				}
-				// END KGU#24 2014-10-18
-				// START KGU#26 2015-11-04: Find escaped quotes
-				else if (thisPart.equals("\\"))
-				{
-					if (nextPart.equals("\""))
-					{
-						parts.set(i, "\\\"");
-						parts.delete(i+1);
-					}
-					// START KGU#344 201702-08: Issue #341 - Precaution against string/character delimiter replacement
-					else if (nextPart.equals("'"))
-					{
-						parts.set(i, "\\'");
-						parts.delete(i+1);
-					}
-					// END KGU#344 2017-02-08
-					else if (nextPart.equals("\\"))
-					{
-						parts.set(i, "\\\\");
-						parts.delete(i+1);
-					}
-				}
-				// END KGU#26 2015-11-04
-				// START KGU#331 2017-01-13: Enh. #333 Precaution against unicode comparison operators
-				else if (thisPart.equals("\u2260")) {
-					parts.set(i, "<>");
-				}
-				else if (thisPart.equals("\u2264")) {
-					parts.set(i, "<=");
-				}
-				else if (thisPart.equals("\u2265")) {
-					parts.set(i, ">=");
-				}
-				// END KGU#331 2017-01-13
-				// START KGU#335/KGU#425 2017-09-29: Re-compose floating-point literals (including those starting or ending with ".")
-				// These are legal cases ($ = line end, ? = don't care):
-				// i             i+1             i+2           i+3        comment
-				// .              .               ?             ?         two-dot-ellipse (Pascal range)
-				// .              .               .             ?         three-dot-ellipse (rarely used)
-				// .            FLOAT1            ?             ?         float literal
-				// .            FLOAT2           [+-]        [0-9]+       float literal
-				// [+-]           .            FLOAT1           ?         float literal - reduce this case the the one -2
-				// [+-]           .            FLOAT2         [+-] [0-9]+ float literal - reduce this case the the one -2
-				// [0-9]+         .            FLOAT1           ?         float literal - reduce this case the the one -4
-				// [0-9]+         .            FLOAT2         [+-] [0-9]+ float literal - reduce this case the the one -4
-				// These are the illegal cases:
-				// [+-]           .               $
-				// [+-]           .               ?
-				// [0-9]+         .               .
-				// So we will first do the necessary lookahead before we manipulate parts
-				else if ( (isEllipse = thisPart.equals("."))	// a single dot might merge with another one or a float pattern
-						|| (	// Otherwise a digit sequence might melt with a dot
-								(isInt = INT_PATTERN.matcher(thisPart).matches())
-								|| (isSign = (thisPart.equals("+") || thisPart.equals("-"))	// a sign with a dot requires more...
-										&& i+2 < parts.count())
-								&& nextPart.equals(".")) 
-						) {
-					int nDelete = 0;
-					// Glue the two together - the only pathologic case would be 
-					if (nextPart.equals(".")) {
-						thisPart += nextPart;
-						nDelete = 1;
-						// Is there anything left at all?
-						if (i+2 < parts.count()) {
-							nextPart = parts.get(i+2);
-						}
-						if (isEllipse && nextPart.equals(".")) {
-							// Okay, then be it a three-point ellipse "..."
-							thisPart += nextPart;
-							nDelete++;
-						}
-						// In case of an ellipse we are done here
-					}
-					else {
-						isEllipse = false;
-					}
-					// nextPart.matches("[0-9]+([eE][0-9]+)?")
-					if (!isEllipse && FLOAT_PATTERN1.matcher(nextPart).matches()) {
-						thisPart += nextPart;
-						nDelete++;
-					}
-					// nextPart.matches("[0-9]+[eE]")
-					else if (!isEllipse && FLOAT_PATTERN2.matcher(nextPart).matches()
-							&& i+nDelete+3 < parts.count()
-							&& SIGN_PATTERN.matcher(parts.get(i+nDelete+2)).matches()
-							&& INT_PATTERN.matcher(parts.get(i+nDelete+3)).matches()) {
-						for (int j = 1; j <= 3; j++) {
-							nDelete++;
-							thisPart += parts.get(i+nDelete);
-						}
-					}
-					else if (isSign || isInt && i+2 < parts.count() && parts.get(i+2).equals(".")) {
-						// In this case the amalgamation may not take place
-						nDelete = 0;
-					}
-					// Now carry out the amalgamation if sensible
-					if (nDelete > 0) {
-						parts.set(i, thisPart);
-						parts.remove(i+1, i+nDelete+1);
-					}
-				}
-				// END KGU#335/KGU#425 2017-09-29
-			}
-			i++;
-		}
-		
-		if (_restoreStrings)
-		{
-			// START KGU#344 2017-02-07: Bugfix #341 Wrong loop inclusion
-			//String[] delimiters = {"\"", "'"};
-			final String delimiters = "\"'";
-			// END KGU#344 2017-02-07
-			// START KGU#139 2016-01-12: Bugfix #105 - apparently incomplete strings got lost
-			// We mustn't eat seemingly incomplete strings, instead we re-feed them
-			StringList parkedTokens = new StringList();
-			// END KGU#139 2016-01-12
-			// START #344 2017-02-07: Bugfix #341: Wrong strategy - the token must select the start delimiter
-			//for (int d = 0; d < delimiters.length; d++)
-			//{
-			int ixDelim = -1;	// delimiter index in delimiters
-			String delim = "";	// starting delimiter for matching the closing delimiter
-			// END KGU#344 2017-02-07
-				boolean withinString = false;
-				String composed = "";
-				i = 0;
-				while (i < parts.count())
-				{
-					String lexeme = parts.get(i);
-					if (withinString)
-					{
-						composed = composed + lexeme;
-						// START KGU#344 2017-02-07: Bugfix #341
-						//if (lexeme.equals(delimiters[d]))
-						if (lexeme.equals(delim))
-						// END KGU#344 2017-02-07
-						{
-							// START KGU#139 2016-01-12: Bugfix #105
-							parkedTokens.clear();
-							// END KGU#139 2016-01-12
-							parts.set(i, composed+"");
-							composed = "";
-							withinString = false;
-							i++;
-						}
-						else
-						{
-							// START KGU#139 2016-01-12: Bugfix #105
-							parkedTokens.add(lexeme);
-							// END KGU#139 2016-01-12
-							parts.delete(i);
-						}
-					}
-					// START KGU#344 2017-02-07: Bugfix #341
-					//else if (lexeme.equals(delimiters[d]))
-					else if (lexeme.length() == 1 && (ixDelim = delimiters.indexOf(lexeme)) >= 0)
-					// END KGU#344 2017-02-27
-					{
-						// START KGU#139 2016-01-12: Bugfix #105
-						parkedTokens.add(lexeme);
-						// END KGU#139 2016-01-12
-						withinString = true;
-						// START KGU#344 2017-02-07: Bugfix #341
-						delim = delimiters.substring(ixDelim, ixDelim+1);
-						// END KGU#344 2017-02-07
-						composed = lexeme+"";
-						parts.delete(i);
-					}
-					else
-					{
-						i++;
-					}
-				}
-			// START KGU#344 2017-02-07: Bugfix #341 No outer loop anymore
-			//}
-			// END KGU#344 2017-02-07
-			// START KGU#139 2916-01-12: Bugfix #105
-			if (parkedTokens.count() > 0)
-			{
-				parts.add(parkedTokens);
-			}
-			// END KGU#139 2016-01-12
-		}
-		return parts;
-	}
-	// END KGU#18/KGU#23
-	
 	// START KGU#101 2015-12-11: Enhancement #54: We need to split expression lists (might go to a helper class)
 	/**
 	 * Splits the string {@code _text}, which is supposed to represent a list of expressions
@@ -2929,7 +2563,7 @@ public abstract class Element {
 		
 	// START KGU#388 2017-09-13: New subroutine
 		//StringList tokens = Element.splitLexically(_text, true);
-		return splitExpressionList(Element.splitLexically(_text.trim(), true), _listSeparator, _appendTail);
+		return splitExpressionList(Syntax.splitLexically(_text.trim(), true), _listSeparator, _appendTail);
 	}
 	
 	/**
@@ -3122,7 +2756,7 @@ public abstract class Element {
 					// START KGU#109 2016-01-15: Bugfix #61/#107 - we must split every "varName" by ' '.
 					// START KGU#371 2019-03-07: Enh. #385 - parameter lists getting more complex...
 					//if (type == null && (posColon = decl.indexOf(" as ")) >= 0)
-					StringList tokens = splitLexically(decl, true);
+					StringList tokens = Syntax.splitLexically(decl, true);
 					if (type == null && (posColon = tokens.indexOf("as", false)) >= 0)
 					// END KGU#371 2019-03-07
 					{
@@ -3275,7 +2909,7 @@ public abstract class Element {
 		}
 		// END KGU#559 2018-07-20
 		for (int i = 0; i < parts.count()-1; i++) {
-			StringList tokens = splitLexically(parts.get(i), true);
+			StringList tokens = Syntax.splitLexically(parts.get(i), true);
 			int posColon = tokens.indexOf(":");
 			if (posColon >= 0) {
 				String name = tokens.subSequence(0, posColon).concatenate().trim();
@@ -3345,7 +2979,7 @@ public abstract class Element {
 			typeSpec = "char";
 		}
 		// END KGU#782 2019-12-02
-		else if (STRING_PATTERN.matcher(expr).matches()) {
+		else if (Syntax.STRING_PATTERN.matcher(expr).matches()) {
 			typeSpec = "String";
 		}
 		// START KGU#388 2017-09-12: Enh. #423: Record initializer support (name-prefixed!)
@@ -3422,7 +3056,7 @@ public abstract class Element {
 					Set<String> variableSet = _this.getVariableSetFor(_this);
 					// END KGU#686 2019-03-16
 
-					StringList parts = Element.splitLexically(_text, true);
+					StringList parts = Syntax.splitLexically(_text, true);
 
 					// START KGU#701 2019-03-29: Issue #718 Derived fonts now cached in static fields
 					//Font boldFont = new Font(Element.font.getName(), Font.BOLD, Element.font.getSize());
@@ -3966,7 +3600,7 @@ public abstract class Element {
     {
     	// START KGU#93 2015-12-21: Bugfix #41/#68/#69 Avoid operator padding
     	//return unifyOperators(_expression, false);
-    	StringList tokens = Element.splitLexically(_expression, true);
+    	StringList tokens = Syntax.splitLexically(_expression, true);
     	unifyOperators(tokens, false);
     	return tokens.concatenate();
     	// END KGU#93 2015-12-21
@@ -4118,7 +3752,7 @@ public abstract class Element {
         //interm = interm.replace("  ", " ");	// By repetition we eliminate the remnants of odd-number space sequences
         //return interm/*.trim()*/;
 
-        StringList tokens = Element.splitLexically(interm, true);
+        StringList tokens = Syntax.splitLexically(interm, true);
         
         // START KGU#165 2016-03-26: Now keyword search with/without case
         cutOutRedundantMarkers(tokens);
@@ -4155,7 +3789,7 @@ public abstract class Element {
         	String marker = redundantMarkers.get(i);
         	if (marker != null && !marker.trim().isEmpty())
         	{
-        		StringList markerTokens = Element.splitLexically(marker, false);
+        		StringList markerTokens = Syntax.splitLexically(marker, false);
         		int markerLen = markerTokens.count();
         		int pos = -1;
         		while ((pos = _tokens.indexOf(markerTokens, 0, !CodeParser.ignoreCase)) >= 0)
@@ -4223,7 +3857,7 @@ public abstract class Element {
 	 */
 	protected final String refactorLine(String _line, HashMap<String, StringList> _splitOldKeys, String[] _prefNames, boolean _ignoreCase)
 	{
-		StringList tokens = Element.splitLexically(_line, true);
+		StringList tokens = Syntax.splitLexically(_line, true);
 		boolean isModified = false;
 		// FIXME: We should order the keys by decreasing length first!
 		for (int i = 0; i < _prefNames.length; i++)
@@ -4283,7 +3917,7 @@ public abstract class Element {
 	{
 		boolean isEnclosed = expression.startsWith("(") && expression.endsWith(")");
 		if (isEnclosed) {
-			StringList tokens = Element.splitLexically(expression, true);
+			StringList tokens = Syntax.splitLexically(expression, true);
 			isEnclosed = isParenthesized0(tokens);
 		}
 		return isEnclosed;
@@ -4512,7 +4146,7 @@ public abstract class Element {
 	public static String negateCondition(String condition)
 	{
 		String negCondition = null;
-		StringList condTokens = Element.splitLexically(condition, true);
+		StringList condTokens = Syntax.splitLexically(condition, true);
 		int length = condTokens.count();
 		String first = condTokens.get(0);
 		// Already explicitly negated?

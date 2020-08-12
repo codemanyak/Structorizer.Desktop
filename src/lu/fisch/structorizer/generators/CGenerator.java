@@ -106,6 +106,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig             2020-03-23      Issues #828, #840: Revisions w.r.t. the File API
  *      Kay Gürtzig             2020-04-22      Bugfix #854: Deterministic topological order of type definitions ensured
  *                                              Enh. #855: New configurable default array size considered
+ *      Kay Gürtzig             2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *
  ******************************************************************************************************
  *
@@ -184,6 +185,7 @@ import java.util.logging.Level;
 
 import lu.fisch.utils.*;
 import lu.fisch.structorizer.parsers.*;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.structorizer.elements.*;
 import lu.fisch.structorizer.executor.Function;
 
@@ -620,7 +622,7 @@ public class CGenerator extends Generator {
 				// START KGU#739 2019-10-03: Bugfix #756 we must avoid false positives...
 				//String lval = _input.substring(0, asgnPos).trim();
 				//String expr = _input.substring(asgnPos + "<-".length()).trim();
-				StringList tokens = Element.splitLexically(_input, true);
+				StringList tokens = Syntax.splitLexically(_input, true);
 				if ((asgnPos = tokens.indexOf("<-")) > 0) {
 					String lval = tokens.concatenate("", 0, asgnPos);
 					String expr = tokens.concatenate("", asgnPos+1).trim();
@@ -664,7 +666,7 @@ public class CGenerator extends Generator {
 					_input = "printf(\"";
 					for (int i = 0; i < exprs.count(); i++) {
 						String expr = exprs.get(i);
-						StringList tokens = Element.splitLexically(expr, true);
+						StringList tokens = Syntax.splitLexically(expr, true);
 						tokens.removeAll(" ");
 						String fSpec = "?";
 						if (tokens.count() == 1) {
@@ -1138,7 +1140,7 @@ public class CGenerator extends Generator {
 		// 3. type definition
 		// 4. Input / output
 		boolean isDisabled = _inst.isDisabled(); 
-		StringList tokens = Element.splitLexically(line.trim(), true);
+		StringList tokens = Syntax.splitLexically(line.trim(), true);
 		// START KGU#796 2020-02-10: Bugfix #808
 		Element.unifyOperators(tokens, false);
 		// END KGU#796 2020-02-10
@@ -1990,7 +1992,7 @@ public class CGenerator extends Generator {
 						}
 						// START KGU#815 2020-03-26: Enh. #828 we have to cope with class methods from a foreign library
 						if (this.importedLibRoots != null && this.importedLibRoots.contains(called)) {
-							StringList tokens = Element.splitLexically(line, true);
+							StringList tokens = Syntax.splitLexically(line, true);
 							Element.unifyOperators(tokens, true);
 							int posAsgn = tokens.indexOf("<-");
 							int posCall = tokens.indexOf(call.getName(), posAsgn+1);
@@ -2765,7 +2767,7 @@ public class CGenerator extends Generator {
 	 */
 	protected void generateAssignment(String _lValue, String _expr, String _indent, boolean _isDisabled) {
 		if (_expr.contains("{") && _expr.endsWith("}")) {
-			StringList pureExprTokens = Element.splitLexically(_expr, true);
+			StringList pureExprTokens = Syntax.splitLexically(_expr, true);
 			pureExprTokens.removeAll(" ");
 			int posBrace = pureExprTokens.indexOf("{");
 			if (pureExprTokens.count() >= 3 && posBrace <= 1) {

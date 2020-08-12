@@ -93,6 +93,7 @@ package lu.fisch.structorizer.generators;
  *                                          corrected
  *      Kay Gürtzig         2020-04-22      Enh. #855: New configurable default array size considered
  *      Kay Gürtzig         2020-04-24      Issue #861/1: Comment placement now according to the GNU Pascal Coding Standards
+ *      Kay Gürtzig         2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *
  ******************************************************************************************************
  *
@@ -138,6 +139,7 @@ package lu.fisch.structorizer.generators;
 
 import lu.fisch.utils.*;
 import lu.fisch.structorizer.parsers.*;
+import lu.fisch.structorizer.syntax.Syntax;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -922,7 +924,7 @@ public class PasGenerator extends Generator
 	 */
     private void generateAssignment(String _target, String _expr, String _indent, boolean _isDisabled) {
 		if (_expr.contains("{") && _expr.endsWith("}")) {
-			StringList pureExprTokens = Element.splitLexically(_expr, true);
+			StringList pureExprTokens = Syntax.splitLexically(_expr, true);
 			pureExprTokens.removeAll(" ");
 			int posBrace = pureExprTokens.indexOf("{");
 			if (pureExprTokens.count() >= 3 && posBrace <= 1) {
@@ -960,7 +962,7 @@ public class PasGenerator extends Generator
     	String condition = transform(_alt.getUnbrokenText().getLongString()).trim();
     	// START KGU#311 2016-12-26: Enh. #314 File API support
     	if (this.usesFileAPI) {
-    		StringList tokens = Element.splitLexically(condition, true);
+    		StringList tokens = Syntax.splitLexically(condition, true);
     		for (int i = 0; i < this.fileVarNames.count(); i++) {
     			if (tokens.contains(this.fileVarNames.get(i))) {
     				this.appendComment("TODO: Consider replacing this file test using IOResult!", _indent);

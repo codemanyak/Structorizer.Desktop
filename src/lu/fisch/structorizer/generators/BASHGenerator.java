@@ -93,6 +93,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig         2020-03-18      Bugfix #839: sticky returns flag mended
  *      Kay Gürtzig         2020-03-23      Issue #840: Adaptations w.r.t. disabled elements using File API
  *      Kay Gürtzig         2020-03-27/29   Enh. #828: Modifications tpo supporet group export
+ *      Kay Gürtzig         2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *
  ******************************************************************************************************
  *
@@ -197,6 +198,7 @@ import lu.fisch.structorizer.executor.Executor;
 import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
 import lu.fisch.structorizer.parsers.CodeParser;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.StringList;
 
 
@@ -502,7 +504,7 @@ public class BASHGenerator extends Generator {
 	@Override
 	protected boolean checkElementInformation(Element _ele)
 	{
-		StringList tokens = Element.splitLexically(_ele.getText().getText(), true);
+		StringList tokens = Syntax.splitLexically(_ele.getText().getText(), true);
 		String[] functionNames = {"ord", "chr"};
 		for (int i = 0; i < functionNames.length; i++)
 		{
@@ -898,7 +900,7 @@ public class BASHGenerator extends Generator {
 			}
 		}
 		else {
-			expr = transformExpression(Element.splitLexically(expr, true), isAssigned, asArgument);
+			expr = transformExpression(Syntax.splitLexically(expr, true), isAssigned, asArgument);
 		}
 		return expr;
 	}
@@ -923,7 +925,7 @@ public class BASHGenerator extends Generator {
 		// KGU#811 2020-02-21: Bugfix #824 - many absurd bugs found and fixed
 		if (!this.suppressTransformation && !(condition.trim().matches("^\\(\\(.*?\\)\\)$")))
 		{
-			StringList condTokens = Element.splitLexically(condition, true);
+			StringList condTokens = Syntax.splitLexically(condition, true);
 			condTokens.removeAll(" ");
 			boolean isNumber = false;
 			for (int i = 1; !isNumber && i < condTokens.count()-1; i++) {
@@ -1605,7 +1607,7 @@ public class BASHGenerator extends Generator {
 							String routineId = Integer.toHexString(routine.hashCode());
 							String resultName = "result" + routineId;
 							String source = "${" + resultName + "}";
-							StringList tokens = Element.splitLexically(line, true);
+							StringList tokens = Syntax.splitLexically(line, true);
 							tokens.removeAll(" ");
 							Element.unifyOperators(tokens, true);
 							String target = Instruction.getAssignedVarname(tokens, true);

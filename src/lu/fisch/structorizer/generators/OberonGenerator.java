@@ -34,62 +34,63 @@ package lu.fisch.structorizer.generators;
  *
  *      Revision List
  *
- *      Author                  Date            Description
- *      ------                  ----            -----------
- *      Klaus-Peter Reimers     2008-01-08      First Issue
- *      Bob Fisch				2008-01-08      Modified "private String transform(String _input)"
- *      Bob Fisch				2008-04-12      Added "Fields" section for generator to be used as plugin
- *      Bob Fisch				2008-08-14      Added declaration output. A comment line in the root element
- *                                              with a "#" is ignored. All other lines are written to the code.
- *      Bob Fisch               2011-11-07      Fixed an issue while doing replacements
- *      Kay Gürtzig             2014-11-10      Operator conversion modified (see comment)
- *      Kay Gürtzig             2014-11-16      Operator conversion corrected (see comment)
- *      Kay Gürtzig             2014-12-02      Additional replacement of long assignment operator "<--" by "<-"
- *      Kay Gürtzig             2015-10-18      Indentation issue fixed and comment generation revised
- *      Kay Gürtzig             2015-12-21      Bugfix #41/#68/#69 (= KGU#93)
- *      Kay Gürtzig             2016-01-16      KGU#109: Bugfix #61 - handling of type names in assignments
- *                                              Enh. #84 + Bugfix #112 (KGU#141): Assignment export revised
- *      Kay Gürtzig             2016-03-23      Enh. #84: Support for FOR-IN loops (KGU#61)
- *      Kay Gürtzig             2016-04-03      KGU#150 Support for CHR and ORD and other built-in functions
- *      Kay Gürtzig             2016-04-29      Bugfix #144 suppressTransformation mode didn't fully work
- *      Kay Gürtzig             2016-07-20      Enh. #160 (subroutines involved) implemented
- *      Kay Gürtzig             2016-08-10      Bugfix #227 (Modules = main programs have to end with full stop)
- *      Kay Gürtzig             2016-08-12      Two tiny embellishments
- *      Kay Gürtzig             2016-08-12      Enh. #231: Additions for Analyser checks 18 and 19 (variable name collisions)
- *      Kay Gürtzig             2016-09-25      Enh. #253: CodeParser.keywordMap refactoring done 
- *      Kay Gürtzig             2016-10-14      Enh. #270: Handling of disabled elements (code.add(...) --> addCode(..))
- *      Kay Gürtzig             2016-10-15      Enh. #271: Support for input instructions with prompt string,
- *                                              Issue #227: In obvious cases (literals) output procedure names inserted.
- *      Kay Gürtzig             2016-10-16      Enh. #274: Colour info for Turtleizer procedures added
- *      Kay Gürtzig             2016-12-22      Issue #227: input and output usage more routine-specific
- *      Kay Gürtzig             2016-01-30      Enh. #335, bugfix #337: More sophisticated type treatment
- *      Kay Gürtzig             2017-02-27      Enh. #346: Insertion mechanism for user-specific include directives
- *      Kay Gürtzig             2017-03-15      Bugfix #382: FOR-IN loop value list items hadn't been transformed 
- *      Kay Gürtzig             2017-05-16      Enh. #372: Export of copyright information
- *      Kay Gürtzig             2017-10-24      Enh. #389, #423: Export strategy for includables and records
- *      Kay Gürtzig             2017-11-02      Issue #447: Line continuation in Alternative and Case elements supported
- *      Kay Gürtzig             2018-03-13      Bugfix #259,#335,#520,#521: Mode suppressTransform enforced for declarations
- *      Kay Gürtzig             2018-07-22      Enh. #563 (simplified record initializers), bugfix #564 (array initializers)
- *      Kay Gürtzig             2019-02-14      Enh. #680: Support for input instructions with several variables
- *      Kay Gürtzig             2019-03-08      Enh. #385: Support for optional parameters (by argument extension in the Call)
- *      Kay Gürtzig             2019-03-13      Enh. #696: All references to Arranger replaced by routinePool
- *      Kay Gürtzig             2019-03-28      Enh. #657: Retrieval for called subroutines now with group filter
- *      Kay Gürtzig             2019-03-30      Issue #696: Type retrieval had to consider an alternative pool
- *      Kay Gürtzig             2019-11-11      Bugfix #773: Mere declarations at top level exported, declarations
- *                                              with incomplete type no longer outcommented but marked with FIXME! comments
- *      Kay Gürtzig             2019-11-12      Enh. #775: Slightly more type-sensitive input instruction handling
- *      Kay Gürtzig             2019-11-13      Bugfix #776: Mere global declarations (from includables must not be repeated
- *                                              as local declarations in subroutines where the variables get assigned
- *      Kay Gürtzig             2019-11-14      Bugfix #779 Correct handling of input and output in case of program diagrams
- *      Kay Gürtzig             2019-11-14      Issue #780: Definitions and calls of parameterless procedures omit parentheses
- *      Kay Gürtzig             2019-11-21      Enh. #739: enum type inference for FOR-IN loops and output
- *      Kay Gürtzig             2019-02-15      Issue #814: Unidentified parameter type marker changed: (*type?*) --> ???
- *      Kay Gürtzig             2020-03-17      Bugfix #838: Generator include mechanism was buggy.
- *      Kay Gürtzig             2020-03-18      Issues #828/#836 Group export enabled, includables had been wrongly handled
- *                                              bugfix #839, fix for issue #780 revised
- *      Kay Gürtzig             2020-03-26      Bugfix KGU#833: The function name got declared as variable without need.
- *      Kay Gürtzig             2020-04-22      Enh. #855: Configurable default array / string size considered
- *      Kay Gürtzig             2020-04-24      Issue #861/1: Comment placement now according to the GNU Pascal Coding Standards
+ *      Author              Date            Description
+ *      ------              ----            -----------
+ *      Klaus-Peter Reimers 2008-01-08      First Issue
+ *      Bob Fisch           2008-01-08      Modified "private String transform(String _input)"
+ *      Bob Fisch           2008-04-12      Added "Fields" section for generator to be used as plugin
+ *      Bob Fisch           2008-08-14      Added declaration output. A comment line in the root element
+ *                                          with a "#" is ignored. All other lines are written to the code.
+ *      Bob Fisch           2011-11-07      Fixed an issue while doing replacements
+ *      Kay Gürtzig         2014-11-10      Operator conversion modified (see comment)
+ *      Kay Gürtzig         2014-11-16      Operator conversion corrected (see comment)
+ *      Kay Gürtzig         2014-12-02      Additional replacement of long assignment operator "<--" by "<-"
+ *      Kay Gürtzig         2015-10-18      Indentation issue fixed and comment generation revised
+ *      Kay Gürtzig         2015-12-21      Bugfix #41/#68/#69 (= KGU#93)
+ *      Kay Gürtzig         2016-01-16      KGU#109: Bugfix #61 - handling of type names in assignments
+ *                                          Enh. #84 + Bugfix #112 (KGU#141): Assignment export revised
+ *      Kay Gürtzig         2016-03-23      Enh. #84: Support for FOR-IN loops (KGU#61)
+ *      Kay Gürtzig         2016-04-03      KGU#150 Support for CHR and ORD and other built-in functions
+ *      Kay Gürtzig         2016-04-29      Bugfix #144 suppressTransformation mode didn't fully work
+ *      Kay Gürtzig         2016-07-20      Enh. #160 (subroutines involved) implemented
+ *      Kay Gürtzig         2016-08-10      Bugfix #227 (Modules = main programs have to end with full stop)
+ *      Kay Gürtzig         2016-08-12      Two tiny embellishments
+ *      Kay Gürtzig         2016-08-12      Enh. #231: Additions for Analyser checks 18 and 19 (variable name collisions)
+ *      Kay Gürtzig         2016-09-25      Enh. #253: CodeParser.keywordMap refactoring done 
+ *      Kay Gürtzig         2016-10-14      Enh. #270: Handling of disabled elements (code.add(...) --> addCode(..))
+ *      Kay Gürtzig         2016-10-15      Enh. #271: Support for input instructions with prompt string,
+ *                                          Issue #227: In obvious cases (literals) output procedure names inserted.
+ *      Kay Gürtzig         2016-10-16      Enh. #274: Colour info for Turtleizer procedures added
+ *      Kay Gürtzig         2016-12-22      Issue #227: input and output usage more routine-specific
+ *      Kay Gürtzig         2016-01-30      Enh. #335, bugfix #337: More sophisticated type treatment
+ *      Kay Gürtzig         2017-02-27      Enh. #346: Insertion mechanism for user-specific include directives
+ *      Kay Gürtzig         2017-03-15      Bugfix #382: FOR-IN loop value list items hadn't been transformed 
+ *      Kay Gürtzig         2017-05-16      Enh. #372: Export of copyright information
+ *      Kay Gürtzig         2017-10-24      Enh. #389, #423: Export strategy for includables and records
+ *      Kay Gürtzig         2017-11-02      Issue #447: Line continuation in Alternative and Case elements supported
+ *      Kay Gürtzig         2018-03-13      Bugfix #259,#335,#520,#521: Mode suppressTransform enforced for declarations
+ *      Kay Gürtzig         2018-07-22      Enh. #563 (simplified record initializers), bugfix #564 (array initializers)
+ *      Kay Gürtzig         2019-02-14      Enh. #680: Support for input instructions with several variables
+ *      Kay Gürtzig         2019-03-08      Enh. #385: Support for optional parameters (by argument extension in the Call)
+ *      Kay Gürtzig         2019-03-13      Enh. #696: All references to Arranger replaced by routinePool
+ *      Kay Gürtzig         2019-03-28      Enh. #657: Retrieval for called subroutines now with group filter
+ *      Kay Gürtzig         2019-03-30      Issue #696: Type retrieval had to consider an alternative pool
+ *      Kay Gürtzig         2019-11-11      Bugfix #773: Mere declarations at top level exported, declarations
+ *                                          with incomplete type no longer outcommented but marked with FIXME! comments
+ *      Kay Gürtzig         2019-11-12      Enh. #775: Slightly more type-sensitive input instruction handling
+ *      Kay Gürtzig         2019-11-13      Bugfix #776: Mere global declarations (from includables must not be repeated
+ *                                          as local declarations in subroutines where the variables get assigned
+ *      Kay Gürtzig         2019-11-14      Bugfix #779 Correct handling of input and output in case of program diagrams
+ *      Kay Gürtzig         2019-11-14      Issue #780: Definitions and calls of parameterless procedures omit parentheses
+ *      Kay Gürtzig         2019-11-21      Enh. #739: enum type inference for FOR-IN loops and output
+ *      Kay Gürtzig         2019-02-15      Issue #814: Unidentified parameter type marker changed: (*type?*) --> ???
+ *      Kay Gürtzig         2020-03-17      Bugfix #838: Generator include mechanism was buggy.
+ *      Kay Gürtzig         2020-03-18      Issues #828/#836 Group export enabled, includables had been wrongly handled
+ *                                          bugfix #839, fix for issue #780 revised
+ *      Kay Gürtzig         2020-03-26      Bugfix KGU#833: The function name got declared as variable without need.
+ *      Kay Gürtzig         2020-04-22      Enh. #855: Configurable default array / string size considered
+ *      Kay Gürtzig         2020-04-24      Issue #861/1: Comment placement now according to the GNU Pascal Coding Standards
+ *      Kay Gürtzig         2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *
  ******************************************************************************************************
  *
@@ -124,6 +125,7 @@ import java.util.regex.Matcher;
 
 import lu.fisch.utils.*;
 import lu.fisch.structorizer.parsers.*;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.structorizer.elements.*;
 import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
@@ -810,7 +812,7 @@ public class OberonGenerator extends Generator {
 		}
 		catch (NumberFormatException ex) {}
 		if (procName.isEmpty() && (_expression.startsWith("\"") || _expression.startsWith("'"))
-				&& Element.splitLexically(_expression, true).count() == 1) {
+				&& Syntax.splitLexically(_expression, true).count() == 1) {
 			procName = "String";
 		}
 		// START KGU#332 2017-01-30: Enh. #335 Identify variable types if possible
@@ -944,7 +946,7 @@ public class OberonGenerator extends Generator {
 	 */
     private void generateAssignment(String _target, String _expr, String _indent, boolean _isDisabled) {
 		if (_expr.contains("{") && _expr.endsWith("}")) {
-			StringList pureExprTokens = Element.splitLexically(_expr, true);
+			StringList pureExprTokens = Syntax.splitLexically(_expr, true);
 			pureExprTokens.removeAll(" ");
 			int posBrace = pureExprTokens.indexOf("{");
 			if (pureExprTokens.count() >= 3 && posBrace <= 1) {

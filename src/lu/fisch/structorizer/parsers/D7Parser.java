@@ -71,6 +71,7 @@ package lu.fisch.structorizer.parsers;
  *      Kay Gürtzig     2020-04-12      Bugfix #847 ensured that ids like 'false', 'true', and built-in functions be lowercase
  *      Kay Gürtzig     2020-04-24      Bugfix #861/2 duplicate procedure comments prevented (was revealed by
  *                                      by a modification of the block comment in PasGenerator.
+ *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *
  ******************************************************************************************************
  *
@@ -102,6 +103,7 @@ import lu.fisch.structorizer.elements.Root;
 import lu.fisch.structorizer.elements.Subqueue;
 import lu.fisch.structorizer.elements.Try;
 import lu.fisch.structorizer.elements.While;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.BString;
 import lu.fisch.utils.StringList;
 
@@ -1182,7 +1184,7 @@ public class D7Parser extends CodeParser
 						case RuleConstants.PROD_ARRAYCONSTANT_LPAREN_RPAREN:
 							value = getContent_R(valRed.get(1).asReduction(), " <- {") + "}";
 							{
-								StringList valueTokens = Element.splitLexically(value, true);
+								StringList valueTokens = Syntax.splitLexically(value, true);
 								valueTokens.replaceAll(",", ", ");
 								value = valueTokens.concatenate();
 							}
@@ -1191,7 +1193,7 @@ public class D7Parser extends CodeParser
 						case RuleConstants.PROD_RECORDCONSTANT_LPAREN_SEMI_RPAREN:
 							value = getContent_R(valRed.get(1).asReduction(), " <- " + type + "{") + "}";
 							{
-								StringList valueTokens = Element.splitLexically(value, true);
+								StringList valueTokens = Syntax.splitLexically(value, true);
 								valueTokens.replaceAll(":", ": ");
 								valueTokens.replaceAll(";", "; ");
 								value = valueTokens.concatenate();
@@ -1959,7 +1961,7 @@ public class D7Parser extends CodeParser
 	private String translateContentWithCalls(String _content)
 	{
 		String translated = this.translateContent(_content);
-		StringList tokens = Element.splitLexically(translated, true);
+		StringList tokens = Syntax.splitLexically(translated, true);
 		int posAsgn = tokens.indexOf("<-");
 		for (int i = 0; i < paramlessRoutineNames.count(); i++) {
 			String routineName = paramlessRoutineNames.get(i);

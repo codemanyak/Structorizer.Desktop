@@ -34,6 +34,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2019-03-15      First Issue (implementing an idea of Bob Fisch, enh. requ. #56)
  *      Kay Gürtzig     2019-09-17      Bugfix #749: Width for FINALLY section wasn't properly reserved
  *      Kay Gürtzig     2019-09-24      Bugfix #749: Text content and width in collapsed mode fixed
+ *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *
  ******************************************************************************************************
  *
@@ -55,6 +56,7 @@ import lu.fisch.graphics.Rect;
 import lu.fisch.structorizer.elements.Element;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.StringList;
 
 /**
@@ -532,7 +534,7 @@ public class Try extends Element {
 	public String getExceptionVarName()
 	{
 		return Instruction.getAssignedVarname(
-				Element.splitLexically(this.getUnbrokenText().getLongString(), true),
+				Syntax.splitLexically(this.getUnbrokenText().getLongString(), true),
 				false
 				);
 	}

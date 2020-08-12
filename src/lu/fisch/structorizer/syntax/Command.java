@@ -24,7 +24,10 @@ package lu.fisch.structorizer.syntax;
 import java.util.List;
 
 /**
- * Represents a command-like instruction line as composed from a command keyword and an expression list
+ * Represents a command-like instruction line as composed from a command keyword
+ * and an expression list.<br/>
+ * It is NOT task of this class to provide a reconstruction of the original line,
+ * i.e., inserting syntactical separators like in FOR expr0 TO expr1 STEP expr2.
  * @author Kay Gürtzig
  */
 public class Command implements Line {
@@ -52,6 +55,7 @@ public class Command implements Line {
 			for (Expression expr: this.expressions) {
 				sb.append(sepa);
 				sb.append(expr.toString());
+				sepa = ',';
 			}
 		}
 		return sb.toString();

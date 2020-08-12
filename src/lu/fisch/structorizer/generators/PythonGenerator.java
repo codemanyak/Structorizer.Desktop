@@ -30,56 +30,57 @@ package lu.fisch.structorizer.generators;
  *
  *      Revision List
  *
- *      Author                  Date            Description
- *      ------                  ----            -----------
- *      Daniel Spittank         2014-02-01      Starting from Java Generator
- *      Kay Gürtzig             2014-11-16      Conversion of C-like logical operators and arcus functions (see comment)
- *      Kay Gürtzig             2014-12-02      Additional replacement of long assignment operator "<--" by "<-"
- *      Kay Gürtzig             2015-10-18      Indentation and comment mechanisms revised, bugfix
- *      Kay Gürtzig             2015-12-12      bugfix #59 (KGU#104) with respect to ER #10
- *      Kay Gürtzig             2015-12-17      Enh. #23 (KGU#78) jump generation revised; Root generation
- *                                              decomposed according to Generator.generateCode(Root, String);
- *                                              Enh. KGU#47: Dummy implementation for Parallel element
- *      Kay Gürtzig             2015-12-21      Bugfix #41/#68/#69 (= KGU#93)
- *      Kay Gürtzig             2015-12-22      Bugfix #51/#54 (= KGU#108) empty input and output expression lists
- *      Kay Gürtzig             2016-01-14      Enh. #84 (= KGU#100) Array init. expr. support
- *      Kay Gürtzig             2016-01-17      Bugfix #61 (= KGU#109) Type names removed from assignments
- *      Kay Gürtzig             2016-03-16      Enh. #84: Support for FOREACH loops (KGU#61) 
- *      Kay Gürtzig             2016-04-01      Enh. #144: Care for new option to suppress content conversion 
- *      Kay Gürtzig             2016-07-20      Enh. #160: Option to involve subroutines implemented (=KGU#178),
- *                                              bugfix for routine calls (superfluous parentheses dropped)
- *      Kay Gürtzig             2016-09-25      Enh. #253: CodeParser.keywordMap refactoring done
- *      Kay Gürtzig             2016-10-14      Enh. #270: Handling of disabled elements (code.add(...) --> addCode(..))
- *      Kay Gürtzig             2016-10-15      Enh. #271: Support for input instructions with prompt
- *      Kay Gürtzig             2016-10-16      Enh. #274: Colour info for Turtleizer procedures added
- *      Kay Gürtzig             2016-12-01      Bugfix #301: More precise check for parenthesis enclosing of log. conditions
- *      Kay Gürtzig             2016-12-27      Enh. #314: Support for Structorizer File API
- *      Kay Gürtzig             2017-02-19      Enh. #348: Parallel sections translated with threading module
- *      Kay Gürtzig             2017-02-23      Issue #350: getOutputReplacer() and Parallel export revised again
- *      Kay Gürtzig             2017-02-27      Enh. #346: Insertion mechanism for user-specific include directives
- *      Kay Gürtzig             2017-03-10      Bugfix #378, #379: charset annotation / wrong inequality operator
- *      Kay Gürtzig             2017-05-16      Bugfix #51: an empty output instruction produced "print(, sep='')"
- *      Kay Gürtzig             2017-05-16      Enh. #372: Export of copyright information
- *      Kay Gürtzig             2017-05-24      Bugfix #412: hash codes may be negative, therefore used in hexadecimal form now
- *      Kay Gürtzig             2017-10-02/03   Enh. #389, #423: Export of globals and mutable record types implemented
- *      Kay Gürtzig             2017-11-02      Issue #447: Line continuation and Case elements supported
- *      Kay Gürtzig             2018-07-20      Enh. #563 - support for simplified record initializers
- *      Kay Gürtzig             2018-10-17      Issue #623: Turtleizer support was defective (moves, color, new routines),
- *                                              bugfix #624 - FOR loop translation into range() fixed
- *      Kay Gürtzig             2019-02-14      Enh. #680: Support for input instructions with several variables
- *      Kay Gürtzig             2019-03-08      Enh. #385: Support for parameter default values
- *      Kay Gürtzig             2019-03-21      Issue #706: Export of Calls with explicit argument assignments enabled
- *      Kay Gürtzig             2019-03-21      Issue #707: Mechanism to adjust the file name proposal
- *      Kay Gürtzig             2019-03-26      Bugfix #716: Assignments were transformed defectively
- *      Kay Gürtzig             2019-03-30      Issue #696: Type retrieval had to consider an alternative pool
- *      Kay Gürtzig             2019-05-28      Issue #725: Smarter export of division operator
- *      Kay Gürtzig             2019-11-08      Bugfix #769: Undercomplex selector list splitting in CASE generation mended
- *      Kay Gürtzig             2019-11-24      Bugfix #782: Declaration of global variables corrected
- *      Kay Gürtzig             2019-12-01      Enh. #739: Support for enumerator types
- *      Kay Gürtzig             2020-02-12      Issue #807: records no longer modeled via `recordtype' but as dictionaries
- *      Kay Gürtzig             2020-02-13      Bugfix #812: Defective solution for #782 (global references) mended
- *      Kay Gürtzig             2020-03-08      Bugfix #831: Obsolete shebang and defective export of CALLs as parallel branch
- *      Kay Gürtzig             2020-04-22      Ensured that appendGlobalInitializations() does not eventually overwrite typeMap
+ *      Author              Date            Description
+ *      ------              ----            -----------
+ *      Daniel Spittank     2014-02-01      Starting from Java Generator
+ *      Kay Gürtzig         2014-11-16      Conversion of C-like logical operators and arcus functions (see comment)
+ *      Kay Gürtzig         2014-12-02      Additional replacement of long assignment operator "<--" by "<-"
+ *      Kay Gürtzig         2015-10-18      Indentation and comment mechanisms revised, bugfix
+ *      Kay Gürtzig         2015-12-12      bugfix #59 (KGU#104) with respect to ER #10
+ *      Kay Gürtzig         2015-12-17      Enh. #23 (KGU#78) jump generation revised; Root generation
+ *                                          decomposed according to Generator.generateCode(Root, String);
+ *                                          Enh. KGU#47: Dummy implementation for Parallel element
+ *      Kay Gürtzig         2015-12-21      Bugfix #41/#68/#69 (= KGU#93)
+ *      Kay Gürtzig         2015-12-22      Bugfix #51/#54 (= KGU#108) empty input and output expression lists
+ *      Kay Gürtzig         2016-01-14      Enh. #84 (= KGU#100) Array init. expr. support
+ *      Kay Gürtzig         2016-01-17      Bugfix #61 (= KGU#109) Type names removed from assignments
+ *      Kay Gürtzig         2016-03-16      Enh. #84: Support for FOREACH loops (KGU#61) 
+ *      Kay Gürtzig         2016-04-01      Enh. #144: Care for new option to suppress content conversion 
+ *      Kay Gürtzig         2016-07-20      Enh. #160: Option to involve subroutines implemented (=KGU#178),
+ *                                          bugfix for routine calls (superfluous parentheses dropped)
+ *      Kay Gürtzig         2016-09-25      Enh. #253: CodeParser.keywordMap refactoring done
+ *      Kay Gürtzig         2016-10-14      Enh. #270: Handling of disabled elements (code.add(...) --> addCode(..))
+ *      Kay Gürtzig         2016-10-15      Enh. #271: Support for input instructions with prompt
+ *      Kay Gürtzig         2016-10-16      Enh. #274: Colour info for Turtleizer procedures added
+ *      Kay Gürtzig         2016-12-01      Bugfix #301: More precise check for parenthesis enclosing of log. conditions
+ *      Kay Gürtzig         2016-12-27      Enh. #314: Support for Structorizer File API
+ *      Kay Gürtzig         2017-02-19      Enh. #348: Parallel sections translated with threading module
+ *      Kay Gürtzig         2017-02-23      Issue #350: getOutputReplacer() and Parallel export revised again
+ *      Kay Gürtzig         2017-02-27      Enh. #346: Insertion mechanism for user-specific include directives
+ *      Kay Gürtzig         2017-03-10      Bugfix #378, #379: charset annotation / wrong inequality operator
+ *      Kay Gürtzig         2017-05-16      Bugfix #51: an empty output instruction produced "print(, sep='')"
+ *      Kay Gürtzig         2017-05-16      Enh. #372: Export of copyright information
+ *      Kay Gürtzig         2017-05-24      Bugfix #412: hash codes may be negative, therefore used in hexadecimal form now
+ *      Kay Gürtzig         2017-10-02/03   Enh. #389, #423: Export of globals and mutable record types implemented
+ *      Kay Gürtzig         2017-11-02      Issue #447: Line continuation and Case elements supported
+ *      Kay Gürtzig         2018-07-20      Enh. #563 - support for simplified record initializers
+ *      Kay Gürtzig         2018-10-17      Issue #623: Turtleizer support was defective (moves, color, new routines),
+ *                                          bugfix #624 - FOR loop translation into range() fixed
+ *      Kay Gürtzig         2019-02-14      Enh. #680: Support for input instructions with several variables
+ *      Kay Gürtzig         2019-03-08      Enh. #385: Support for parameter default values
+ *      Kay Gürtzig         2019-03-21      Issue #706: Export of Calls with explicit argument assignments enabled
+ *      Kay Gürtzig         2019-03-21      Issue #707: Mechanism to adjust the file name proposal
+ *      Kay Gürtzig         2019-03-26      Bugfix #716: Assignments were transformed defectively
+ *      Kay Gürtzig         2019-03-30      Issue #696: Type retrieval had to consider an alternative pool
+ *      Kay Gürtzig         2019-05-28      Issue #725: Smarter export of division operator
+ *      Kay Gürtzig         2019-11-08      Bugfix #769: Undercomplex selector list splitting in CASE generation mended
+ *      Kay Gürtzig         2019-11-24      Bugfix #782: Declaration of global variables corrected
+ *      Kay Gürtzig         2019-12-01      Enh. #739: Support for enumerator types
+ *      Kay Gürtzig         2020-02-12      Issue #807: records no longer modeled via `recordtype' but as dictionaries
+ *      Kay Gürtzig         2020-02-13      Bugfix #812: Defective solution for #782 (global references) mended
+ *      Kay Gürtzig         2020-03-08      Bugfix #831: Obsolete shebang and defective export of CALLs as parallel branch
+ *      Kay Gürtzig         2020-04-22      Ensured that appendGlobalInitializations() does not eventually overwrite typeMap
+ *      Kay Gürtzig         2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *
  ******************************************************************************************************
  *
@@ -128,6 +129,7 @@ import java.util.regex.Pattern;
 
 import lu.fisch.utils.*;
 import lu.fisch.structorizer.parsers.*;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.turtle.TurtleBox;
 import lu.fisch.diagrcontrol.DiagramController;
 import lu.fisch.structorizer.elements.*;
@@ -459,7 +461,7 @@ public class PythonGenerator extends Generator
 					if (comps.containsKey(compName)) {
 						// START KGU#795 2020-02-12: Issue #807 - we now use directories instead of recordtype lib
 						//prevToken += sepa + transformTokens(Element.splitLexically(comps.get(compName), true));
-						prevToken += sepa + "'" + compName + "': " + transformTokens(Element.splitLexically(comps.get(compName), true));
+						prevToken += sepa + "'" + compName + "': " + transformTokens(Syntax.splitLexically(comps.get(compName), true));
 						// END KGU#795 2020-02-12
 					}
 					// START KGU#795 2020-02-12: Issue #807 - we now use directories instead of recordtype lib
@@ -477,7 +479,7 @@ public class PythonGenerator extends Generator
 				tokens.remove(pos+1, tokens.count());
 				if (tail != null) {
 					// restore the tokens of the remaining text.
-					tokens.add(Element.splitLexically(tail, true));
+					tokens.add(Syntax.splitLexically(tail, true));
 				}
 				posLBrace = pos;
 			}
@@ -541,7 +543,7 @@ public class PythonGenerator extends Generator
 			//	String expr = _input.substring(asgnPos + "<-".length()).trim();
 			if (Instruction.isAssignment(_input))
 			{
-				StringList tokens = Element.splitLexically(_input, true);
+				StringList tokens = Syntax.splitLexically(_input, true);
 				// START KGU#698 2019-03-26: Bugfix #716
 				Element.unifyOperators(tokens, false);
 				// END KGU#698 2019-03-26
@@ -1313,7 +1315,7 @@ public class PythonGenerator extends Generator
 	 * @return true iff all code generation for the instruction line is done
 	 */
 	private boolean generateDeclaration(String _line, Root _root, String _indent, boolean _isDisabled) {
-		StringList tokens = Element.splitLexically(_line + " <- 0", true);
+		StringList tokens = Syntax.splitLexically(_line + " <- 0", true);
 		tokens.removeAll(" ");
 		String varName = Instruction.getAssignedVarname(tokens, false);
 		if (this.wasDefHandled(_root, varName, false)) {
@@ -1509,7 +1511,7 @@ public class PythonGenerator extends Generator
 	// START KGU#799 2020-02-13: Auxiliary fpor bugfix #812
 	private String getAssignedVarname(String line, boolean pureBasename)
 	{
-		StringList tokens = Element.splitLexically(line, true);
+		StringList tokens = Syntax.splitLexically(line, true);
 		tokens.removeAll(" ");
 		Element.unifyOperators(tokens, true);
 		String var = Instruction.getAssignedVarname(tokens, false);

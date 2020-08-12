@@ -32,7 +32,7 @@ package lu.fisch.structorizer.generators;
  *
  *      Author                  Date            Description
  *      ------                  ----            -----------
- *      Bob Fisch       	    2008-11-17      First Issue
+ *      Bob Fisch               2008-11-17      First Issue
  *      Gunter Schillebeeckx    2009-08-10		Bugfixes (see comment)
  *      Bob Fisch               2009-08-17      Bugfixes (see comment)
  *      Bob Fisch               2010.08-30      Different fixes asked by Kay Gürtzig and Peter Ehrlich
@@ -71,6 +71,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig             2020-03-23      Issue #840: Adaptations w.r.t. disabled elements using File API
  *      Kay Gürtzig             2020-04-05      Enh. #828: Preparations for group export (modified include mechanism)
  *      Kay Gürtzig             2020-04-06/07   Bugfixes #843, #844: Global declarations and record/array types
+ *      Kay Gürtzig             2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *
  ******************************************************************************************************
  *
@@ -128,6 +129,7 @@ package lu.fisch.structorizer.generators;
 
 import lu.fisch.utils.*;
 import lu.fisch.structorizer.parsers.*;
+import lu.fisch.structorizer.syntax.Syntax;
 
 import java.util.HashMap;
 import java.util.Map.Entry;
@@ -371,7 +373,7 @@ public class PHPGenerator extends Generator
 					newTokens.add(tokens.subSequence(0, posBraceL));
 					newTokens.add(this.transformArrayInit(exprs));
 				}
-				tokens = Element.splitLexically(tail.substring(1), true);
+				tokens = Syntax.splitLexically(tail.substring(1), true);
 			}
 			else {
 				// Pass all tokens upto and including the found closing brace
@@ -397,7 +399,7 @@ public class PHPGenerator extends Generator
 		StringList result = new StringList();
 		result.add("array(");
 		for (int i = 0; i < exprs.count(); i++) {
-			StringList tokens = Element.splitLexically(exprs.get(i), true);
+			StringList tokens = Syntax.splitLexically(exprs.get(i), true);
 			if (tokens.contains("{")) {
 				tokens = this.transformInitializers(tokens);
 			}
@@ -428,7 +430,7 @@ public class PHPGenerator extends Generator
 			if (!compName.startsWith("§") && compVal != null) {
 				result.add("\"" + compName + "\"");
 				result.add(" "); result.add("=>"); result.add(" ");
-				StringList tokens = Element.splitLexically(compVal, true);
+				StringList tokens = Syntax.splitLexically(compVal, true);
 				if (tokens.contains("{")) {
 					tokens = transformInitializers(tokens);
 				}
@@ -510,7 +512,7 @@ public class PHPGenerator extends Generator
 					// END KGU#284 2016-10-16
 					// START KGU#839 2020-04-06: Bugfix #843 (issues #389, #782)
 					else if (Instruction.isDeclaration(line)) {
-						StringList tokens = Element.splitLexically(transf, true);
+						StringList tokens = Syntax.splitLexically(transf, true);
 						// identify declared variable - the token will start with a dollar
 						int posVar = 0;
 						boolean mereDecl = Instruction.isMereDeclaration(line);

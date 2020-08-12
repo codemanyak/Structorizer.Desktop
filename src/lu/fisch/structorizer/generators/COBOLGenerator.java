@@ -30,14 +30,15 @@ package lu.fisch.structorizer.generators;
  *
  *      Revision List
  *
- *      Author                  Date            Description
- *      ------                  ----            -----------
- *      Simon Sobisch           2017.04.14      First Issue for #357
- *      Kay Gürtzig             2019-03-30      Issue #696: Type retrieval had to consider an alternative pool
- *      Kay Gürtzig             2019-10-09      Code for Alternative and Case implemented
- *      Kay Gürtzig             2020-04-16      Issue #739: Enumeration type export prepared
- *      Kay Gürtzig             2020-04-19      Declaration part advanced.
- *      Kay Gürtzig             2020-04-22      Bugfix #854: Deterministic topological order of type definitions ensured
+ *      Author              Date            Description
+ *      ------              ----            -----------
+ *      Simon Sobisch       2017.04.14      First Issue for #357
+ *      Kay Gürtzig         2019-03-30      Issue #696: Type retrieval had to consider an alternative pool
+ *      Kay Gürtzig         2019-10-09      Code for Alternative and Case implemented
+ *      Kay Gürtzig         2020-04-16      Issue #739: Enumeration type export prepared
+ *      Kay Gürtzig         2020-04-19      Declaration part advanced.
+ *      Kay Gürtzig         2020-04-22      Bugfix #854: Deterministic topological order of type definitions ensured
+ *      Kay Gürtzig         2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *      
  ******************************************************************************************************
  *
@@ -88,6 +89,7 @@ import lu.fisch.structorizer.elements.TypeMapEntry;
 import lu.fisch.structorizer.elements.While;
 import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.StringList;
 
 /**
@@ -811,7 +813,7 @@ public class COBOLGenerator extends Generator {
 				if (line.isEmpty() || Instruction.isMereDeclaration(line)) {
 					continue;
 				}
-				StringList tokens = Element.splitLexically(line, true);
+				StringList tokens = Syntax.splitLexically(line, true);
 				Element.unifyOperators(tokens, false);
 				String transfLine = transform(line);
 				// Input and output should work via standard transformation...
@@ -874,7 +876,7 @@ public class COBOLGenerator extends Generator {
 												}
 												else if (indexList.get(0).trim().startsWith("]")) {
 													// This should be the tail
-													indices = Element.splitLexically(indexList.get(0).substring(1), true);
+													indices = Syntax.splitLexically(indexList.get(0).substring(1), true);
 												}
 											}
 											// END KGU #784 2019-12-02
@@ -1131,7 +1133,7 @@ public class COBOLGenerator extends Generator {
 				boolean isFct = Call.isAssignment(line);
 				String target = null;
 				if (isFct) {
-					StringList tokens = Element.splitLexically(line, true);
+					StringList tokens = Syntax.splitLexically(line, true);
 					tokens.removeAll(" ");
 					target = transform(Call.getAssignedVarname(tokens, true));
 				}

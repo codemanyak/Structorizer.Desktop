@@ -195,6 +195,7 @@ package lu.fisch.structorizer.executor;
  *      Kay Gürtzig     2020-04-13      Bugfix #848: On updating the context of includables mere declarations had been forgotten
  *      Kay Gürtzig     2020-04-23      Bugfix #858: split function in FOR-IN loop was not correctly handled
  *      Kay Gürtzig     2020-04-28      Issue #822: Empty CALL lines should cause more sensible error messages
+ *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *
  ******************************************************************************************************
  *
@@ -357,6 +358,7 @@ import lu.fisch.structorizer.elements.*;
 import lu.fisch.structorizer.gui.Diagram;
 import lu.fisch.structorizer.gui.IconLoader;
 import lu.fisch.structorizer.parsers.CodeParser;
+import lu.fisch.structorizer.syntax.Syntax;
 //import lu.fisch.structorizer.syntax.ExprParser;
 import lu.fisch.utils.BString;
 import lu.fisch.utils.StringList;
@@ -1114,7 +1116,7 @@ public class Executor implements Runnable
 	private String convert(String s, boolean convertComparisons)
 	{
 		// START KGU#128 2016-01-07: Bugfix #92 - Effort via tokens to avoid replacements within string literals
-		StringList tokens = Element.splitLexically(s, true);
+		StringList tokens = Syntax.splitLexically(s, true);
 		Element.unifyOperators(tokens, false);
 		// START KGU#130 2015-01-08: Bugfix #95 - Conversion of div operator had been forgotten...
 		tokens.replaceAll("div", "/");		// FIXME: Operands should better be coerced to integer...
@@ -1272,7 +1274,7 @@ public class Executor implements Runnable
 			//// END KGU#490 2018-02-07
 			//// Now we do the same with && operators
 			//exprs = StringList.explodeWithDelimiter(exprs, " && ");
-			StringList allTokens = Element.splitLexically(str, true);
+			StringList allTokens = Syntax.splitLexically(str, true);
 			StringList exprs = new StringList();
 			int lastI = 0;
 			for (int i = 0; i < allTokens.count(); i++) {
@@ -1293,7 +1295,7 @@ public class Executor implements Runnable
 				// START KGU#76 2016-04-25: Issue #30 - convert all string comparisons
 				//String[] eqOps = {"==", "!="};
 				//for (int op = 0; op < eqOps.length; op++)
-				StringList tokens = Element.splitLexically(s.trim(), true);
+				StringList tokens = Syntax.splitLexically(s.trim(), true);
 				for (int op = 0; op < compOps.length; op++)
 				// END KGU#76 2016-04-25
 				{
@@ -1673,7 +1675,7 @@ public class Executor implements Runnable
 				// END KGU#375 2017-03-30
 				// START KGU#388 2017-09-18: Enh. #423 Track at least record types
 				if (type != null) {
-					StringList typeTokens = Element.splitLexically(type, true);
+					StringList typeTokens = Syntax.splitLexically(type, true);
 					typeTokens.removeAll(" ");
 					if (isConstant) {
 						typeTokens.remove(0);
@@ -3435,7 +3437,7 @@ public class Executor implements Runnable
 
 		// ======== PHASE 1: Analysis of the target structure ===========
 
-		StringList tokens = Element.splitLexically(target, true);
+		StringList tokens = Syntax.splitLexically(target, true);
 		tokens.removeAll(" ");
 		int nTokens = tokens.count();
 		String token0 = tokens.get(0).toLowerCase();
@@ -4519,7 +4521,7 @@ public class Executor implements Runnable
 					// assignment?
 					// START KGU#377 2017-03-30: Bugfix
 					//if (cmd.indexOf("<-") >= 0)
-					if (Element.splitLexically(cmd, true).contains("<-"))
+					if (Syntax.splitLexically(cmd, true).contains("<-"))
 					// END KGU#377 2017-03-30: Bugfix
 					{
 						trouble = tryAssignment(cmd, element, i);
@@ -4717,7 +4719,7 @@ public class Executor implements Runnable
 				// assignment?
 				// START KGU#377 2017-03-30: Bugfix
 				//if (cmd.indexOf("<-") >= 0)
-				if (Element.splitLexically(cmd, true).contains("<-"))
+				if (Syntax.splitLexically(cmd, true).contains("<-"))
 				// END KGU#377 2017-03-30: Bugfix
 				{
 					trouble = tryAssignment(cmd, element, i);
@@ -4799,7 +4801,7 @@ public class Executor implements Runnable
 		}
 		// Exit from entire program?
 		else if (element.isExit()) {
-			StringList tokens = Element.splitLexically(sl.get(0).trim(), true);
+			StringList tokens = Syntax.splitLexically(sl.get(0).trim(), true);
 			// START KGU#365/KGU#380 2017-04-14: Issues #380, #394 Allow arbitrary integer expressions now
 			//tokens.removeAll("");
 			tokens.remove(0);	// Get rid of the keyword...
@@ -4933,7 +4935,7 @@ public class Executor implements Runnable
 			// We advance from right to left, this way we will evaluate deeper nested
 			// functions first.
 			// Begin with collecting all possible occurrence positions
-			StringList tokens = Element.splitLexically(expression, true);
+			StringList tokens = Syntax.splitLexically(expression, true);
 			LinkedList<Integer> positions = new LinkedList<Integer>();
 			int pos = tokens.count();
 			while ((pos = tokens.lastIndexOf("(", pos-1)) >= 0) {
@@ -4977,7 +4979,7 @@ public class Executor implements Runnable
 						//tokens.add(controller.castArgument(result, function.getReturnType()).toString());
 						tokens.add(result.toString());
 						if (!tail.isEmpty()) {
-							tokens.add(Element.splitLexically(tail.substring(1), true));
+							tokens.add(Syntax.splitLexically(tail.substring(1), true));
 						}
 					// START KGU#592 2018-10-04 - Bugfix #617 (continued)
 					}
@@ -5022,7 +5024,7 @@ public class Executor implements Runnable
 //		String varName = cmd.substring(0, cmd.indexOf("<-")).trim();
 //		String expression = cmd.substring(
 //				cmd.indexOf("<-") + 2, cmd.length()).trim();
-		StringList tokens = Element.splitLexically(cmd, true);
+		StringList tokens = Syntax.splitLexically(cmd, true);
 		int posAsgnOpr = tokens.indexOf("<-");
 		String leftSide = tokens.subSequence(0, posAsgnOpr).concatenate().trim();
 		tokens.remove(0, posAsgnOpr+1);
@@ -5031,7 +5033,7 @@ public class Executor implements Runnable
 		// DEBUG
 		//StringBuilder problems = new StringBuilder();
 		//ExprParser.getInstance().parse(tokens.concatenate(), problems);
-		tokens = Element.splitLexically(this.convertStringComparison(tokens.concatenate().trim()), true);
+		tokens = Syntax.splitLexically(this.convertStringComparison(tokens.concatenate().trim()), true);
 		// END KGU#490 2018-02-08
 		// START KGU#388 2017-09-13: Enh. #423 support records
 		tokens.removeAll(" ");
@@ -5141,7 +5143,7 @@ public class Executor implements Runnable
 			//instr.updateTypeMapFromLine(context.dynTypeMap, cmd, lineNo);
 			if (!leftSide.contains(".") && !leftSide.contains("[")) {
 				TypeMapEntry oldEntry = null;
-				String target = Instruction.getAssignedVarname(Element.splitLexically(leftSide, true), false) + "";
+				String target = Instruction.getAssignedVarname(Syntax.splitLexically(leftSide, true), false) + "";
 				if (!context.dynTypeMap.containsKey(target) || !(oldEntry = context.dynTypeMap.get(target)).isDeclared) {
 					String typeDescr = Instruction.identifyExprType(context.dynTypeMap, expression, true);
 					if (oldEntry == null) {
@@ -5801,12 +5803,12 @@ public class Executor implements Runnable
 			// START KGU#453 2017-11-02
 			// START KGU#259 2016-09-25: Bugfix #254
 			//String expression = text.get(0) + " = ";
-			StringList tokens = Element.splitLexically(text.get(0), true);
+			StringList tokens = Syntax.splitLexically(text.get(0), true);
 			for (String key : parserKeys)
 			{
 				if (!key.trim().isEmpty())
 				{
-					tokens.removeAll(Element.splitLexically(key, false), !CodeParser.ignoreCase);
+					tokens.removeAll(Syntax.splitLexically(key, false), !CodeParser.ignoreCase);
 				}		
 			}
 			// START KGU#417 2017-06-30: Enh. #424
@@ -5849,12 +5851,12 @@ public class Executor implements Runnable
 					{
 						// START KGU#259 2016-09-25: Bugfix #254
 						//String test = convert(expression + constants[c]);
-						tokens = Element.splitLexically(constants[c], true);
+						tokens = Syntax.splitLexically(constants[c], true);
 						for (String key : parserKeys)
 						{
 							if (!key.trim().isEmpty())
 							{
-								tokens.removeAll(Element.splitLexically(key, false), !CodeParser.ignoreCase);
+								tokens.removeAll(Syntax.splitLexically(key, false), !CodeParser.ignoreCase);
 							}		
 						}
 						String test = convert(expression + tokens.concatenate());
@@ -5921,14 +5923,14 @@ public class Executor implements Runnable
 //			}
 //
 //			s = convert(s);
-			StringList tokens = Element.splitLexically(s, true);
+			StringList tokens = Syntax.splitLexically(s, true);
 			for (String key : new String[]{
 					CodeParser.getKeyword("preAlt"),
 					CodeParser.getKeyword("postAlt")})
 			{
 				if (!key.trim().isEmpty())
 				{
-					tokens.removeAll(Element.splitLexically(key, false), !CodeParser.ignoreCase);
+					tokens.removeAll(Syntax.splitLexically(key, false), !CodeParser.ignoreCase);
 				}		
 			}
 			s = convert(tokens.concatenate());
@@ -6032,14 +6034,14 @@ public class Executor implements Runnable
 //				condStr = convert(condStr, false);
 //				// END KGU#79 2015-11-12
 //				// System.out.println("WHILE: "+condStr);
-				StringList tokens = Element.splitLexically(condStr, true);
+				StringList tokens = Syntax.splitLexically(condStr, true);
 				for (String key : new String[]{
 						CodeParser.getKeyword("preWhile"),
 						CodeParser.getKeyword("postWhile")})
 				{
 					if (!key.trim().isEmpty())
 					{
-						tokens.removeAll(Element.splitLexically(key, false), !CodeParser.ignoreCase);
+						tokens.removeAll(Syntax.splitLexically(key, false), !CodeParser.ignoreCase);
 					}		
 				}
 				// START KGU#433 2017-10-11: Bugfix #434 Don't try to be too clever here - variables might change type within the loop..
@@ -6182,14 +6184,14 @@ public class Executor implements Runnable
 //				condStr = BString.replace(condStr, CodeParser.postRepeat, "");
 //			}
 //			condStr = convert(condStr, false);
-			StringList tokens = Element.splitLexically(condStr, true);
+			StringList tokens = Syntax.splitLexically(condStr, true);
 			for (String key : new String[]{
 					CodeParser.getKeyword("preRepeat"),
 					CodeParser.getKeyword("postRepeat")})
 			{
 				if (!key.trim().isEmpty())
 				{
-					tokens.removeAll(Element.splitLexically(key, false), !CodeParser.ignoreCase);
+					tokens.removeAll(Syntax.splitLexically(key, false), !CodeParser.ignoreCase);
 				}		
 			}
 			// START KGU#433 2017-10-11: Bugfix #434 Don't try to be too clever here - variables might change type within the loop...
@@ -6896,7 +6898,7 @@ public class Executor implements Runnable
 	protected Object evaluateExpression(String _expr, boolean _withInitializers, boolean _preserveBrackets) throws EvalError
 	{
 		Object value = null;
-		StringList tokens = Element.splitLexically(_expr, true);
+		StringList tokens = Syntax.splitLexically(_expr, true);
 		// START KGU#773 2019-11-28: Bugfix #786 Blanks are not tolerated by the susequent mechanisms like index evaluation
 		tokens.removeAll(" ");
 		// END KGU#773 2019-11-28

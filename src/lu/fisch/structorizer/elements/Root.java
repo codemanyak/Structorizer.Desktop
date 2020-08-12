@@ -155,6 +155,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2020-02-21      Bugfix #825: The subsections of TRY elements hadn't been analysed
  *      Kay Gürtzig     2020-03-29      Bugfix #841: Analyser check for missing or misplaced parameter list didn't work
  *      Kay Gürtzig     2020-04-22      Bugfix #854: typeMap made a LinkedHashMap to ensure topological order on code export
+ *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *      
  ******************************************************************************************************
  *
@@ -224,6 +225,7 @@ import java.util.Date;
 import lu.fisch.graphics.*;
 import lu.fisch.utils.*;
 import lu.fisch.structorizer.parsers.*;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.structorizer.helpers.GENPlugin;
 import lu.fisch.structorizer.io.*;
 import lu.fisch.structorizer.locales.LangTextHolder;
@@ -2620,7 +2622,7 @@ public class Root extends Element {
 		_line = transform_inc_dec(_line);
 		// END KGU#575 2018-09-17
 
-		StringList tokens = Element.splitLexically(_line.trim(), true);
+		StringList tokens = Syntax.splitLexically(_line.trim(), true);
 
 		Element.unifyOperators(tokens, false);
 
@@ -2666,7 +2668,7 @@ public class Root extends Element {
 				s = INDEX_PATTERN.matcher(s).replaceAll("$2");
 			} else { s = ""; }
 
-			StringList indices = Element.splitLexically(s, true);
+			StringList indices = Syntax.splitLexically(s, true);
 			indices.add(tokens.subSequence(asgnPos+1, tokens.count()));
 			tokens = indices;
 		}
@@ -2692,7 +2694,7 @@ public class Root extends Element {
 			StringList items = Instruction.getInputItems(_line);
 			tokens.clear();
 			for (int j = 1; j < items.count(); j++) {
-				StringList itemTokens = Element.splitLexically(items.get(j), true);
+				StringList itemTokens = Syntax.splitLexically(items.get(j), true);
 				String s = "";
 				if (itemTokens.indexOf("[", 1) >= 0)
 				{
@@ -2703,7 +2705,7 @@ public class Root extends Element {
 					//System.out.println("\" to \"" + s + "\"");
 				}
 				// Only the indices are relevant here
-				itemTokens = Element.splitLexically(s, true);
+				itemTokens = Syntax.splitLexically(s, true);
 				tokens.addIfNew(itemTokens);
 			}
 			// END KGU#653 2019-02-16
@@ -2772,14 +2774,14 @@ public class Root extends Element {
 					// Append all the value strings for the components but not the component names
 					for (Entry<String, String> comp: components.entrySet()) {
 						if (!comp.getKey().startsWith("§")) {
-							StringList subTokens = Element.splitLexically(comp.getValue(), true);
+							StringList subTokens = Syntax.splitLexically(comp.getValue(), true);
 							skimRecordInitializers(subTokens);
 							tokens.add(subTokens);
 						}
 					}
 					// If there was further text beyond the initializer then tokenize and append it
 					if (components.containsKey("§TAIL§")) {
-						StringList subTokens = Element.splitLexically(components.get("§TAIL§"), true);
+						StringList subTokens = Syntax.splitLexically(components.get("§TAIL§"), true);
 						skimRecordInitializers(subTokens);
 						tokens.add(subTokens);
 					}
@@ -2835,7 +2837,7 @@ public class Root extends Element {
     	String[] keywords = CodeParser.getAllProperties();
     	for (int k = 0; k < keywords.length; k++)
     	{
-    		splitKeywords.add(Element.splitLexically(keywords[k], false));
+    		splitKeywords.add(Syntax.splitLexically(keywords[k], false));
     	}
     	// END KGU#163 2016-03-25
 
@@ -2852,7 +2854,7 @@ public class Root extends Element {
     		allText = transform_inc_dec(allText);
     		// END KGU#575 2018-09-17
 
-    		StringList tokens = Element.splitLexically(allText, true);
+    		StringList tokens = Syntax.splitLexically(allText, true);
 
     		Element.unifyOperators(tokens, false);
 
@@ -3069,7 +3071,7 @@ public class Root extends Element {
     public LinkedHashMap<String,String> extractEnumerationConstants(String _typeDefLine)
     {
     	LinkedHashMap<String,String> enumConstants = null;
-    	StringList tokens = Element.splitLexically(_typeDefLine, true);
+    	StringList tokens = Syntax.splitLexically(_typeDefLine, true);
     	tokens.removeAll(" ");
     	if (!tokens.get(3).equalsIgnoreCase("enum")) {
     		return null;
@@ -3944,10 +3946,10 @@ public class Root extends Element {
 		// START KGU#388 2017-09-13: Enh. #423
 		boolean isTypedef = false;
 		// END KGU#388 2017-09-13
-		StringList inputTokens = Element.splitLexically(CodeParser.getKeyword("input"), false);
-		StringList outputTokens = Element.splitLexically(CodeParser.getKeyword("output"), false);
+		StringList inputTokens = Syntax.splitLexically(CodeParser.getKeyword("input"), false);
+		StringList outputTokens = Syntax.splitLexically(CodeParser.getKeyword("output"), false);
 		// START KGU#297 2016-11-22: Issue #295 - Instructions starting with the return keyword must be handled separately
-		StringList returnTokens = Element.splitLexically(CodeParser.getKeyword("preReturn"), false);
+		StringList returnTokens = Syntax.splitLexically(CodeParser.getKeyword("preReturn"), false);
 		// END KGU#297 2016-11-22
 
 		// Check every instruction line...
@@ -3957,7 +3959,7 @@ public class Root extends Element {
 			//String myTest = test.get(l);
 
 			// START KGU#65/KGU#126 2016-01-06: More precise analysis, though expensive
-			StringList tokens = splitLexically(test.get(lnr).trim(), true);
+			StringList tokens = Syntax.splitLexically(test.get(lnr).trim(), true);
 			unifyOperators(tokens, false);
 			// START KGU#297 2016-11-22: Issue #295 - Instructions starting with the return keyword must be handled separately
 			//if (tokens.contains("<-"))
@@ -4592,7 +4594,7 @@ public class Root extends Element {
 					addError(_errors, new DetectedError(errorMsg(Menu.error24_1, String.valueOf(i)), _instr), 24);
 				}
 				else {
-					StringList tokens = splitLexically(line, true);
+					StringList tokens = Syntax.splitLexically(line, true);
 					int posAsgnmt = tokens.indexOf("=");
 					String typename = tokens.concatenate("", 1, posAsgnmt).trim();
 					String typeSpec = tokens.concatenate("", posAsgnmt + 1, tokens.count()).trim();
@@ -4682,7 +4684,7 @@ public class Root extends Element {
 				// END KGU#375 2017-04-20
 				// START KGU#388 2017-09-17: Enh. #423 Check the definition of type names and components
 				if (check(24)) {
-					StringList tokens = Element.splitLexically(line, true);
+					StringList tokens = Syntax.splitLexically(line, true);
 					//int nTokens = tokens.count();
 					int posBrace = 0;
 					String typeName = "";
@@ -4945,7 +4947,7 @@ public class Root extends Element {
 	{
 		StringList unbrText = _ele.getUnbrokenText();
 		for (int i = 0; i < unbrText.count(); i++) {
-			StringList tokens = Element.splitLexically(unbrText.get(i), true);
+			StringList tokens = Syntax.splitLexically(unbrText.get(i), true);
 			Element.cutOutRedundantMarkers(tokens);
 			analyse_24_tokens(_ele, _errors, _types, tokens);
 		}
@@ -5416,7 +5418,7 @@ public class Root extends Element {
     	if (this.isSubroutine())	// KGU 2015-12-20: Types more rigorously discarded if this is a program
     	{
     		String rootText = getText().getLongString();
-    		StringList tokens = Element.splitLexically(rootText, true);
+    		StringList tokens = Syntax.splitLexically(rootText, true);
     		//tokens.removeAll(" ");
     		int posOpenParenth = tokens.indexOf("(");
     		int posCloseParenth = tokens.indexOf(")");

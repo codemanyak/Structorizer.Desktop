@@ -88,6 +88,7 @@ import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
 import lu.fisch.structorizer.parsers.CodeParser;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.*;
 
 
@@ -618,7 +619,7 @@ public class For extends Element implements ILoop {
 		if (valueListString != null) {
 			valueListString = valueListString.trim();
 			boolean hadBraces = valueListString.startsWith("{") && valueListString.endsWith("}");
-			StringList valueListTokens = splitLexically(valueListString, true);
+			StringList valueListTokens = Syntax.splitLexically(valueListString, true);
 			// There are no built-in functions returning an array and external function calls
 			// aren't allowed at this position, hence it's relatively safe to conclude
 			// an item enumeration from the occurrence of a comma.
@@ -709,7 +710,7 @@ public class For extends Element implements ILoop {
 	{
 		// Pad the string to ease the key word detection
 		//String interm = " " + _text + " ";
-		StringList tokens = Element.splitLexically(_text, true);
+		StringList tokens = Syntax.splitLexically(_text, true);
 
 		// START KGU#61 2016-03-20: Enh. #84/#135
 		// First collect the placemarkers of the for loop header ...
@@ -744,7 +745,7 @@ public class For extends Element implements ILoop {
 			String marker = forMarkers[i];
 			if (!marker.isEmpty())
 			{
-				StringList markerTokens = Element.splitLexically(marker, false);
+				StringList markerTokens = Syntax.splitLexically(marker, false);
 				int markerLen = markerTokens.count();
 				int pos = -1;
 				while ((pos = tokens.indexOf(markerTokens, pos+1, !CodeParser.ignoreCase)) >= 0)

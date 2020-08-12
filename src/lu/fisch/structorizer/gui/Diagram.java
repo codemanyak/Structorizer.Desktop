@@ -202,6 +202,7 @@ package lu.fisch.structorizer.gui;
  *      Kay Gürtzig     2020-04-28      Bugfix #865: On subroutine generation arguments true and false weren't recognised
  *      Kay Gürtzig     2020-05-02      Issue #866: Selection expansion / reduction mechanisms revised
  *      Kay Gürtzig     2020-06-03      Issue #868: Code import via files drop had to be disabled in restricted mode
+ *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *
  ******************************************************************************************************
  *
@@ -275,6 +276,7 @@ import lu.fisch.graphics.*;
 import lu.fisch.utils.*;
 import lu.fisch.utils.Desktop;
 import lu.fisch.structorizer.parsers.*;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.structorizer.io.*;
 import lu.fisch.structorizer.locales.Locales;
 import lu.fisch.structorizer.generators.*;
@@ -2289,7 +2291,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 				HashMap<String, StringList> splitPrefs = new HashMap<String, StringList>();
 				// and adopt the stored preferences of the diagram
 				for (String key: CodeParser.keywordSet()) {
-					splitPrefs.put(key, Element.splitLexically(CodeParser.getKeywordOrDefault(key, ""), false));
+					splitPrefs.put(key, Syntax.splitLexically(CodeParser.getKeywordOrDefault(key, ""), false));
 					StringList stored = root.storedParserPrefs.get(key);
 					if (stored != null) {
 						CodeParser.setKeyword(key, stored.concatenate());
@@ -4484,7 +4486,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 				// END KGU#744 2019-10-05
 				String result = "";
 				if (((Call)selected).isFunctionCall()) {
-					StringList lineTokens = Element.splitLexically(call.getUnbrokenText().get(0), true);
+					StringList lineTokens = Syntax.splitLexically(call.getUnbrokenText().get(0), true);
 					lineTokens.removeAll(" ");
 					String var = Call.getAssignedVarname(lineTokens, true);
 					if (Function.testIdentifier(var, null)) {
@@ -4889,14 +4891,14 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		// Possibly preceding assignment of the selection expression value
 		Instruction asgnmt = null;
 		// tokenized selection expression
-		StringList selTokens = Element.splitLexically(caseElem.getText().get(0), true);
+		StringList selTokens = Syntax.splitLexically(caseElem.getText().get(0), true);
 		// Eliminate parser preference keywords
 		String[] redundantKeywords = {CodeParser.getKeyword("preCase"), CodeParser.getKeyword("postCase")};
 		for (String keyword: redundantKeywords)
 		{
 			if (!keyword.trim().isEmpty())
 			{
-				StringList tokenizedKey = Element.splitLexically(keyword, false);
+				StringList tokenizedKey = Syntax.splitLexically(keyword, false);
 				int pos = -1;
 				while ((pos = selTokens.indexOf(tokenizedKey, pos+1, !CodeParser.ignoreCase)) >= 0)
 				{
@@ -7699,7 +7701,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 					// END KGU#288 2016-11-06
 					{
 						// Complete strings aren't likely to be found in a key, so don't bother
-						oldKeywordMap.put(key, Element.splitLexically(keyword,  false));
+						oldKeywordMap.put(key, Syntax.splitLexically(keyword,  false));
 					}
 				}
 //			}

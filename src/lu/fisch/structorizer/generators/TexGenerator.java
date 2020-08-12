@@ -45,6 +45,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig     2018.01.02      Issue #497: FOR-IN loop list conversion fixed, height arg reduced, includedRoots involved
  *      Kay Gürtzig     2019-09-27      Enh. #738: Support for code preview map on Root level
  *      Kay Gürtzig     2020-04-03      Enh. #828: Configuration for group export
+ *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *
  ******************************************************************************************************
  *
@@ -65,6 +66,7 @@ import lu.fisch.structorizer.elements.*;
 import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
 import lu.fisch.structorizer.parsers.CodeParser;
+import lu.fisch.structorizer.syntax.Syntax;
 
 public class TexGenerator extends Generator {
 	
@@ -288,7 +290,7 @@ public class TexGenerator extends Generator {
 					code.add(_indent+"\\assign{%");
 					code.add(_indent+this.getIndent() + "\\begin{declaration}[type:]");
 					// get the type name
-					StringList tokens = Element.splitLexically(line, true);
+					StringList tokens = Syntax.splitLexically(line, true);
 					tokens.removeAll(" ");
 					String typeName = tokens.get(1);
 					code.add(_indent+this.getIndent()+this.getIndent() + "\\description{" + typeName + "}{"
@@ -300,7 +302,7 @@ public class TexGenerator extends Generator {
 					code.add(_indent+"\\assign{%");
 					code.add(_indent+this.getIndent() + "\\begin{declaration}[variable:]");
 					// get the variable name
-					StringList tokens = Element.splitLexically(line + "<-", true);
+					StringList tokens = Syntax.splitLexically(line + "<-", true);
 					tokens.removeAll(" ");
 					String varName = Instruction.getAssignedVarname(tokens, false);
 					code.add(_indent+this.getIndent()+this.getIndent() + "\\description{" + varName + "}{"

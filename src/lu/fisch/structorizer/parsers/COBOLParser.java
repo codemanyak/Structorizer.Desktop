@@ -100,6 +100,7 @@ package lu.fisch.structorizer.parsers;
  *      Kay Gürtzig     2020-04-20      Issue #851/1 Insertion of declaration for auxiliary variables
  *                                      Issue #851/4 Provisional implementation of SORT statement import
  *                                      Issue #851/5 Simple solution for PERFORM ... THRU ... call spans
+ *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *
  ******************************************************************************************************
  *
@@ -173,6 +174,7 @@ import lu.fisch.structorizer.elements.While;
 import lu.fisch.structorizer.parsers.CobTools.CobProg;
 import lu.fisch.structorizer.parsers.CobTools.CobVar;
 import lu.fisch.structorizer.parsers.CobTools.Usage;
+import lu.fisch.structorizer.syntax.Syntax;
 //import lu.fisch.structorizer.parsers.CodeParser.FilePreparationException;
 import lu.fisch.utils.BString;
 import lu.fisch.utils.StringList;
@@ -7721,7 +7723,7 @@ public class COBOLParser extends CodeParser
 				String by = this.getContent_R(forRed.get(4).asReduction(), "");
 				String cond = this.getContent_R(condRed, "").trim();
 				// Check whether the condition might be composed and build a while loop in this case!
-				StringList condTokens = Element.splitLexically(cond, true);
+				StringList condTokens = Syntax.splitLexically(cond, true);
 				// FIXME this is just a quick hack
 				int step = 0;
 				try {

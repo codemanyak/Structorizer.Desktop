@@ -69,6 +69,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2019-03-13      Issues #518, #544, #557: Element drawing now restricted to visible rect.
  *      Kay Gürtzig     2019-03-18      Enh. #56: "preThrow" keyword handling
  *      Kay Gürtzig     2019-11-17      Enh. #739: Support for enum type definitions
+ *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *
  ******************************************************************************************************
  *
@@ -93,6 +94,7 @@ import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.gui.IconLoader;
 import lu.fisch.structorizer.gui.SelectedSequence;
 import lu.fisch.structorizer.parsers.CodeParser;
+import lu.fisch.structorizer.syntax.Syntax;
 //import lu.fisch.structorizer.gui.IconLoader;
 import lu.fisch.utils.*;
 
@@ -567,7 +569,7 @@ public class Instruction extends Element {
 	/** @return true iff the given line contains an assignment symbol */
 	public static boolean isAssignment(String line)
 	{
-		StringList tokens = Element.splitLexically(line, true);
+		StringList tokens = Syntax.splitLexically(line, true);
 		unifyOperators(tokens, true);
 		// START KGU#689 2019-03-21: Issue #706 we should better cope with named parameter assignment
 		//return tokens.contains("<-");
@@ -595,7 +597,7 @@ public class Instruction extends Element {
 	/** @return true iff the given {@code line} starts with one of the configured EXIT keywords */
 	public static boolean isJump(String line)
 	{
-		StringList tokens = Element.splitLexically(line, true);
+		StringList tokens = Syntax.splitLexically(line, true);
 		// FIXME: These tests might be too simple if the keywords don't comply with identifier syntax
 		return (tokens.indexOf(CodeParser.getKeyword("preReturn"), !CodeParser.ignoreCase) == 0 ||
 				tokens.indexOf(CodeParser.getKeyword("preLeave"), !CodeParser.ignoreCase) == 0 ||
@@ -647,7 +649,7 @@ public class Instruction extends Element {
 	public static boolean isFunctionCall(String line)
 	{
 		boolean isFunc = false;
-		StringList tokens = Element.splitLexically(line, true);
+		StringList tokens = Syntax.splitLexically(line, true);
 		unifyOperators(tokens, true);
 		int asgnPos = tokens.indexOf("<-");
 		if (asgnPos > 0)
@@ -668,7 +670,7 @@ public class Instruction extends Element {
 	/** @return true iff the given {@code line} represents an output instruction */
 	public static boolean isOutput(String line)
 	{
-		StringList tokens = Element.splitLexically(line, true);
+		StringList tokens = Syntax.splitLexically(line, true);
 		return (tokens.indexOf(CodeParser.getKeyword("output"), !CodeParser.ignoreCase) == 0);
 	}
 	/** @return true if at least one of the instruction lines of {@code this} complies to {@link #isOutput(String)} */
@@ -700,8 +702,8 @@ public class Instruction extends Element {
 	public static StringList getInputItems(String line)
 	{
 		StringList inputItems = null;
-		StringList tokens = Element.splitLexically(line, true);
-		StringList keyTokens = Element.splitLexically(CodeParser.getKeyword("input"), false);
+		StringList tokens = Syntax.splitLexically(line, true);
+		StringList keyTokens = Syntax.splitLexically(CodeParser.getKeyword("input"), false);
 		if (tokens.indexOf(keyTokens, 0, !CodeParser.ignoreCase) == 0) {
 			// It is an input instruction
 			inputItems = new StringList();
@@ -785,7 +787,7 @@ public class Instruction extends Element {
 	 */
 	public static boolean isDeclaration(String line)
 	{
-		StringList tokens = Element.splitLexically(line, true);
+		StringList tokens = Syntax.splitLexically(line, true);
 		unifyOperators(tokens, true);
 		boolean typeA = tokens.indexOf("var") == 0 && tokens.indexOf(":") > 1;
 		boolean typeB = tokens.indexOf("dim") == 0 && tokens.indexOf("as") > 1;
@@ -895,7 +897,7 @@ public class Instruction extends Element {
 	 */
 	public static boolean isTypeDefinition(String line, HashMap<String, TypeMapEntry> typeMap)
 	{
-		StringList tokens = Element.splitLexically(line.trim(), true);
+		StringList tokens = Syntax.splitLexically(line.trim(), true);
 		if (tokens.count() == 0 || !tokens.get(0).equalsIgnoreCase("type")) {
 			return false;
 		}
@@ -1038,7 +1040,7 @@ public class Instruction extends Element {
 		if (lines.count() > 0 && lineNo < lines.count())
 		{
 			String potentialCall = lines.get(lineNo);
-			StringList tokens = Element.splitLexically(potentialCall, true);
+			StringList tokens = Syntax.splitLexically(potentialCall, true);
 			unifyOperators(tokens, true);
 			int asgnPos = tokens.indexOf("<-");
 			if (asgnPos > 0)
@@ -1118,7 +1120,7 @@ public class Instruction extends Element {
 	
 	public void updateTypeMapFromLine(HashMap<String, TypeMapEntry> typeMap, String line, int lineNo)
 	{
-		StringList tokens = Element.splitLexically(line, true);
+		StringList tokens = Syntax.splitLexically(line, true);
 		String varName = null;
 		String typeSpec = "";
 		boolean isAssigned = false;
