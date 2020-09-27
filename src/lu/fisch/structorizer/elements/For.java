@@ -55,7 +55,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2016-07-30      Enh. #128: New mode "comments plus text" supported, drawing code delegated
  *      Kay Gürtzig     2016-09-24      Enh. #250: Adaptations to make the new editor design work
  *      Kay Gürtzig     2016-09-25      Issue #252: ':=' and '<-' equivalence in consistency check
- *                                      Enh. #253: CodeParser.keywordMap refactored
+ *                                      Enh. #253: Syntax.keywordMap refactored
  *      Kay Gürtzig     2016-10-04      Enh. #253: Refactoring configuration revised
  *      Kay Gürtzig     2017-01-26      Enh. #259: Type retrieval support added (for counting loops)
  *      Kay Gürtzig     2017-04-14      Enh. #259: Approach to guess FOR-IN loop variable type too
@@ -66,7 +66,8 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2018-07-12      Separator bug in For(String,String,String,int) fixed.
  *      Kay Gürtzig     2018-10-26      Enh. #619: Method getMaxLineLength() implemented
  *      Kay Gürtzig     2019-03-13      Issues #518, #544, #557: Element drawing now restricted to visible rect.
- *      Kay Gürtzig     2019-11-21      Enh. #739 Enum types considered in type compatibility check for FOR-IN lists 
+ *      Kay Gürtzig     2019-11-21      Enh. #739 Enum types considered in type compatibility check for FOR-IN lists
+ *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *
  ******************************************************************************************************
  *
@@ -87,7 +88,6 @@ import lu.fisch.graphics.*;
 import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
-import lu.fisch.structorizer.parsers.CodeParser;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.*;
 
@@ -189,10 +189,10 @@ public class For extends Element implements ILoop {
 	 */
 	public For(String varName, String startValStr, String endValStr, int stepVal)
 	{
-		this(CodeParser.getKeywordOrDefault("preFor", "for") + " " + varName
+		this(Syntax.getKeywordOrDefault("preFor", "for") + " " + varName
 				+ " <- " + startValStr + " "
-				+ CodeParser.getKeywordOrDefault("postFor", "to") + " " + endValStr
-				+ (stepVal != 1 ? (" " + CodeParser.getKeywordOrDefault("stepFor", "by") + " " + stepVal) : ""));
+				+ Syntax.getKeywordOrDefault("postFor", "to") + " " + endValStr
+				+ (stepVal != 1 ? (" " + Syntax.getKeywordOrDefault("stepFor", "by") + " " + stepVal) : ""));
 	}
 	
 	/**
@@ -203,8 +203,8 @@ public class For extends Element implements ILoop {
 	 */
 	public For(String varName, String valueList)
 	{
-		this(CodeParser.getKeywordOrDefault("preForIn", "foreach") + " " + varName + " "
-				+ CodeParser.getKeywordOrDefault("postForIn", "in") + " " + valueList);
+		this(Syntax.getKeywordOrDefault("preForIn", "foreach") + " " + varName + " "
+				+ Syntax.getKeywordOrDefault("postForIn", "in") + " " + valueList);
 	}
 	// END KGU#354 2017-04-30
 	
@@ -714,16 +714,16 @@ public class For extends Element implements ILoop {
 
 		// START KGU#61 2016-03-20: Enh. #84/#135
 		// First collect the placemarkers of the for loop header ...
-		//String[] forMarkers = {CodeParser.preFor, CodeParser.postFor, CodeParser.stepFor};
+		//String[] forMarkers = {Syntax.preFor, Syntax.postFor, Syntax.stepFor};
 		// ... and their replacements (in same order!)
 		//String[] forSeparators = {forSeparatorPre, forSeparatorTo, forSeparatorBy};
 		// First collect the placemarkers of the for loop header ...
 		String[] forMarkers = {
-				CodeParser.getKeyword("preFor"),
-				CodeParser.getKeyword("postFor"),
-				CodeParser.getKeyword("stepFor"),
-				(CodeParser.getKeyword("preForIn").trim().isEmpty() ? CodeParser.getKeyword("preFor") : CodeParser.getKeyword("preForIn")),
-				CodeParser.getKeyword("postForIn")
+				Syntax.getKeyword("preFor"),
+				Syntax.getKeyword("postFor"),
+				Syntax.getKeyword("stepFor"),
+				(Syntax.getKeyword("preForIn").trim().isEmpty() ? Syntax.getKeyword("preFor") : Syntax.getKeyword("preForIn")),
+				Syntax.getKeyword("postForIn")
 				};
 		// ... and their replacements (in same order!)
 		String[] forSeparators = {forSeparatorPre, forSeparatorTo, forSeparatorBy,
@@ -748,7 +748,7 @@ public class For extends Element implements ILoop {
 				StringList markerTokens = Syntax.splitLexically(marker, false);
 				int markerLen = markerTokens.count();
 				int pos = -1;
-				while ((pos = tokens.indexOf(markerTokens, pos+1, !CodeParser.ignoreCase)) >= 0)
+				while ((pos = tokens.indexOf(markerTokens, pos+1, !Syntax.ignoreCase)) >= 0)
 				{
 					// Replace the first token of the parser keyword by the separator 
 					tokens.set(pos, forSeparators[i]);
@@ -994,12 +994,12 @@ public class For extends Element implements ILoop {
 		{
 			asgnmtOpr = " := ";
 		}
-		String forClause = CodeParser.getKeyword("preFor").trim() + " " +
+		String forClause = Syntax.getKeyword("preFor").trim() + " " +
 				_counter + asgnmtOpr + _start + " " +
-				CodeParser.getKeyword("postFor").trim() + " " + _end;
+				Syntax.getKeyword("postFor").trim() + " " + _end;
 		if (_step != 1 || _forceStep)
 		{
-			forClause = forClause + " " + CodeParser.getKeyword("stepFor").trim() + " " +
+			forClause = forClause + " " + Syntax.getKeyword("stepFor").trim() + " " +
 					Integer.toString(_step);
 		}
 		// Now get rid of multiple blanks
@@ -1045,10 +1045,10 @@ public class For extends Element implements ILoop {
 	 */
 	public static String composeForInClause(String _iterator, String _valueList)
 	{
-		String preForIn = CodeParser.getKeyword("preForIn").trim();
-		if (preForIn.isEmpty()) { preForIn = CodeParser.getKeyword("preFor").trim(); }
+		String preForIn = Syntax.getKeyword("preForIn").trim();
+		if (preForIn.isEmpty()) { preForIn = Syntax.getKeyword("preFor").trim(); }
 		String forClause = preForIn + " " + _iterator + " " +
-				CodeParser.getKeyword("postForIn").trim() + " " + _valueList;
+				Syntax.getKeyword("postForIn").trim() + " " + _valueList;
 		return forClause;
 	}
 	
@@ -1075,7 +1075,7 @@ public class For extends Element implements ILoop {
 		// END KGU#256 2016-09-25
 		//System.out.println(thisText + " <-> " + this.composeForClause() + " <-> " + this.composeForInClause());
 		
-		if (CodeParser.ignoreCase)
+		if (Syntax.ignoreCase)
 		{
 			// START KGU#256 2016-09-25: Bugfix #252 - we will level all assignment symbols here
 			//if (thisText.equalsIgnoreCase(this.composeForClause()) ||

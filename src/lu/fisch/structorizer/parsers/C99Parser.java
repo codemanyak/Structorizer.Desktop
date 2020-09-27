@@ -94,6 +94,7 @@ import lu.fisch.structorizer.elements.Root;
 import lu.fisch.structorizer.elements.Subqueue;
 import lu.fisch.structorizer.elements.TypeMapEntry;
 import lu.fisch.structorizer.elements.While;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.StringList;
 
 /**
@@ -676,7 +677,7 @@ public class C99Parser extends CPreParser
 					arguments = new StringList();
 				}
 				if (procName.equals("exit")) {
-					content = getKeywordOrDefault("preExit", "exit");
+					content = Syntax.getKeywordOrDefault("preExit", "exit");
 					if (arguments.count() > 0) {
 						content += arguments.get(0);
 						_parentNode.addElement(this.equipWithSourceComment(new Jump(content), _reduction));
@@ -824,7 +825,7 @@ public class C99Parser extends CPreParser
 					ruleId == RuleConstants.PROD_JUMPSTMT_BREAK_SEMI
 					)
 			{
-				String content = getKeyword("preLeave");
+				String content = Syntax.getKeyword("preLeave");
 				_parentNode.addElement(this.equipWithSourceComment(new Jump(content.trim()), _reduction));
 			}
 			else if (
@@ -832,7 +833,7 @@ public class C99Parser extends CPreParser
 					ruleId == RuleConstants.PROD_JUMPSTMT_RETURN_SEMI
 					)
 			{
-				String content = getKeyword("preReturn");
+				String content = Syntax.getKeyword("preReturn");
 				Reduction exprRed = _reduction.get(1).asReduction();
 				if (exprRed.getParent().getTableIndex() != RuleConstants.PROD_EXPROPT2) { 
 					content += " " + translateContent(getContent_R(exprRed, ""));

@@ -124,7 +124,6 @@ import lu.fisch.graphics.*;
 import lu.fisch.utils.*;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
-import lu.fisch.structorizer.parsers.CodeParser;
 import lu.fisch.structorizer.syntax.Syntax;
 
 public class Jump extends Instruction {
@@ -276,7 +275,7 @@ public class Jump extends Instruction {
 	public static boolean isReturn(String line)
 	{
 		StringList tokens = Syntax.splitLexically(line, true);
-		return (tokens.indexOf(CodeParser.getKeyword("preReturn"), !CodeParser.ignoreCase) == 0);
+		return (tokens.indexOf(Syntax.getKeyword("preReturn"), !Syntax.ignoreCase) == 0);
 	}
 	/**
 	 * Checks whether this element contains a return statement
@@ -298,7 +297,7 @@ public class Jump extends Instruction {
 	public static boolean isLeave(String line)
 	{
 		StringList tokens = Syntax.splitLexically(line, true);
-		return (tokens.indexOf(CodeParser.getKeyword("preLeave"), !CodeParser.ignoreCase) == 0);
+		return (tokens.indexOf(Syntax.getKeyword("preLeave"), !Syntax.ignoreCase) == 0);
 	}
 	/**
 	 * Checks whether this element contains a leave statement
@@ -320,7 +319,7 @@ public class Jump extends Instruction {
 	public static boolean isExit(String line)
 	{
 		StringList tokens = Syntax.splitLexically(line, true);
-		return (tokens.indexOf(CodeParser.getKeyword("preExit"), !CodeParser.ignoreCase) == 0);
+		return (tokens.indexOf(Syntax.getKeyword("preExit"), !Syntax.ignoreCase) == 0);
 	}
 	/**
 	 * Checks whether this element contains an exit statement
@@ -345,7 +344,7 @@ public class Jump extends Instruction {
 	public static boolean isThrow(String line)
 	{
 		StringList tokens = Syntax.splitLexically(line, true);
-		return (tokens.indexOf(CodeParser.getKeyword("preThrow"), !CodeParser.ignoreCase) == 0);
+		return (tokens.indexOf(Syntax.getKeyword("preThrow"), !Syntax.ignoreCase) == 0);
 	}
 	/**
 	 * Checks whether this element contains an exit statement

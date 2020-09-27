@@ -120,7 +120,7 @@ package lu.fisch.structorizer.generators;
  ******************************************************************************************************///
 
 import lu.fisch.utils.*;
-import lu.fisch.structorizer.parsers.*;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.turtle.TurtleBox;
 
 import java.util.HashMap;
@@ -473,7 +473,7 @@ public class JavaGenerator extends CGenerator
 	{
 		// START KGU#101 2015-12-12: Enh. #54 - support lists of expressions
 		if (_doInputOutput) {
-			String outputKey = CodeParser.getKeyword("output").trim(); 
+			String outputKey = Syntax.getKeyword("output").trim(); 
 			if (_input.matches("^" + getKeywordPattern(outputKey) + "[ ](.*?)"))
 			{
 				StringList expressions = 

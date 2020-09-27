@@ -128,7 +128,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import lu.fisch.utils.*;
-import lu.fisch.structorizer.parsers.*;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.turtle.TurtleBox;
 import lu.fisch.diagrcontrol.DiagramController;
@@ -648,10 +647,10 @@ public class PythonGenerator extends Generator
 				}
 				// END KGU#799 2020-02-13
 				if (inputItems != null && inputItems.count() > 2) {
-					String inputKey = CodeParser.getKeyword("input") + " ";
+					String inputKey = Syntax.getKeyword("input") + " ";
 					String prompt = inputItems.get(0);
 					if (!prompt.isEmpty()) {
-						addCode(transform(CodeParser.getKeyword("output") + " " + prompt), _indent, isDisabled);
+						addCode(transform(Syntax.getKeyword("output") + " " + prompt), _indent, isDisabled);
 					}
 					for (int j = 1; j < inputItems.count(); j++) {
 						String item = inputItems.get(j);
@@ -933,9 +932,9 @@ public class PythonGenerator extends Generator
 			boolean isEmpty = true;
 
 			StringList lines = _jump.getUnbrokenText();
-			String preReturn = CodeParser.getKeywordOrDefault("preReturn", "return");
-			String preLeave  = CodeParser.getKeywordOrDefault("preLeave", "leave");
-			String preThrow  = CodeParser.getKeywordOrDefault("preThrow", "throw");
+			String preReturn = Syntax.getKeywordOrDefault("preReturn", "return");
+			String preLeave  = Syntax.getKeywordOrDefault("preLeave", "leave");
+			String preThrow  = Syntax.getKeywordOrDefault("preThrow", "throw");
 			for (int i = 0; isEmpty && i < lines.count(); i++) {
 				String line = transform(lines.get(i)).trim();
 				if (!line.isEmpty())

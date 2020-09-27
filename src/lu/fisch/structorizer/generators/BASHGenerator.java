@@ -197,7 +197,6 @@ import lu.fisch.structorizer.elements.While;
 import lu.fisch.structorizer.executor.Executor;
 import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
-import lu.fisch.structorizer.parsers.CodeParser;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.StringList;
 
@@ -581,14 +580,14 @@ public class BASHGenerator extends Generator {
 		}
 		// END KGU#388 2017-10-24
 		// START KGU#161 2016-03-24: Bugfix #135/#92 - variables in read instructions must not be prefixed!
-		if (tokens.contains(CodeParser.getKeyword("input")))
+		if (tokens.contains(Syntax.getKeyword("input")))
 		{
 			// Hide the text from the replacement, except for occurrences as index
 			posAsgnOpr = tokens.count();
 		}
 		// END KGU#161 2016-03-24
 		// START KGU#61 2016-03-21: Enh. #84/#135
-		if (posAsgnOpr < 0 && !CodeParser.getKeyword("postForIn").trim().isEmpty()) posAsgnOpr = tokens.indexOf(CodeParser.getKeyword("postForIn"));
+		if (posAsgnOpr < 0 && !Syntax.getKeyword("postForIn").trim().isEmpty()) posAsgnOpr = tokens.indexOf(Syntax.getKeyword("postForIn"));
 		// END KGU#61 2016-03-21
 		// If there is an array variable left of the assignment symbol, check the index 
 		int posBracket1 = tokens.indexOf("[");
@@ -633,7 +632,7 @@ public class BASHGenerator extends Generator {
 		{
 			// Since keywords have already been replaced by super.transform(String), this is quite fine
 			// 
-			String[] keywords = CodeParser.getAllProperties();
+			String[] keywords = Syntax.getAllProperties();
 			boolean startsWithKeyword = false;
 			String firstToken = tokens.get(0);
 			for (int kwi = 0; !startsWithKeyword && kwi < keywords.length; kwi++)
@@ -1028,7 +1027,7 @@ public class BASHGenerator extends Generator {
 	@Override
 	protected String transformOutput(String _interm)
 	{
-		String output = CodeParser.getKeyword("output").trim();
+		String output = Syntax.getKeyword("output").trim();
 		if (_interm.matches("^" + output + "[ ](.*?)"))
 		{
 			StringList expressions = 
@@ -1065,9 +1064,9 @@ public class BASHGenerator extends Generator {
 			//String preLeave = CodeParser.keywordMap.getOrDefault("preLeave","").trim();
 			//String preReturn = CodeParser.keywordMap.getOrDefault("preReturn","").trim();
 			//String preExit = CodeParser.keywordMap.getOrDefault("preExit","").trim();
-			String preLeave = CodeParser.getKeywordOrDefault("preLeave","leave").trim();
-			String preReturn = CodeParser.getKeywordOrDefault("preReturn","return").trim();
-			String preExit = CodeParser.getKeywordOrDefault("preExit","exit").trim();
+			String preLeave = Syntax.getKeywordOrDefault("preLeave","leave").trim();
+			String preReturn = Syntax.getKeywordOrDefault("preReturn","return").trim();
+			String preExit = Syntax.getKeywordOrDefault("preExit","exit").trim();
 			// END KGU#288 2016-11-06
 			if (intermed.matches("^" + Matcher.quoteReplacement(preLeave) + "(\\W.*|$)"))
 			{
@@ -1117,7 +1116,7 @@ public class BASHGenerator extends Generator {
 			// END KGU 2014-11-16
 			StringList text = _inst.getUnbrokenText(); 
 			// START KGU#803 2020-02-16: Issue #816
-			String preReturn = CodeParser.getKeywordOrDefault("preReturn","return").trim();
+			String preReturn = Syntax.getKeywordOrDefault("preReturn","return").trim();
 			// END KGU#803 2020-02-16
 			int nLines = text.count();
 			for (int i = 0; i < nLines; i++)
@@ -1143,7 +1142,7 @@ public class BASHGenerator extends Generator {
 				if (inputItems != null && inputItems.count() > 2) {
 					String prompt = inputItems.get(0);
 					if (!prompt.isEmpty()) {
-						addCode(transform(CodeParser.getKeyword("output") + " " + prompt), _indent, disabled);
+						addCode(transform(Syntax.getKeyword("output") + " " + prompt), _indent, disabled);
 					}
 					for (int j = 1; j < inputItems.count(); j++) {
 						String item = transform(inputItems.get(j) + " <-");
@@ -1665,7 +1664,7 @@ public class BASHGenerator extends Generator {
 			boolean disabled = _jump.isDisabled();
 			// END KGU#277 2016-10-14
 			// START KGU#803 2020-02-16: Issue #816
-			String preReturn = CodeParser.getKeywordOrDefault("preReturn","return").trim();
+			String preReturn = Syntax.getKeywordOrDefault("preReturn","return").trim();
 			// END KGU#803 2020-02-16
 			StringList jumpText = _jump.getUnbrokenText();
 			for (int i=0; i < jumpText.count(); i++)

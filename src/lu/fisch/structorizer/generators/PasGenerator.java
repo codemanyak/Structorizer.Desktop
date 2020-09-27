@@ -138,7 +138,6 @@ package lu.fisch.structorizer.generators;
  ******************************************************************************************************///
 
 import lu.fisch.utils.*;
-import lu.fisch.structorizer.parsers.*;
 import lu.fisch.structorizer.syntax.Syntax;
 
 import java.util.HashMap;
@@ -641,7 +640,7 @@ public class PasGenerator extends Generator
 			boolean commentInserted = false;
 			// END KGU#424 2017-09-25
 
-			String preReturn = CodeParser.getKeywordOrDefault("preReturn", "return");
+			String preReturn = Syntax.getKeywordOrDefault("preReturn", "return");
 			Pattern preReturnMatch = Pattern.compile(getKeywordPattern(preReturn)+"([\\W].*|$)");
 			StringList lines = _inst.getUnbrokenText();
 			// START KGU#424 2017-09-25: Put the comment if the element doesn't contain anything else
@@ -1372,9 +1371,9 @@ public class PasGenerator extends Generator
 			else
 			{
 			// END KGU#142 2016-01-17
-				String preReturn = CodeParser.getKeywordOrDefault("preReturn", "return");
-				String preExit   = CodeParser.getKeywordOrDefault("preExit", "exit");
-				String preThrow  = CodeParser.getKeywordOrDefault("preThrow", "throw");
+				String preReturn = Syntax.getKeywordOrDefault("preReturn", "return");
+				String preExit   = Syntax.getKeywordOrDefault("preExit", "exit");
+				String preThrow  = Syntax.getKeywordOrDefault("preThrow", "throw");
 				for (int i = 0; isEmpty && i < lines.count(); i++) {
 					String line = transform(lines.get(i)).trim();
 					if (!line.isEmpty())

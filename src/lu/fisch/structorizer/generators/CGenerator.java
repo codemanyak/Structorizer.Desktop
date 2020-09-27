@@ -184,7 +184,6 @@ import java.util.Map.Entry;
 import java.util.logging.Level;
 
 import lu.fisch.utils.*;
-import lu.fisch.structorizer.parsers.*;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.structorizer.elements.*;
 import lu.fisch.structorizer.executor.Function;
@@ -1459,7 +1458,7 @@ public class CGenerator extends Generator {
 		//if (_inputItems.count() > 2) {
 		if (_inputItems.count() > 2 || this.getClass().getSimpleName().equals("CGenerator") && _inputItems.count() == 2) {
 		// END KGU#794 2020-02-13
-			String inputKey = CodeParser.getKeyword("input") + " ";
+			String inputKey = Syntax.getKeyword("input") + " ";
 			String prompt = _inputItems.get(0);
 			if (!prompt.isEmpty()) {
 				prompt += " ";
@@ -1475,7 +1474,7 @@ public class CGenerator extends Generator {
 				_inputItems.add(targetList);
 			}
 			else if (!prompt.isEmpty()) {
-				addCode(transform(CodeParser.getKeyword("output") + " " + prompt), _indent, _isDisabled);
+				addCode(transform(Syntax.getKeyword("output") + " " + prompt), _indent, _isDisabled);
 			}
 			for (int i = 0; i < _inputItems.count(); i++) {
 				if (targetList == null) {
@@ -2054,8 +2053,8 @@ public class CGenerator extends Generator {
 			
 			StringList lines = _jump.getText();
 			boolean isEmpty = lines.getLongString().trim().isEmpty();
-			String preReturn = CodeParser.getKeywordOrDefault("preReturn", "return").trim();
-			String preExit   = CodeParser.getKeywordOrDefault("preExit", "exit").trim();
+			String preReturn = Syntax.getKeywordOrDefault("preReturn", "return").trim();
+			String preExit   = Syntax.getKeywordOrDefault("preExit", "exit").trim();
 			// START KGU#380 2017-04-14: Bugfix #394 - We don't consider superfluous lines anymore
 			//String preLeave  = CodeParser.getKeywordOrDefault("preLeave", "leave").trim();
 			//String preReturnMatch = Matcher.quoteReplacement(preReturn)+"([\\W].*|$)";
@@ -2087,7 +2086,7 @@ public class CGenerator extends Generator {
 				// START KGU#686 2019-03-20: Enh. #56 Throw has to be implemented
 				else if (_jump.isThrow() && this.getTryCatchLevel() != TryCatchSupportLevel.TC_NO_TRY) {
 					this.generateThrowWith(line.substring(
-							CodeParser.getKeywordOrDefault("preThrow", "throw").length()).trim(), _indent, isDisabled);
+							Syntax.getKeywordOrDefault("preThrow", "throw").length()).trim(), _indent, isDisabled);
 				}
 				// END KGU#686 2019-03-20
 				// Has it already been matched with a loop? Then syntax must have been okay...

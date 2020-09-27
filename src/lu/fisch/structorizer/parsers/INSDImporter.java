@@ -77,5 +77,14 @@ public interface INSDImporter {
 	 */
 	public javax.swing.filechooser.FileFilter getFileFilter();
 	
+	/**
+	 * Parses the file with path {@code _filename} (possibly employing a SAX
+	 * parser) and converts the content into a Structorizer diagram that is
+	 * to be returned
+	 * @param _filename - path of the file assumed to represent a structured algorithm
+	 * @return the extracted Nassi-Shneiderman diagram as Structorizer {@link Root} object
+	 * @throws SAXException in case of some XML format or schema violation
+	 * @throws IOException - in case of a general IO error (e.g. file not readable)
+	 */
 	public Root parse(String _filename) throws SAXException, IOException;
 }

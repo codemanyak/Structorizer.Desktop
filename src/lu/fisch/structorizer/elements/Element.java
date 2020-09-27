@@ -203,7 +203,6 @@ import java.awt.FontMetrics;
 
 import lu.fisch.utils.*;
 import lu.fisch.graphics.*;
-import lu.fisch.structorizer.parsers.*;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.structorizer.executor.Executor;
 import lu.fisch.structorizer.executor.Function;
@@ -3166,15 +3165,15 @@ public abstract class Element {
 
 					// These markers might have changed by configuration, so don't cache them
 					StringList ioSigns = new StringList();
-					ioSigns.add(CodeParser.getKeywordOrDefault("input", "").trim());
-					ioSigns.add(CodeParser.getKeywordOrDefault("output", "").trim());
+					ioSigns.add(Syntax.getKeywordOrDefault("input", "").trim());
+					ioSigns.add(Syntax.getKeywordOrDefault("output", "").trim());
 					// START KGU#116 2015-12-23: Enh. #75 - highlight jump keywords
 					StringList jumpSigns = new StringList();
-					jumpSigns.add(CodeParser.getKeywordOrDefault("preLeave", "leave").trim());
-					jumpSigns.add(CodeParser.getKeywordOrDefault("preReturn", "return").trim());
-					jumpSigns.add(CodeParser.getKeywordOrDefault("preExit", "exit").trim());
+					jumpSigns.add(Syntax.getKeywordOrDefault("preLeave", "leave").trim());
+					jumpSigns.add(Syntax.getKeywordOrDefault("preReturn", "return").trim());
+					jumpSigns.add(Syntax.getKeywordOrDefault("preExit", "exit").trim());
 					// START KGU#686 2019-03-18: Enh. #56
-					jumpSigns.add(CodeParser.getKeywordOrDefault("preThrow", "throw").trim());
+					jumpSigns.add(Syntax.getKeywordOrDefault("preThrow", "throw").trim());
 					// END KGU#686 2019-03-18
 					// END KGU#116 2015-12-23
 
@@ -3248,7 +3247,7 @@ public abstract class Element {
 							// if this part has to be colored with io color
 							// START KGU#165 2016-03-25: consider the new option
 							//else if(ioSigns.contains(display))
-							else if(ioSigns.contains(display, !CodeParser.ignoreCase))
+							else if(ioSigns.contains(display, !Syntax.ignoreCase))
 								// END KGU#165 2016-03-25
 							{
 								// green, bold
@@ -3267,7 +3266,7 @@ public abstract class Element {
 							// START KGU#116 2015-12-23: Enh. #75
 							// START KGU#165 2016-03-25: consider the new case option
 							//else if(jumpSigns.contains(display))
-							else if(jumpSigns.contains(display, !CodeParser.ignoreCase))
+							else if(jumpSigns.contains(display, !Syntax.ignoreCase))
 								// END KGU#165 2016-03-25
 							{
 								// orange, bold
@@ -3771,18 +3770,18 @@ public abstract class Element {
     {
     	// Collect redundant placemarkers to be deleted from the text
         StringList redundantMarkers = new StringList();
-        redundantMarkers.addByLength(CodeParser.getKeyword("preAlt"));
-        redundantMarkers.addByLength(CodeParser.getKeyword("preCase"));
+        redundantMarkers.addByLength(Syntax.getKeyword("preAlt"));
+        redundantMarkers.addByLength(Syntax.getKeyword("preCase"));
         //redundantMarkers.addByLength(CodeParser.preFor);	// will be handled separately
-        redundantMarkers.addByLength(CodeParser.getKeyword("preWhile"));
-        redundantMarkers.addByLength(CodeParser.getKeyword("preRepeat"));
+        redundantMarkers.addByLength(Syntax.getKeyword("preWhile"));
+        redundantMarkers.addByLength(Syntax.getKeyword("preRepeat"));
 
-        redundantMarkers.addByLength(CodeParser.getKeyword("postAlt"));
-        redundantMarkers.addByLength(CodeParser.getKeyword("postCase"));
+        redundantMarkers.addByLength(Syntax.getKeyword("postAlt"));
+        redundantMarkers.addByLength(Syntax.getKeyword("postCase"));
         //redundantMarkers.addByLength(CodeParser.postFor);	// will be handled separately
         //redundantMarkers.addByLength(CodeParser.stepFor);	// will be handled separately
-        redundantMarkers.addByLength(CodeParser.getKeyword("postWhile"));
-        redundantMarkers.addByLength(CodeParser.getKeyword("postRepeat"));
+        redundantMarkers.addByLength(Syntax.getKeyword("postWhile"));
+        redundantMarkers.addByLength(Syntax.getKeyword("postRepeat"));
         
         for (int i = 0; i < redundantMarkers.count(); i++)
         {
@@ -3792,7 +3791,7 @@ public abstract class Element {
         		StringList markerTokens = Syntax.splitLexically(marker, false);
         		int markerLen = markerTokens.count();
         		int pos = -1;
-        		while ((pos = _tokens.indexOf(markerTokens, 0, !CodeParser.ignoreCase)) >= 0)
+        		while ((pos = _tokens.indexOf(markerTokens, 0, !Syntax.ignoreCase)) >= 0)
         		{
         			for (int j = 0; j < markerLen; j++)
         			{
@@ -3819,7 +3818,7 @@ public abstract class Element {
     /**
      * Returns a fixed array of names of parser preferences being relevant for
      * the current type of Element (e.g. in case of refactoring)
-     * @return Arrays of key strings for CodeParser.keywordMap
+     * @return Arrays of key strings for Syntax.keywordMap
      */
     protected abstract String[] getRelevantParserKeys();
     
@@ -3865,7 +3864,7 @@ public abstract class Element {
 			StringList splitKey = _splitOldKeys.get(_prefNames[i]);
 			if (splitKey != null)
 			{
-				String subst = CodeParser.getKeyword(_prefNames[i]);
+				String subst = Syntax.getKeyword(_prefNames[i]);
 				// line shouldn't be inflated ...
 				if (!splitKey.get(0).equals(" ")) {
 					while (subst.startsWith(" ")) subst = subst.substring(1); 

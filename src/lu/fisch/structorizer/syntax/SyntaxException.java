@@ -44,6 +44,7 @@ package lu.fisch.structorizer.syntax;
  * @author kay
  *
  */
+@SuppressWarnings("serial")
 public class SyntaxException extends Exception {
 
 	/**

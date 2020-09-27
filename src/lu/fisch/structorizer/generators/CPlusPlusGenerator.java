@@ -62,6 +62,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig     2019-12-02      KGU#784 Defective type descriptions in argument lists and thread function operators
  *      Kay Gürtzig     2020-03-20/23   Enh. #828 bugfix #836: Group export implemented, batch export improved
  *      Kay Gürtzig     2020-03-23      Issue #840: Adaptations w.r.t. disabled elements using File API
+ *      Kay Gürtzig     2020-08-12      Issue #800: CodeParser replaced by Syntax
  *
  ******************************************************************************************************
  *
@@ -88,7 +89,7 @@ import lu.fisch.structorizer.elements.Try;
 import lu.fisch.structorizer.elements.TypeMapEntry;
 import lu.fisch.structorizer.executor.Executor;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
-import lu.fisch.structorizer.parsers.CodeParser;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.BString;
 import lu.fisch.utils.StringList;
 
@@ -265,7 +266,7 @@ public class CPlusPlusGenerator extends CGenerator {
 	protected String transform(String _input)
 	{
 		// START KGU#101 2015-12-11: Enh. #54 - support lists of expressions
-		String outputKey = CodeParser.getKeyword("output").trim();
+		String outputKey = Syntax.getKeyword("output").trim();
 		if (_input.matches("^" + getKeywordPattern(outputKey) + "[ ](.*?)"))
 		{
 			StringList expressions = 

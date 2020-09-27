@@ -224,7 +224,6 @@ import java.util.Date;
 
 import lu.fisch.graphics.*;
 import lu.fisch.utils.*;
-import lu.fisch.structorizer.parsers.*;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.structorizer.helpers.GENPlugin;
 import lu.fisch.structorizer.io.*;
@@ -2570,7 +2569,7 @@ public class Root extends Element {
     		}
     		//System.out.println(lines);
 
-    		String[] keywords = CodeParser.getAllProperties();
+    		String[] keywords = Syntax.getAllProperties();
     		StringList parts = new StringList();
     		
     		for(int i=0; i<lines.count(); i++)
@@ -2605,7 +2604,7 @@ public class Root extends Element {
 	private StringList getUsedVarNames(String _line, String[] _keywords)
 	{
 		if (_keywords == null) {
-			_keywords = CodeParser.getAllProperties();
+			_keywords = Syntax.getAllProperties();
 		}
 //		Regex r;
 
@@ -2635,7 +2634,7 @@ public class Root extends Element {
 				StringList keyTokens = splitKeywords.elementAt(kw);
 				int keyLength = keyTokens.count();
 				int pos = -1;
-				while ((pos = tokens.indexOf(keyTokens, pos + 1, !CodeParser.ignoreCase)) >= 0)
+				while ((pos = tokens.indexOf(keyTokens, pos + 1, !Syntax.ignoreCase)) >= 0)
 				{
 					tokens.set(pos, _keywords[kw]);
 					for (int j=1; j < keyLength; j++)
@@ -2647,9 +2646,9 @@ public class Root extends Element {
 		}
 
 		// Unify FOR-IN loops and FOR loops for the purpose of variable analysis
-		if (!CodeParser.getKeyword("postForIn").trim().isEmpty())
+		if (!Syntax.getKeyword("postForIn").trim().isEmpty())
 		{
-			tokens.replaceAll(CodeParser.getKeyword("postForIn"), "<-");
+			tokens.replaceAll(Syntax.getKeyword("postForIn"), "<-");
 		}
 		
 		// Here all the unification, alignment, reduction is done, now the actual analysis begins
@@ -2682,13 +2681,13 @@ public class Root extends Element {
 		// END KGU#332/KGU#375 2017-01-17
 
 		// cutoff output keyword
-		else if (token0.equals(CodeParser.getKeyword("output")))	// Must be at the line's very beginning
+		else if (token0.equals(Syntax.getKeyword("output")))	// Must be at the line's very beginning
 		{
 			tokens.delete(0);
 		}
 
 		// parse out array index
-		else if (token0.equals(CodeParser.getKeyword("input")))
+		else if (token0.equals(Syntax.getKeyword("input")))
 		{
 			// START KGU#653 2019-02-16: Enh. #680 - with multiple variables we must decompose the list
 			StringList items = Instruction.getInputItems(_line);
@@ -2834,7 +2833,7 @@ public class Root extends Element {
 
     	// START KGU#163 2016-03-25: Pre-processed match patterns for identifier search
     	splitKeywords.clear();
-    	String[] keywords = CodeParser.getAllProperties();
+    	String[] keywords = Syntax.getAllProperties();
     	for (int k = 0; k < keywords.length; k++)
     	{
     		splitKeywords.add(Syntax.splitLexically(keywords[k], false));
@@ -2861,13 +2860,13 @@ public class Root extends Element {
     		// Replace all split keywords by the respective configured strings
     		// This replacement will be aware of the case sensitivity preference
     		for (int kw = 0; kw < keywords.length; kw++)
-    		{    				
+    		{
     			if (keywords[kw].trim().length() > 0)
     			{
     				StringList keyTokens = splitKeywords.elementAt(kw);
     				int keyLength = keyTokens.count();
     				int pos = -1;
-    				while ((pos = tokens.indexOf(keyTokens, pos + 1, !CodeParser.ignoreCase)) >= 0)
+    				while ((pos = tokens.indexOf(keyTokens, pos + 1, !Syntax.ignoreCase)) >= 0)
     				{
     					tokens.set(pos, keywords[kw]);
     					for (int j=1; j < keyLength; j++)
@@ -2879,9 +2878,9 @@ public class Root extends Element {
     		}
 
     		// Unify FOR-IN loops and FOR loops for the purpose of variable analysis
-    		if (!CodeParser.getKeyword("postForIn").trim().isEmpty())
+    		if (!Syntax.getKeyword("postForIn").trim().isEmpty())
     		{
-    			tokens.replaceAll(CodeParser.getKeyword("postForIn"), "<-");
+    			tokens.replaceAll(Syntax.getKeyword("postForIn"), "<-");
     		}
 
     		// Here all the unification, alignment, reduction is done, now the actual analysis begins
@@ -2903,7 +2902,7 @@ public class Root extends Element {
 
 
     		// get names from read statements
-    		int inpPos = tokens.indexOf(CodeParser.getKeyword("input"));
+    		int inpPos = tokens.indexOf(Syntax.getKeyword("input"));
     		if (inpPos >= 0)
     		{
     			// START KGU#281 2016-10-12: Issue #271 - there may be a prompt string literal to be skipped
@@ -3419,7 +3418,7 @@ public class Root extends Element {
     		{
     			@SuppressWarnings("unchecked")
     			HashMap<String, String> constantDefs = (HashMap<String, String>)_constants.clone();
-    			String[] keywords = CodeParser.getAllProperties();
+    			String[] keywords = Syntax.getAllProperties();
     			StringList initVars = _vars.copy();
     			// START KGU#423 2017-09-13: Enh. #416 - cope with user-defined line breaks
     			//for (int j = 0; j < ele.getText().count(); j++) {
@@ -3946,10 +3945,10 @@ public class Root extends Element {
 		// START KGU#388 2017-09-13: Enh. #423
 		boolean isTypedef = false;
 		// END KGU#388 2017-09-13
-		StringList inputTokens = Syntax.splitLexically(CodeParser.getKeyword("input"), false);
-		StringList outputTokens = Syntax.splitLexically(CodeParser.getKeyword("output"), false);
+		StringList inputTokens = Syntax.splitLexically(Syntax.getKeyword("input"), false);
+		StringList outputTokens = Syntax.splitLexically(Syntax.getKeyword("output"), false);
 		// START KGU#297 2016-11-22: Issue #295 - Instructions starting with the return keyword must be handled separately
-		StringList returnTokens = Syntax.splitLexically(CodeParser.getKeyword("preReturn"), false);
+		StringList returnTokens = Syntax.splitLexically(Syntax.getKeyword("preReturn"), false);
 		// END KGU#297 2016-11-22
 
 		// Check every instruction line...
@@ -3963,7 +3962,7 @@ public class Root extends Element {
 			unifyOperators(tokens, false);
 			// START KGU#297 2016-11-22: Issue #295 - Instructions starting with the return keyword must be handled separately
 			//if (tokens.contains("<-"))
-			boolean isReturn = tokens.indexOf(returnTokens, 0, !CodeParser.ignoreCase) == 0;
+			boolean isReturn = tokens.indexOf(returnTokens, 0, !Syntax.ignoreCase) == 0;
 			// END KGU#297 2016-11-22
 			if (tokens.contains("<-") && !isReturn)
 			{
@@ -3978,7 +3977,7 @@ public class Root extends Element {
 				// END KGU#375 2017-04-05
 			}
 			// START KGU#388 2017-09-13: Enh. #423
-			else if (tokens.indexOf("type", 0, !CodeParser.ignoreCase) == 0) {
+			else if (tokens.indexOf("type", 0, !Syntax.ignoreCase) == 0) {
 				isTypedef = true;
 			}
 			// END KGU#388 2017-09-13
@@ -3992,11 +3991,11 @@ public class Root extends Element {
 			}
 			
 			// CHECK: wrong multi-line instruction (#10 - new!)	
-			if (tokens.indexOf(inputTokens, 0, !CodeParser.ignoreCase) == 0)
+			if (tokens.indexOf(inputTokens, 0, !Syntax.ignoreCase) == 0)
 			{
 				isInput = true;
 			}
-			if (tokens.indexOf(outputTokens, 0, !CodeParser.ignoreCase) == 0)
+			if (tokens.indexOf(outputTokens, 0, !Syntax.ignoreCase) == 0)
 			{
 				isOutput = true;
 			}
@@ -4128,19 +4127,19 @@ public class Root extends Element {
 	private void analyse_13_16_jump(Jump ele, Vector<DetectedError> _errors, StringList _myVars, boolean[] _resultFlags)
 	{
 		StringList sl = ele.getText();
-		String preReturn = CodeParser.getKeywordOrDefault("preReturn", "return");
-		String preLeave = CodeParser.getKeywordOrDefault("preLeave", "leave");
-		String preExit = CodeParser.getKeywordOrDefault("preExit", "exit");
+		String preReturn = Syntax.getKeywordOrDefault("preReturn", "return");
+		String preLeave = Syntax.getKeywordOrDefault("preLeave", "leave");
+		String preExit = Syntax.getKeywordOrDefault("preExit", "exit");
 		// START KGU#686 2019-03-18: Enh. #56
 		//String jumpKeywords = "«" + preLeave + "», «" + preReturn +	"», «" + preExit + "»";
-		String preThrow = CodeParser.getKeywordOrDefault("preThrow", "throw");
+		String preThrow = Syntax.getKeywordOrDefault("preThrow", "throw");
 		String jumpKeywords = "«" + preLeave + "», «" + preReturn +	"», «" + preExit + "», «" + preThrow + "»";
 		// END KGU#686 2019-03-18
 		String line = sl.get(0).trim();
 		String lineComp = line;
 
 		// Preparation
-		if (CodeParser.ignoreCase) {
+		if (Syntax.ignoreCase) {
 			preReturn = preReturn.toLowerCase();
 			preLeave = preLeave.toLowerCase();
 			preExit = preExit.toLowerCase();
@@ -4272,26 +4271,26 @@ public class Root extends Element {
 	private void analyse_13_16_instr(Instruction ele, Vector<DetectedError> _errors, boolean _isLastElement, StringList _myVars, boolean[] _resultFlags)
 	{
 		StringList sl = ele.getText();
-		String preReturn =  CodeParser.getKeywordOrDefault("preReturn", "return").trim();
-		String preLeave = CodeParser.getKeywordOrDefault("preLeave", "leave").trim();
-		String preExit = CodeParser.getKeywordOrDefault("preExit", "exit").trim();
-		String patternReturn = Matcher.quoteReplacement(CodeParser.ignoreCase ? preReturn.toLowerCase() : preReturn);
-		String patternLeave = Matcher.quoteReplacement(CodeParser.ignoreCase ? preLeave.toLowerCase() : preLeave);
-		String patternExit = Matcher.quoteReplacement(CodeParser.ignoreCase ? preExit.toLowerCase() : preExit);
+		String preReturn =  Syntax.getKeywordOrDefault("preReturn", "return").trim();
+		String preLeave = Syntax.getKeywordOrDefault("preLeave", "leave").trim();
+		String preExit = Syntax.getKeywordOrDefault("preExit", "exit").trim();
+		String patternReturn = Matcher.quoteReplacement(Syntax.ignoreCase ? preReturn.toLowerCase() : preReturn);
+		String patternLeave = Matcher.quoteReplacement(Syntax.ignoreCase ? preLeave.toLowerCase() : preLeave);
+		String patternExit = Matcher.quoteReplacement(Syntax.ignoreCase ? preExit.toLowerCase() : preExit);
 
 		for (int ls=0; ls < sl.count(); ls++)
 		{
 			String line = sl.get(ls).trim().toLowerCase();
 			// START KGU#78 2015-11-25: Make sure a potential result is following a return keyword
 			//if(line.toLowerCase().indexOf("return")==0)
-			if (CodeParser.ignoreCase) line = line.toLowerCase();
+			if (Syntax.ignoreCase) line = line.toLowerCase();
 			boolean isReturn = line.matches(Matcher.quoteReplacement(patternReturn) + "([\\W].*|$)");
 			boolean isLeave = line.matches(Matcher.quoteReplacement(patternLeave) + "([\\W].*|$)");
 			boolean isExit = line.matches(Matcher.quoteReplacement(patternExit) + "([\\W].*|$)");
 			boolean isJump = isLeave || isExit ||
 					line.matches("exit([\\W].*|$)") ||	// Also check hard-coded keywords
 					line.matches("break([\\W].*|$)");	// Also check hard-coded keywords
-			if (isReturn && !line.substring(CodeParser.getKeywordOrDefault("preReturn", "return").length()).isEmpty())
+			if (isReturn && !line.substring(Syntax.getKeywordOrDefault("preReturn", "return").length()).isEmpty())
 				// END KGU#78 2015-11-25
 			{
 				_resultFlags[0] = true;
@@ -4303,7 +4302,7 @@ public class Root extends Element {
 				if (_resultFlags[1] || _resultFlags[2])
 				{
 					//error = new DetectedError("Your function seems to use several competitive return mechanisms!",(Element) _node.getElement(i));
-					addError(_errors, new DetectedError(errorMsg(Menu.error13_3, CodeParser.getKeywordOrDefault("preReturn", "return")), ele), 13);
+					addError(_errors, new DetectedError(errorMsg(Menu.error13_3, Syntax.getKeywordOrDefault("preReturn", "return")), ele), 13);
 				}
 				// END KGU#78 2015-11-25
 			}
@@ -4557,7 +4556,7 @@ public class Root extends Element {
 	private void analyse_22_24(Instruction _instr, Vector<DetectedError> _errors, StringList _vars, StringList _uncertainVars, HashMap<String, String> _definedConsts, HashMap<String, TypeMapEntry> _types)
 	{
 		StringList knownVars = _vars.copy();
-		String[] keywords = CodeParser.getAllProperties();
+		String[] keywords = Syntax.getAllProperties();
 		// START KGU#413 2017-09-17: Enh. #416 cope with user-inserted line breaks
 		//for (int i = 0; i < _instr.getText().count(); i++) {
 		//	String line = _instr.getText().get(i);
@@ -5026,7 +5025,7 @@ public class Root extends Element {
 				String text = null;
 				switch (code) {
 				case 26: // hello world tour 
-					text = errorMsg(Menu.hint26[0], CodeParser.getKeywordOrDefault("output", "OUTPUT"));
+					text = errorMsg(Menu.hint26[0], Syntax.getKeywordOrDefault("output", "OUTPUT"));
 					addError(_errors, new DetectedError(text, this.children), 26);
 					break;
 				case 25: // first IPO guide 
@@ -5035,7 +5034,7 @@ public class Root extends Element {
 						text = errorMsg(Menu.hint25_5, "");
 						break;
 					case DT_MAIN:
-						text = errorMsg(Menu.hint25_1, new String[]{CodeParser.getKeyword("input"), (check(5) ? "X" : "x")});
+						text = errorMsg(Menu.hint25_1, new String[]{Syntax.getKeyword("input"), (check(5) ? "X" : "x")});
 						//startNextTutorial(true);
 						break;
 					case DT_SUB:
@@ -5128,7 +5127,7 @@ public class Root extends Element {
 						new String[]{"Diagram", "Add", "Before", "Instruction"}));
 				addError(_errors, 
 						new DetectedError(
-								errorMsg(Menu.hint25_2, new String[]{CodeParser.getKeywordOrDefault("input", "INPUT"), varName1, menuPath.concatenate(" \u25BA ")}),
+								errorMsg(Menu.hint25_2, new String[]{Syntax.getKeywordOrDefault("input", "INPUT"), varName1, menuPath.concatenate(" \u25BA ")}),
 								this.children.getElement(0)), 25);    						    								
 			}
 			else if (!hasIO[1]) {
@@ -5137,7 +5136,7 @@ public class Root extends Element {
 						new String[]{"Diagram", "Add", "After", "Instruction"}));
 				addError(_errors,
 						new DetectedError(
-								errorMsg(Menu.hint25_3, new String[]{CodeParser.getKeywordOrDefault("output", "OUTPUT"), varName2, menuPath.concatenate(" \u25BA ")}),
+								errorMsg(Menu.hint25_3, new String[]{Syntax.getKeywordOrDefault("output", "OUTPUT"), varName2, menuPath.concatenate(" \u25BA ")}),
 								this.children.getElement(this.children.getSize()-1)), 25);    						    												
 			}
 			else if (!hasIO[2]) {
@@ -5647,7 +5646,7 @@ public class Root extends Element {
     {
         structorizerKeywords.clear();
         structorizerKeywords.add("global");
-        for (String keyword: CodeParser.getAllProperties()) {
+        for (String keyword: Syntax.getAllProperties()) {
             structorizerKeywords.add(keyword);
         }
 

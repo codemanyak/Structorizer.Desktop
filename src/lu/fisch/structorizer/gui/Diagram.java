@@ -701,7 +701,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 	{
 		// load different things from INI-file
 		Element.loadFromINI();
-		CodeParser.loadFromINI();
+		Syntax.loadFromINI();
 
 		this.addMouseListener(this);
 		this.addMouseMotionListener(this);
@@ -2241,8 +2241,8 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 			// START KGU#288 2016-11-06: Issue #279 - Method getOrDefault() missing in OpenJDK
 			//String newValue = CodeParser.getKeywordOrDefault(entry.getKey(), "");
 			String currentValue = (entry.getKey().equals("ignoreCase"))
-					? Boolean.toString(CodeParser.ignoreCase)
-					: CodeParser.getKeywordOrDefault(entry.getKey(), "");
+					? Boolean.toString(Syntax.ignoreCase)
+					: Syntax.getKeywordOrDefault(entry.getKey(), "");
 			// END KGU#288 2016-11-06
 			if (!storedValue.equals(currentValue))
 			{
@@ -2290,15 +2290,15 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 				// Cache the current parser preferences
 				HashMap<String, StringList> splitPrefs = new HashMap<String, StringList>();
 				// and adopt the stored preferences of the diagram
-				for (String key: CodeParser.keywordSet()) {
-					splitPrefs.put(key, Syntax.splitLexically(CodeParser.getKeywordOrDefault(key, ""), false));
+				for (String key: Syntax.keywordSet()) {
+					splitPrefs.put(key, Syntax.splitLexically(Syntax.getKeywordOrDefault(key, ""), false));
 					StringList stored = root.storedParserPrefs.get(key);
 					if (stored != null) {
-						CodeParser.setKeyword(key, stored.concatenate());
+						Syntax.setKeyword(key, stored.concatenate());
 					}
 				}
-				boolean tmpIgnoreCase = CodeParser.ignoreCase;
-				CodeParser.ignoreCase = wasCaseIgnored;
+				boolean tmpIgnoreCase = Syntax.ignoreCase;
+				Syntax.ignoreCase = wasCaseIgnored;
 				try {
 					Ini.getInstance().save();
 				} catch (Exception ex) {
@@ -4137,7 +4137,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 				for (Jump jmp: jumps) {
 					String jumpLine = jmp.getUnbrokenText().getLongString().trim();
 					if (jumpLine.isEmpty()) {
-						jumpLine = "(" + CodeParser.getKeywordOrDefault("preLeave", "leave") + ")";
+						jumpLine = "(" + Syntax.getKeywordOrDefault("preLeave", "leave") + ")";
 					}
 					jumpTexts += "\n \u25CF " + jumpLine;
 				}
@@ -4835,12 +4835,12 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		// START KGU#229 2016-09-09: Take care of the configured prefix and postfix
 		//While whileLoop = new While(forLoop.getCounterVar() + (step < 0 ? " >= " : " <= ") + forLoop.getEndValue());
 		String prefix = "", postfix = "";
-		if (!CodeParser.getKeyword("preWhile").trim().isEmpty()) {
-			prefix = CodeParser.getKeyword("preWhile");
+		if (!Syntax.getKeyword("preWhile").trim().isEmpty()) {
+			prefix = Syntax.getKeyword("preWhile");
 			if (!prefix.endsWith(" ")) prefix += " ";
 		}
-		if (!CodeParser.getKeyword("postWhile").trim().isEmpty()) {
-			postfix = CodeParser.getKeyword("postWhile");
+		if (!Syntax.getKeyword("postWhile").trim().isEmpty()) {
+			postfix = Syntax.getKeyword("postWhile");
 			if (!postfix.startsWith(" ")) postfix = " " + postfix;
 		}
 		While whileLoop = new While(prefix + forLoop.getCounterVar() + (step < 0 ? " >= " : " <= ") + forLoop.getEndValue() + postfix);
@@ -4893,14 +4893,14 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		// tokenized selection expression
 		StringList selTokens = Syntax.splitLexically(caseElem.getText().get(0), true);
 		// Eliminate parser preference keywords
-		String[] redundantKeywords = {CodeParser.getKeyword("preCase"), CodeParser.getKeyword("postCase")};
+		String[] redundantKeywords = {Syntax.getKeyword("preCase"), Syntax.getKeyword("postCase")};
 		for (String keyword: redundantKeywords)
 		{
 			if (!keyword.trim().isEmpty())
 			{
 				StringList tokenizedKey = Syntax.splitLexically(keyword, false);
 				int pos = -1;
-				while ((pos = selTokens.indexOf(tokenizedKey, pos+1, !CodeParser.ignoreCase)) >= 0)
+				while ((pos = selTokens.indexOf(tokenizedKey, pos+1, !Syntax.ignoreCase)) >= 0)
 				{
 					for (int i = 0; i < tokenizedKey.count(); i++)
 					{
@@ -4922,12 +4922,12 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		
 		// Take care of the configured prefix and postfix
 		String prefix = "", postfix = "";
-		if (!CodeParser.getKeyword("preAlt").trim().isEmpty()) {
-			prefix = CodeParser.getKeyword("preAlt");
+		if (!Syntax.getKeyword("preAlt").trim().isEmpty()) {
+			prefix = Syntax.getKeyword("preAlt");
 			if (!prefix.endsWith(" ")) prefix += " ";
 		}
-		if (!CodeParser.getKeyword("postAlt").trim().isEmpty()) {
-			postfix = CodeParser.getKeyword("postAlt");
+		if (!Syntax.getKeyword("postAlt").trim().isEmpty()) {
+			postfix = Syntax.getKeyword("postAlt");
 			if (!postfix.startsWith(" ")) postfix = " " + postfix;
 		}
 		
@@ -4957,7 +4957,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 				}
 				// START KGU#288 2016-11-06: Issue #279
 				//cond = cond.substring(4).replace("||", CodeParser.getKeywordOrDefault("oprOr", "or"));
-				cond = cond.substring(4).replace("||", CodeParser.getKeywordOrDefault("oprOr", "or"));
+				cond = cond.substring(4).replace("||", Syntax.getKeywordOrDefault("oprOr", "or"));
 				// END KGU#288 2016-11-06
 				Alternative newAlt = new Alternative(prefix + cond + postfix);
 				newAlt.qTrue = caseElem.qs.get(lineNo-1);
@@ -7647,35 +7647,35 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 								Math.round(p.y+(getVisibleRect().height-parserPreferences.getHeight())/2+this.getVisibleRect().y));
 		
 		// set fields
-		parserPreferences.edtAltPre.setText(CodeParser.getKeyword("preAlt"));
-		parserPreferences.edtAltPost.setText(CodeParser.getKeyword("postAlt"));
-		parserPreferences.edtCasePre.setText(CodeParser.getKeyword("preCase"));
-		parserPreferences.edtCasePost.setText(CodeParser.getKeyword("postCase"));
-		parserPreferences.edtForPre.setText(CodeParser.getKeyword("preFor"));
-		parserPreferences.edtForPost.setText(CodeParser.getKeyword("postFor"));
+		parserPreferences.edtAltPre.setText(Syntax.getKeyword("preAlt"));
+		parserPreferences.edtAltPost.setText(Syntax.getKeyword("postAlt"));
+		parserPreferences.edtCasePre.setText(Syntax.getKeyword("preCase"));
+		parserPreferences.edtCasePost.setText(Syntax.getKeyword("postCase"));
+		parserPreferences.edtForPre.setText(Syntax.getKeyword("preFor"));
+		parserPreferences.edtForPost.setText(Syntax.getKeyword("postFor"));
 		// START KGU#3 2015-11-08: New configurable separator for FOR loop step const
-		parserPreferences.edtForStep.setText(CodeParser.getKeyword("stepFor"));
+		parserPreferences.edtForStep.setText(Syntax.getKeyword("stepFor"));
 		// END KGU#3 2015-11-08
 		// START KGU#61 2016-03-21: New configurable keywords for FOR-IN loop
-		parserPreferences.edtForInPre.setText(CodeParser.getKeyword("preForIn"));
-		parserPreferences.edtForInPost.setText(CodeParser.getKeyword("postForIn"));
+		parserPreferences.edtForInPre.setText(Syntax.getKeyword("preForIn"));
+		parserPreferences.edtForInPost.setText(Syntax.getKeyword("postForIn"));
 		// END KGU#61 2016-03-21
-		parserPreferences.edtWhilePre.setText(CodeParser.getKeyword("preWhile"));
-		parserPreferences.edtWhilePost.setText(CodeParser.getKeyword("postWhile"));
-		parserPreferences.edtRepeatPre.setText(CodeParser.getKeyword("preRepeat"));
-		parserPreferences.edtRepeatPost.setText(CodeParser.getKeyword("postRepeat"));
+		parserPreferences.edtWhilePre.setText(Syntax.getKeyword("preWhile"));
+		parserPreferences.edtWhilePost.setText(Syntax.getKeyword("postWhile"));
+		parserPreferences.edtRepeatPre.setText(Syntax.getKeyword("preRepeat"));
+		parserPreferences.edtRepeatPost.setText(Syntax.getKeyword("postRepeat"));
 		// START KGU#78 2016-03-25: Enh. #23 - Jump configurability introduced
-		parserPreferences.edtJumpLeave.setText(CodeParser.getKeyword("preLeave"));
-		parserPreferences.edtJumpReturn.setText(CodeParser.getKeyword("preReturn"));
-		parserPreferences.edtJumpExit.setText(CodeParser.getKeyword("preExit"));
+		parserPreferences.edtJumpLeave.setText(Syntax.getKeyword("preLeave"));
+		parserPreferences.edtJumpReturn.setText(Syntax.getKeyword("preReturn"));
+		parserPreferences.edtJumpExit.setText(Syntax.getKeyword("preExit"));
 		// END KGU#78 2016-03-25
 		// START KGU#686 2019-03-18: Enh. #56 - Try / Carch / Throw mechanism implemented
-		parserPreferences.edtJumpThrow.setText(CodeParser.getKeyword("preThrow"));
+		parserPreferences.edtJumpThrow.setText(Syntax.getKeyword("preThrow"));
 		// END KGU#686 2019-03-18
-		parserPreferences.edtInput.setText(CodeParser.getKeyword("input"));
-		parserPreferences.edtOutput.setText(CodeParser.getKeyword("output"));
+		parserPreferences.edtInput.setText(Syntax.getKeyword("input"));
+		parserPreferences.edtOutput.setText(Syntax.getKeyword("output"));
 		// START KGU#165 2016-03-25: We need a transparent decision here
-		parserPreferences.chkIgnoreCase.setSelected(CodeParser.ignoreCase);
+		parserPreferences.chkIgnoreCase.setSelected(Syntax.ignoreCase);
 		// END KGU#165 2016-03-25
 		
 		parserPreferences.pack();
@@ -7685,18 +7685,18 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		{
 			// START KGU#258 2016-09-26: Enh. #253 - prepare the old settings for a refactoring
 			HashMap<String, StringList> oldKeywordMap = null;
-			boolean wasCaseIgnored = CodeParser.ignoreCase;
+			boolean wasCaseIgnored = Syntax.ignoreCase;
 			boolean considerRefactoring = root.children.getSize() > 0
 					|| isArrangerOpen() && Arranger.getInstance().getAllRoots().size() > 0;
 //			if (considerRefactoring)
 //			{
 				oldKeywordMap = new LinkedHashMap<String, StringList>();
-				for (String key: CodeParser.keywordSet())
+				for (String key: Syntax.keywordSet())
 				{
 					// START KGU#288 2016-11-06: Issue #279 - method getOrDefault may not be available
 					//String keyword = CodeParser.keywordMap.getOrDefault(key, "");
 					//if (!keyword.trim().isEmpty())
-					String keyword = CodeParser.getKeyword(key);
+					String keyword = Syntax.getKeyword(key);
 					if (keyword != null && !keyword.trim().isEmpty())
 					// END KGU#288 2016-11-06
 					{
@@ -7708,39 +7708,39 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 			// END KGU#258 2016-09-26
 
 			// get fields
-			CodeParser.setKeyword("preAlt", parserPreferences.edtAltPre.getText());
-			CodeParser.setKeyword("postAlt", parserPreferences.edtAltPost.getText());
-			CodeParser.setKeyword("preCase", parserPreferences.edtCasePre.getText());
-			CodeParser.setKeyword("postCase", parserPreferences.edtCasePost.getText());
-			CodeParser.setKeyword("preFor", parserPreferences.edtForPre.getText());
-			CodeParser.setKeyword("postFor", parserPreferences.edtForPost.getText());
+			Syntax.setKeyword("preAlt", parserPreferences.edtAltPre.getText());
+			Syntax.setKeyword("postAlt", parserPreferences.edtAltPost.getText());
+			Syntax.setKeyword("preCase", parserPreferences.edtCasePre.getText());
+			Syntax.setKeyword("postCase", parserPreferences.edtCasePost.getText());
+			Syntax.setKeyword("preFor", parserPreferences.edtForPre.getText());
+			Syntax.setKeyword("postFor", parserPreferences.edtForPost.getText());
 			// START KGU#3 2015-11-08: New configurable separator for FOR loop step const
-			CodeParser.setKeyword("stepFor", parserPreferences.edtForStep.getText());
+			Syntax.setKeyword("stepFor", parserPreferences.edtForStep.getText());
 			// END KGU#3 2015-11-08
 			// START KGU#61 2016-03-21: New configurable keywords for FOR-IN loop
-			CodeParser.setKeyword("preForIn", parserPreferences.edtForInPre.getText());
-			CodeParser.setKeyword("postForIn", parserPreferences.edtForInPost.getText());
+			Syntax.setKeyword("preForIn", parserPreferences.edtForInPre.getText());
+			Syntax.setKeyword("postForIn", parserPreferences.edtForInPost.getText());
 			// END KGU#61 2016-03-21
-			CodeParser.setKeyword("preWhile", parserPreferences.edtWhilePre.getText());
-			CodeParser.setKeyword("postWhile", parserPreferences.edtWhilePost.getText());
-			CodeParser.setKeyword("preRepeat", parserPreferences.edtRepeatPre.getText());
-			CodeParser.setKeyword("postRepeat", parserPreferences.edtRepeatPost.getText());
+			Syntax.setKeyword("preWhile", parserPreferences.edtWhilePre.getText());
+			Syntax.setKeyword("postWhile", parserPreferences.edtWhilePost.getText());
+			Syntax.setKeyword("preRepeat", parserPreferences.edtRepeatPre.getText());
+			Syntax.setKeyword("postRepeat", parserPreferences.edtRepeatPost.getText());
 			// START KGU#78 2016-03-25: Enh. #23 - Jump configurability introduced
-			CodeParser.setKeyword("preLeave", parserPreferences.edtJumpLeave.getText());
-			CodeParser.setKeyword("preReturn", parserPreferences.edtJumpReturn.getText());
-			CodeParser.setKeyword("preExit", parserPreferences.edtJumpExit.getText());
+			Syntax.setKeyword("preLeave", parserPreferences.edtJumpLeave.getText());
+			Syntax.setKeyword("preReturn", parserPreferences.edtJumpReturn.getText());
+			Syntax.setKeyword("preExit", parserPreferences.edtJumpExit.getText());
 			// END KGU#78 2016-03-25
 			// START KGU#686 2019-03-18: Enh. #56 - Try / Carch / Throw mechanism implemented
-			CodeParser.setKeyword("preThrow", parserPreferences.edtJumpThrow.getText());
+			Syntax.setKeyword("preThrow", parserPreferences.edtJumpThrow.getText());
 			// END KGU#686 2019-03-18
-			CodeParser.setKeyword("input", parserPreferences.edtInput.getText());
-			CodeParser.setKeyword("output", parserPreferences.edtOutput.getText());
+			Syntax.setKeyword("input", parserPreferences.edtInput.getText());
+			Syntax.setKeyword("output", parserPreferences.edtOutput.getText());
 			// START KGU#165 2016-03-25: We need a transparent decision here
-			CodeParser.ignoreCase = parserPreferences.chkIgnoreCase.isSelected();
+			Syntax.ignoreCase = parserPreferences.chkIgnoreCase.isSelected();
 			// END KGU#165 2016-03-25
 
 			// save fields to ini-file
-			CodeParser.saveToINI();
+			Syntax.saveToINI();
 			
 			// START KGU#258 2016-09-26: Enh. #253 - now try a refactoring if specified
 			boolean redrawn = false;
@@ -7810,7 +7810,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 			String oldValue = entry.getValue().concatenate();
 			// START KGU#288 2016-11-06: Issue #279 - Method getOrDefault() missing in OpenJDK
 			//String newValue = CodeParser.getKeywordOrDefault(entry.getKey(), "");
-			String newValue = CodeParser.getKeywordOrDefault(entry.getKey(), "");
+			String newValue = Syntax.getKeywordOrDefault(entry.getKey(), "");
 			// END KGU#288 2016-11-06
 			if (!oldValue.equals(newValue))
 			{
@@ -7877,7 +7877,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 						Menu.msgDiscardParserPrefs.getText()) == JOptionPane.OK_OPTION) {
 					// Revert the changes
 					for (Map.Entry<String, StringList> refEntry: refactoringData.entrySet()) {
-						CodeParser.setKeyword(refEntry.getKey(), refEntry.getValue().concatenate());
+						Syntax.setKeyword(refEntry.getKey(), refEntry.getValue().concatenate());
 					}
 					answer = 2;
 				}
@@ -7885,7 +7885,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 			if (answer != 0)
 			// END KGU#362 2017-03-28
 			{
-				if (CodeParser.ignoreCase)
+				if (Syntax.ignoreCase)
 				{
 					refactoringData.put("ignoreCase", StringList.getNew("true"));
 				}
@@ -7936,7 +7936,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		int startPos = 0;
 		if (old != null) {
 			String oldPrefix = old.concatenate();
-			String newPrefix = CodeParser.getKeywordOrDefault(prefixKey, "");
+			String newPrefix = Syntax.getKeywordOrDefault(prefixKey, "");
 			if (!oldPrefix.trim().isEmpty() && structPref.startsWith(oldPrefix)) {
 				structPref = newPrefix + structPref.substring(oldPrefix.length());
 				startPos = newPrefix.length();
@@ -7945,7 +7945,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		old = refactoringData.get(postfixKey);
 		if (old != null) {
 			String oldPostfix = old.concatenate();
-			String newPostfix = CodeParser.getKeywordOrDefault(postfixKey, "");
+			String newPostfix = Syntax.getKeywordOrDefault(postfixKey, "");
 			if (!oldPostfix.trim().isEmpty() && structPref.substring(startPos).endsWith(oldPostfix)) {
 				structPref = structPref.substring(0, structPref.length() - oldPostfix.length()) + newPostfix;
 			}
@@ -7957,8 +7957,8 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		StringList structPrefLines = StringList.explode(preCase, "\n");
 		String oldPrefix = "";
 		String oldPostfix = "";
-		String newPrefix = CodeParser.getKeywordOrDefault("preCase", "");
-		String newPostfix = CodeParser.getKeywordOrDefault("postCase", "");
+		String newPrefix = Syntax.getKeywordOrDefault("preCase", "");
+		String newPostfix = Syntax.getKeywordOrDefault("postCase", "");
 		StringList old = refactoringData.get("preCase");
 		if (old != null) {
 			oldPrefix = old.concatenate();
@@ -7986,11 +7986,11 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		String oldInfix1 = "";
 		String oldInfix1a = "";
 		String oldInfix2 = "";
-		String newPrefix1 = CodeParser.getKeywordOrDefault("preFor", "");
-		String newPrefix2 = CodeParser.getKeywordOrDefault("preForIn", "");
-		String newInfix1 = CodeParser.getKeywordOrDefault("postFor", "");
-		String newInfix1a = CodeParser.getKeywordOrDefault("stepFor", "");
-		String newInfix2 = CodeParser.getKeywordOrDefault("postForIn", "");
+		String newPrefix1 = Syntax.getKeywordOrDefault("preFor", "");
+		String newPrefix2 = Syntax.getKeywordOrDefault("preForIn", "");
+		String newInfix1 = Syntax.getKeywordOrDefault("postFor", "");
+		String newInfix1a = Syntax.getKeywordOrDefault("stepFor", "");
+		String newInfix2 = Syntax.getKeywordOrDefault("postForIn", "");
 		StringList old = null;
 		if ((old = refactoringData.get("preFor")) != null) {
 			oldPrefix1 = old.concatenate();

@@ -180,7 +180,7 @@ public class NSDParser extends DefaultHandler {
 			if (fileVersion.compareTo("3.25") > 0)
 			// END KGU#362 2017-03-28
 			{
-				for (String key: CodeParser.keywordSet())
+				for (String key: Syntax.keywordSet())
 				{
 					if (attributes.getIndex(key) != -1)
 					{
@@ -203,12 +203,12 @@ public class NSDParser extends DefaultHandler {
 			// END KGU#258 2016-09-25
 			// START KGU#362 2017-03-28: Issue #370 - avoid to lose original keyword information
 			if (!refactorKeywords && !savedParserPrefs.isEmpty()) {
-				for (String key: CodeParser.keywordSet()) {
-					String current = CodeParser.getKeyword(key);
+				for (String key: Syntax.keywordSet()) {
+					String current = Syntax.getKeyword(key);
 					StringList loaded = savedParserPrefs.get(key);
 					if (loaded != null) {
 						String loadedStr = loaded.concatenate();
-						if (!(CodeParser.ignoreCase && loadedStr.equalsIgnoreCase(current) || loadedStr.equals(current))) {
+						if (!(Syntax.ignoreCase && loadedStr.equalsIgnoreCase(current) || loadedStr.equals(current))) {
 							savedParserPrefs.put("ignoreCase", StringList.getNew(Boolean.toString(ignoreCase)));
 							root.storedParserPrefs = savedParserPrefs;
 							break;
@@ -508,7 +508,7 @@ public class NSDParser extends DefaultHandler {
 			{
 				// Now we try to reconstruct the value list.
 				// For this we use the post-FOR-IN separator that was valid on saving the file 
-				String currentInSep = D7Parser.getKeyword("postForIn");
+				String currentInSep = Syntax.getKeyword("postForIn");
 				if (!savedParserPrefs.containsKey("postForIn") && attributes.getIndex("insep")!=-1)
 				{
 					// In this case it's unlikely that the FOR-IN separator has already been 
@@ -516,7 +516,7 @@ public class NSDParser extends DefaultHandler {
 					if (inSep != null && !inSep.trim().isEmpty())
 					{
 						// Temporarily substitute the postForIn keyword with that from file
-						D7Parser.setKeyword("postForIn", inSep);
+						Syntax.setKeyword("postForIn", inSep);
 					}
 				}
 				try {
@@ -527,7 +527,7 @@ public class NSDParser extends DefaultHandler {
 				}
 				finally {
 					// Make sure the current FOR-IN separator does not remain crooked
-					D7Parser.setKeyword("postForIn", currentInSep);
+					Syntax.setKeyword("postForIn", currentInSep);
 				}
 			}
 			// END KGU#61 2016-03-21

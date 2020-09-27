@@ -52,6 +52,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig     2017.06.30      Enh. #389: New attribute "includeList" added.
  *      Kay Gürtzig     2019-03-17      Enh. #56: Method generateCode(Try, String) implemented.
  *      Kay Gürtzig     2019-11-13      Method loadLicenseText moved to Generator in order to fix bug #778
+ *      Kay Gürtzig     2020-08-12      Issue #800: CodeParser references replaced by Syntax
  *
  ******************************************************************************************************
  *
@@ -65,7 +66,7 @@ import lu.fisch.utils.*;
 import lu.fisch.structorizer.elements.*;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
 import lu.fisch.structorizer.io.Ini;
-import lu.fisch.structorizer.parsers.CodeParser;
+import lu.fisch.structorizer.syntax.Syntax;
 
 public class XmlGenerator extends Generator
 {
@@ -302,7 +303,7 @@ public class XmlGenerator extends Generator
 				specificAttributes +
 				"\" style=\"" + BString.encodeToHtml(_for.style.toString()) +
 				// FIXME: No longer needed beyond version 3.25-01, except for backward compatibility (i. e. temporarily)
-				(_for.isForInLoop() ? ("\" insep=\"" + BString.encodeToHtml(CodeParser.getKeyword("postForIn"))) : "") +
+				(_for.isForInLoop() ? ("\" insep=\"" + BString.encodeToHtml(Syntax.getKeyword("postForIn"))) : "") +
 				"\" color=\"" + _for.getHexColor()+"\" disabled=\""+
 				(_for.disabled ? "1" : "0") + "\">");
 		// END KGU#118 2015-12-31
@@ -417,7 +418,7 @@ public class XmlGenerator extends Generator
 		// START KGU#257 2016-09-25: Enh. #253
 		String pp_attributes = "";
 		
-		for (Map.Entry<String, String> entry: CodeParser.getPropertyMap(true).entrySet())
+		for (Map.Entry<String, String> entry: Syntax.getPropertyMap(true).entrySet())
 		{
 			// Empty keywords will hardly have been used in this diagram, so it's okay to omit them
 			// START KGU#362 2017-03-28: Enh. #370 - Special care for un-refactored diagrams

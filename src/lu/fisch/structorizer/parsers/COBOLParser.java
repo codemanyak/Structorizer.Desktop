@@ -5683,7 +5683,7 @@ public class COBOLParser extends CodeParser
 			if (content.endsWith(", ")) {
 				content = content.substring(0,  content.length()-2);
 			}
-			content = CodeParser.getKeyword("output") + " " + content;
+			content = getKeyword("output") + " " + content;
 			Instruction instr = new Instruction(content);
 			_parentNode.addElement(this.equipWithSourceComment(instr, _reduction));
 		}
@@ -5815,7 +5815,7 @@ public class COBOLParser extends CodeParser
 		{
 			//System.out.println("PROD_GOBACK_STATEMENT_GOBACK");
 			Reduction secRed = _reduction.get(1).asReduction();
-			String content = CodeParser.getKeywordOrDefault("preReturn", "return");
+			String content = getKeywordOrDefault("preReturn", "return");
 			if (secRed.getParent().getTableIndex() == RuleConstants.PROD_EXIT_PROGRAM_RETURNING2) {
 				content = this.getContent_R(secRed.get(1).asReduction(), content + " ");
 			}
@@ -5828,7 +5828,7 @@ public class COBOLParser extends CodeParser
 			//System.out.println("PROD_STOP_STATEMENT_STOP[_RUN]");
 			int contentIx = (ruleId == RuleConstants.PROD_STOP_STATEMENT_STOP) ? 1 : 2;
 			Reduction secRed = _reduction.get(contentIx).asReduction();
-			String content = CodeParser.getKeywordOrDefault("preExit", "exit");
+			String content = getKeywordOrDefault("preExit", "exit");
 			String exitVal = this.getContent_R(secRed, "").trim();
 			if (exitVal.isEmpty()) exitVal = "0";
 			_parentNode.addElement(this.equipWithSourceComment(new Jump(content + " " + exitVal), _reduction));
@@ -7214,7 +7214,7 @@ public class COBOLParser extends CodeParser
 					fileStatusCase.qs.get(i).addElement(asgnmt);
 				}
 				fileStatusFct.children.addElement(fileStatusCase);
-				fileStatusFct.children.addElement(new Instruction(CodeParser.getKeywordOrDefault("preReturn", "return") + " file_status"));
+				fileStatusFct.children.addElement(new Instruction(getKeywordOrDefault("preReturn", "return") + " file_status"));
 				this.addRoot(fileStatusFct);
 				this.fileStatusFctAdded = true;
 			}
@@ -7598,14 +7598,14 @@ public class COBOLParser extends CodeParser
 		case RuleConstants.PROD_EXIT_BODY_PROGRAM:	// <exit_body> ::= PROGRAM <exit_program_returning>
 		case RuleConstants.PROD_EXIT_BODY_FUNCTION:	// <exit_body> ::= FUNCTION
 			{
-				content = CodeParser.getKeywordOrDefault("preReturn", "return");
+				content = getKeywordOrDefault("preReturn", "return");
 				if (secRed.getParent().getTableIndex() == RuleConstants.PROD_EXIT_PROGRAM_RETURNING2) {
 					content = this.getContent_R(secRed.get(1).asReduction(), content + " ");
 				}
 			}
 			break;
 		case RuleConstants.PROD_EXIT_BODY_PERFORM:	// <exit_body> ::= PERFORM
-			content = CodeParser.getKeywordOrDefault("preLeave", "leave");
+			content = getKeywordOrDefault("preLeave", "leave");
 			break;
 		case RuleConstants.PROD_EXIT_BODY_PERFORM_CYCLE: // <exit_body> ::= PERFORM CYCLE
 			content = "continue";	// may even work in some code exports, can be understood
@@ -7618,7 +7618,7 @@ public class COBOLParser extends CodeParser
 			//content = this.getContent_R(_reduction, "");
 			//color = Color.RED;
 			//comment = "Unsupported kind of JUMP";
-			content = CodeParser.getKeywordOrDefault("preReturn", "return");
+			content = getKeywordOrDefault("preReturn", "return");
 			comment = "EXIT " + secRed.get(0).asString();
 			exitTarget = (secRuleId == RuleConstants.PROD_EXIT_BODY_SECTION) ? SoPTarget.SOP_SECTION : SoPTarget.SOP_PARAGRAPH;
 			break;

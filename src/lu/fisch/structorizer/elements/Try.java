@@ -53,7 +53,6 @@ import javax.swing.ImageIcon;
 
 import lu.fisch.graphics.Canvas;
 import lu.fisch.graphics.Rect;
-import lu.fisch.structorizer.elements.Element;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
 import lu.fisch.structorizer.syntax.Syntax;

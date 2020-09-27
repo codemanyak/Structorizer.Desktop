@@ -93,7 +93,6 @@ import lu.fisch.graphics.*;
 import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.gui.IconLoader;
 import lu.fisch.structorizer.gui.SelectedSequence;
-import lu.fisch.structorizer.parsers.CodeParser;
 import lu.fisch.structorizer.syntax.Syntax;
 //import lu.fisch.structorizer.gui.IconLoader;
 import lu.fisch.utils.*;
@@ -599,12 +598,12 @@ public class Instruction extends Element {
 	{
 		StringList tokens = Syntax.splitLexically(line, true);
 		// FIXME: These tests might be too simple if the keywords don't comply with identifier syntax
-		return (tokens.indexOf(CodeParser.getKeyword("preReturn"), !CodeParser.ignoreCase) == 0 ||
-				tokens.indexOf(CodeParser.getKeyword("preLeave"), !CodeParser.ignoreCase) == 0 ||
+		return (tokens.indexOf(Syntax.getKeyword("preReturn"), !Syntax.ignoreCase) == 0 ||
+				tokens.indexOf(Syntax.getKeyword("preLeave"), !Syntax.ignoreCase) == 0 ||
 				// START KGU#686 2019-03-18: Enh. #56 new flavour, for try/catch
-				tokens.indexOf(CodeParser.getKeyword("preThrow"), !CodeParser.ignoreCase) == 0 ||
+				tokens.indexOf(Syntax.getKeyword("preThrow"), !Syntax.ignoreCase) == 0 ||
 				// END KGU#686 2019-03-18
-				tokens.indexOf(CodeParser.getKeyword("preExit"), !CodeParser.ignoreCase) == 0
+				tokens.indexOf(Syntax.getKeyword("preExit"), !Syntax.ignoreCase) == 0
 				);
 	}
 	/** @return true if this element is empty or consists of exactly one line and the line complies to {@link #isJump(String)} */
@@ -671,7 +670,7 @@ public class Instruction extends Element {
 	public static boolean isOutput(String line)
 	{
 		StringList tokens = Syntax.splitLexically(line, true);
-		return (tokens.indexOf(CodeParser.getKeyword("output"), !CodeParser.ignoreCase) == 0);
+		return (tokens.indexOf(Syntax.getKeyword("output"), !Syntax.ignoreCase) == 0);
 	}
 	/** @return true if at least one of the instruction lines of {@code this} complies to {@link #isOutput(String)} */
 	public boolean isOutput()
@@ -703,8 +702,8 @@ public class Instruction extends Element {
 	{
 		StringList inputItems = null;
 		StringList tokens = Syntax.splitLexically(line, true);
-		StringList keyTokens = Syntax.splitLexically(CodeParser.getKeyword("input"), false);
-		if (tokens.indexOf(keyTokens, 0, !CodeParser.ignoreCase) == 0) {
+		StringList keyTokens = Syntax.splitLexically(Syntax.getKeyword("input"), false);
+		if (tokens.indexOf(keyTokens, 0, !Syntax.ignoreCase) == 0) {
 			// It is an input instruction
 			inputItems = new StringList();
 			tokens.remove(0, keyTokens.count());	// Remove the keyword

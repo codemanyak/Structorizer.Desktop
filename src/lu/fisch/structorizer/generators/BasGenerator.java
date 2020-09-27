@@ -106,7 +106,6 @@ import lu.fisch.structorizer.elements.TypeMapEntry;
 import lu.fisch.structorizer.elements.While;
 import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
-import lu.fisch.structorizer.parsers.CodeParser;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.StringList;
 
@@ -435,12 +434,12 @@ public class BasGenerator extends Generator
 	protected String transform(String _input)
 	{
 		// START KGU#101 2015-12-19: Enh. #54 - support lists of output expressions
-		if (_input.matches("^" + getKeywordPattern(CodeParser.getKeyword("output").trim()) + "[ ](.*?)"))
+		if (_input.matches("^" + getKeywordPattern(Syntax.getKeyword("output").trim()) + "[ ](.*?)"))
 		{
 			// Replace commas by semicolons to avoid tabulation
 			StringList expressions = 
-					Element.splitExpressionList(_input.substring(CodeParser.getKeyword("output").trim().length()), ",");
-			_input = CodeParser.getKeyword("output").trim() + " " + expressions.getText().replace("\n", "; ");
+					Element.splitExpressionList(_input.substring(Syntax.getKeyword("output").trim().length()), ",");
+			_input = Syntax.getKeyword("output").trim() + " " + expressions.getText().replace("\n", "; ");
 		}
 		// END KGU#101 2015-12-19
 
@@ -1133,8 +1132,8 @@ public class BasGenerator extends Generator
 			//StringList lines = _jump.getText();
 			StringList lines = _jump.getUnbrokenText();
 			// END KGU#779 2019-12-01
-			String preReturn  = CodeParser.getKeywordOrDefault("preReturn", "return");
-			String preThrow   = CodeParser.getKeywordOrDefault("preThrow", "throw");
+			String preReturn  = Syntax.getKeywordOrDefault("preReturn", "return");
+			String preThrow   = Syntax.getKeywordOrDefault("preThrow", "throw");
 			for (int i = 0; isEmpty && i < lines.count(); i++) {
 				String line = transform(lines.get(i)).trim();
 				if (!line.isEmpty())

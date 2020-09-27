@@ -84,14 +84,17 @@ public class StrkParser extends DefaultHandler implements INSDImporter
 	
 	//---------------------- File Filter configuration ---------------------------
 	
+	@Override
 	public String getDialogTitle() {
 		return "Struktogrammeditor";
 	}
 
+	@Override
 	public String getFileDescription() {
 		return "Struktogrammeditor files";
 	}
 
+	@Override
 	public String[] getFileExtensions() {
 		final String[] exts = { "strk", "xml" };
 		return exts;
@@ -145,6 +148,7 @@ public class StrkParser extends DefaultHandler implements INSDImporter
 		return res;
 	}
 	
+	@Override
 	public javax.swing.filechooser.FileFilter getFileFilter() {
 		return new javax.swing.filechooser.FileFilter() {
 
@@ -387,10 +391,11 @@ public class StrkParser extends DefaultHandler implements INSDImporter
 		return decoded;
 	}
 
+	@Override
 	public Root parse(String _filename) throws SAXException, IOException
 	{
 		// setup a new root
-		root=new Root();
+		root = new Root();
 
 		// clear stacks
 		stack.clear();
@@ -443,7 +448,17 @@ public class StrkParser extends DefaultHandler implements INSDImporter
 	}
 
 	// START KGU#177 2016-04-14: Enh. 158 - we need an opportunity to parse an XML string as well
-	// (FIXME: This is just a copy-and-paste clone of Root parse(String _filename))
+	/* (FIXME: This is just a copy-and-paste clone of Root parse(String _filename),
+	 * but without name adaptation. Nowhere used by now, though!)
+	 */
+	/**
+	 * Parses the given XML stream {@code _is} and converts the content into a
+	 * Structorizer diagram that is to be returned
+	 * @param _is
+	 * @return the extracted Nassi-Shneiderman diagram as Structorizer {@link Root} object
+	 * @throws SAXException in case of some XML format or schema violation
+	 * @throws IOException - in case of a general IO error (e.g. stream not open)
+	 */
 	public Root parse(InputStream _is) throws SAXException, IOException
 	{
 		// setup a new root

@@ -118,7 +118,6 @@ import lu.fisch.structorizer.elements.TypeMapEntry;
 import lu.fisch.structorizer.elements.While;
 import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
-import lu.fisch.structorizer.parsers.CodeParser;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.StringList;
 
@@ -566,10 +565,10 @@ public class PerlGenerator extends Generator {
 				// START KGU#653 2019-02-15: Enh. #680 - input with several items...
 				StringList inputItems = Instruction.getInputItems(line);
 				if (inputItems != null && inputItems.count() > 2) {
-					String inputKey = CodeParser.getKeyword("input");
+					String inputKey = Syntax.getKeyword("input");
 					String prompt = inputItems.get(0);
 					if (!prompt.isEmpty()) {
-						addCode(transform(CodeParser.getKeyword("output") + " " + prompt), _indent, isDisabled);
+						addCode(transform(Syntax.getKeyword("output") + " " + prompt), _indent, isDisabled);
 					}
 					for (int j = 1; j < inputItems.count(); j++) {
 						String item = inputItems.get(j);
@@ -1025,11 +1024,11 @@ public class PerlGenerator extends Generator {
 			boolean isEmpty = true;
 			
 			StringList lines = _jump.getUnbrokenText();
-			String preReturn = CodeParser.getKeywordOrDefault("preReturn", "return");
-			String preExit   = CodeParser.getKeywordOrDefault("preExit", "exit");
-			String preLeave  = CodeParser.getKeywordOrDefault("preLeave", "leave");
+			String preReturn = Syntax.getKeywordOrDefault("preReturn", "return");
+			String preExit   = Syntax.getKeywordOrDefault("preExit", "exit");
+			String preLeave  = Syntax.getKeywordOrDefault("preLeave", "leave");
 			// START KGU#686 2019-03-21: Enh. #56
-			String preThrow  = CodeParser.getKeywordOrDefault("preThrow", "throw");
+			String preThrow  = Syntax.getKeywordOrDefault("preThrow", "throw");
 			// END KGU#686 2019-03-21
 			for (int i = 0; isEmpty && i < lines.count(); i++) {
 				String line = transform(lines.get(i)).trim();

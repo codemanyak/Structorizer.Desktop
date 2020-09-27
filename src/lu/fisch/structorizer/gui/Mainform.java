@@ -93,6 +93,7 @@ package lu.fisch.structorizer.gui;
  *      Bob Fisch       2020-05-25      New "restricted" flag to suppress GUI elements offering code import/export
  *      Kay Gürtzig     2020-06-03      Bugfix #868: mends implementation defects in Bob's most recent change
  *      Kay Gürtzig     2020-06-06      Issue #870: restricted mode now set from predominant ini file instead of command line
+ *      Kay Gürtzig     2020-08-12      Issue #800: CodeParser references replaced by Syntax
  *
  ******************************************************************************************************
  *
@@ -131,6 +132,7 @@ import javax.swing.*;
 import lu.fisch.structorizer.io.*;
 import lu.fisch.structorizer.locales.Translator;
 import lu.fisch.structorizer.parsers.*;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.turtle.TurtleBox;
 import lu.fisch.diagrcontrol.DiagramController;
 import lu.fisch.structorizer.archivar.IRoutinePool;
@@ -681,7 +683,7 @@ public class Mainform  extends LangFrame implements NSDController, IRoutinePoolL
 			updateColors();
 
 			// parser
-			CodeParser.loadFromINI();
+			Syntax.loadFromINI();
 
 			// look & feel
 			laf = ini.getProperty("laf","Mac OS X");
@@ -1150,7 +1152,7 @@ public class Mainform  extends LangFrame implements NSDController, IRoutinePoolL
 	{
 		//System.out.println("Saving");
 		saveToINI();
-		CodeParser.saveToINI();
+		Syntax.saveToINI();
 		Element.saveToINI();
 		Root.saveToINI();
 	}

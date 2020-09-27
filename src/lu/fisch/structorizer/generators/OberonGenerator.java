@@ -124,7 +124,6 @@ import java.util.Queue;
 import java.util.regex.Matcher;
 
 import lu.fisch.utils.*;
-import lu.fisch.structorizer.parsers.*;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.structorizer.elements.*;
 import lu.fisch.structorizer.executor.Function;
@@ -564,7 +563,7 @@ public class OberonGenerator extends Generator {
 			
 			appendComment(_inst, _indent);
 
-			String outputKey = CodeParser.getKeyword("output");
+			String outputKey = Syntax.getKeyword("output");
 			StringList lines = _inst.getUnbrokenText();
 			for (int i=0; i<lines.count(); i++)
 			{
@@ -602,7 +601,7 @@ public class OberonGenerator extends Generator {
 					//addCode(transf, _indent, isDisabled);
 					StringList inputItems = Instruction.getInputItems(line);
 					if (inputItems.count() > 2) {
-						String inputKey = CodeParser.getKeyword("input");
+						String inputKey = Syntax.getKeyword("input");
 						String prompt = inputItems.get(0);
 						if (!prompt.isEmpty()) {
 							generateTypeSpecificOutput(prompt, _indent, isDisabled, outputKey);
@@ -708,7 +707,7 @@ public class OberonGenerator extends Generator {
 							transline += " " + this.commentSymbolLeft() + " color = " + _inst.getHexColor() + " " + this.commentSymbolRight();
 						}
 						// START KGU 2017-01-31: return must be capitalized here
-						transline = transline.replaceFirst("^" + BString.breakup(CodeParser.getKeywordOrDefault("preReturn", "return"), true) + "($|\\W+.*)", "RETURN$1");
+						transline = transline.replaceFirst("^" + BString.breakup(Syntax.getKeywordOrDefault("preReturn", "return"), true) + "($|\\W+.*)", "RETURN$1");
 						// END KGU 2017-01-31
 						// START KGU#261/KGU#504 2018-03-13: Enh. #259/#335, bugfix #521
 						//addCode(transline, _indent, isDisabled);
@@ -1334,9 +1333,9 @@ public class OberonGenerator extends Generator {
 			}
 			// START KGU#74/KGU#78 2015-11-30: More sophisticated jump handling
 			//code.add(_indent + line + ";");
-			String preReturn = CodeParser.getKeywordOrDefault("preReturn", "return");
-			String preExit   = CodeParser.getKeywordOrDefault("preExit", "exit");
-			String preLeave  = CodeParser.getKeywordOrDefault("preLeave", "leave");
+			String preReturn = Syntax.getKeywordOrDefault("preReturn", "return");
+			String preExit   = Syntax.getKeywordOrDefault("preExit", "exit");
+			String preLeave  = Syntax.getKeywordOrDefault("preLeave", "leave");
 			if (line.matches(Matcher.quoteReplacement(preReturn)+"([\\W].*|$)"))
 			{
 				addCode("RETURN " + line.substring(preReturn.length()).trim() + ";",

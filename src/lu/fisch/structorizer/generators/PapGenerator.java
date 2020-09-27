@@ -75,7 +75,7 @@ import lu.fisch.structorizer.elements.Subqueue;
 import lu.fisch.structorizer.elements.Try;
 import lu.fisch.structorizer.elements.While;
 import lu.fisch.structorizer.executor.Function;
-import lu.fisch.structorizer.parsers.CodeParser;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.BString;
 import lu.fisch.utils.StringList;
 
@@ -556,20 +556,20 @@ public class PapGenerator extends Generator {
 				// FIXME: EXIT node found - Prepare a routing from this figure to the target figure!
 				// START KGU#496 2020-04-02: Enh. #440 Provisional approach
 				// As a first shot, we just build a dead end, i.e. a blind connector without exit link (ironically)
-				String label = CodeParser.getKeywordOrDefault("preLeave", "break");
+				String label = Syntax.getKeywordOrDefault("preLeave", "break");
 				if (!text.isEmpty()) {
 					// Not a default leave, check whether the line contains arguments
 					if (((Jump) element).isReturn()) {
-						label = CodeParser.getKeywordOrDefault("preReturn", "return");
+						label = Syntax.getKeywordOrDefault("preReturn", "return");
 						if (isLastElementOfRoot()) {
 							isRegularReturn = true;
 						}
 					}
 					else if (((Jump) element).isExit()) {
-						label = CodeParser.getKeywordOrDefault("preExit", "exit");
+						label = Syntax.getKeywordOrDefault("preExit", "exit");
 					}
 					else if (((Jump) element).isThrow()) {
-						label = CodeParser.getKeywordOrDefault("preThrow", "throw");
+						label = Syntax.getKeywordOrDefault("preThrow", "throw");
 					}
 				}
 				PapFigure lastFigure = new PapFigure(row++, column0, PapFigure.Type.PapActivity, text.getText(), null);

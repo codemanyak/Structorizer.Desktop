@@ -128,7 +128,6 @@ package lu.fisch.structorizer.generators;
  ******************************************************************************************************///
 
 import lu.fisch.utils.*;
-import lu.fisch.structorizer.parsers.*;
 import lu.fisch.structorizer.syntax.Syntax;
 
 import java.util.HashMap;
@@ -490,7 +489,7 @@ public class PHPGenerator extends Generator
 					for (int j = 1; j < inputItems.count(); j++) {
 						// Let the variable name be used as default key for the retrieval
 						String key = prompt == null ? "'" + inputItems.get(j) + "'" : prompt;
-						String subLine = CodeParser.getKeyword("input") + " " + key + " " + inputItems.get(j);
+						String subLine = Syntax.getKeyword("input") + " " + key + " " + inputItems.get(j);
 						addCode(transform(subLine) + ";", _indent, isDisabled);
 					}
 				}
@@ -836,10 +835,10 @@ public class PHPGenerator extends Generator
 		boolean isEmpty = true;
 		
 		StringList lines = _jump.getUnbrokenText();
-		String preReturn = CodeParser.getKeywordOrDefault("preReturn", "return");
-		String preExit   = CodeParser.getKeywordOrDefault("preExit", "exit");
+		String preReturn = Syntax.getKeywordOrDefault("preReturn", "return");
+		String preExit   = Syntax.getKeywordOrDefault("preExit", "exit");
 		//String preLeave  = CodeParser.getKeywordOrDefault("preLeave", "leave");
-		String preThrow  = CodeParser.getKeywordOrDefault("preThrow", "throw");
+		String preThrow  = Syntax.getKeywordOrDefault("preThrow", "throw");
 		for (int i = 0; isEmpty && i < lines.count(); i++) {
 			// FIXME: That the line is transformed prior to the detection is a potential risk
 			String line = transform(lines.get(i)).trim();

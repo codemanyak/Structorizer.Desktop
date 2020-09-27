@@ -37,6 +37,7 @@ package lu.fisch.structorizer.gui;
  *      Kay Gürtzig     2018-12-30      Issue #658: Text fields for Jump keywords enabled.
  *      Kay Gürtzig     2019-03-05      Enh. #327: Adaptation in parserPrefsButtonActionPerformed(ActionEvent)
  *      Kay Gürtzig     2019-03-24      Enh. #56: Try elements and Throw flavour of Jump elements introduced
+ *      Kay Gürtzig     2020-08-12      Enh. #800: CodeParser references replaced by Syntax
  *
  ******************************************************************************************************
  *
@@ -84,7 +85,7 @@ import lu.fisch.structorizer.io.Ini;
 import lu.fisch.structorizer.io.LicFilter;
 import lu.fisch.structorizer.locales.LangDialog;
 import lu.fisch.structorizer.locales.LangTextHolder;
-import lu.fisch.structorizer.parsers.CodeParser;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.StringList;
 
 /**
@@ -743,7 +744,7 @@ public class AttributeInspector extends LangDialog implements WindowListener {
 				String text = "";
 				if (keyTokens != null) { text = keyTokens.concatenate(); }
 				entry.getValue().setText(text);
-				if (!CodeParser.getKeywordOrDefault(entry.getKey(), "").equals(text)) {
+				if (!Syntax.getKeywordOrDefault(entry.getKey(), "").equals(text)) {
 					entry.getValue().setForeground(Color.RED);
 					entry.getValue().setEditable(false);
 					entry.getValue().setEnabled(true);
@@ -756,28 +757,28 @@ public class AttributeInspector extends LangDialog implements WindowListener {
 		ParserPreferences parserPreferences = new ParserPreferences(frame);
 		parserPreferences.setTitle(parserPreferences.getTitle() + " for comparison / to adopt");
 		// set fields
-		parserPreferences.edtAltPre.setText(CodeParser.getKeyword("preAlt"));
-		parserPreferences.edtAltPost.setText(CodeParser.getKeyword("postAlt"));
-		parserPreferences.edtCasePre.setText(CodeParser.getKeyword("preCase"));
-		parserPreferences.edtCasePost.setText(CodeParser.getKeyword("postCase"));
-		parserPreferences.edtForPre.setText(CodeParser.getKeyword("preFor"));
-		parserPreferences.edtForPost.setText(CodeParser.getKeyword("postFor"));
-		parserPreferences.edtForStep.setText(CodeParser.getKeyword("stepFor"));
-		parserPreferences.edtForInPre.setText(CodeParser.getKeyword("preForIn"));
-		parserPreferences.edtForInPost.setText(CodeParser.getKeyword("postForIn"));
-		parserPreferences.edtWhilePre.setText(CodeParser.getKeyword("preWhile"));
-		parserPreferences.edtWhilePost.setText(CodeParser.getKeyword("postWhile"));
-		parserPreferences.edtRepeatPre.setText(CodeParser.getKeyword("preRepeat"));
-		parserPreferences.edtRepeatPost.setText(CodeParser.getKeyword("postRepeat"));
-		parserPreferences.edtJumpLeave.setText(CodeParser.getKeyword("preLeave"));
-		parserPreferences.edtJumpReturn.setText(CodeParser.getKeyword("preReturn"));
-		parserPreferences.edtJumpExit.setText(CodeParser.getKeyword("preExit"));
+		parserPreferences.edtAltPre.setText(Syntax.getKeyword("preAlt"));
+		parserPreferences.edtAltPost.setText(Syntax.getKeyword("postAlt"));
+		parserPreferences.edtCasePre.setText(Syntax.getKeyword("preCase"));
+		parserPreferences.edtCasePost.setText(Syntax.getKeyword("postCase"));
+		parserPreferences.edtForPre.setText(Syntax.getKeyword("preFor"));
+		parserPreferences.edtForPost.setText(Syntax.getKeyword("postFor"));
+		parserPreferences.edtForStep.setText(Syntax.getKeyword("stepFor"));
+		parserPreferences.edtForInPre.setText(Syntax.getKeyword("preForIn"));
+		parserPreferences.edtForInPost.setText(Syntax.getKeyword("postForIn"));
+		parserPreferences.edtWhilePre.setText(Syntax.getKeyword("preWhile"));
+		parserPreferences.edtWhilePost.setText(Syntax.getKeyword("postWhile"));
+		parserPreferences.edtRepeatPre.setText(Syntax.getKeyword("preRepeat"));
+		parserPreferences.edtRepeatPost.setText(Syntax.getKeyword("postRepeat"));
+		parserPreferences.edtJumpLeave.setText(Syntax.getKeyword("preLeave"));
+		parserPreferences.edtJumpReturn.setText(Syntax.getKeyword("preReturn"));
+		parserPreferences.edtJumpExit.setText(Syntax.getKeyword("preExit"));
 		// START KGU#686 2019-03-24: Enh. #56
-		parserPreferences.edtJumpThrow.setText(CodeParser.getKeyword("preThrow"));
+		parserPreferences.edtJumpThrow.setText(Syntax.getKeyword("preThrow"));
 		// END KGU#686 2019-03-24
-		parserPreferences.edtInput.setText(CodeParser.getKeyword("input"));
-		parserPreferences.edtOutput.setText(CodeParser.getKeyword("output"));
-		parserPreferences.chkIgnoreCase.setSelected(CodeParser.ignoreCase);
+		parserPreferences.edtInput.setText(Syntax.getKeyword("input"));
+		parserPreferences.edtOutput.setText(Syntax.getKeyword("output"));
+		parserPreferences.chkIgnoreCase.setSelected(Syntax.ignoreCase);
 
 		parserPreferences.edtAltPre.setEnabled(false);
 		parserPreferences.edtAltPost.setEnabled(false);

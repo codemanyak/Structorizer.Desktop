@@ -139,7 +139,7 @@ import java.util.regex.Matcher;
 import lu.fisch.structorizer.elements.*;
 import lu.fisch.structorizer.executor.Executor;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
-import lu.fisch.structorizer.parsers.CodeParser;
+import lu.fisch.structorizer.syntax.Syntax;
 
 
 public class CSharpGenerator extends CGenerator 
@@ -320,7 +320,7 @@ public class CSharpGenerator extends CGenerator
 		String subst = getOutputReplacer();
 		String subst0 = subst.replaceAll("Line", "");
 		// Between the input keyword and the variable name there MUST be some blank...
-		String keyword = CodeParser.getKeyword("output").trim();
+		String keyword = Syntax.getKeyword("output").trim();
 		if (!keyword.isEmpty() && _interm.startsWith(keyword))
 		{
 			String matcher = Matcher.quoteReplacement(keyword);

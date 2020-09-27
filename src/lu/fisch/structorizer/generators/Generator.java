@@ -206,7 +206,6 @@ import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.helpers.IPluginClass;
 import lu.fisch.structorizer.io.Ini;
 import lu.fisch.structorizer.io.LicFilter;
-import lu.fisch.structorizer.parsers.CodeParser;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.BString;
 import lu.fisch.utils.BTextfile;
@@ -412,9 +411,6 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	 */
 	protected StringList varNames = new StringList();
 	// END KGU#129/KGU#61 2015-01-22
-	// START KGU 2016-03-29: For keyword detection improvement
-	private Vector<StringList> splitKeywords = new Vector<StringList>();
-	// END KGU 2016-03-29
 	// START KGU#446 2017-10-27: Enh. #441
 	/** Flag to remember whether Turtleizer routine calls are in the code (to prepare support if possible) */
 	protected boolean usesTurtleizer = false;
@@ -1690,15 +1686,16 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		// START KGU 2016-03-29: Unify all parser keywords
 		// This is somewhat redundant because most of the keywords have already been cut out
 		// but it's still needed for the meaningful ones.
-		String[] keywords = CodeParser.getAllProperties();
+		String[] keywords = Syntax.getAllProperties();
 		for (int kw = 0; kw < keywords.length; kw++)
 		{
-			if (keywords[kw].trim().length() > 0)
+			String keyword = keywords[kw];
+			if (keyword.trim().length() > 0)
 			{
-				StringList keyTokens = this.splitKeywords.elementAt(kw);
+				StringList keyTokens = Syntax.getSplitKeyword(keywords[kw]);
 				int keyLength = keyTokens.count();
 				int pos = -1;
-				while ((pos = tokens.indexOf(keyTokens, pos + 1, !CodeParser.ignoreCase)) >= 0)
+				while ((pos = tokens.indexOf(keyTokens, pos + 1, !Syntax.ignoreCase)) >= 0)
 				{
 					// Replace the first token of the keyword by the entire keyword
 					tokens.set(pos, keywords[kw]);
@@ -1731,11 +1728,11 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 			//transformed = transformInput(transformed);
 			//// output instruction transformation
 			//transformed = transformOutput(transformed);
-			if (transformed.indexOf(CodeParser.getKeyword("input").trim()) >= 0)
+			if (transformed.indexOf(Syntax.getKeyword("input").trim()) >= 0)
 			{
 				transformed = transformInput(transformed);
 			}
-			else if (transformed.indexOf(CodeParser.getKeyword("output").trim()) >= 0)
+			else if (transformed.indexOf(Syntax.getKeyword("output").trim()) >= 0)
 			{
 				transformed = transformOutput(transformed);
 			}
@@ -1878,7 +1875,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		//String subst = getInputReplacer();
 		// END KGU#281 2016-10-15
 		// Between the input keyword and the variable name there MUST be some blank...
-		String keyword = CodeParser.getKeyword("input").trim();
+		String keyword = Syntax.getKeyword("input").trim();
 		// START KGU#399 2017-05-16: bugfix #403
 		//if (!keyword.isEmpty() && _interm.startsWith(keyword))
 		String gap = (!keyword.isEmpty() && Character.isJavaIdentifierPart(keyword.charAt(keyword.length()-1)) ? "[\\W]" : "");
@@ -1956,7 +1953,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	protected String transformOutput(String _interm)
 	{
 		String subst = getOutputReplacer();
-		String keyword = CodeParser.getKeyword("output").trim();
+		String keyword = Syntax.getKeyword("output").trim();
 		// START KGU#399 2017-05-16: bugfix #403
 		//if (!keyword.isEmpty() && _interm.startsWith(keyword))
 		// Between the input keyword and a variable name there must be some blank unless the keyword itself ends
@@ -2000,15 +1997,15 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	// START KGU#165 2016-04-03: Support keyword case sensitivity
 	/**
 	 * Returns an appropriate match string for the given parser preference string
-	 * (where {@link CodeParser#ignoreCase} is paid attention to)
-	 * @see lu.fisch.structorizer.parsers.CodeParser#getKeyword(String)
+	 * (where {@link Syntax#ignoreCase} is paid attention to)
+	 * @see lu.fisch.structorizer.parsers.Syntax#getKeyword(String)
 	 * @param keyword - parser preference string
 	 * @return match pattern
 	 */
 	protected static String getKeywordPattern(String keyword)
 	{
 		String pattern = Matcher.quoteReplacement(keyword);
-		if (CodeParser.ignoreCase)
+		if (Syntax.ignoreCase)
 		{
 			pattern = BString.breakup(pattern, true);
 		}
@@ -2039,7 +2036,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	{
 		boolean surelyReturns = false;
 //		String preLeave  = CodeParser.getKeywordOrDefault("preLeave", "leave");
-		String preReturn = CodeParser.getKeywordOrDefault("preReturn", "return");
+		String preReturn = Syntax.getKeywordOrDefault("preReturn", "return");
 //		String preExit   = CodeParser.getKeywordOrDefault("preExit", "exit");
 //		String patternLeave = getKeywordPattern(preLeave) + "([\\W].*|$)";
 		String patternReturn = getKeywordPattern(preReturn) + "([\\W].*|$)";
@@ -3711,6 +3708,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 //			// END KGU#194 2016-05-07
 //
 //			// START KGU 2016-03-29: Pre-processed match patterns for better identification of complicated keywords
+			// KGU 2020-08-13: Has never been used, though
 //			this.splitKeywords.clear();
 //			String[] keywords = CodeParser.getAllProperties();
 //			for (int k = 0; k < keywords.length; k++)
@@ -3859,14 +3857,6 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 
 		//=============== Get export options ======================
 		getExportOptions(false);
-
-		//=============== Split keywords for more precise detection ======================
-		this.splitKeywords.clear();
-		String[] keywords = CodeParser.getAllProperties();
-		for (int k = 0; k < keywords.length; k++)
-		{
-			this.splitKeywords.add(Syntax.splitLexically(keywords[k], false));
-		}
 
 		//=============== Now do the code generation ======================
 		try
@@ -4508,13 +4498,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 			// END KGU#815/KGU#824 2020-03-21
 		}
 
-		CodeParser.loadFromINI();
-		this.splitKeywords.clear();
-		String[] keywords = CodeParser.getAllProperties();
-		for (int k = 0; k < keywords.length; k++)
-		{
-			this.splitKeywords.add(Syntax.splitLexically(keywords[k], false));
-		}
+		Syntax.loadFromINI();
 
 		/* START KGU#676 2019-03-13: Enh. #696 Now that we can export archives
 		 * we must consider subroutines and includes here too */
@@ -4654,15 +4638,6 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 				pureFilename = pureFilename.substring(0, dotPos);
 			}
 			// END KGU#194 2016-05-07
-
-			// START KGU 2016-03-29: Pre-processed match patterns for better identification of complicated keywords
-			this.splitKeywords.clear();
-			String[] keywords = CodeParser.getAllProperties();
-			for (int k = 0; k < keywords.length; k++)
-			{
-				this.splitKeywords.add(Syntax.splitLexically(keywords[k], false));
-			}
-			// END KGU 2016-03-29
 
 			try
 			{

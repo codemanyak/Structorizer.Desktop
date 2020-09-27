@@ -65,7 +65,6 @@ import java.util.LinkedList;
 import lu.fisch.structorizer.elements.*;
 import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
-import lu.fisch.structorizer.parsers.CodeParser;
 import lu.fisch.structorizer.syntax.Syntax;
 
 public class TexGenerator extends Generator {
@@ -213,7 +212,7 @@ public class TexGenerator extends Generator {
 		tokens.replaceAll("!=", "\\neq");
 		tokens.replaceAll("<=", "\\leq");
 		tokens.replaceAll(">=", "\\geq");
-		String[] keywords = CodeParser.getAllProperties();
+		String[] keywords = Syntax.getAllProperties();
 		HashSet<String> keys = new HashSet<String>(keywords.length);
 		for (String keyword: keywords) {
 			keys.add(keyword);
@@ -428,14 +427,14 @@ public class TexGenerator extends Generator {
 						"\\in " + valueList + "\\)";				
 			}
 			else if (_for.style == For.ForLoopStyle.COUNTER) {
-				content = "\\pKey{" + CodeParser.getKeyword("preFor") + "}\\(" +
+				content = "\\pKey{" + Syntax.getKeyword("preFor") + "}\\(" +
 						transform(_for.getCounterVar()) +
 						"\\ \\gets\\ " +
 						transform(_for.getStartValue()) +
-						"\\)\\pKey{" + CodeParser.getKeyword("postFor") + "}\\(" +
+						"\\)\\pKey{" + Syntax.getKeyword("postFor") + "}\\(" +
 						transform(_for.getEndValue()) + "\\)";
 				if (_for.getStepConst() != 1) {
-					content += "\\pKey{" + CodeParser.getKeyword("stepFor") + "}\\(" +
+					content += "\\pKey{" + Syntax.getKeyword("stepFor") + "}\\(" +
 							transform(_for.getStepString()) + "\\)";
 				}
 			}
@@ -503,7 +502,7 @@ public class TexGenerator extends Generator {
 			{
 				// START KGU#483 2017-12-30: Bugfix #497 - should contain a keyword
 				//code.add(_indent+ "\\exit{}");
-				code.add(_indent+ "\\exit{\\(" + transform(CodeParser.getKeywordOrDefault("preLeave", "leave")) +"\\)}");
+				code.add(_indent+ "\\exit{\\(" + transform(Syntax.getKeywordOrDefault("preLeave", "leave")) +"\\)}");
 				// END KGU#483 2017-12-30
 			}
 			else

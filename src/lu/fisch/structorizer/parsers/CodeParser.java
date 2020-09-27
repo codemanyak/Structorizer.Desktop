@@ -52,6 +52,7 @@ package lu.fisch.structorizer.parsers;
  *      Kay Gürtzig     2020-03-08      Issue #833: Modified API for new mechanism to get rid of superfluous roots
  *      Kay Gürtzig     2020-03-09      Issue #835: New import option and method for insertion of structure preference keywords
  *      Kay Gürtzig     2020-04-24      Method cleanComment() improved (indentation trimmed, empty lines dropped)
+ *      Kay Gürtzig     2020-08-22      Issue #800: Configurable keyword stuff moved to class Syntax
  *
  ******************************************************************************************************
  *
@@ -69,10 +70,8 @@ import java.io.OutputStreamWriter;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.logging.Level;
@@ -94,6 +93,7 @@ import lu.fisch.structorizer.elements.Root;
 import lu.fisch.structorizer.elements.Subqueue;
 import lu.fisch.structorizer.helpers.IPluginClass;
 import lu.fisch.structorizer.io.Ini;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.StringList;
 
 
@@ -1413,190 +1413,15 @@ public abstract class CodeParser extends javax.swing.filechooser.FileFilter impl
 	{
 	}
 
-	/************************
-	 * static things
-	 ************************/
-
-	// START KGU#165 2016-03-25: Once and for all: It should be a transparent choice, ...
-	/**
-	 * whether or not the keywords are to be handled in a case-independent way
-	 */
-	public static boolean ignoreCase = true;
-	// END KGU#165 2016-03-25
-
-	// START KGU#288 2016-11-06: Issue #279: Access limited to private, compensated by new methods
-	//public static final HashMap<String, String> keywordMap = new LinkedHashMap<String, String>();
-	private static final HashMap<String, String> keywordMap = new LinkedHashMap<String, String>();
-	// END KGU#288 2016-11-06
-	static {
-		keywordMap.put("preAlt",     "");
-		keywordMap.put("postAlt",    "");
-		keywordMap.put("preCase",    "");
-		keywordMap.put("postCase",   "");
-		keywordMap.put("preFor",     "for");
-		keywordMap.put("postFor",    "to");
-		keywordMap.put("stepFor",    "by");
-		keywordMap.put("preForIn",   "foreach");
-		keywordMap.put("postForIn",  "in");
-		keywordMap.put("preWhile",   "while");
-		keywordMap.put("postWhile",  "");
-		keywordMap.put("preRepeat",  "until");
-		keywordMap.put("postRepeat", "");
-		keywordMap.put("preLeave",   "leave");
-		keywordMap.put("preReturn",  "return");
-		keywordMap.put("preExit",    "exit");
-		// START KGU#686 2019-03-18: Enh. #56
-		keywordMap.put("preThrow",   "throw");
-		// END KGU#686 2019-03-18
-		keywordMap.put("input",      "INPUT");
-		keywordMap.put("output",     "OUTPUT");
-	}
-
-	// START KGU#466 2019-08-02: Issue #733 - Support selective preference export
-	public static String[] getPreferenceKeys()
-	{
-		return new String[] {"Parser*"};
-	}
-	// END KGU#466 2019-08-02
-
-	/**
-	 * Loads the parser-related preferences (i.e. chiefly the configured parser keywords)
-	 * from the Ini file into the internal cache.
-	 * @see #getPropertyMap(boolean)
-	 * @see #saveToINI()
-	 */
-	public static void loadFromINI()
-	{
-		final HashMap<String, String> defaultKeys = new HashMap<String, String>();
-		// START KGU 2017-01-06: Issue #327: Defaults changed to English
-		defaultKeys.put("ParserPreFor", "for");
-		defaultKeys.put("ParserPostFor", "to");
-		defaultKeys.put("ParserStepFor", "by");
-		defaultKeys.put("ParserPreForIn", "foreach");
-		defaultKeys.put("ParserPostForIn", "in");
-		defaultKeys.put("ParserPreWhile", "while ");
-		defaultKeys.put("ParserPreRepeat", "until ");
-		defaultKeys.put("ParserPreLeave", "leave");
-		defaultKeys.put("ParserPreReturn", "return");
-		defaultKeys.put("ParserPreExit", "exit");
-		defaultKeys.put("ParserInput", "INPUT");
-		defaultKeys.put("ParserOutput", "OUTPUT");
-		// END KGU 2017-01-06 #327
-		// START KGU#376 2017-04-11: Enh. #389
-		defaultKeys.put("ParserPreImport", "include");
-		// END KGU#376 2017-04-11
-		// START KGU#686 2019-03-18: Enh. #56
-		defaultKeys.put("ParserPreThrow", "throw");
-		// END KGU#686 2019-03-18
-		try
-		{
-			Ini ini = Ini.getInstance();
-			ini.load();
-
-			for (String key: keywordMap.keySet())
-			{
-				String propertyName = "Parser" + Character.toUpperCase(key.charAt(0)) + key.substring(1);
-				if(defaultKeys.containsKey(propertyName))
-				{
-					keywordMap.put(key, ini.getProperty(propertyName, defaultKeys.get(propertyName)));
-				}
-				else
-				{
-					keywordMap.put(key, ini.getProperty(propertyName, ""));
-				}
-			}
-			// START KGU#659 2019-02-19: Bugfix #684 - An empty FOR-IN keyword (legacy) meant equality with FOR loop keyword 
-			if (keywordMap.get("preForIn").trim().isEmpty()) {
-				keywordMap.put("preForIn", keywordMap.get("preFor"));
-			}
-			// END KGU#659 2019-02-19
-
-			// START KGU#165 2016-03-25: Enhancement configurable case awareness
-			ignoreCase = ini.getProperty("ParserIgnoreCase", "true").equalsIgnoreCase("true");
-			// END KGU#3 2016-03-25
-
-		}
-		catch (Exception e)
-		{
-			Logger.getLogger(CodeParser.class.getName()).log(Level.WARNING, "Ini", e);
-		}
-	}
-	
-	/**
-	 * Saves the parser-related preferences, i.e. chiefly the configured keywords to the
-	 * Ini file.
-	 * @see #getPropertyMap(boolean)
-	 * @see #loadFromINI()
-	 */
-	public static void saveToINI()
-	{
-		try
-		{
-			Ini ini = Ini.getInstance();
-			ini.load();			// elements
-			for (Map.Entry<String, String> entry: getPropertyMap(true).entrySet())
-			{
-				String propertyName = "Parser" + Character.toUpperCase(entry.getKey().charAt(0)) + entry.getKey().substring(1);
-				ini.setProperty(propertyName, entry.getValue());
-			}
-
-			ini.save();
-		}
-		catch (Exception e)
-		{
-			Logger.getLogger(CodeParser.class.getName()).log(Level.WARNING, "Ini", e);
-		}
-	}
-
-	// START KGU#163 2016-03-25: For syntax analysis purposes
-	/**
-	 * Returns the complete set of configurable parser keywords for {@link Element}s
-	 * @return array of current keyword strings
-	 */
-	public static String[] getAllProperties()
-	{
-		String[] props = new String[]{};
-		return keywordMap.values().toArray(props);
-	}
-	// END KGU#163 2016-03-25
-
-	// START KGU#258 2016-09-25: Enh. #253 (temporary workaround for the needed Hashmap)
-	/**
-	 * Returns a {@link Hashmap} mapping parser preference labels like "preAlt" to the
-	 * configured parser preference keywords.
-	 * @param includeAuxiliary - whether or not non-keyword settings (like "ignoreCase") are to be included
-	 * @return the hash table with the current settings
-	 */
-	public static final HashMap<String, String> getPropertyMap(boolean includeAuxiliary)
-	{
-		HashMap<String, String> keywords = keywordMap;
-		if (includeAuxiliary)
-		{
-			keywords = new HashMap<String,String>(keywordMap);
-			// The following information may be important for a correct search
-			keywords.put("ignoreCase",  Boolean.toString(ignoreCase));
-		}
-		return keywords;
-	}
-	// END KGU#258 2016-09-25
-
-	// START KGU#288 2016-11-06: New methods to facilitate bugfix #278, #279
-	/**
-	 * @return the set of the (internal) parser preference names (the keys of the map)
-	 */
-	public static Set<String> keywordSet()
-	{
-		return keywordMap.keySet();
-	}
-
+	// START KGU 2020-08-12: Issue #800 - Keyword stuff moved to class Syntax, wrappers placed here
 	/**
 	 * Returns the cached keyword for parser preference {@code _key} or {@code null}
 	 * @param _key - the name of the requested parser preference
 	 * @return the cached keyword or {@code null}
 	 */
-	public static String getKeyword(String _key)
+	public String getKeyword(String _key)
 	{
-		return keywordMap.get(_key);
+		return Syntax.getKeyword(_key);
 	}
 
 	/**
@@ -1606,44 +1431,12 @@ public abstract class CodeParser extends javax.swing.filechooser.FileFilter impl
 	 * @param _defaultVal - a default keyword to be returned if there is no non-empty cached value
 	 * @return the cached or default keyword
 	 */
-	public static String getKeywordOrDefault(String _key, String _defaultVal)
+	public String getKeywordOrDefault(String _key, String _defaultVal)
 	{
-		// This method circumvents the use of the Java 8 method:
-		//return keywordMap.getOrDefault(_key, _defaultVal);
-		String keyword = keywordMap.get(_key);
-		if (keyword == null || keyword.isEmpty()) {
-			keyword = _defaultVal;
-		}
-		return keyword;
+		return Syntax.getKeywordOrDefault(_key, _defaultVal);
 	}
+	// END KGU 2020-08-12
 
-	/**
-	 * Replaces the cached parser preference {@code _key} with the new keyword
-	 * {@code _keyword} for this session.<br/>
-	 * Note:
-	 * <ol>
-	 * <li>
-	 * This does NOT influence the Ini file, not even the Ini properties!
-	 * </li>
-	 * <li>
-	 * Only for existing keys a new mapping may be set
-	 * </li>
-	 * </ol>
-	 * @param _key - name of the parser preference
-	 * @param _keyword - new value of the parser preference or null
-	 */
-	public static void setKeyword(String _key, String _keyword)
-	{
-		if (_keyword == null) {
-			_keyword = "";
-		}
-		// Bugfix #281/#282
-		if (keywordMap.containsKey(_key)) {
-			keywordMap.put(_key, _keyword);
-		}
-	}
-	// END KGU#288 2016-11-06
-	
 	// START KGU#822 2020-03-09: Issue #835 - convenience method for the optional insertion of keywords
 	/**
 	 * Retrieves the configured keyword specified by the internal {@code _key} if the
@@ -1659,7 +1452,7 @@ public abstract class CodeParser extends javax.swing.filechooser.FileFilter impl
 	{
 		String prefix = "";
 		if (this.optionInsertOptKeywords) {
-			prefix = getKeyword(_key);
+			prefix = Syntax.getKeyword(_key);
 			if (prefix == null) {
 				prefix = "";
 			}
@@ -1675,4 +1468,5 @@ public abstract class CodeParser extends javax.swing.filechooser.FileFilter impl
 		return prefix;
 	}
 	// END KGU#822 2020-03-09
+
 }

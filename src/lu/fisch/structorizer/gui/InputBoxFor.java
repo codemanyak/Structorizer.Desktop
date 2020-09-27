@@ -49,6 +49,7 @@ package lu.fisch.structorizer.gui;
  *      Kay Gürtzig     2017-01-09  Bugfix #330 (issue #81): Scaling stuff outsourced to class GUIScaler
  *      Kay Gürtzig     2017-07-01  Issue #413 FOR-IN value list check made aware of built-in split function
  *      Kay Gürtzig     2019-02-19  Bugfix #684 Fall-back FOR-IN radio button caption was wrong in case preForIn is void
+ *      Kay Gürtzig     2020-08-12  Issue #800: CodeParser references replaced by Syntax
  *
  ******************************************************************************************************
  *
@@ -90,7 +91,7 @@ import lu.fisch.structorizer.elements.For;
 import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.io.Ini;
 import lu.fisch.structorizer.locales.LangTextHolder;
-import lu.fisch.structorizer.parsers.CodeParser;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.StringList;
 
 /**
@@ -185,9 +186,9 @@ public class InputBoxFor extends InputBox implements ItemListener {
 		lblEndVal = new JLabel("End value");
 		lblIncr = new JLabel("Increment");
 		//lblPreFor = new JLabel(CodeParser.keywordMap.get("preFor"));
-		lblPostFor = new JLabel(CodeParser.getKeyword("postFor"));
+		lblPostFor = new JLabel(Syntax.getKeyword("postFor"));
 		lblAsgnmt = new JLabel(" <- ");
-		lblStepFor = new JLabel(CodeParser.getKeyword("stepFor"));
+		lblStepFor = new JLabel(Syntax.getKeyword("stepFor"));
 		txtParserInfo = new JTextField(300);
 		txtParserInfo.setEditable(false);
 		if (UIManager.getLookAndFeel().getName().equals("Nimbus"))
@@ -204,7 +205,7 @@ public class InputBoxFor extends InputBox implements ItemListener {
 		chkTextInput = new JCheckBox("Full Text Editing");
 		// START KGU#61 2016-09-23: Enh. #250 - Additional field set for FOR-IN loops
 		//lblPreForIn = new JLabel(CodeParser.keywordMap.get("preFor")In);
-		lblpostForIn = new JLabel(CodeParser.getKeyword("postForIn"));
+		lblpostForIn = new JLabel(Syntax.getKeyword("postForIn"));
 		txtVariableIn = new JTextField(50);
 		txtValueList = new JTextField(120);
 		txtVariableIn.setEnabled(false);
@@ -236,13 +237,13 @@ public class InputBoxFor extends InputBox implements ItemListener {
 		// END KGU#294 2016-11-21
 		
 		// START KGU#254 2016-09-24: Enh. #250 - GUI redesign
-		rbCounting = new JRadioButton(CodeParser.getKeyword("preFor"));
+		rbCounting = new JRadioButton(Syntax.getKeyword("preFor"));
 		rbCounting.setActionCommand("FOR");
 		rbCounting.setToolTipText("Select this if you want to count through a range of numbers.");
 		
 		// START KGU#659 2019-02-19: Bugfix #684 - wrong default keyword 
 		//rbTraversing = new JRadioButton(CodeParser.getKeyword("preForIn").isEmpty() ? CodeParser.getKeyword("postFor") : CodeParser.getKeyword("preForIn"));
-		rbTraversing = new JRadioButton(CodeParser.getKeyword("preForIn").isEmpty() ? CodeParser.getKeyword("preFor") : CodeParser.getKeyword("preForIn"));
+		rbTraversing = new JRadioButton(Syntax.getKeyword("preForIn").isEmpty() ? Syntax.getKeyword("preFor") : Syntax.getKeyword("preForIn"));
 		// END KGU#659 2019-02-19
 		rbTraversing.setActionCommand("FOR-IN");
 		rbTraversing.setToolTipText("Select this if you want to traverse all members of a collection.");

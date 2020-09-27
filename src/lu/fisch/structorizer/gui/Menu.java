@@ -1525,7 +1525,7 @@ public class Menu extends LangMenuBar implements NSDController, LangEventListene
 			preferenceKeys.put("menuPreferencesFont", new String[] {"Font", "Size", "editorFontSize", "fixPadding", "unicodeCompOps"});
 			preferenceKeys.put("menuPreferencesColors", Element.getPreferenceKeys("color"));
 			preferenceKeys.put("menuPreferencesOptions", Element.getPreferenceKeys("structure"));
-			preferenceKeys.put("menuPreferencesParser", CodeParser.getPreferenceKeys());
+			preferenceKeys.put("menuPreferencesParser", Syntax.getPreferenceKeys());
 			preferenceKeys.put("menuPreferencesAnalyser", Root.getPreferenceKeys());
 			preferenceKeys.put("menuPreferencesSaving", Mainform.getPreferenceKeys("saving"));
 			String[] exportKeys = new String[generatorPlugins.size()+1];
@@ -2322,11 +2322,11 @@ public class Menu extends LangMenuBar implements NSDController, LangEventListene
 	 */
 	private HashMap<String, StringList> fetchRefactoringData() {
 		HashMap<String, StringList> refactoringData = new LinkedHashMap<String, StringList>();
-		for (String key: CodeParser.keywordSet())
+		for (String key: Syntax.keywordSet())
 		{
 			// START KGU#288 2016-11-06: Issue #279 - getOrDefault() may not be available
 			//String keyword = CodeParser.keywordMap.getOrDefault(key, "");
-			String keyword = CodeParser.getKeywordOrDefault(key, "");
+			String keyword = Syntax.getKeywordOrDefault(key, "");
 			// END KGU#288 2016-11-06
 			if (!keyword.trim().isEmpty())
 			{

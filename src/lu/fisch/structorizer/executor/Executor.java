@@ -357,7 +357,6 @@ import lu.fisch.structorizer.arranger.Arranger;
 import lu.fisch.structorizer.elements.*;
 import lu.fisch.structorizer.gui.Diagram;
 import lu.fisch.structorizer.gui.IconLoader;
-import lu.fisch.structorizer.parsers.CodeParser;
 import lu.fisch.structorizer.syntax.Syntax;
 //import lu.fisch.structorizer.syntax.ExprParser;
 import lu.fisch.utils.BString;
@@ -4481,13 +4480,13 @@ public class Executor implements Runnable
 				//	cmd = convert(cmd).trim();
 				// Input (keyword should only trigger this if positioned at line start)
 				if (cmd.matches(
-						this.getKeywordPattern(CodeParser.getKeyword("input")) + "([\\W].*|$)"))
+						this.getKeywordPattern(Syntax.getKeyword("input")) + "([\\W].*|$)"))
 				{
 					trouble = tryInput(cmd);
 				}
 				// output (keyword should only trigger this if positioned at line start)
 				else if (cmd.matches(
-						this.getKeywordPattern(CodeParser.getKeyword("output")) + "([\\W].*|$)"))
+						this.getKeywordPattern(Syntax.getKeyword("output")) + "([\\W].*|$)"))
 				{
 					// START KGU#569 2018-08-06: Issue #577 - circumvent GUI trouble on window output
 					isOutput = true;
@@ -4499,10 +4498,10 @@ public class Executor implements Runnable
 				}
 				// return statement
 				// The "return" keyword ought to be the first word of the instruction,
-				// comparison should not be case-sensitive while CodeParser.preReturn isn't fully configurable,
+				// comparison should not be case-sensitive while Syntax.preReturn isn't fully configurable,
 				// but a separator would be fine...
 				else if (cmd.matches(
-						this.getKeywordPattern(CodeParser.getKeywordOrDefault("preReturn", "return")) + "([\\W].*|$)"))
+						this.getKeywordPattern(Syntax.getKeywordOrDefault("preReturn", "return")) + "([\\W].*|$)"))
 				{		 
 					trouble = tryReturn(cmd.trim());
 				}
@@ -4774,7 +4773,7 @@ public class Executor implements Runnable
 		if (element.isLeave()) {
 			int nLevels = element.getLevelsUp();
 			if (nLevels < 1) {
-				String argument = sl.get(0).trim().substring(CodeParser.getKeyword("preLeave").length()).trim();
+				String argument = sl.get(0).trim().substring(Syntax.getKeyword("preLeave").length()).trim();
 				trouble = control.msgIllegalLeave.getText().replace("%1", argument);				
 			}
 			else {
@@ -4862,7 +4861,7 @@ public class Executor implements Runnable
 		// START KGU#686 2019-03-18: Enh. #56 throw instructions introduced
 		else if (element.isThrow()) {
 			try {
-				String expr = sl.get(0).trim().substring(CodeParser.getKeyword("preThrow").length()).trim();
+				String expr = sl.get(0).trim().substring(Syntax.getKeyword("preThrow").length()).trim();
 				if (expr.isEmpty()) {
 					trouble = RETHROW_MESSAGE;
 				}
@@ -5439,7 +5438,7 @@ public class Executor implements Runnable
 		}
 		
 		boolean committed = JOptionPane.showConfirmDialog(diagram.getParent(), pnl,
-				CodeParser.getKeywordOrDefault("input", "INPUT"),
+				Syntax.getKeywordOrDefault("input", "INPUT"),
 				JOptionPane.OK_CANCEL_OPTION,
 				JOptionPane.QUESTION_MESSAGE) == JOptionPane.OK_OPTION;
 		if (committed) {
@@ -5463,7 +5462,7 @@ public class Executor implements Runnable
 		String trouble = "";
 		// KGU 2015-12-11: Instruction is supposed to start with the output keyword!
 		String out = cmd.substring(/*cmd.indexOf(CodeParser.output) +*/
-						CodeParser.getKeyword("output").trim().length()).trim();
+						Syntax.getKeyword("output").trim().length()).trim();
 		// START KGU#490 2018-02-07: Bugfix #503 
 		out = this.evaluateDiagramControllerFunctions(convert(out).trim());
 		// END KGU#490 2018-02-07
@@ -5562,7 +5561,7 @@ public class Executor implements Runnable
 	{
 		String trouble = "";
 		String header = control.lbReturnedResult.getText();
-		String out = cmd.substring(CodeParser.getKeywordOrDefault("preReturn", "return").length()).trim();
+		String out = cmd.substring(Syntax.getKeywordOrDefault("preReturn", "return").length()).trim();
 		// START KGU#77 (#21) 2015-11-13: We ought to allow an empty return
 		//Object n = interpreter.eval(out);
 		//if (n == null)
@@ -5790,8 +5789,8 @@ public class Executor implements Runnable
 	{
 		// START KGU 2016-09-25: Bugfix #254
 		String[] parserKeys = new String[]{
-				CodeParser.getKeyword("preCase"),
-				CodeParser.getKeyword("postCase")
+				Syntax.getKeyword("preCase"),
+				Syntax.getKeyword("postCase")
 				};
 		// END KGU 2016-09-25
 		String trouble = new String();
@@ -5808,7 +5807,7 @@ public class Executor implements Runnable
 			{
 				if (!key.trim().isEmpty())
 				{
-					tokens.removeAll(Syntax.splitLexically(key, false), !CodeParser.ignoreCase);
+					tokens.removeAll(Syntax.splitLexically(key, false), !Syntax.ignoreCase);
 				}		
 			}
 			// START KGU#417 2017-06-30: Enh. #424
@@ -5856,7 +5855,7 @@ public class Executor implements Runnable
 						{
 							if (!key.trim().isEmpty())
 							{
-								tokens.removeAll(Syntax.splitLexically(key, false), !CodeParser.ignoreCase);
+								tokens.removeAll(Syntax.splitLexically(key, false), !Syntax.ignoreCase);
 							}		
 						}
 						String test = convert(expression + tokens.concatenate());
@@ -5925,12 +5924,12 @@ public class Executor implements Runnable
 //			s = convert(s);
 			StringList tokens = Syntax.splitLexically(s, true);
 			for (String key : new String[]{
-					CodeParser.getKeyword("preAlt"),
-					CodeParser.getKeyword("postAlt")})
+					Syntax.getKeyword("preAlt"),
+					Syntax.getKeyword("postAlt")})
 			{
 				if (!key.trim().isEmpty())
 				{
-					tokens.removeAll(Syntax.splitLexically(key, false), !CodeParser.ignoreCase);
+					tokens.removeAll(Syntax.splitLexically(key, false), !Syntax.ignoreCase);
 				}		
 			}
 			s = convert(tokens.concatenate());
@@ -6036,12 +6035,12 @@ public class Executor implements Runnable
 //				// System.out.println("WHILE: "+condStr);
 				StringList tokens = Syntax.splitLexically(condStr, true);
 				for (String key : new String[]{
-						CodeParser.getKeyword("preWhile"),
-						CodeParser.getKeyword("postWhile")})
+						Syntax.getKeyword("preWhile"),
+						Syntax.getKeyword("postWhile")})
 				{
 					if (!key.trim().isEmpty())
 					{
-						tokens.removeAll(Syntax.splitLexically(key, false), !CodeParser.ignoreCase);
+						tokens.removeAll(Syntax.splitLexically(key, false), !Syntax.ignoreCase);
 					}		
 				}
 				// START KGU#433 2017-10-11: Bugfix #434 Don't try to be too clever here - variables might change type within the loop..
@@ -6186,12 +6185,12 @@ public class Executor implements Runnable
 //			condStr = convert(condStr, false);
 			StringList tokens = Syntax.splitLexically(condStr, true);
 			for (String key : new String[]{
-					CodeParser.getKeyword("preRepeat"),
-					CodeParser.getKeyword("postRepeat")})
+					Syntax.getKeyword("preRepeat"),
+					Syntax.getKeyword("postRepeat")})
 			{
 				if (!key.trim().isEmpty())
 				{
-					tokens.removeAll(Syntax.splitLexically(key, false), !CodeParser.ignoreCase);
+					tokens.removeAll(Syntax.splitLexically(key, false), !Syntax.ignoreCase);
 				}		
 			}
 			// START KGU#433 2017-10-11: Bugfix #434 Don't try to be too clever here - variables might change type within the loop...
@@ -7213,14 +7212,14 @@ public class Executor implements Runnable
 	// START KGU#165 2016-04-03: Support keyword case sensitivity
 	/**
 	 * Returns an appropriate match string for the given parser preference string
-	 * (where CodeParser.ignoreCase is paid attention to)
+	 * (where {@link Syntax#ignoreCase} is paid attention to)
 	 * @param keyword - parser preference string
 	 * @return match pattern
 	 */
 	private String getKeywordPattern(String keyword)
 	{
 		String pattern = Matcher.quoteReplacement(keyword);
-		if (CodeParser.ignoreCase)
+		if (Syntax.ignoreCase)
 		{
 			pattern = BString.breakup(pattern, true);
 		}
