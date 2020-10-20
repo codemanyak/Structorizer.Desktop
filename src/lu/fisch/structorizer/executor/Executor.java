@@ -196,6 +196,7 @@ package lu.fisch.structorizer.executor;
  *      Kay Gürtzig     2020-04-23      Bugfix #858: split function in FOR-IN loop was not correctly handled
  *      Kay Gürtzig     2020-04-28      Issue #822: Empty CALL lines should cause more sensible error messages
  *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
+ *      Kay Gürtzig     2020-10-19      Issue #879: Inappropriate handling of input looking like initializers
  *
  ******************************************************************************************************
  *
@@ -3285,8 +3286,15 @@ public class Executor implements Runnable
 //				}
 				// END KGU#388 2017-09-18
 				else if (strInput.endsWith("}") && (strInput.startsWith("{") ||
-						strInput.indexOf("{") > 0 && Function.testIdentifier(strInput.substring(0, strInput.indexOf("{")), null))) {
-					varName = setVar(target, this.evaluateExpression(strInput, true, false));
+						strInput.indexOf("{") > 0 && Function.testIdentifier(strInput.substring(0, strInput.indexOf("{")), false, null))) {
+					// START KGU#879 2020-10-19: Issue #879 - we should not invalidate a successfully set content
+					//varName = setVar(target, this.evaluateExpression(strInput, true, false));
+					Object evaluated = this.evaluateExpression(strInput, true, false);
+					// If there is no sensible evaluation result then leave the value as is
+					if (evaluated != null) {
+						varName = setVar(target, evaluated);
+					}
+					// END KGU#879 2020-10-19
 				}
 				// START KGU#283 2016-10-16: Enh. #273
 				else if (strInput.equals("true") || strInput.equals("false"))
@@ -3308,26 +3316,28 @@ public class Executor implements Runnable
 		// try adding as double
 		try
 		{
-			double dblInput = Double.parseDouble(rawInput);
+			double dblInput = Double.parseDouble(rawInput);	// may cause an exception 
 			varName = setVar(target, dblInput);
 			finalError = null;
 		} catch (Exception ex)
 		{
 			//System.out.println(rawInput + " as double: " + ex.getMessage());
 			if (ex instanceof EvalError) {
+				// In this case the error came from the interpreter, not from parsing attempts
 				finalError = (EvalError)ex;
 			}
 		}
 		// finally try adding as integer
 		try
 		{
-			int intInput = Integer.parseInt(rawInput);
+			int intInput = Integer.parseInt(rawInput);	// may cause an exception
 			varName = setVar(target, intInput);
 			finalError = null;
 		} catch (Exception ex)
 		{
 			//System.out.println(rawInput + " as int: " + ex.getMessage());
 			if (ex instanceof EvalError) {
+				// In this case the error came from the interpreter, not from parsing attempts
 				finalError = (EvalError)ex;
 			}
 		}
@@ -3492,7 +3502,7 @@ public class Executor implements Runnable
 				recordType = this.identifyRecordType(target, false);	// This will only differ from null if it's a record type
 				recordName = target;
 				// Now check recursively for record component names 
-				while (recordType != null && nTokens >= 3 && tokens.get(1).equals(".") && Function.testIdentifier(tokens.get(2), null)) {
+				while (recordType != null && nTokens >= 3 && tokens.get(1).equals(".") && Function.testIdentifier(tokens.get(2), false, null)) {
 					LinkedHashMap<String, TypeMapEntry> comps = recordType.getComponentInfo(false);
 					String compName = tokens.get(2);
 					if (comps.containsKey(compName)) {
@@ -3917,7 +3927,7 @@ public class Executor implements Runnable
 	 */
 	private void associateType(String target, StringList typeDescr) {
 		String typeName = null;
-		if (typeDescr != null && typeDescr.count() == 1 && Function.testIdentifier(typeName = typeDescr.get(0), null)
+		if (typeDescr != null && typeDescr.count() == 1 && Function.testIdentifier(typeName = typeDescr.get(0), false, null)
 				&& context.dynTypeMap.containsKey(":" + typeName)) {
 			context.dynTypeMap.put(target, context.dynTypeMap.get(":" + typeName));
 		}
@@ -6920,7 +6930,7 @@ public class Executor implements Runnable
 			// indexed access to an array element... An how can we make sure its evaluation hasn't got irreversible side
 			// effects?
 			// At least the check against following parenthesis will help to avoid the spoiling of Java method calls.
-			if (i+1 < tokens.count() && Function.testIdentifier(tokens.get(i+1), null) && (i+2 == tokens.count() || !tokens.get(i+2).equals("("))) {
+			if (i+1 < tokens.count() && Function.testIdentifier(tokens.get(i+1), false, null) && (i+2 == tokens.count() || !tokens.get(i+2).equals("("))) {
 				tokens.set(i, ".get(\"" + tokens.get(i+1) + "\")");
 				tokens.remove(i+1);
 			}
