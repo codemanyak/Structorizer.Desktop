@@ -202,7 +202,7 @@ public class Expression {
 					sb.append(text);
 				}
 				// Insert a gap if the operator is an identifier (word)
-				if (Function.testIdentifier(text, null)) {
+				if (Function.testIdentifier(text, false, null)) {
 					sb.append(" "); 
 				}
 			}
@@ -610,7 +610,7 @@ public class Expression {
 		boolean signPos = true;	// true if a following '+' or '-' must be a sign
 		while (!unifiedTokens.isEmpty() && (stopTokens == null || !stopTokens.contains(unifiedTokens.get(0)))) {
 			String token = unifiedTokens.get(0);
-			if (Function.testIdentifier(token, null)) {
+			if (Function.testIdentifier(token, false, null)) {
 				if (unifiedTokens.count() > 2 && unifiedTokens.get(1).equals("(")) {
 					expr = new Expression(NodeType.FUNCTION, token);
 					stack.addLast(expr);

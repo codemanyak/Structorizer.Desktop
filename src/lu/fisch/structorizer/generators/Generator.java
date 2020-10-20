@@ -2667,13 +2667,13 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	protected boolean isVariable(StringList _tokens, boolean _mayBeQualified, HashMap<String, TypeMapEntry> _typeMap) {
 		boolean isVar = false;
 		String token0 = null;
-		if (!_tokens.isEmpty() && Function.testIdentifier(token0 = _tokens.get(0), null)
+		if (!_tokens.isEmpty() && Function.testIdentifier(token0 = _tokens.get(0), false, null)
 				&& (varNames.contains(token0) || _typeMap != null && _typeMap.containsKey(token0))) {
 			if (_mayBeQualified) {
 				isVar = true;
 				_tokens = _tokens.subSequence(1, _tokens.count());
 				while (isVar && _tokens.count() > 1 && ".[".contains(token0 = _tokens.get(0))) {
-					if (token0.equals(".") && Function.testIdentifier(_tokens.get(1), null)) {
+					if (token0.equals(".") && Function.testIdentifier(_tokens.get(1), false, null)) {
 						// Okay, is a component access qualifier
 						_tokens.remove(0, 2);
 					}

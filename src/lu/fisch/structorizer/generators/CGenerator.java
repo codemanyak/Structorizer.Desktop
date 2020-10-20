@@ -1999,7 +1999,7 @@ public class CGenerator extends Generator {
 							}
 							// START KGU#815 2020-03-26: Enh. #828 we have to cope with class methods from a foreign library
 							if (this.importedLibRoots != null && this.importedLibRoots.contains(called)) {
-								StringList tokens = Element.splitLexically(line, true);
+								StringList tokens = Syntax.splitLexically(line, true);
 								Element.unifyOperators(tokens, true);
 								int posAsgn = tokens.indexOf("<-");
 								int posCall = tokens.indexOf(call.getName(), posAsgn+1);
