@@ -45,7 +45,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
@@ -333,7 +332,7 @@ public class Syntax {
 			String keyword = getKeyword(_key);
 			if (keyword != null) {
 				tokens = splitLexically(keyword, false);
-				splitKeywords.put(_key,  tokens);
+				splitKeywords.put(_key, tokens);
 			}
 		}
 		return tokens;
@@ -663,6 +662,66 @@ public class Syntax {
 	}
 	// END KGU#18/KGU#23 2015-11-04
 	
+	// START KGU#18/KGU#23 2015-10-24 intermediate transformation added and decomposed
+	/**
+	 * Converts the operator symbols accepted by Structorizer into Java operators:
+	 * - Assignment:		"<-"
+	 * - Comparison:		"==", "<", ">", "<=", ">=", "!="
+	 * - Logic:				"&&", "||", "!", "^"
+	 * - Arithmetics:		"div" and usual Java operators (e.g. "mod" -> "%")
+	 * @param _expression - an Element's text in practically unknown syntax
+	 * @return an equivalent of the _expression String with replaced operators
+	 */
+	public static String unifyOperators(String _expression)
+	{
+		// START KGU#93 2015-12-21: Bugfix #41/#68/#69 Avoid operator padding
+		//return unifyOperators(_expression, false);
+		StringList tokens = Syntax.splitLexically(_expression, true);
+		unifyOperators(tokens, false);
+		return tokens.concatenate();
+		// END KGU#93 2015-12-21
+	}
+
+	// START KGU#92 2015-12-01: Bugfix #41 Okay now, here is the new approach (still a sketch)
+	/**
+	 * Converts the operator symbols accepted by Structorizer into intermediate operators
+	 * (mostly Java operators):
+	 * <ul>
+	 * <li>Assignment:		"<-"</li>
+	 * <li>Comparison*:		"==", "<", ">", "<=", ">=", "!="</li>
+	 * <li>Logic*:			"&&", "||", "!", "^"</li>
+	 * <li>Arithmetics*:		"div" and usual Java operators (e. g. "mod" -> "%")</li>
+	 * </ul>
+	 * @param _tokens - a tokenised line of an Element's text (in practically unknown syntax)
+	 * @param _assignmentOnly - if true then only assignment operator will be unified
+	 * @return total number of deletions / replacements
+	 */
+	public static int unifyOperators(StringList _tokens, boolean _assignmentOnly)
+	{
+		int count = 0;
+		count += _tokens.replaceAll(":=", "<-");
+		// START KGU#115 2015-12-23: Bugfix #74 - logical inversion
+		//if (_assignmentOnly)
+		if (!_assignmentOnly)
+			// END KGU#115 2015-12-23
+		{
+			count += _tokens.replaceAll("=", "==");
+			count += _tokens.replaceAll("<>", "!=");
+			count += _tokens.replaceAllCi("mod", "%");
+			count += _tokens.replaceAllCi("shl", "<<");
+			count += _tokens.replaceAllCi("shr", ">>");
+			count += _tokens.replaceAllCi("and", "&&");
+			count += _tokens.replaceAllCi("or", "||");
+			count += _tokens.replaceAllCi("not", "!");
+			count += _tokens.replaceAllCi("xor", "^");
+			// START KGU#843 2020-04-11: Bugfix #847 Inconsistency in handling operators (we don't count this, though)
+			_tokens.replaceAllCi("DIV", "div");
+			// END KGU#843 2020-04-11
+		}
+		return count;
+	}
+	// END KGU#92 2015-12-01
+
 	/**
 	 * Stores the syntactical representation of the given Element text {@code _lines}
 	 * in the central syntax map under the Element ID {@code _id}.
@@ -686,8 +745,8 @@ public class Syntax {
 	/**
 	 * Retrieves the parsed syntax of the lines of Element with the given
 	 * ID {@code _id} if it has been in the map, null otherwise
-	 * @param _id
-	 * @return A vector of {@link Line} structures or {@code null}
+	 * @param _id - the element id.
+	 * @return An array of {@link Line} structures or {@code null}
 	 */
 	public static Line[] getElementSyntax(long _id)
 	{
@@ -715,16 +774,6 @@ public class Syntax {
 	 * @return
 	 */
 	private Line parseLine(StringList tokens) {
-		// Check if the line starts with a command keyword
-		for (String key:keywordSet()) {
-			StringList splitKey = getSplitKeyword(key);
-			if (splitKey != null && tokens.indexOf(splitKey, 0, !Syntax.ignoreCase) == 0) {
-				// Now it depends on the type of keyword what to do (element-type-specific?).
-				// Should there be Syntax subclasses for Root, Instrucion, Jump etc.?
-				// What about element transmutation?
-			}
-		}
-		// If so, identify the separators and expression parts
 		return null;
 	}
 	

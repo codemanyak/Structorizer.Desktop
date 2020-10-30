@@ -34,6 +34,7 @@ package lu.fisch.structorizer.syntax;
  *      Kay Gürtzig     2017-10-24      First Issue (for KGU#455 and other enhancements/problems)
  *      Kay Gürtzig     2019-11-11      Method parse() implemented, new method inferType, some node types dropped
  *      Kay Gürtzig     2019-12-19      Signature change of TypeMapEntry constructor integrated
+ *      Kay Gürtzig     2020-10-26      Opportunity of null delimiter in parseList(...) added.
  *
  ******************************************************************************************************
  *
@@ -129,23 +130,26 @@ public class Expression {
 	/** COMPONENT means the colon separating a component name and a component value in a record initializer,<br/>
 	 * QUALIFIER is the dot separating a record and a component name (whereas the dot in a method call is handled as OPERATOR) <br/>
 	 * PARENTH symbolizes an opening parenthesis and is only temporarily used within the shunting yard algorithm in {@link Expression#parse(StringList, StringList, StringList)} */
-	public enum NodeType {LITERAL, VARIABLE, OPERATOR, FUNCTION, /*QUALIFIER, INDEX,*/ ARRAY_INITIALIZER, RECORD_INITIALIZER, COMPONENT, PARENTH};
+	public static enum NodeType {LITERAL, VARIABLE, OPERATOR, FUNCTION, /*QUALIFIER, INDEX,*/ ARRAY_INITIALIZER, RECORD_INITIALIZER, COMPONENT, PARENTH};
 	public NodeType type;
 	public String text;
 	public LinkedList<Expression> children;
+	public short tokenPos = 0;
 	
-	public Expression(NodeType _type, String _text)
+	public Expression(NodeType _type, String _text, short _position)
 	{
 		type = _type;
 		text = _text;
 		children = new LinkedList<Expression>();
+		tokenPos = _position;
 	}
 	
-	public Expression(NodeType _type, String _text, LinkedList<Expression> _children)
+	public Expression(NodeType _type, String _text, short _position, LinkedList<Expression> _children)
 	{
 		type = _type;
 		text = _text;
 		children = new LinkedList<Expression>(_children);
+		tokenPos = _position;
 	}
 	
 	/**
@@ -254,7 +258,9 @@ public class Expression {
 			break;
 		case COMPONENT:
 			sb.append(text + ": ");
-			sb.append(children.getFirst().toString());
+			if (!children.isEmpty()) {
+				sb.append(children.getFirst().toString());
+			}
 			break;
 		case FUNCTION:
 			sb.append(text + "(");
@@ -470,7 +476,9 @@ public class Expression {
 //		}
 			break;
 		case FUNCTION:
-			// TODO: We should have a list of all built-in function, scan all controller functions and investigate the Arranger routines
+			/* TODO: We should have a list of all built-in functions, scan all controller
+			 * functions and investigate the Arranger routines
+			 */
 			break;
 //		case INDEX:	// obsolete
 //			break;
@@ -582,58 +590,121 @@ public class Expression {
 	
 	/**
 	 * Parses a token list into a list of Expression trees. The resulting Expression
-	 * list will usually contain one element. Raises an exception in case of
+	 * list will usually contain a single element. Raises an exception in case of
 	 * syntactical errors.
 	 * @param unifiedTokens - a {@link StringList} containing the tokenized and
 	 * unified expression text, will be consumed on parsing until a first token that
-	 * does not fit well.
+	 * does not fit well. Spaces will be eliminated (if still present).
 	 * @param stopTokens - a {@link StringList} containing possible delimiters,
 	 * which, at top level, shall stop the parsing. The found stop token will not be
-	 * consumed.
-	 * @param varNames TODO
+	 * consumed from {@code unifiedTokens}. If being {@code null} then stops without
+	 * exception at the first token not being expected, provided the stack is empty
+	 * and output is already containing an Expression.
+	 * @param varNames - List of variable names if known (otherwise all identifiers without
+	 * following argument list would be interpreted as values)
 	 * @return the syntax tree or null.
 	 * @throws ExpressionException
 	 * @see {@link #parseList(StringList, String, String, StringList)}
 	 */
 	public static LinkedList<Expression> parse(StringList unifiedTokens, StringList stopTokens, StringList varNames) throws SyntaxException
 	{
-		// FIXME: signs like -1, 8 * -7, etc.
-		// FIXME: Array access:
-		// stack[top-1]  --->  stack
-		// stack[top-1]  --->  top
-		// stack[top-1]  --->  1[-]
+		// FIXME: signs like in -1, 8 * -7, etc.
+		/* FIXME: Array access:
+		 * stack[top-1]  --->  stack
+		 * stack[top-1]  --->  top
+		 * stack[top-1]  --->  1[-]
+		 */
 		// Basically, this follows Dijkstra's shunting yard algorithm
 		Expression expr = null;
-		unifiedTokens.removeAll(" ");	// Just in case
+		unifiedTokens.removeAll(" ");	// Just in case...
 		LinkedList<Expression> stack = new LinkedList<Expression>();
 		LinkedList<Expression> output = new LinkedList<Expression>();
+		short position = 0;
+		boolean stopped = false;	// Flag for a detected stopToken
+		short nestingLevel = 0;	// bracket nesting - used to check expression listing
+		boolean wasOpd = false;	// true if the previous token was an operand
 		boolean signPos = true;	// true if a following '+' or '-' must be a sign
-		while (!unifiedTokens.isEmpty() && (stopTokens == null || !stopTokens.contains(unifiedTokens.get(0)))) {
+		//while (!unifiedTokens.isEmpty() && (stopTokens == null || !stopTokens.contains(unifiedTokens.get(0)) || !stack.isEmpty())) {
+		while (!unifiedTokens.isEmpty() && !stopped) {
 			String token = unifiedTokens.get(0);
-			if (Function.testIdentifier(token, false, null)) {
-				if (unifiedTokens.count() > 2 && unifiedTokens.get(1).equals("(")) {
-					expr = new Expression(NodeType.FUNCTION, token);
+			if (Function.testIdentifier(token, false, null)
+					&& (stopTokens == null || !stopTokens.contains(token))) {
+				String nextToken = null;
+				if (unifiedTokens.count() > 2) {
+					nextToken = unifiedTokens.get(1);
+				}
+				if ("(".equals(nextToken)) {
+					expr = new Expression(NodeType.FUNCTION, token, position);
 					stack.addLast(expr);
+					wasOpd = false;
+				}
+				else if ("{".equals(nextToken)) {
+					// TODO: Identify record type name to verify the record initializer entry
+					expr = new Expression(NodeType.RECORD_INITIALIZER, token, position);
+					stack.addLast(expr);
+					wasOpd = false;
+				}
+				else if (":".equals(nextToken)) {
+					// Check that we are within a record initializer context
+					Expression paren = stack.peekLast();
+					if (paren == null || paren.type != NodeType.PARENTH || !"{".equals(paren.text)) {
+						throw new SyntaxException("Found '" + token + ":' outside a record initializer.", position);
+					}
+					// now provisionally remove the stack top (which is already cached in paren)
+					stack.removeLast();
+					// beneath the opening brace there must be a recod initializer node
+					try {
+						if ((expr = stack.peekLast()) == null || expr.type != NodeType.RECORD_INITIALIZER) {
+							throw new SyntaxException("Found '" + token + ":' outside a record initializer.", position);
+						}
+					}
+					finally {
+						// push the popped parenthesis node again
+						stack.addLast(paren);
+					}
+					// TODO We might check for the record type and verify token is a component id
+					expr = new Expression(NodeType.COMPONENT, token, position);
+					stack.addLast(expr);
+					// Drop the component name now, such that the loop will remove the colon
+					unifiedTokens.remove(0); position++;
+					wasOpd = false;
 				}
 				else /*if (varNames == null || varNames.contains(token))*/ {
-					// TODO: Identify record type name and prepare a record initializer entry if so
-					expr = new Expression(NodeType.VARIABLE, token);
-					output.addLast(expr);
-					if ((expr = stack.peekLast()) != null && expr.type == NodeType.PARENTH) {
-						expr.children.add(null);	// Count the element
+					// If the previous token was an operand then a new expression might start here, so clean up
+					if (wasOpd) {
+						if (nestingLevel > 0) {
+							// Not allowed within brackets
+							throw new SyntaxException("Operand «" + token + "» immediately following another", position);
+						}
+						while (!stack.isEmpty() && !output.isEmpty()
+								&& composeExpression(stack.peekLast(), output)) {
+							stack.removeLast();
+						}
 					}
+					expr = new Expression(NodeType.VARIABLE, token, position);
+					output.addLast(expr);
 					signPos = false;
+					wasOpd = true;
 				}
 			}
 			else if (token.startsWith("\"") || token.startsWith("'")
 					|| token.equals("false") || token.equals("true")
 					|| !token.isEmpty() && Character.isDigit(token.charAt(0))) {
-				expr = new Expression(NodeType.LITERAL, token);
-				output.addLast(expr);
-				if ((expr = stack.peekLast()) != null && expr.type == NodeType.PARENTH) {
-					expr.children.add(null);	// Count the element
+				// If the previous token was an operand then a new expression might start here, so clean up
+				if (wasOpd) {
+					if (nestingLevel > 0) {
+						// Not allowed within brackets
+						throw new SyntaxException("Operand «" + token + "» immediately following another", position);
+					}
+					while (!stack.isEmpty() && !output.isEmpty()
+							&& composeExpression(stack.peekLast(), output)) {
+						stack.removeLast();
+					}
 				}
+				expr = new Expression(NodeType.LITERAL, token, position);
+				output.addLast(expr);
 				signPos = false;
+				wasOpd = true;
 			}
 			else if (token.equals(",")) {
 				// Argument separator
@@ -641,21 +712,21 @@ public class Expression {
 				do {
 					expr = stack.peekLast();
 					if (expr == null) {
-						throw new SyntaxException("Misplaced ',' or missing '(' or '[' or '{'.");
-					}
-					if (!(parenthFound = expr.type == NodeType.PARENTH)) {
-						if (expr.type == NodeType.OPERATOR) {
-							try {
-								expr.children.addFirst(output.removeLast());
-								if (!expr.text.equals("!") && !expr.text.equalsIgnoreCase("not") && !expr.text.endsWith("1")) {
-									expr.children.addFirst(output.removeLast());
-								}
-							}
-							catch (NoSuchElementException ex) {
-								throw new SyntaxException("Too few operands for operator " + expr.text, ex);
-							}
+						// START KGU#790 2020-10-26: Modified behaviour
+						//throw new SyntaxException("Misplaced ',' or missing '(' or '[' or '{'.");
+						if (!(stopTokens == null && output.size() >= 1) &&
+								!(stopTokens != null && (stopped = stopTokens.contains(",")))) {
+							// We leave it to the caller whether the listing of expressions is welcome
+							//throw new SyntaxException("Misplaced ',' or missing '(' or '[' or '{'.", position);
+							System.out.println("Misplaced ',' at pos. " + position + " or missing '(' or '[' or '{'");
 						}
-						output.addLast(expr);
+						break;
+					}
+					if (parenthFound = expr.type == NodeType.PARENTH) {
+						expr.children.add(null);	// Count the element
+					}
+					else {
+						composeExpression(expr, output);
 						stack.removeLast();
 					}
 				} while (!parenthFound);
@@ -671,6 +742,7 @@ public class Expression {
 //					stack.addLast(expr);	// Restore the opening bracket
 //				}
 				signPos = true;
+				wasOpd = false;
 			}
 			else if (OPERATOR_PRECEDENCE.containsKey(token) || token.equals("[")) {
 				if (token.equals("[")) {
@@ -691,37 +763,52 @@ public class Expression {
 						}
 					}
 					catch (NoSuchElementException ex) {
-						throw new SyntaxException("Too few operands for operator '" + expr.text + "'.", ex);
+						throw new SyntaxException("Too few operands for operator '" + expr.text + "'.", expr.tokenPos, ex);
 					}
 					output.addLast(expr);
 					stack.removeLast();
 				}
-				expr = new Expression(NodeType.OPERATOR, mayBeSign ? token+"1" : token);
+				expr = new Expression(NodeType.OPERATOR, mayBeSign ? token+"1" : token, position);
 				stack.addLast(expr);
 				if (token.equals("[]")) {
-					expr = new Expression(NodeType.PARENTH, "[");
-					expr.children.addLast(null);	// Add a dummy operand for the array
+					expr = new Expression(NodeType.PARENTH, "[", position);
+					expr.children.addLast(null);		// one operand is the array
+					if (unifiedTokens.count() > 2 && !unifiedTokens.get(1).equals("]")) {
+						expr.children.addLast(null);	// expect at least one index
+					}
 					stack.addLast(expr);
+					nestingLevel++;
 				}
 				signPos = true;
+				wasOpd = false;
 			}
 			else if (token.equals("(")) {
-				if ((expr = stack.peekLast()) != null && expr.type == NodeType.PARENTH) {
-					expr.children.add(null);	// Count the element
+				// May be a parenthesized arithmetic expression or an argument list
+				expr = new Expression(NodeType.PARENTH, token, position);
+				stack.addLast(expr);
+				nestingLevel++;
+				if (unifiedTokens.count() > 1 && !unifiedTokens.get(1).equals(")")) {
+					expr.children.add(null);	// Expect an element
 				}
-				stack.addLast(new Expression(NodeType.PARENTH, token));
 				signPos = true;
+				wasOpd = false;
 			}
 			else if (token.equals("{")) {
 				// May be an array or a record initializer
 				expr = stack.peekLast();
 				if (expr == null || expr.type != NodeType.RECORD_INITIALIZER) {
-					stack.addLast(new Expression(NodeType.ARRAY_INITIALIZER, "{}"));
+					stack.addLast(new Expression(NodeType.ARRAY_INITIALIZER, "{}", position));
 				}
-				stack.addLast(new Expression(NodeType.PARENTH, token));
+				stack.addLast(expr = new Expression(NodeType.PARENTH, token, position));
+				nestingLevel++;
+				if (unifiedTokens.count() > 1 && !unifiedTokens.get(1).equals("}")) {
+					expr.children.add(null);	// Expect an element
+				}
 				signPos = true;
+				wasOpd = false;
 			}
-			else if (token.length() == 1 && "}])".contains(token)) {
+			else if ("}])".contains(token)) {
+				// End of parentheses, brackets or braces
 				int pos = "}])".indexOf(token);
 				String opening = "{[(".substring(pos, pos+1);
 				boolean parenthFound = false;
@@ -729,27 +816,27 @@ public class Expression {
 				do {
 					expr = stack.peekLast();
 					if (expr == null) {
-						throw new SyntaxException("'" + token + "' without preceding '" + opening + "'.");
-					}
-					if (!(parenthFound = expr.type == NodeType.PARENTH)) {
-						if (expr.type == NodeType.OPERATOR) {
-							try {
-								expr.children.addFirst(output.removeLast());
-								if (!expr.text.equals("!") && !expr.text.equalsIgnoreCase("not") && !expr.text.endsWith("1")) {
-									expr.children.addFirst(output.removeLast());
-								}
-							}
-							catch (NoSuchElementException ex) {
-								throw new SyntaxException("Too few operands for operator " + expr.text, ex);
-							}
+						// START KGU#790 2020-10-26: Modified behaviour
+						if (stopTokens == null && output.size() == 1) {
+							return output;
 						}
-						output.addLast(expr);
-					} else {
+						// END KGU#790 2020-10-26
+						throw new SyntaxException("'" + token + "' without preceding '" + opening + "'.", position);
+					}
+					if (parenthFound = expr.type == NodeType.PARENTH) {
+						if (!expr.text.equals(opening)) {
+							// Wrong type of opening bracket
+							throw new SyntaxException("'" + token + "' without matching '" + opening + "'.", position);
+						}
 						nItems = expr.children.size();
+					}
+					else {
+						composeExpression(expr, output);
 					}
 					stack.removeLast();
 				} while (!parenthFound);
 				expr = stack.peekLast();
+				// Care for non-arithmetic brackets (argument list, index list, initializer)
 				if (expr != null) {
 					if (opening.equals("(") && expr.type == NodeType.FUNCTION
 							|| opening.equals("{") && (expr.type == NodeType.ARRAY_INITIALIZER || expr.type == NodeType.RECORD_INITIALIZER)
@@ -759,20 +846,33 @@ public class Expression {
 								expr.children.addFirst(output.removeLast());
 							}
 							catch (NoSuchElementException ex) {
-								throw new SyntaxException("Lost arguments / items / indices for " + expr.text, ex);
+								throw new SyntaxException("Lost arguments / items / indices for " + expr.text, expr.tokenPos, ex);
 							}
 						}
 						output.addLast(stack.removeLast());
 					}
 				}
+				nestingLevel--;
 				signPos = false;
+				wasOpd = true;
 			}
-			unifiedTokens.remove(0);
-		} // while (!unifiedTokens.isEmpty() && !stopTokens.contains(unifiedTokens.get(0)))
+			else if (stopTokens != null && stopTokens.contains(token)) {
+				stopped = true;
+			}
+			else {
+				// TODO Can we infer a syntactical error here?
+				System.err.println("Unexpected token «" + token + "» skipped.");
+			}
+			if (!stopped) {
+				unifiedTokens.remove(0); position++;
+			}
+		} // while (!unifiedTokens.isEmpty() && !stopped)
+		
+		// Now resolve the remaining operator stack content as far a possible
 		while (!stack.isEmpty()) {
 			expr = stack.removeLast();
 			if (expr.type == NodeType.PARENTH) {
-				throw new SyntaxException("There are more opening " + expr.text + " than closing brackets.");
+				throw new SyntaxException("There are more opening '" + expr.text + "' than closing brackets.", expr.tokenPos);
 			}
 			int nOpds = expr.children.size();
 			if (expr.type == NodeType.OPERATOR && !expr.text.equals("[]")) {
@@ -789,36 +889,51 @@ public class Expression {
 				}
 			}
 			catch (NoSuchElementException ex) {
-				throw new SyntaxException("Too few operands for operator '" + expr.text + "'.", ex);
+				throw new SyntaxException("Too few operands for operator '" + expr.text + "'.", expr.tokenPos, ex);
 			}
 			output.addLast(expr);
 		}
 		return output;
 	}
 
-	/**
-	 * Parses a token list into an expression list. Raises an exception in case of
-	 * syntactical errors.
-	 * @param unifiedTokens - a {@link StringList} containing the tokenized and
-	 * unified expression text, will be consumed on parsing until a first token that
-	 * does not fit well.
-	 * @param separator - an expected list separator token.
-	 * @param delimiter - an expected stop token designating the list end; will NOT
-	 * be consumed.
-	 * @param varNames - List of variable names if known (otherwise all identifiers without
-	 * following argument list would be interpreted as values)
-	 * @return the list of Expression roots (may be empty).
-	 * @throws SyntaxException 
+	/**}
+	 * Given the incomplete expression node {@code expr}, which is supposed to be
+	 * an operator or a record component initializer, completes the expression by
+	 * consuming elements from the operand stack {@code operands} and pushes the
+	 * composed expression node to the {@code operands} stack.
+	 * @param expr - the incomplete expression node
+	 * @param operands - stack of operands
+	 * @return {@code true} if a composition was possible, {@code false} otherwise
+	 * @throws SyntaxException if {@code expr} is of an inappropriate type or if
+	 * {@code operands} does not contain enough elements to accomplish {@code expr}
 	 */
-	public static LinkedList<Expression> parseList(StringList unifiedTokens, String separator, String delimiter, StringList varNames) throws SyntaxException
-	{
-		LinkedList<Expression> exprs = new LinkedList<Expression>();
-		unifiedTokens.removeAll(" ");	// Just in case
-		StringList stopTokens = new StringList(new String[]{separator, delimiter});
-		while (!unifiedTokens.isEmpty() && !(unifiedTokens.get(0)).equals(delimiter)) {
-			exprs.addAll(parse(unifiedTokens, stopTokens, null));
+	private static boolean composeExpression(Expression expr, LinkedList<Expression> operands) throws SyntaxException {
+		boolean done = true;
+		if (expr.type == NodeType.OPERATOR) {
+			try {
+				expr.children.addFirst(operands.removeLast());
+				if (!expr.text.equals("!") && !expr.text.equalsIgnoreCase("not") && !expr.text.endsWith("1")) {
+					expr.children.addFirst(operands.removeLast());
+				}
+			}
+			catch (NoSuchElementException ex) {
+				throw new SyntaxException("Too few operands for operator " + expr.text, 0, ex);
+			}
 		}
-		return exprs;
+		else if (expr.type == NodeType.COMPONENT) {
+			try {
+				expr.children.addFirst(operands.removeLast());
+			}
+			catch (NoSuchElementException ex) {
+				throw new SyntaxException("Missing value for record component «" + expr.text + "»", 0, ex);
+			}
+		}
+		else {
+			done = false;
+			//throw new SyntaxException("Parsing stack inconsistent, found: " + expr.toString(), 0);
+		}
+		operands.addLast(expr);
+		return done;
 	}
 
 }

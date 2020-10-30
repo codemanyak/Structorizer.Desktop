@@ -33,25 +33,26 @@ package lu.fisch.utils;
  *
  *      Author          Date            Description
  *      ------          ----            -----------
- *      Bob Fisch       2007.12.09      First Issue
- *      Kay Gürtzig     2015.11.04      Methods indexOf added.
- *      Kay Gürtzig     2015.11.24      Method clear added.
- *      Kay Gürtzig     2015.12.01      Methods replaceAll, replaceAllCi added.
- *      Kay Gürtzig     2015.12.01      Methods concatenate(...) added; getText() etc. reduced to them.
- *      Kay Gürtzig     2016.01.08      Method replaceAllBetween() added, replaceAll etc. reduced to it.
- *      Kay Gürtzig     2016.03.26      Method subSequence() added.
- *      Kay Gürtzig     2016.04.03      Method int removeAll(StringList, int, boolean) added
- *      Bob Fisch       2016.08.01      added method "toArray()" and "remove(int)" (which is a synonym to delete(int))
- *      Kay Gürtzig     2017.01.31      Method remove(int,int) added. 
- *      Kay Gürtzig     2017.03.31      Methods addOrderedIfNew and addByLengthIfNew revised (now with return value)
- *      Kay Gürtzig     2017.06.18      Methods explodeWithDelimiter() revised (don't mistake '_by' for a regex anymore)
- *      Kay Gürtzig     2017.10.02      New functional variant with null separator for methods concatenate(...)
- *      Kay Gürtzig     2017.10.28      Method trim() added.
+ *      Bob Fisch       2007-12-09      First Issue
+ *      Kay Gürtzig     2015-11-04      Methods indexOf added.
+ *      Kay Gürtzig     2015-11-24      Method clear added.
+ *      Kay Gürtzig     2015-12-01      Methods replaceAll, replaceAllCi added.
+ *      Kay Gürtzig     2015-12-01      Methods concatenate(...) added; getText() etc. reduced to them.
+ *      Kay Gürtzig     2016-01-08      Method replaceAllBetween() added, replaceAll etc. reduced to it.
+ *      Kay Gürtzig     2016-03-26      Method subSequence() added.
+ *      Kay Gürtzig     2016-04-03      Method int removeAll(StringList, int, boolean) added
+ *      Bob Fisch       2016-08-01      added method "toArray()" and "remove(int)" (which is a synonym to delete(int))
+ *      Kay Gürtzig     2017-01-31      Method remove(int,int) added. 
+ *      Kay Gürtzig     2017-03-31      Methods addOrderedIfNew and addByLengthIfNew revised (now with return value)
+ *      Kay Gürtzig     2017-06-18      Methods explodeWithDelimiter() revised (don't mistake '_by' for a regex anymore)
+ *      Kay Gürtzig     2017-10-02      New functional variant with null separator for methods concatenate(...)
+ *      Kay Gürtzig     2017-10-28      Method trim() added.
  *      Kay Gürtzig     2019-02-15      Method isEmpty() added
  *      Kay Gürtzig     2019-03-03      Bugfix in method explodeFirstOnly(String, String)
  *      Kay Gürtzig     2019-03-05      New method variants explodeWithDelimiter() for case-independent splitting
  *      Kay Gürtzig     2019-11-20      New methods count(String), count(String, boolean), insert(StringList, int)
  *      Kay Gürtzig     2020-03-18      Internal bugfix KGU#827 in toString, getCommaText() - caused errors with null elements
+ *      Kay Gürtzig     2020-10-25      saveToFile() and loadFromFile now with return value, both write error message to err.
  *
  ******************************************************************************************************
  *
@@ -1069,8 +1070,18 @@ public class StringList {
 		return res;
 	}
 
-	public void loadFromFile(String _filename)
+	/**
+	 * Tries to read the text content of the file with path {@code _filename}
+	 * and replaces previous contents with the list of read lines. Character
+	 * encoding UTF-8 is expected.
+	 * In case of an I/O error, writes a message to the standard error stream.
+	 * @param _filename - relative or absolute file path
+	 * @return {@code true} in case of success, {@code false} otherwise.
+	 * @see #saveToFile(String)
+	 */
+	public boolean loadFromFile(String _filename)
 	{
+		boolean done = false;
 		try
 		{
 			StringBuffer buffer = new StringBuffer();
@@ -1085,8 +1096,12 @@ public class StringList {
 
 			strings.clear();
 			add(StringList.explode(buffer.toString(),"\n"));
+			done = true;
 		}
-		catch(IOException ex){}
+		catch(IOException ex){
+			System.err.println("StringList.loadFromFile(): " + ex.getMessage());
+		}
+		return done;
 
 /*		try
 		{
@@ -1107,14 +1122,24 @@ public class StringList {
 */
 	}
 
-    public void saveToFile(String _filename)
+    /**
+     * Saves the content of this as a sequence of text lines (separated by newlines)
+     * in UTF-8 encoding to the file with given path {@code _filename}.<br/>
+     * In case of an I/O error writes a message to the standard error stream.
+     * @param _filename - relative or absolute file path
+     * @return {@code true} in case of success, {@code false} otherwise.
+     * @see #loadFromFile(String)
+     */
+    public boolean saveToFile(String _filename)
     {
+        boolean done = false;
         try
         {
             FileOutputStream fos = new FileOutputStream(_filename);
             Writer out = new OutputStreamWriter(fos, "UTF-8");
             out.write(this.getText());
             out.close();
+            done = true;
             /*
             BTextfile inp = new BTextfile(_filename);
             inp.rewrite();
@@ -1124,10 +1149,24 @@ public class StringList {
         }
         catch (IOException ex)
         {
-            System.err.println("StringListsaveToFile(): " + ex.getMessage());
+            System.err.println("StringList.saveToFile(): " + ex.getMessage());
         }
+        return done;
     }
 
+    /**
+     * Returns a string representing a copied subsequence from this, starting at
+     * character position {@code beginIndex} in the element with index {@code beginLine}
+     * and ending immediately before character position {@code endIndex} in element
+     * with index {@code endLine}.
+     * @param beginLine - index of the first element ("line") to be considered
+     * @param beginIndex - starting character position within element {@code beginLine}
+     * @param endLine - index of the element ("line") where the copy is to end
+     * @param endIndex - the character position in element {@code endLine} before which
+     * copy is to end.
+     * @return a single string comprising the copied text, with newline characters
+     * between the copies from consecutive elements ("lines").
+     */
     public String copyFrom(int beginLine, int beginIndex, int endLine, int endIndex)
     {
         String ret = "";
@@ -1176,7 +1215,7 @@ public class StringList {
     
     /**
      * Returns a multi-line String composed of the sub-StringList from element
-     * _start to the end
+     * with index {@code _start} to the end
      * @param _start - index of first element to include
      * @return a string with newlines as separator
      */
@@ -1186,7 +1225,8 @@ public class StringList {
     }
     
     /**
-     * Removes all elements being equal to the given string _string
+     * Removes all elements being equal to the given string {@code _string}.<b/>
+     * Note that <b>this is bound to modify itself</b>.
      * @param _string - the searched string
      * @return number of deletions
      */
@@ -1214,9 +1254,11 @@ public class StringList {
     }
     
     /**
-     * Removes all elements being exactly or case-insensitively equal to the given string _string
+     * Removes all elements being exactly or case-insensitively equal to the given
+     * string {@code _string}.<br/>
+     * Note that <b>this is bound to modify itself</b>.
      * @param _string - the searched string
-     * @param _matchCase - if the string is be compared exactly (or case-ignoringly)
+     * @param _matchCase - if the string is to be compared exactly (or case-ignorantly)
      * @return number of deletions
      */
     public int removeAll(String _string, boolean _matchCase)
@@ -1242,10 +1284,11 @@ public class StringList {
     
     // START KGU 2016-04-03: New methods to ease case-independent manipulations
     /**
-     * Removes all subsequences being equal to _subList, either case-independently
-     * or not, according to the _matchCase argument
-     * @param _subList - The subsequence to cut out
-     * @param _matchCase - if false then case is ignored
+     * Removes all subsequences being equal to {@code _subList}, either case-independently
+     * or not, according to the {@code _matchCase} argument.<br/>
+     * Note that <b>this is bound to modify itself</b>.
+     * @param _subList - The subsequence to be cut out
+     * @param _matchCase - if {@code false} then case will be ignored
      * @return the number of removed matches
      */
     public int removeAll(StringList _subList, boolean _matchCase)
@@ -1409,7 +1452,7 @@ public class StringList {
     /**
      * Removes all elements at front and rear that contain only whitespace, such that
      * this.concatenate().trim() and this.trim().concatenate() produce the same result.<br/>
-     * Note that the StringList itself is bound to be modified, not a copy of this!
+     * Note that the StringList <b>itself is bound to be modified</b>, not a copy of this!
      * @return this StringList after having been trimmed.
      * @see #removeAll(String)
      * @see #removeAll(String, boolean)

@@ -1608,7 +1608,7 @@ public class BASHGenerator extends Generator {
 							String source = "${" + resultName + "}";
 							StringList tokens = Syntax.splitLexically(line, true);
 							tokens.removeAll(" ");
-							Element.unifyOperators(tokens, true);
+							Syntax.unifyOperators(tokens, true);
 							String target = Instruction.getAssignedVarname(tokens, true);
 							boolean done = false;
 							if (target != null && this.varNames.contains(target)) {

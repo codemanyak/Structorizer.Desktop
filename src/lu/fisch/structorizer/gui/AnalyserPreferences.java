@@ -331,8 +331,7 @@ public class AnalyserPreferences extends LangDialog {
 		String[] captions = {null, null};
 		if (checkNo > 0 && checkNo <= checkCaptions.length) {
 			captions[1] = checkCaptions[checkNo-1];
-			String localeName = Locales.getInstance().getLoadedLocaleName();
-			Locale locale = Locales.getInstance().getLocale(localeName);
+			Locale locale = Locales.getLoadedLocale(true);
 			String transl = locale.getValue("Structorizer", "AnalyserPreferences.checkboxes." + (checkNo) + ".text");
 			if (!transl.isEmpty()) {
 				captions[1] = transl;

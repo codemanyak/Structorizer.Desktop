@@ -616,7 +616,7 @@ public class CGenerator extends Generator {
 		{
 		// END KGU#162 2016-04-01
 			// START KGU#109/KGU#141 2016-01-16: Bugfix #61,#107,#112
-			_input = Element.unifyOperators(_input);
+			_input = Syntax.unifyOperators(_input);
 			int asgnPos = _input.indexOf("<-");
 			if (asgnPos > 0)
 			{
@@ -1143,7 +1143,7 @@ public class CGenerator extends Generator {
 		boolean isDisabled = _inst.isDisabled(); 
 		StringList tokens = Syntax.splitLexically(line.trim(), true);
 		// START KGU#796 2020-02-10: Bugfix #808
-		Element.unifyOperators(tokens, false);
+		Syntax.unifyOperators(tokens, false);
 		// END KGU#796 2020-02-10
 		StringList pureTokens = tokens.copy();	// will not contain separating space
 		StringList exprTokens = null;	// Tokens of the expression in case of an assignment
@@ -2000,7 +2000,7 @@ public class CGenerator extends Generator {
 							// START KGU#815 2020-03-26: Enh. #828 we have to cope with class methods from a foreign library
 							if (this.importedLibRoots != null && this.importedLibRoots.contains(called)) {
 								StringList tokens = Syntax.splitLexically(line, true);
-								Element.unifyOperators(tokens, true);
+								Syntax.unifyOperators(tokens, true);
 								int posAsgn = tokens.indexOf("<-");
 								int posCall = tokens.indexOf(call.getName(), posAsgn+1);
 								tokens.set(posCall, this.makeLibCallName(call.getName()));

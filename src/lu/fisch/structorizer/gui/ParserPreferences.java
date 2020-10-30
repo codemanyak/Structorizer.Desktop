@@ -612,7 +612,7 @@ public class ParserPreferences extends LangDialog {
 	protected void showLocalePulldown() {
 		if (popupLocales == null) {
 			Locales locales = Locales.getInstance();
-			Locale currentLocale = locales.getLocale(locales.getLoadedLocaleName());
+			Locale currentLocale = Locales.getLoadedLocale(true);
 			popupLocales = new JPopupMenu();
 			for (int iLoc = 0; iLoc < Locales.LOCALES_LIST.length; iLoc++)
 			{

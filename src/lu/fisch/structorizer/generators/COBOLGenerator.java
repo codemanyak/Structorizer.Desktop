@@ -814,7 +814,7 @@ public class COBOLGenerator extends Generator {
 					continue;
 				}
 				StringList tokens = Syntax.splitLexically(line, true);
-				Element.unifyOperators(tokens, false);
+				Syntax.unifyOperators(tokens, false);
 				String transfLine = transform(line);
 				// Input and output should work via standard transformation...
 				if (Instruction.isAssignment(line)) {

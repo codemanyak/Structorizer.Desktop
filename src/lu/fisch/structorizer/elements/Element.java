@@ -115,6 +115,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2020-04-12      Bugfix #847 inconsistent handling of upper and lowercase in operator names (esp. DIV)
  *      Kay Gürtzig     2020-08-12      Enh. #800: Started to delegate syntactic analysis to class Syntax
  *      Kay Gürtzig     2020-10-17/19   Enh. #872: New mode to display operators in C style
+ *      Kay Gürtzig     2020-10-30      Enh. #800: Methods unifyOperators moved to class Syntax
  *
  ******************************************************************************************************
  *
@@ -2670,7 +2671,7 @@ public abstract class Element {
 	 * or brace and ending with its pendant (or with a level underflow).
 	 * @param tokens - lexically split tokens.
 	 * @return a sequence of level 0 lexical tokens and coagulated sub expressions
-	 * @see #splitLexically(String, boolean)
+	 * @see Syntax#splitLexically(String, boolean)
 	 * @see #splitExpressionList(String, String)
 	 * @see #splitExpressionList(String, String, boolean)
 	 * @see #splitExpressionList(StringList, String, boolean)
@@ -3626,66 +3627,6 @@ public abstract class Element {
     protected abstract void addFullText(StringList _lines, boolean _instructionsOnly);
     // END KGU 2015-10-16
     
-    // START KGU#18/KGU#23 2015-10-24 intermediate transformation added and decomposed
-    /**
-     * Converts the operator symbols accepted by Structorizer into Java operators:
-     * - Assignment:		"<-"
-     * - Comparison:		"==", "<", ">", "<=", ">=", "!="
-     * - Logic:				"&&", "||", "!", "^"
-     * - Arithmetics:		"div" and usual Java operators (e.g. "mod" -> "%")
-     * @param _expression - an Element's text in practically unknown syntax
-     * @return an equivalent of the _expression String with replaced operators
-     */
-    public static String unifyOperators(String _expression)
-    {
-    	// START KGU#93 2015-12-21: Bugfix #41/#68/#69 Avoid operator padding
-    	//return unifyOperators(_expression, false);
-    	StringList tokens = Syntax.splitLexically(_expression, true);
-    	unifyOperators(tokens, false);
-    	return tokens.concatenate();
-    	// END KGU#93 2015-12-21
-    }
-    
-	// START KGU#92 2015-12-01: Bugfix #41 Okay now, here is the new approach (still a sketch)
-    /**
-     * Converts the operator symbols accepted by Structorizer into intermediate operators
-     * (mostly Java operators):
-     * <ul>
-     * <li>Assignment:		"<-"</li>
-     * <li>Comparison*:		"==", "<", ">", "<=", ">=", "!="</li>
-     * <li>Logic*:			"&&", "||", "!", "^"</li>
-     * <li>Arithmetics*:		"div" and usual Java operators (e. g. "mod" -> "%")</li>
-     * </ul>
-     * @param _tokens - a tokenised line of an Element's text (in practically unknown syntax)
-     * @param _assignmentOnly - if true then only assignment operator will be unified
-     * @return total number of deletions / replacements
-     */
-    public static int unifyOperators(StringList _tokens, boolean _assignmentOnly)
-    {
-        int count = 0;
-        count += _tokens.replaceAll(":=", "<-");
-        // START KGU#115 2015-12-23: Bugfix #74 - logical inversion
-        //if (_assignmentOnly)
-        if (!_assignmentOnly)
-        // END KGU#115 2015-12-23
-        {
-        	count += _tokens.replaceAll("=", "==");
-        	count += _tokens.replaceAll("<>", "!=");
-        	count += _tokens.replaceAllCi("mod", "%");
-        	count += _tokens.replaceAllCi("shl", "<<");
-        	count += _tokens.replaceAllCi("shr", ">>");
-        	count += _tokens.replaceAllCi("and", "&&");
-        	count += _tokens.replaceAllCi("or", "||");
-        	count += _tokens.replaceAllCi("not", "!");
-        	count += _tokens.replaceAllCi("xor", "^");
-        	// START KGU#843 2020-04-11: Bugfix #847 Inconsistency in handling operators (we don't count this, though)
-        	_tokens.replaceAllCi("DIV", "div");
-        	// END KGU#843 2020-04-11
-        }
-        return count;
-    }
-	// END KGU#92 2015-12-01
-
     /**
      * Returns a (hopefully) lossless representation of the stored text as a
      * StringList in a common intermediate language (code generation phase 1).
@@ -3798,7 +3739,7 @@ public abstract class Element {
         cutOutRedundantMarkers(tokens);
         // END KGU#165 2016-03-26
         
-        unifyOperators(tokens, false);
+        Syntax.unifyOperators(tokens, false);
         
         return tokens;
         // END KGU#93 2015-12-21

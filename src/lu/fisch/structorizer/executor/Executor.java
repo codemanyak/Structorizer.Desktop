@@ -1117,7 +1117,7 @@ public class Executor implements Runnable
 	{
 		// START KGU#128 2016-01-07: Bugfix #92 - Effort via tokens to avoid replacements within string literals
 		StringList tokens = Syntax.splitLexically(s, true);
-		Element.unifyOperators(tokens, false);
+		Syntax.unifyOperators(tokens, false);
 		// START KGU#130 2015-01-08: Bugfix #95 - Conversion of div operator had been forgotten...
 		tokens.replaceAll("div", "/");		// FIXME: Operands should better be coerced to integer...
 		// END KGU#130 2015-01-08

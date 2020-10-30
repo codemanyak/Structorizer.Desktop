@@ -8466,7 +8466,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		if (comp instanceof JTabbedPane) {
 			//prefGenName + Menu.
 			Locales locales = Locales.getInstance();
-			String tt = locales.getLocale(locales.getLoadedLocaleName()).getValue("Structorizer", "Menu.menuFileExportCodeFavorite.tooltip");
+			String tt = Locales.getLoadedLocale(false).getValue("Structorizer", "Menu.menuFileExportCodeFavorite.tooltip");
 			if (tt.isEmpty()) {
 				tt = locales.getDefaultLocale().getValue("Structorizer", "Menu.menuFileExportCodeFavorite.tooltip");
 			}
@@ -10657,7 +10657,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 	 */
 	public Set<String> selectPreferencesToExport(String title, HashMap<String, String[]> preferenceKeys) {
 		lu.fisch.structorizer.locales.Locale locale0 = Locales.getInstance().getDefaultLocale();
-		lu.fisch.structorizer.locales.Locale locale = Locales.getInstance().getLocale(Locales.getInstance().getLoadedLocaleName());
+		lu.fisch.structorizer.locales.Locale locale = Locales.getLoadedLocale(false);
 		double scale = Double.parseDouble(Ini.getInstance().getProperty("scaleFactor", "1"));
 		// Fill the selection vector to the necessary size
 		for (int j = prefCategorySelection.size(); j < preferenceKeys.size(); j++) {

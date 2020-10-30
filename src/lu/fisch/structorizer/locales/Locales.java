@@ -49,6 +49,7 @@ package lu.fisch.structorizer.locales;
  *      Kay Gürtzig     2019-03-03  Enh. #327: New methods removeLocale(String, boolean), removeLocales(boolean)
  *      Kay Gürtzig     2019-06-14  Issue #728: Mechanism for setting mnemonics enhanced
  *      Kay Gürtzig     2019-09-30  KGU#736 Precaution against newlines in tooltips
+ *      Kay Gürtzig     2020-10-25  KGU#882 New convenience method getLoadedLocale() on occasion of issue #800
  *
  ******************************************************************************************************
  *
@@ -78,15 +79,17 @@ import lu.fisch.utils.BString;
 import lu.fisch.utils.StringList;
 
 /**
- *
+ * Fundamental localization manager (singleton class), holds the locales, registers GUI
+ * components that want localization, and performs translations.
  * @author robertfisch
  */
 public class Locales {
     /**
      * LOCALES_LIST of all locales we have and their respective English denomination.<br/>
-     * Locales for actually existing languages MUST have an English language name, whereas
-     * pure technical pseudo-locales MUST NOT have a denomination.<br/>
-     * Note: Order matters (preferences menu, Translator etc. will present locales in the order given here) 
+     * Locales for actually existing languages <b><i>must</i></b> have an English language name,
+     * whereas purely technical pseudo-locales <b><i>must not</i></b> have a denomination.<br/>
+     * Note: Order matters (preferences menu, Translator etc. will present locales in the order
+     * given here) 
      */
     public static final String[][] LOCALES_LIST = {
     	{"en", "English"},
@@ -124,12 +127,21 @@ public class Locales {
     private String loadedLocaleFilename = null;
     private final ArrayList<Component> components = new ArrayList<Component>();
     
+    /**
+     * @return the singleton instance of this class (creates it if missing)
+     * @see #hasInstance()
+     */
     public static Locales getInstance()
     {
         if(instance==null) instance=new Locales();
         return instance;
     }
     
+    /**
+     * Checks whether there ha already been an instance
+     * @return true if a instance has been created, false otherwise
+     * @see #getInstance()
+     */
     public static boolean hasInstance()
     {
         return (instance!=null);
@@ -140,6 +152,26 @@ public class Locales {
         instance=null;
         System.gc();
     }
+    
+    // START KGU#882 2020-10-25: New convenience method
+    /**
+     * Returns the currently loaded locale if Locales has already been instantiated (or
+     * {@code forceInstace} is {@code true}).
+     * Otherwise returns {@code null}. If a current locale hadn't been loaded yet then it will
+     * be loaded now - this may take time and could raise error message boxes.
+     * @param forceInstance - if {@code true} then an instantiation will be forced if there
+     * hadn't been an instance yet
+     * @return - the current locale or {@code null}
+     */
+    public static Locale getLoadedLocale(boolean forceInstance)
+    {
+        if (forceInstance || hasInstance()) {
+            String name = getInstance().getLoadedLocaleName();
+            return instance.getLocale(name);
+        }
+        return null;
+    }
+    // END KGU#882 2020-10-25
     
     public static void main(String[] args)
     {

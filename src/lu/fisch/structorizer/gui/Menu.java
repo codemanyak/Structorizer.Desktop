@@ -2145,8 +2145,7 @@ public class Menu extends LangMenuBar implements NSDController, LangEventListene
 	public static String[] getLocalizedMenuPath(String[] menuItemKeys, String[] defaultStrings)
 	{
 		String[] names = new String[menuItemKeys.length];
-		String localeName = Locales.getInstance().getLoadedLocaleName();
-		Locale locale = Locales.getInstance().getLocale(localeName);
+		Locale locale = Locales.getLoadedLocale(true);
 		if (locale != null) {
 			for (int i = 0; i < menuItemKeys.length; i++) {
 				String text = locale.getValue("Structorizer", "Menu." + menuItemKeys[i] + ".text");

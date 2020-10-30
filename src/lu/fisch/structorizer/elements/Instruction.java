@@ -70,6 +70,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2019-03-18      Enh. #56: "preThrow" keyword handling
  *      Kay Gürtzig     2019-11-17      Enh. #739: Support for enum type definitions
  *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
+ *      Kay Gürtzig     2020-10-30      Enh. #800: Calls of unifyOperators redirected to class Syntax
  *
  ******************************************************************************************************
  *
@@ -569,7 +570,7 @@ public class Instruction extends Element {
 	public static boolean isAssignment(String line)
 	{
 		StringList tokens = Syntax.splitLexically(line, true);
-		unifyOperators(tokens, true);
+		Syntax.unifyOperators(tokens, true);
 		// START KGU#689 2019-03-21: Issue #706 we should better cope with named parameter assignment
 		//return tokens.contains("<-");
 		boolean isAsgnmt = tokens.contains("<-");
@@ -649,7 +650,7 @@ public class Instruction extends Element {
 	{
 		boolean isFunc = false;
 		StringList tokens = Syntax.splitLexically(line, true);
-		unifyOperators(tokens, true);
+		Syntax.unifyOperators(tokens, true);
 		int asgnPos = tokens.indexOf("<-");
 		if (asgnPos > 0)
 		{
@@ -787,7 +788,7 @@ public class Instruction extends Element {
 	public static boolean isDeclaration(String line)
 	{
 		StringList tokens = Syntax.splitLexically(line, true);
-		unifyOperators(tokens, true);
+		Syntax.unifyOperators(tokens, true);
 		boolean typeA = tokens.indexOf("var") == 0 && tokens.indexOf(":") > 1;
 		boolean typeB = tokens.indexOf("dim") == 0 && tokens.indexOf("as") > 1;
 		int posAsgn = tokens.indexOf("<-");
@@ -900,7 +901,7 @@ public class Instruction extends Element {
 		if (tokens.count() == 0 || !tokens.get(0).equalsIgnoreCase("type")) {
 			return false;
 		}
-		unifyOperators(tokens, true);
+		Syntax.unifyOperators(tokens, true);
 		int posDef = tokens.indexOf("=");
 		if (posDef < 2 || posDef == tokens.count()-1) {
 			return false;
@@ -1040,7 +1041,7 @@ public class Instruction extends Element {
 		{
 			String potentialCall = lines.get(lineNo);
 			StringList tokens = Syntax.splitLexically(potentialCall, true);
-			unifyOperators(tokens, true);
+			Syntax.unifyOperators(tokens, true);
 			int asgnPos = tokens.indexOf("<-");
 			if (asgnPos > 0)
 			{
@@ -1124,7 +1125,7 @@ public class Instruction extends Element {
 		String typeSpec = "";
 		boolean isAssigned = false;
 		boolean isDeclared = true;
-		unifyOperators(tokens, true);
+		Syntax.unifyOperators(tokens, true);
 		tokens.removeAll(" ");
 		if (tokens.isEmpty()) {
 			return;

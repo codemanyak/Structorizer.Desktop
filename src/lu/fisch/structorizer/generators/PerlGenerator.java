@@ -433,7 +433,7 @@ public class PerlGenerator extends Generator {
 		if (!this.suppressTransformation)
 		{
 		// END KGU#162 2016-04-01
-			_input = Element.unifyOperators(_input);
+			_input = Syntax.unifyOperators(_input);
 		// START KGU#162 2016-04-01: Enh. #144 - hands off in "no conversion" mode
 		}
 		// END KGU#162 2016-04-01
@@ -599,7 +599,7 @@ public class PerlGenerator extends Generator {
 				if (isAsgn) {
 					StringList tokens = Syntax.splitLexically(line, true);
 					tokens.removeAll(" ");
-					Element.unifyOperators(tokens, true);
+					Syntax.unifyOperators(tokens, true);
 					int posAsgn = tokens.indexOf("<-");
 					String var = Instruction.getAssignedVarname(tokens.subSequence(0, posAsgn), true);
 					StringList expr = tokens.subSequence(posAsgn+1, tokens.count());

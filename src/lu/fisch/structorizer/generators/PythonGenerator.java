@@ -544,7 +544,7 @@ public class PythonGenerator extends Generator
 			{
 				StringList tokens = Syntax.splitLexically(_input, true);
 				// START KGU#698 2019-03-26: Bugfix #716
-				Element.unifyOperators(tokens, false);
+				Syntax.unifyOperators(tokens, false);
 				// END KGU#698 2019-03-26
 				tokens = Element.coagulateSubexpressions(tokens);
 				int asgnPos = tokens.indexOf("<-");
@@ -1512,7 +1512,7 @@ public class PythonGenerator extends Generator
 	{
 		StringList tokens = Syntax.splitLexically(line, true);
 		tokens.removeAll(" ");
-		Element.unifyOperators(tokens, true);
+		Syntax.unifyOperators(tokens, true);
 		String var = Instruction.getAssignedVarname(tokens, false);
 		if (var != null && !Function.testIdentifier(var, false, "")) {
 			if (MTCH_IDENTIFIER.reset(var).matches()) {

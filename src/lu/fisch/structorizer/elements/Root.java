@@ -158,7 +158,8 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *      Kay Gürtzig     2020-10-16      Issue #874: Identifier check in Analyser modified with respect to non-ascii letters
  *      Kay Gürtzig     2020-10-19      Issue #875: New public method for the retrieval of potential arguments
- *      
+ *      Kay Gürtzig     2020-10-30      Enh. #800: Calls of unifyOperators redirected to class Syntax
+ *
  ******************************************************************************************************
  *
  *      Comment:		/
@@ -2625,7 +2626,7 @@ public class Root extends Element {
 
 		StringList tokens = Syntax.splitLexically(_line.trim(), true);
 
-		Element.unifyOperators(tokens, false);
+		Syntax.unifyOperators(tokens, false);
 
 		// Replace all split keywords by the respective configured strings
 		// This replacement will be aware of the case sensitivity preference
@@ -2857,7 +2858,7 @@ public class Root extends Element {
 
     		StringList tokens = Syntax.splitLexically(allText, true);
 
-    		Element.unifyOperators(tokens, false);
+    		Syntax.unifyOperators(tokens, false);
 
     		// Replace all split keywords by the respective configured strings
     		// This replacement will be aware of the case sensitivity preference
@@ -3967,7 +3968,7 @@ public class Root extends Element {
 
 			// START KGU#65/KGU#126 2016-01-06: More precise analysis, though expensive
 			StringList tokens = Syntax.splitLexically(test.get(lnr).trim(), true);
-			unifyOperators(tokens, false);
+			Syntax.unifyOperators(tokens, false);
 			// START KGU#297 2016-11-22: Issue #295 - Instructions starting with the return keyword must be handled separately
 			//if (tokens.contains("<-"))
 			boolean isReturn = tokens.indexOf(returnTokens, 0, !Syntax.ignoreCase) == 0;
@@ -4527,7 +4528,7 @@ public class Root extends Element {
 		}
 		// START KGU#836 2020-03-29: Issue #841 In case of a non-subroutine a parameter list should also be wrong
 		else if (!this.isSubroutine() && this.getText().getText().indexOf("(") >= 0) {
-			Locale loc = Locales.getInstance().getLocale(Locales.getInstance().getLoadedLocaleName());
+			Locale loc = Locales.getLoadedLocale(true);
 			Locale loc0 = Locales.getInstance().getDefaultLocale();
 			String key1 = "ElementNames.localizedNames." + (this.isProgram() ? 13 : 15) + ".text";
 			String key2 = "ElementNames.localizedNames.14.text";

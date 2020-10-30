@@ -620,9 +620,15 @@ public class For extends Element implements ILoop {
 			valueListString = valueListString.trim();
 			boolean hadBraces = valueListString.startsWith("{") && valueListString.endsWith("}");
 			StringList valueListTokens = Syntax.splitLexically(valueListString, true);
-			// There are no built-in functions returning an array and external function calls
-			// aren't allowed at this position, hence it's relatively safe to conclude
-			// an item enumeration from the occurrence of a comma.
+			/* There are of course built-in functions with more than one argument (such
+			 * that commas may occur within expressions) but method splitExpressionList
+			 * is structure-aware such that it's relatively safe to decompose an item
+			 * enumeration with commas as separator.
+			 * FIXME: The tricky case is the absence of a comma: If we split by spaces then
+			 * an expression like a + 3 would be broken - and that is exactly what will
+			 * happen in the else branch. So that syntax variant should be declared
+			 * deprecated.
+			 */
 			if (valueListTokens.contains(",")) {
 				if (hadBraces)
 				{
@@ -879,7 +885,7 @@ public class For extends Element implements ILoop {
 				forParts[3] = "1";
 			}
 		}
-		unifyOperators(init, true);
+		Syntax.unifyOperators(init, true);
 		int posAsgnOpr = init.indexOf("<-");
 		if (posAsgnOpr > 0)
 		{

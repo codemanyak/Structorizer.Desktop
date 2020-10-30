@@ -522,7 +522,7 @@ public class BasGenerator extends Generator
 				// START KGU#779 2019-12-01: Bugfix #790 (enh. #416)
 				String line = lines.get(i);
 				StringList tokens = Syntax.splitLexically(line, true);
-				Element.unifyOperators(tokens, false);
+				Syntax.unifyOperators(tokens, false);
 				boolean isRecordInit = false;
 				// END KGU#779 2019-12-01
 				// START KGU#100 2016-01-22: Enh. #84 - resolve array initialisation
