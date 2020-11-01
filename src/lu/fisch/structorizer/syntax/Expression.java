@@ -52,7 +52,6 @@ import java.util.LinkedList;
 import java.util.NoSuchElementException;
 
 import lu.fisch.structorizer.elements.TypeMapEntry;
-import lu.fisch.structorizer.executor.Function;
 import lu.fisch.utils.StringList;
 
 /**
@@ -281,7 +280,7 @@ public class Expression {
 					sb.append(symbol);
 				}
 				// Insert a gap if the operator is an identifier (word)
-				if (Function.testIdentifier(symbol, false, null)) {
+				if (Syntax.isIdentifier(symbol, false, null)) {
 					sb.append(" ");
 				}
 			}
@@ -755,7 +754,7 @@ public class Expression {
 				signPos = true;
 				wasOpd = false;
 			}
-			else if (Function.testIdentifier(token, false, null)
+			else if (Syntax.isIdentifier(token, false, null)
 					&& (stopTokens == null || !stopTokens.contains(token))) {
 				String nextToken = null;
 				if (tokens.count() > 2) {

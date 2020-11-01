@@ -33,6 +33,7 @@ package lu.fisch.structorizer.syntax;
  *      Author          Date            Description
  *      ------          ----            -----------
  *      Kay Gürtzig     2020-08-12      First Issue
+ *      Kay Gürtzig     2020-11-01      Further methods from Element and Function moved hitherto
  *
  ******************************************************************************************************
  *
@@ -368,6 +369,58 @@ public class Syntax {
 		}
 	}
 	// END KGU#288 2016-11-06
+	
+	// START KGU#790 2020-11-01: Moved hitherto from Function.testIdentifier() and renamed
+	/**
+	 * Checks identifier syntax (i.e. ASCII letters, digits, underscores, and possibly dots)
+	 * @param _str - the identifier candidate
+	 * @param _strictAscii - whether non-ascii letters are to be rejected
+	 * @param _alsoAllowedChars - a String containing additionally accepted characters (e.g. ".") or null
+	 * @return true iff _str complies with the strict identifier syntax convention (plus allowed characters)
+	 */
+	public static boolean isIdentifier(String _str, boolean _strictAscii, String _alsoAllowedChars)
+	{
+		_str = _str.trim().toLowerCase();
+		// START KGU#877 2020-10-16: Bugfix #874 - we should tolerate non-ascii letters
+		//boolean isIdent = !_str.isEmpty() &&
+		//		('a' <= _str.charAt(0) && 'z' >= _str.charAt(0) || _str.charAt(0) == '_');
+		boolean isIdent = false;
+		if (!_str.isEmpty()) {
+			char firstChar = _str.charAt(0);
+			isIdent = ('a' <= firstChar && firstChar <= 'z')
+					|| !_strictAscii && Character.isLetter(firstChar)
+					|| firstChar == '_';
+		}
+		// END KGU#877 2020-10-16
+		if (_alsoAllowedChars == null)
+		{
+			_alsoAllowedChars = "";
+		}
+		for (int i = 1; isIdent && i < _str.length(); i++)
+		{
+			char currChar = _str.charAt(i);
+			if (!(
+					('a' <= currChar && currChar <= 'z')
+					// START KGU#877 2020-10-16: Bugfix #874 - we should tolerate non-ascii letters
+					||
+					!_strictAscii && Character.isLetter(currChar)
+					// END KGU#877 2020-10-16
+					||
+					('0' <= currChar && currChar <= '9')
+					||
+					(currChar == '_')
+					||
+					_alsoAllowedChars.indexOf(currChar) >= 0
+					))
+				// END KGU 2015-11-25
+			{
+				isIdent = false;
+			}
+		}
+		return isIdent;
+	}
+	// END KGU#790 2020-11-01
+
 	
 	// START KGU#18/KGU#23 2015-11-04: Lexical splitter extracted from writeOutVariables
 	/**

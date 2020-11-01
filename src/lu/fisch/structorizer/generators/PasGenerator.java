@@ -147,7 +147,6 @@ import java.util.Map.Entry;
 import java.util.regex.Pattern;
 
 import lu.fisch.structorizer.elements.*;
-import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
 
 
@@ -778,7 +777,7 @@ public class PasGenerator extends Generator
 								// END KGU#560 2018-07-22
 								generateArrayInit(varName, expr, _indent, null, isDisabled);
 							}
-							else if (posBrace > 0 && Function.testIdentifier(potTypeName, false, ".") && expr.endsWith("}"))
+							else if (posBrace > 0 && Syntax.isIdentifier(potTypeName, false, ".") && expr.endsWith("}"))
 							{
 								// START KGU#559 2018-07-20: Enh. #563 - smarter record initializer interpretation
 								//generateRecordInit(varName, expr, _indent, false, isDisabled, null);
@@ -981,7 +980,7 @@ public class PasGenerator extends Generator
 			pureExprTokens.removeAll(" ");
 			int posBrace = pureExprTokens.indexOf("{");
 			if (pureExprTokens.count() >= 3 && posBrace <= 1) {
-				if (posBrace == 1 && Function.testIdentifier(pureExprTokens.get(0), false, null)) {
+				if (posBrace == 1 && Syntax.isIdentifier(pureExprTokens.get(0), false, null)) {
 					// Record initializer
 					String typeName = pureExprTokens.get(0);							
 					TypeMapEntry recType = this.typeMap.get(":"+typeName);

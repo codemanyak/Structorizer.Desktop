@@ -135,7 +135,6 @@ import java.util.Map.Entry;
 
 import lu.fisch.structorizer.elements.*;
 import lu.fisch.structorizer.executor.Executor;
-import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
 
 // FIXME (KGU 2014-11-11): Variable names will have to be accomplished by a '$' prefix - this requires
@@ -303,7 +302,7 @@ public class PHPGenerator extends Generator
 		// Now convert all qualified names into array access via string key
 		for (int i = 0; i < tokens.count(); i++) {
 			String token = tokens.get(i);
-			if (Function.testIdentifier(token, false, null)) {
+			if (Syntax.isIdentifier(token, false, null)) {
 				// Check for a preceding dot
 				int k = i;
 				while (k > 0 && tokens.get(--k).trim().isEmpty());

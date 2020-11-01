@@ -688,7 +688,7 @@ public class OberonGenerator extends Generator {
 						}
 						// START KGU#388 2017-10-24: Enh. #423 cope with record initializers
 						else if (bracePos > 0 && expr.endsWith("}")
-								&& Function.testIdentifier(expr.substring(0, bracePos), false, null))
+								&& Syntax.isIdentifier(expr.substring(0, bracePos), false, null))
 						{
 							isComplexInit = true;
 							// START KGU#559 2018-07-22: Enh. #563
@@ -816,7 +816,7 @@ public class OberonGenerator extends Generator {
 			procName = "String";
 		}
 		// START KGU#332 2017-01-30: Enh. #335 Identify variable types if possible
-		if (procName.isEmpty() && Function.testIdentifier(_expression, false, ".")) {
+		if (procName.isEmpty() && Syntax.isIdentifier(_expression, false, ".")) {
 			// START KGU#388 2017-10-24: Enh. 423
 			//TypeMapEntry typeInfo = typeMap.get(expr);
 			String[] nameParts = _expression.split("[.]");
@@ -950,7 +950,7 @@ public class OberonGenerator extends Generator {
 			pureExprTokens.removeAll(" ");
 			int posBrace = pureExprTokens.indexOf("{");
 			if (pureExprTokens.count() >= 3 && posBrace <= 1) {
-				if (posBrace == 1 && Function.testIdentifier(pureExprTokens.get(0), false, null)) {
+				if (posBrace == 1 && Syntax.isIdentifier(pureExprTokens.get(0), false, null)) {
 					// Record initializer
 					String typeName = pureExprTokens.get(0);							
 					TypeMapEntry recType = this.typeMap.get(":"+typeName);

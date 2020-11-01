@@ -1307,7 +1307,7 @@ public abstract class Element {
 		StringList tokens = Syntax.splitLexically(text, true);
 		for (int i = 0; i < tokens.count(); i++) {
 			String token = tokens.get(i).trim();
-			if (!token.isEmpty() && Function.testIdentifier(token, false, null)) {
+			if (!token.isEmpty() && Syntax.isIdentifier(token, false, null)) {
 				// Skip all whitespace
 				int j = i;
 				String nextToken = null;
@@ -2942,7 +2942,7 @@ public abstract class Element {
 			if (posColon >= 0) {
 				String name = tokens.subSequence(0, posColon).concatenate().trim();
 				String expr = tokens.subSequence(posColon + 1, tokens.count()).concatenate().trim();
-				if (Function.testIdentifier(name, false, null)) {
+				if (Syntax.isIdentifier(name, false, null)) {
 					components.put(name, expr);
 					// START KGU#559 2018-07-20: Enh. #563 Stop associating from type as soon as an explicit name is given
 					guessComponents = false;
@@ -3360,7 +3360,7 @@ public abstract class Element {
 							}
 							// END KGU 2015-11-12
 							// START KGU#480 2018-01-21: Enh. #490 DiagramController routine aliases?
-							else if (E_APPLY_ALIASES && Function.testIdentifier(display, false, "#")) {
+							else if (E_APPLY_ALIASES && Syntax.isIdentifier(display, false, "#")) {
 								int j = i;
 								while (j < parts.count() && parts.get(++j).trim().isEmpty());
 								if (j < parts.count() && parts.get(j).equals("(")) {
@@ -4037,7 +4037,7 @@ public abstract class Element {
 			TypeMapEntry entry = typeMap.get(varName);
 			// Get the referred type entry in case typeSpec is a previously defined type
 			TypeMapEntry typeEntry = null;
-			if (Function.testIdentifier(typeSpec, false, null)) {
+			if (Syntax.isIdentifier(typeSpec, false, null)) {
 				typeEntry = typeMap.get(":" + typeSpec);
 			}
 			if (entry == null) {
@@ -4089,7 +4089,7 @@ public abstract class Element {
 					if (i < compTypes.count()) {
 						String type = compTypes.get(i);
 						if (type != null) {
-							if (Function.testIdentifier(type, false, null)) {
+							if (Syntax.isIdentifier(type, false, null)) {
 								// Try to find an existing type entry with this name
 								compEntry = typeMap.get(":" + type);
 								if (compEntry == null) {

@@ -64,7 +64,6 @@ import java.util.HashSet;
 import java.util.LinkedList;
 
 import lu.fisch.structorizer.elements.*;
-import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
 import lu.fisch.structorizer.syntax.Syntax;
 
@@ -429,7 +428,7 @@ public class TexGenerator extends Generator {
 				}
 				else {
 					valueList = items.concatenate(", ");
-					if (items.count() != 1 || !isStringLiteral(items.get(0)) && !Function.testIdentifier(items.get(0), false, null)) {
+					if (items.count() != 1 || !isStringLiteral(items.get(0)) && !Syntax.isIdentifier(items.get(0), false, null)) {
 						valueList = "\\{" + transform(valueList) + "\\}";
 					}
 					else {

@@ -2735,10 +2735,10 @@ public class Root extends Element {
 		{
 			String token = tokens.get(i);
 			// START KGU#588 2018-10-04: Bugfix #618 Function names shouldn't be gathered here
-			//if((Function.testIdentifier(token, null)
+			//if((Syntax.isIdentifier(token, null)
 			//		&& (i == tokens.count() - 1 || !tokens.get(i+1).equals("("))
 			//		|| this.variables.contains(token)))
-			if((Function.testIdentifier(token, false, null) || this.getCachedVarNames().contains(token))
+			if((Syntax.isIdentifier(token, false, null) || this.getCachedVarNames().contains(token))
 					&& (i == tokens.count() - 1 || !tokens.get(i+1).equals("(")))
 			// END KGU#588 2018-10-04
 			{
@@ -2747,7 +2747,7 @@ public class Root extends Element {
 				i++;
 			}
 			// START KGU#388 2017-09-17: Enh. #423 Record support - don't complain component names!
-			else if (token.equals(".") && i+1 < tokens.count() && Function.testIdentifier(tokens.get(i+1), false, null)) {
+			else if (token.equals(".") && i+1 < tokens.count() && Syntax.isIdentifier(tokens.get(i+1), false, null)) {
 				// Drop the dot together with the following component name
 				tokens.remove(i, i+2);
 			}
@@ -2768,7 +2768,7 @@ public class Root extends Element {
 	private void skimRecordInitializers(StringList tokens) {
 		int posBrace = 0;
 		while ((posBrace = tokens.indexOf("{", posBrace+1)) > 0) {
-			if (Function.testIdentifier(tokens.get(posBrace-1), false, null)) {
+			if (Syntax.isIdentifier(tokens.get(posBrace-1), false, null)) {
 				HashMap<String, String> components = Element.splitRecordInitializer(tokens.concatenate("", posBrace-1), null, false);
 				if (components != null) {
 					// Remove all tokens from the type name on (they are in the HashMap now)
@@ -3875,14 +3875,14 @@ public class Root extends Element {
 			// CHECK: correct identifiers (#7)
 			// START KGU#61 2016-03-22: Method outsourced
 			//if(testidentifier(myVars.get(j))==false)
-			if (!Function.testIdentifier(myVar, false, null))
+			if (!Syntax.isIdentifier(myVar, false, null))
 			// END KGU#61 2016-03-22
 			{
 				//error  = new DetectedError("«"+myVars.get(j)+"» is not a valid name for a variable!",(Element) _node.getElement(i));
 				addError(_errors, new DetectedError(errorMsg(Menu.error07_3, myVar), ele), 7);
 			}
 			// START KGU#877 2020-10-16: Bugfix #874
-			else if (!Function.testIdentifier(myVar, true, null))
+			else if (!Syntax.isIdentifier(myVar, true, null))
 			{
 				//error  = new DetectedError(Identifier "«"+myVar+"» contains non-ascii letters, this should be avoided.",(Element) _node.getElement(i));
 				addError(_errors, new DetectedError(errorMsg(Menu.error07_5, myVar), ele), 7);
@@ -4116,7 +4116,7 @@ public class Root extends Element {
 					//error  = new DetectedError("The called subroutine «<routine_name>(<arg_count>)» is currently not available.",(Element) _node.getElement(i));
 					addError(_errors, new DetectedError(errorMsg(Menu.error15_2, subName + "(" + subArgCount + ")"), ele), 15);
 					// START KGU#877 2020-10-16: Issue #874 warn in case of a non-ascii name before the subroutine gets derived
-					if (!Function.testIdentifier(subName, true, null)) {
+					if (!Syntax.isIdentifier(subName, true, null)) {
 						addError(_errors, new DetectedError(errorMsg(Menu.error07_5, subName), ele), 7);
 					}
 					// END KGU#877 2020-10-16
@@ -4618,7 +4618,7 @@ public class Root extends Element {
 						StringList compNames = new StringList();
 						StringList compTypes = new StringList();
 						// We test here against type-associated variable names and an existing type name
-						if (!Function.testIdentifier(typename, false, null) || _types.containsKey(typename) || _types.containsKey(":" + typename)) {
+						if (!Syntax.isIdentifier(typename, false, null) || _types.containsKey(typename) || _types.containsKey(":" + typename)) {
 							//error  = new DetectedError("Type name «" + typename + "» is illegal or colliding with another identifier.", _instr);
 							addError(_errors, new DetectedError(errorMsg(Menu.error24_2, typename), _instr), 24);					
 						}
@@ -4647,7 +4647,7 @@ public class Root extends Element {
 							this.extractDeclarationsFromList(typeSpec.substring(posBrace+1, typeSpec.length()-1), compNames, compTypes, null);
 							for (int j = 0; j < compNames.count(); j++) {
 								String compName = compNames.get(j);
-								if (!Function.testIdentifier(compName, false, null) || compNames.subSequence(0, j-1).contains(compName)) {
+								if (!Syntax.isIdentifier(compName, false, null) || compNames.subSequence(0, j-1).contains(compName)) {
 									//error  = new DetectedError("Component name «" + compName + "» is illegal or duplicate.", _instr);
 									addError(_errors, new DetectedError(errorMsg(Menu.error24_3, compName), _instr), 24);					
 								}
@@ -4673,7 +4673,7 @@ public class Root extends Element {
 						// END KGU#542 2019-11-17
 					// START KGU#543 2018-07-05 - check if it is a valid type reference
 					}
-					else if (Function.testIdentifier(typeSpec, false, null) && !_types.containsKey(":" + typeSpec)) {
+					else if (Syntax.isIdentifier(typeSpec, false, null) && !_types.containsKey(":" + typeSpec)) {
 						//error  = new DetectedError("Type name «" + type + "» is illegal or unknown.", _instr);
 						addError(_errors, new DetectedError(errorMsg(Menu.error24_4, typeSpec), _instr), 24);														
 					}
@@ -4701,7 +4701,7 @@ public class Root extends Element {
 					//int nTokens = tokens.count();
 					int posBrace = 0;
 					String typeName = "";
-					while ((posBrace = tokens.indexOf("{", posBrace + 1)) > 1 && Function.testIdentifier((typeName = tokens.get(posBrace-1)), false, null)) {
+					while ((posBrace = tokens.indexOf("{", posBrace + 1)) > 1 && Syntax.isIdentifier((typeName = tokens.get(posBrace-1)), false, null)) {
 						TypeMapEntry recType = _types.get(":"+typeName);
 						if (recType == null || !recType.isRecord()) {
 							//error  = new DetectedError("There is no defined record type «"+typeName+"»!", _instr);
@@ -4762,7 +4762,7 @@ public class Root extends Element {
 				before = _tokens.get(posBrack - 1);
 			}
 			String after = _tokens.get(posDot+1);
-			if (!Function.testIdentifier(after, false, null) || !Function.testIdentifier(before, false, null)) {
+			if (!Syntax.isIdentifier(after, false, null) || !Syntax.isIdentifier(before, false, null)) {
 				path = "";
 				varType = null;
 				continue;
@@ -4773,7 +4773,7 @@ public class Root extends Element {
 				varType = null;
 			}
 			// END KGU#507 2018-03-15
-			if ((path.isEmpty() || varType == null) && Function.testIdentifier(before, false, null)) {
+			if ((path.isEmpty() || varType == null) && Syntax.isIdentifier(before, false, null)) {
 				if (path.isEmpty()) {
 					path = before;
 				}
@@ -5395,7 +5395,7 @@ public class Root extends Element {
     		{
     			// START KGU#61 2016-03-22: Method outsourced
     			//if (testidentifier(tokens[i]))
-    			if (Function.testIdentifier(tokens[i], false, null))
+    			if (Syntax.isIdentifier(tokens[i], false, null))
     			// END KGU#61 2016-03-22
     			{
     				programName = tokens[i];
@@ -5455,7 +5455,7 @@ public class Root extends Element {
     			if ((resultType == null || resultType.isEmpty()) && posOpenParenth > 1) {
     				StringList left = tokens.subSequence(0, posOpenParenth);
     				left.removeAll(" ");
-    				if (left.count() > 1 && Function.testIdentifier(left.get(left.count()-1), false, null))
+    				if (left.count() > 1 && Syntax.isIdentifier(left.get(left.count()-1), false, null))
     			// END KGU#61 2016-03-22
     				{
     					// We assume that the last token is the procedure name, the previous strings
@@ -5757,7 +5757,7 @@ public class Root extends Element {
         // START KGU#61 2016-03-22: Method outsourced
         //if(testidentifier(programName)==false)
         boolean hasValidName = true;
-        if (!Function.testIdentifier(programName, false, null))
+        if (!Syntax.isIdentifier(programName, false, null))
         // END KGU#61 2016-03-22
         {
             //error  = new DetectedError("«"+programName+"» is not a valid name for a program or function!",this);
@@ -5767,7 +5767,7 @@ public class Root extends Element {
                 // "What is your algorithm to do? Replace «???» with a good name for it!"
                 error  = new DetectedError(errorMsg(Menu.hint07_1, programName), this);
             }
-            else if (programName.contains(" ") && Function.testIdentifier(programName.replace(' ', '_'), false, null)) {
+            else if (programName.contains(" ") && Syntax.isIdentifier(programName.replace(' ', '_'), false, null)) {
                 // "Program names should not contain spaces, better place underscores between the words:"
                 error  = new DetectedError(errorMsg(Menu.error07_4, programName.replace(' ', '_')), this);        		
             }
@@ -5780,7 +5780,7 @@ public class Root extends Element {
             addError(errors, error, 7);
         }
         // START KGU#877 2020-10-16: Issue #874 tolerate non-ascii letters, but warn
-        else if (!Function.testIdentifier(programName, true, null)) {
+        else if (!Syntax.isIdentifier(programName, true, null)) {
             // Identifier "«"+programName+"» contains non-ascii letters; this should be avoided."
             addError(errors, new DetectedError(errorMsg(Menu.error07_5, programName), this), 7);
         }
@@ -5820,7 +5820,7 @@ public class Root extends Element {
             // CHECK: correct identifiers (#7)
             // START KGU#61 2016-03-22: Method outsourced
             //if(testidentifier(vars.get(j))==false)
-            if (!Function.testIdentifier(para, false, null))
+            if (!Syntax.isIdentifier(para, false, null))
             // END KGU#61 2016-03-22
             {
                 //error  = new DetectedError("«"+vars.get(j)+"» is not a valid name for a parameter!",this);
@@ -5828,7 +5828,7 @@ public class Root extends Element {
                 addError(errors, error, 7);
             }
             // START KGU#877 2020-10-16: Issue #874 tolerate non-ascii lettes but warn
-            if (!Function.testIdentifier(para, true, null))
+            if (!Syntax.isIdentifier(para, true, null))
             {
                 //error  = new DetectedError("Identifier «"+para+"» contains non-asscii letters; this should be avoided.", this);
                 addError(errors, new DetectedError(errorMsg(Menu.error07_5, para), this), 7);

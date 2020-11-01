@@ -1,5 +1,6 @@
 package lu.fisch.structorizer.syntax;
 
+import lu.fisch.structorizer.executor.Function;
 import lu.fisch.utils.StringList;
 
 /******************************************************************************************************
@@ -15,6 +16,7 @@ import lu.fisch.utils.StringList;
  *      Author          Date            Description
  *      ------          ----            -----------
  *      Kay Gürtzig     2019-12-19      First Issue (#800)
+ *      Kay Gürtzig     2020-11-01      Name check inserted
  *
  ******************************************************************************************************
  *
@@ -25,9 +27,18 @@ import lu.fisch.utils.StringList;
 
 public class Type {
 
+	/**
+	 * Name to be shown for unspecified types
+	 */
 	protected static final String dummy = "???";
 	
+	/**
+	 * The type identifier, will be tested to adhere to identifier syntax
+	 */
 	protected String name = "";
+	/**
+	 * {@code null} or a list of modifiers (each of which ought to be an identifier)
+	 */
 	protected StringList modifiers = null;
 
 	/**
@@ -37,12 +48,16 @@ public class Type {
 	 * <li>[mod1 mod2 ...] name</li>
 	 * </ul>
 	 * @param specTokens blank-free token list
+	 * @throws SyntaxException if the name does not fit to identifier syntax
 	 */
-	public Type(StringList specTokens) {
+	public Type(StringList specTokens) throws SyntaxException {
 		// TODO: somewhat rough, we ought to check for non-identifiers
 		int length = specTokens.count();
 		if (length >= 1) {
 			this.name = specTokens.get(length-1);
+			if (!Syntax.isIdentifier(this.name, true, null)) {
+				throw new SyntaxException("Type name must be an Ascii identifier", 0);
+			}
 			this.modifiers = specTokens.subSequence(0, length-1);
 		}
 	}
@@ -50,15 +65,22 @@ public class Type {
 	/**
 	 * Constructs the type from the given {@code name} and {@code modifiers}
 	 * list (which will be reduced, i.e. blanks and empty parts will be removed).
-	 * @param name - type name
+	 * @param name - type name, must be an Ascii identifier
 	 * @param modifiers - list of modifiers or null
+	 * @throws SyntaxException if {@code name} does not fit to identifier syntax
 	 */
-	public Type(String name, StringList modifiers) {
-		this.name = (name != null ? name.trim() : "");
+	public Type(String name, StringList modifiers) throws SyntaxException {
+		if (!Syntax.isIdentifier(name, true, null)) {
+			throw new SyntaxException("Type name must be an Ascii identifier", 0);
+		}
+		this.name = name.trim();
 		if (modifiers != null) {
 			modifiers = new StringList(modifiers);
 			modifiers.removeAll(" ");
 			modifiers.removeAll("");
+			for (int i = 0; i < modifiers.count(); i++) {
+				modifiers.set(i, modifiers.get(i).trim());
+			}
 		}
 		this.modifiers = modifiers;
 	}
@@ -95,12 +117,12 @@ public class Type {
 		if (mods == null) {
 			mods = new StringList();
 		}
-		if (!this.name.trim().isEmpty()) {
-			mods.add(this.name);
-		}
-		else {
-			mods.add(dummy);
-		}
+//		if (!this.name.trim().isEmpty()) {
+//			mods.add(this.name);
+//		}
+//		else {
+//			mods.add(dummy);
+//		}
 		return mods.getLongString();
 	}
 

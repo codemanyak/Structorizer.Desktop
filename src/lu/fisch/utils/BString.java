@@ -44,6 +44,7 @@ package lu.fisch.utils;
  *      Kay Gürtzig     2018-09-12      Method name typo refactored: enocodeVectorToHtml() --> encodeVectorToHtml()
  *      Kay Gürtzig     2019-11-22      Dead code in encodeToHtml() disabled, bugfix in explode()
  *      Kay Gürtzig     2020-04-21      Bugfix #852: method breakup completely rewritten, signature changed
+ *      Kay Gürtzig     2020-11-01      Issue #800: Method countChar moved hitherto from Function
  *
  ******************************************************************************************************
  *
@@ -312,6 +313,25 @@ public abstract class BString
 			return outi;
 		}
 
+		/**
+		 * Counts the occurrences of character {@code c} in string {@code str}
+		 * @param str - the scrutinised string
+		 * @param c - the searched character
+		 * @return the number of occurrences
+		 */
+		public static int countChar(String str, char c)
+		{
+			int res = 0;
+			for (int i=0; i<str.length(); i++)
+			{
+				if (str.charAt(i)==c)
+				{
+					res++;
+				}
+			}
+			return res;
+		}
+		
 		/**
 		 * Checks that the character codes of string {@code s} are strictly monotonous,
 		 * i.e. i &le; j --&gt; s[i] &le; s[j], but not all equal (if there are

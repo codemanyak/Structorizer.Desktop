@@ -1315,7 +1315,7 @@ public class Executor implements Runnable
 						String left = tokens.concatenate("", 0, opPos).trim();
 						// END KGU#76 2016-04-25
 						// Re-balance parentheses
-						while (Function.countChar(left, '(') > Function.countChar(left, ')') &&
+						while (BString.countChar(left, '(') > BString.countChar(left, ')') &&
 								left.startsWith("("))
 						{
 							leftParenth = leftParenth + "(";
@@ -1328,7 +1328,7 @@ public class Executor implements Runnable
 						String right = tokens.concatenate("", opPos+1).trim();
 						// END KGU#76 2016-04-25
 						// Re-balance parentheses
-						while (Function.countChar(right, ')') > Function.countChar(right, '(') &&
+						while (BString.countChar(right, ')') > BString.countChar(right, '(') &&
 								right.endsWith(")"))
 						{
 							rightParenth = rightParenth + ")";
@@ -3270,7 +3270,7 @@ public class Executor implements Runnable
 //				// END KGU#184 2016-04-25
 //				// START KGU#388 2017-09-18: Enh. #423
 //				else if (strInput.indexOf("{") > 0 && strInput.endsWith("}")
-//						&& Function.testIdentifier(strInput.substring(0, strInput.indexOf("{")), null)) {
+//						&& Syntax.isIdentifier(strInput.substring(0, strInput.indexOf("{")), null)) {
 //					String asgnmt = "HashMap " + target + " = new HashMap()";
 //					this.evaluateExpression(asgnmt, false);
 //					HashMap<String, String> components = Element.splitRecordInitializer(strInput);
@@ -3286,7 +3286,7 @@ public class Executor implements Runnable
 //				}
 				// END KGU#388 2017-09-18
 				else if (strInput.endsWith("}") && (strInput.startsWith("{") ||
-						strInput.indexOf("{") > 0 && Function.testIdentifier(strInput.substring(0, strInput.indexOf("{")), false, null))) {
+						strInput.indexOf("{") > 0 && Syntax.isIdentifier(strInput.substring(0, strInput.indexOf("{")), false, null))) {
 					// START KGU#879 2020-10-19: Issue #879 - we should not invalidate a successfully set content
 					//varName = setVar(target, this.evaluateExpression(strInput, true, false));
 					Object evaluated = this.evaluateExpression(strInput, true, false);
@@ -3502,7 +3502,7 @@ public class Executor implements Runnable
 				recordType = this.identifyRecordType(target, false);	// This will only differ from null if it's a record type
 				recordName = target;
 				// Now check recursively for record component names 
-				while (recordType != null && nTokens >= 3 && tokens.get(1).equals(".") && Function.testIdentifier(tokens.get(2), false, null)) {
+				while (recordType != null && nTokens >= 3 && tokens.get(1).equals(".") && Syntax.isIdentifier(tokens.get(2), false, null)) {
 					LinkedHashMap<String, TypeMapEntry> comps = recordType.getComponentInfo(false);
 					String compName = tokens.get(2);
 					if (comps.containsKey(compName)) {
@@ -3927,7 +3927,7 @@ public class Executor implements Runnable
 	 */
 	private void associateType(String target, StringList typeDescr) {
 		String typeName = null;
-		if (typeDescr != null && typeDescr.count() == 1 && Function.testIdentifier(typeName = typeDescr.get(0), false, null)
+		if (typeDescr != null && typeDescr.count() == 1 && Syntax.isIdentifier(typeName = typeDescr.get(0), false, null)
 				&& context.dynTypeMap.containsKey(":" + typeName)) {
 			context.dynTypeMap.put(target, context.dynTypeMap.get(":" + typeName));
 		}
@@ -6930,7 +6930,7 @@ public class Executor implements Runnable
 			// indexed access to an array element... An how can we make sure its evaluation hasn't got irreversible side
 			// effects?
 			// At least the check against following parenthesis will help to avoid the spoiling of Java method calls.
-			if (i+1 < tokens.count() && Function.testIdentifier(tokens.get(i+1), false, null) && (i+2 == tokens.count() || !tokens.get(i+2).equals("("))) {
+			if (i+1 < tokens.count() && Syntax.isIdentifier(tokens.get(i+1), false, null) && (i+2 == tokens.count() || !tokens.get(i+2).equals("("))) {
 				tokens.set(i, ".get(\"" + tokens.get(i+1) + "\")");
 				tokens.remove(i+1);
 			}

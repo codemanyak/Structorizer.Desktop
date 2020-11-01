@@ -839,7 +839,7 @@ public class COBOLGenerator extends Generator {
 								// FIXME This code is incomplete and not ready
 								if (posBrace >= 0 && posBrace <= 1 && exprTokens.get(exprTokens.count()-1).equals("}")) {
 									String transfExpr = null;
-									if (posBrace == 1 && exprTokens.count() >= 3 && Function.testIdentifier(exprTokens.get(0), false, null)) {
+									if (posBrace == 1 && exprTokens.count() >= 3 && Syntax.isIdentifier(exprTokens.get(0), false, null)) {
 										String typeName = exprTokens.get(0);							
 										TypeMapEntry recType = this.typeMap.get(":"+typeName);
 										if (recType != null && recType.isRecord()) {
@@ -1161,7 +1161,7 @@ public class COBOLGenerator extends Generator {
 						if (paramTypes != null && paramTypes.count() > j && (paramType = paramTypes.get(j)) != null) {
 							isConst = paramType.startsWith("const ");
 							isCompound = paramType.contains("[") || paramType.toLowerCase().startsWith("array ");
-							if (Function.testIdentifier(paramType, false, "") && typeMap.containsKey(":" + paramType)) {
+							if (Syntax.isIdentifier(paramType, false, "") && typeMap.containsKey(":" + paramType)) {
 								TypeMapEntry parType = typeMap.get(":" + paramType);
 								if (parType != null && (parType.isArray() || parType.isRecord())) {
 									isCompound = true;

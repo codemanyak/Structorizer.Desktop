@@ -23,7 +23,7 @@ package lu.fisch.structorizer.syntax;
  *
  *      Author:         kay
  *
- *      Description:    Abstract class for all Elements.
+ *      Description:    Type class for enumeration types.
  *
  ******************************************************************************************************
  *
@@ -31,7 +31,7 @@ package lu.fisch.structorizer.syntax;
  *
  *      Author          Date            Description
  *      ------          ----            -----------
- *      kay       20.12.2019      First Issue
+ *      Kay Gürtzig     2019-12-20      First Issue (for #800)
  *
  ******************************************************************************************************
  *
@@ -46,8 +46,8 @@ import java.util.Map.Entry;
 import lu.fisch.utils.StringList;
 
 /**
- * @author kay
- *
+ * Data type class for enumeration types
+ * @author Kay Gürtzig
  */
 public class EnumType extends Type {
 
@@ -69,8 +69,9 @@ public class EnumType extends Type {
 	 * @param name - type name
 	 * @param modificators - possible specification of the underlying integral type
 	 * @param items - a sequential map of names to value descriptions or null.
+	 * @throws SyntaxException if the name does not fit to identifier syntax
 	 */
-	public EnumType(String name, StringList modificators, LinkedHashMap<String, String> items) {
+	public EnumType(String name, StringList modificators, LinkedHashMap<String, String> items) throws SyntaxException {
 		super(name, modificators);
 		this.items.putAll(items);
 	}
@@ -81,8 +82,9 @@ public class EnumType extends Type {
 	 * @param name - type name
 	 * @param modificators - possible specification of the underlying integral type
 	 * @param itemNames - sequence of constant names for this type.
+	 * @throws SyntaxException if the name does not fit to identifier syntax
 	 */
-	public EnumType(String name, StringList modificators, StringList itemNames) {
+	public EnumType(String name, StringList modificators, StringList itemNames) throws SyntaxException {
 		super(name, modificators);
 		for (int i = 0; i < itemNames.count(); i++) {
 			this.items.put(itemNames.get(i), null);

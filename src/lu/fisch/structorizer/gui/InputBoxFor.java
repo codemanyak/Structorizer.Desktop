@@ -724,7 +724,7 @@ public class InputBoxFor extends InputBox implements ItemListener {
 			// END KGU#247 2016-09-23
 		}
 		// START KGU 2016-09-23
-		else if (Function.testIdentifier(forInValueList, false, ""))
+		else if (Syntax.isIdentifier(forInValueList, false, ""))
 		{
 			txtParserInfo.setForeground(Color.BLUE);
 			txtParserInfo.setText(msgEnsureVariableIsArray.getText().replace("%", forInValueList));

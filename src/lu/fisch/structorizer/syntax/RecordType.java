@@ -31,7 +31,8 @@ package lu.fisch.structorizer.syntax;
  *
  *      Author          Date            Description
  *      ------          ----            -----------
- *      Kay Gürtzig     2019-12-20      First Issue
+ *      Kay Gürtzig     2019-12-20      First Issue (for #800)
+ *      Kay Gürtzig     2020-11-01      Specific auxiliary methods added
  *
  ******************************************************************************************************
  *
@@ -46,11 +47,14 @@ import java.util.Map.Entry;
 import lu.fisch.utils.StringList;
 
 /**
- * @author kay
- *
+ * Data type class for records/structs, consists of named components.
+ * @author Kay Gürtzig
  */
 public class RecordType extends Type {
 	
+	/**
+	 * Ordered map of component name and type
+	 */
 	private LinkedHashMap<String, Type> compTypes = null;
 
 //	/**
@@ -86,12 +90,13 @@ public class RecordType extends Type {
 //	}
 
 	/**
-	 * Constructs the type from the given {@code name} with the specified
+	 * Constructs the type for the given {@code name} with the specified
 	 * {@code components}.
 	 * @param name - the type identifier
 	 * @param components maps the component names to the respective component types
+	 * @throws SyntaxException 
 	 */
-	public RecordType(String name, LinkedHashMap<String, Type> components) {
+	public RecordType(String name, LinkedHashMap<String, Type> components) throws SyntaxException {
 		super(name, null);
 		this.compTypes = components;
 	}
@@ -126,5 +131,26 @@ public class RecordType extends Type {
 			}
 		}
 		return "$" + this.name + "(" + compStr.concatenate(";") + ")";
+	}
+	
+	/**
+	 * Returns the data type of the component with given {@code name} if there
+	 * is any with this name.
+	 * @param name - name of the assumed component
+	 * @return the {@link Type} of the requested component, or {@code null}.
+	 * @see #getComponentNames()
+	 */
+	public Type getComponentType(String name)
+	{
+		return this.compTypes.get(name);
+	}
+	
+	/**
+	 * @return the ordered list of the component names.
+	 * @see #getComponentType(String)
+	 */
+	public StringList getComponentNames()
+	{
+		return new StringList(this.compTypes.keySet().toArray(new String[this.compTypes.size()]));
 	}
 }

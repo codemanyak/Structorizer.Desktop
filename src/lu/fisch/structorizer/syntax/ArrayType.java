@@ -78,7 +78,15 @@ public class ArrayType extends Type {
 //		
 //	}
 
-	public ArrayType(String name, Type elementType, int size) {
+	/**
+	 * Constructs an array type for the given {@code name} and {@code size} elements
+	 * of data type {@code elementType}, assuming that indexing starts with 0.
+	 * @param name - the type name (must fit to strict Ascii identifier syntax)
+	 * @param elementType - data type of the elements (or {@code null} if unspecified)
+	 * @param size - maximum element number (or 0 if unspecified)
+	 * @throws SyntaxException if the name does not fit to identifier syntax
+	 */
+	public ArrayType(String name, Type elementType, int size) throws SyntaxException {
 		super(name, null);
 		elType = elementType;
 		if (size > 0) {
@@ -86,7 +94,14 @@ public class ArrayType extends Type {
 		}
 	}
 
-	public ArrayType(String name, Type elementType, int[] indexRange) {
+	/**
+	 * 
+	 * @param name
+	 * @param elementType
+	 * @param indexRange
+	 * @throws SyntaxException if the name does not fit to identifier syntax
+	 */
+	public ArrayType(String name, Type elementType, int[] indexRange) throws SyntaxException {
 		super(name, null);
 		elType = elementType;
 		if (indexRange != null) {
@@ -119,6 +134,26 @@ public class ArrayType extends Type {
 			}
 		}
 		return "@" + this.name + "(" + elTypeStr + "," + offset + "," + size + ")";
+	}
+	
+	/**
+	 * @return the data type of the array elements (if known), {@code null} otherwise.
+	 */
+	public Type getElementType()
+	{
+		return this.elType;
+	}
+	
+	/**
+	 * @return the number of dimensions (= array nesting level), minimum is 1.
+	 */
+	public int getDimensions()
+	{
+		int nDims = 1;
+		if (this.elType instanceof ArrayType) {
+			nDims += ((ArrayType) this.elType).getDimensions();
+		}
+		return nDims;
 	}
 	
 }

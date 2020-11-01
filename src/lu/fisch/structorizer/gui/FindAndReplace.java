@@ -127,10 +127,10 @@ import lu.fisch.structorizer.elements.For;
 import lu.fisch.structorizer.elements.IElementSequence;
 import lu.fisch.structorizer.elements.IElementSequence.Iterator;
 import lu.fisch.structorizer.elements.Root;
-import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.io.Ini;
 import lu.fisch.structorizer.locales.LangFrame;
 import lu.fisch.structorizer.locales.LangTextHolder;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.BString;
 import lu.fisch.utils.StringList;
 
@@ -577,7 +577,7 @@ public class FindAndReplace extends LangFrame implements IRoutinePoolListener /*
 				public void itemStateChanged(ItemEvent evt) {
 					Boolean deselected = evt.getStateChange() == ItemEvent.DESELECTED;
 					chkCaseSensitive.setEnabled(deselected);
-					chkWholeWord.setEnabled(deselected && Function.testIdentifier((String)cmbSearchPattern.getEditor().getItem(), false, null));
+					chkWholeWord.setEnabled(deselected && Syntax.isIdentifier((String)cmbSearchPattern.getEditor().getItem(), false, null));
 				}
 			});
 			this.chkRegEx.setSelected(ini.getProperty("findRegEx", "0").equals("1"));
@@ -1776,7 +1776,7 @@ public class FindAndReplace extends LangFrame implements IRoutinePoolListener /*
 		}
 		String item = (String)box.getEditor().getItem();
 		if (box == cmbSearchPattern) {
-			chkWholeWord.setEnabled(!chkRegEx.isSelected() && Function.testIdentifier(item, false, null));
+			chkWholeWord.setEnabled(!chkRegEx.isSelected() && Syntax.isIdentifier(item, false, null));
 		}
 		if (patternList.isEmpty() || !item.equals(patternList.getFirst())) {
 			ListIterator<String> iter = patternList.listIterator();

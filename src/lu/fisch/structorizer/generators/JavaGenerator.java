@@ -131,7 +131,6 @@ import java.util.Map.Entry;
 import lu.fisch.diagrcontrol.DiagramController;
 import lu.fisch.structorizer.elements.*;
 import lu.fisch.structorizer.executor.Executor;
-import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
 
 
@@ -405,7 +404,7 @@ public class JavaGenerator extends CGenerator
 	{
 		for (int i = 0; i < tokens.count(); i++) {
 			String token = tokens.get(i);
-			if (Function.testIdentifier(token, false, null)) {
+			if (Syntax.isIdentifier(token, false, null)) {
 				// START KGU#542 2019-11-30: Enh. #739 - support for enum types
 				String constVal = null;	// Will be needed on enum test
 				// END KGU#542 2019-11-30

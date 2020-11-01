@@ -97,11 +97,11 @@ import java.util.Vector;
 
 import lu.fisch.diagrcontrol.DiagramController;
 import lu.fisch.structorizer.elements.Element;
-import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.helpers.GENPlugin;
 import lu.fisch.structorizer.io.Ini;
 import lu.fisch.structorizer.locales.LangDialog;
 import lu.fisch.structorizer.locales.LangTextHolder;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.StringList;
 
 /**
@@ -508,7 +508,7 @@ public class DiagramControllerAliases extends LangDialog implements PropertyChan
 				int rowNo = table.getSelectedRow();
 				String newValue = (String)table.getModel().getValueAt(rowNo, 1);
 				if (newValue != null) {
-					if (!newValue.isEmpty() && !Function.testIdentifier(newValue, false, null)) {
+					if (!newValue.isEmpty() && !Syntax.isIdentifier(newValue, false, null)) {
 						JOptionPane.showMessageDialog(this,
 								msgIdentifierRequired.getText(),
 								ttlIllegalValues.getText(),
