@@ -22,17 +22,15 @@ package lu.fisch.structorizer.syntax;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Vector;
 
 import lu.fisch.structorizer.elements.Element;
 import lu.fisch.structorizer.elements.Instruction;
-import lu.fisch.structorizer.io.Ini;
 import lu.fisch.structorizer.syntax.Expression.NodeType;
 import lu.fisch.utils.StringList;
 
 /******************************************************************************************************
  *
- *      Author:         kay
+ *      Author:         Kay Gürtzig
  *
  *      Description:    Class representing a line of text for all kinds of Element.
  *
@@ -44,6 +42,7 @@ import lu.fisch.utils.StringList;
  *      ------          ----            -----------
  *      Kay Gürtzig     2019-12-27      First Issue
  *      Kay Gürtzig     2020-10-24      Changed from Interface to Class
+ *      Kay Gürtzig     2020-11-01      Parsing and variable gathering mechanism implemented
  *
  ******************************************************************************************************
  *
@@ -53,7 +52,7 @@ import lu.fisch.utils.StringList;
  ******************************************************************************************************///
 
 /**
- * Represents the syntacic structure of a line of an {@link Element}
+ * Represents the syntactic structure of a line of an {@link Element}
  * @author Kay Gürtzig
  */
 public class Line {
@@ -122,7 +121,6 @@ public class Line {
 		lineStartsToTypes.put("dim", LineType.LT_VAR_DECL);
 		lineStartsToTypes.put("const", LineType.LT_CONST_DEF);
 		lineStartsToTypes.put("type", LineType.LT_TYPE_DEF);
-		
 	}
 	
 	private LineType type;
@@ -398,11 +396,20 @@ public class Line {
 				List<Expression> parsed = Expression.parse(tokens0, null);
 				if (tokens0.isEmpty() && parsed.size() == 1) {
 					Expression varSpec = parsed.get(0);
-					if (isForIn && varSpec.type != NodeType.VARIABLE
-							|| !isForIn && (varSpec.type != NodeType.OPERATOR || !varSpec.text.equals("<-"))) {
+					if (isForIn && varSpec.type != NodeType.VARIABLE ||
+							!isForIn && (varSpec.type != NodeType.OPERATOR
+							|| !varSpec.text.equals("<-") && !varSpec.text.equals(":=")
+							|| varSpec.children.size() != 2
+							|| varSpec.children.getFirst().type != Expression.NodeType.VARIABLE)) {
 						throw new SyntaxException("Wrong loop variable specification: " + parsed.toString(), 0);
 					}
-					_exprs.add(parsed.get(0));
+					if (isForIn) {
+						_exprs.add(parsed.get(0));
+					}
+					else {
+						// append assigned variable and start value expression separately
+						_exprs.addAll(varSpec.children);
+					}
 				}
 				else {
 					System.err.println("Wrong parsing result or remainder: "
@@ -518,6 +525,9 @@ public class Line {
 					_exprs.add(parsed.get(0));
 				}
 			}
+			else {
+				// TODO Otherwise we would like to fetch the variable name(s)
+			}
 		}
 			break;
 		default:
@@ -571,26 +581,103 @@ public class Line {
 		return sb.toString();
 	}
 	
+	public boolean gatherVariables(StringList assignedVars, StringList declaredVars, StringList usedVars)
+	{
+		boolean okay = true;
+		switch (this.type) {
+		case LT_CONST_DEF:
+		case LT_ASSIGNMENT:
+		case LT_CATCH:
+			if (expressions != null && expressions.length == 1) {
+				okay = expressions[0].gatherVariables(assignedVars, usedVars,
+						this.type == LineType.LT_CATCH);
+			}
+			break;
+		case LT_CASE:
+		case LT_CONDITION:
+		case LT_EXIT:
+		case LT_LEAVE:
+		case LT_RETURN:
+		case LT_THROW:
+		case LT_OUTPUT:
+		case LT_PROC_CALL:
+			for (Expression expr: expressions) {
+				okay = expr.gatherVariables(assignedVars, usedVars, false) && okay;
+			}
+			break;
+		case LT_FOREACH_LOOP:
+		case LT_FOR_LOOP:
+			if (expressions != null && expressions.length > 1) {
+				if (assignedVars != null) {
+					assignedVars.addIfNew(expressions[0].text);
+				}
+				for (int i = 1; i < expressions.length; i++) {
+					okay = expressions[i].gatherVariables(assignedVars, usedVars, false) && okay;
+				}
+			}
+			else {
+				okay = false;
+			}
+			break;
+		case LT_INPUT:
+			if (expressions != null && expressions.length > 1) {
+				for (int i = 1; i < expressions.length; i++) {
+					okay = expressions[i].gatherVariables(assignedVars, usedVars, true) && okay;
+				}
+			}
+			break;
+		case LT_RAW:
+			okay = false;
+		case LT_TYPE_DEF:
+			// Nothing to do here
+			break;
+		case LT_VAR_DECL:
+			if (this.expressions != null && this.expressions.length >= 1) {
+				Expression firstExpr = this.expressions[0];
+				if (firstExpr.type == Expression.NodeType.OPERATOR
+						&& "<-,:=".contains(firstExpr.text)) {
+					okay = firstExpr.gatherVariables(assignedVars, usedVars, false);
+				}
+				else if (declaredVars != null) {
+					for (Expression expr: expressions) {
+						if (firstExpr.type == Expression.NodeType.VARIABLE) {
+							declaredVars.addIfNew(expr.text);
+						}
+					}
+				}
+			}
+			break;
+		default:
+			okay = false;
+			break;
+		}
+		return okay;
+	}
+	
+	/**
+	 * Test method
+	 * @param args
+	 */
 	public static void main(String[] args) {
-		//Syntax.loadFromINI();
+		Syntax.loadFromINI();
 		
 		String[] exprTests = new String[] {
 				// "good" expressions
-//				"a <- 7 * (15 - sin(1.3))",
-//				"a <- 7 * (15 - sin(b))",
-//				"a[i+1] <- { 16, \"doof\", 45+9, b}",
-//				"7 * (15 - sin(1.3)), { 16, \"doof\", 45+9, b}",
-//				"7 * (15 - pow(-18, 1.3)) + len({ 16, \"doof\", 45+9, b})",
-//				"rec <- Date{2020, a + 4, max(29, d)}",
-//				"rec <- Date{year: 2020, month: a + 4, day: max(29, d)}",
-//				"test[top-1]",
-//				"25 * -a - b",
-//				"a < 5 && b >= c || isDone",
-//				"not hasFun(person)",
-//				"28 - b % 13 > 4.5 / sqrt(23) * x",
-//				"*p <- 17 + &x",
+				"a <- 7 * (15 - sin(1.3))",
+				"a <- 7 * (15 - sin(b))",
+				"a[i+1] <- { 16, \"doof\", 45+9, b}",
+				"7 * (15 - sin(1.3)), { 16, \"doof\", 45+9, b}",
+				"7 * (15 - pow(-18, 1.3)) + len({ 16, \"doof\", 45+9, b})",
+				"rec <- Date{2020, a + 4, max(29, d)}",
+				"rec <- Date{year: 2020, month: a + 4, day: max(29, d)}",
+				"test[top-1]",
+				"25 * -a - b",
+				"a < 5 && b >= c || isDone",
+				"not hasFun(person)",
+				"28 - b % 13 > 4.5 / sqrt(23) * x",
+				"*p <- 17 + &x",
 				"a & ~(17 | 86) ^ ~b | ~c | ~1",
-				// Defective lines
+				// Defective lines - are to provoke SyntaxExceptions
 				"7 * (15 - sin(1.3)) }, { 16, \"doof\", 45+9, b}",
 				"6[-6 * -a] + 34",
 				"(23 + * 6",
@@ -626,6 +713,8 @@ public class Line {
 				"not (28 - b * 13 > 4.5 / sqrt(23) * x)"
 		};
 		
+		TypeRegistry types = new TypeRegistry();
+		
 		for (String test: exprTests) {
 			try {
 				StringList tokens = Syntax.splitLexically(test, true);
@@ -633,8 +722,20 @@ public class Line {
 				List<Expression> exprs = Expression.parse(tokens, /*sepas/**/ /**/null/**/);
 				int i = 1;
 				for (Expression expr: exprs) {
+					StringList vars1 = new StringList();
+					StringList vars2 = new StringList();
 					System.out.println(i + ": " + expr.toString());
 					System.out.println(i + ": " + expr.translate(Expression.verboseOperators));
+					boolean okay = expr.gatherVariables(vars1, vars2, false);
+					System.out.println("Assigned: " + vars1.toString() +
+							", used: " + vars2.toString() + (okay ? "" : ", errors"));
+					Type exprType = expr.inferType(types, true, false);
+					if (exprType != null) {
+						System.out.println(exprType.toString(true));
+					}
+					else {
+						System.out.println("No type retrieved");
+					}
 					i++;
 				}
 			} catch (SyntaxException exc) {
@@ -645,9 +746,16 @@ public class Line {
 		for (String line: lineTests) {
 			System.out.println("===== " + line + " =====");
 			StringList errors = new StringList();
+			StringList vars1 = new StringList();
+			StringList vars2 = new StringList();
+			StringList vars3 = new StringList();
 			Line aLine = Line.parse(line, null, errors);
 			System.out.println(aLine);
 			System.err.println(errors.getText());
+			boolean okay = aLine.gatherVariables(vars1, vars2, vars3);
+			System.out.println("Assigned: " + vars1.toString() +
+					", decalred: " + vars2.toString() + 
+					", used: " + vars3.toString() + (okay ? "" : ", errors"));
 		}
 		
 		for (String test: negationTests) {
@@ -657,13 +765,29 @@ public class Line {
 				List<Expression> exprs = Expression.parse(tokens, null);
 				Expression cond = exprs.get(0);
 				System.out.println(cond.toString());
+				Type exprType = cond.inferType(types, false, false);
+				if (exprType != null) {
+					System.out.println(exprType.toString(true));
+				}
+				else {
+					System.out.println("No type retrieved");
+				}
 				Expression neg = Expression.negateCondition(cond, false);
 				System.out.print(neg.toString() + " <-> ");
+				exprType = neg.inferType(types, false, false);
 				System.out.println(Expression.negateCondition(neg, false));
+				if (exprType != null) {
+					System.out.println(exprType.toString(true));
+				}
+				else {
+					System.out.println("No type retrieved");
+				}
 			} catch (SyntaxException exc) {
 				System.err.println(exc.getMessage() + " at " + exc.getPosition());
 			}
 		}
+		
+		System.out.println(types);
 	}
 
 }

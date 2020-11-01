@@ -35,6 +35,7 @@ package lu.fisch.structorizer.syntax;
  *      Kay Gürtzig     2019-11-11      Method parse() implemented, new method inferType, some node types dropped
  *      Kay Gürtzig     2019-12-19      Signature change of TypeMapEntry constructor integrated
  *      Kay Gürtzig     2020-10-26      Opportunity of null delimiter in parseList(...) added.
+ *      Kay Gürtzig     2020-11-01      Reliable variable gathering and type retrieval mechanism implemented
  *
  ******************************************************************************************************
  *
@@ -47,11 +48,11 @@ package lu.fisch.structorizer.syntax;
 
 import java.util.HashMap;
 import java.util.Iterator;
-
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.NoSuchElementException;
 
-import lu.fisch.structorizer.elements.TypeMapEntry;
+import lu.fisch.structorizer.executor.Function;
 import lu.fisch.utils.StringList;
 
 /**
@@ -207,6 +208,11 @@ public class Expression {
 	public String text;
 	public LinkedList<Expression> children;
 	public short tokenPos = 0;
+	/**
+	 * May hold a retrieved expression data type
+	 * Type retrieval can be forced by {@link #inferType(HashMap, boolean, boolean)}
+	 */
+	public Type dataType = null;
 	
 	public Expression(NodeType _type, String _text, short _position)
 	{
@@ -529,166 +535,252 @@ public class Expression {
 		return type == NodeType.FUNCTION;
 	}
 	
-	public boolean isNumeric(HashMap<String, TypeMapEntry> _typeMap, boolean _trueIfUnknown)
+	public boolean isNumeric(TypeRegistry _typeMap, boolean _trueIfUnknown)
 	{
-		TypeMapEntry entry = inferType(_typeMap);
-		if (entry == null) {
+		Type dataType = inferType(_typeMap, true, false);
+		if (dataType == null) {
 			return _trueIfUnknown;	// there is no "maybe"
 		}
-		return entry.isNumeric(_trueIfUnknown);
+		
+		return dataType.isNumeric();
 	}
 	
 	// TODO - We might rather need a method working on the Type class hierarchy
-	public TypeMapEntry inferType(HashMap<String, TypeMapEntry> _typeMap)
+	public Type inferType(TypeRegistry _typeMap, boolean _cacheTypes, boolean _overwrite)
 	{
-		TypeMapEntry typeEntry = null;
+		Type dType = _overwrite? null : this.dataType;
+		if (dType != null) {
+			if (_cacheTypes && _typeMap != null) {
+				_typeMap.putType(dType, false);
+			}
+			return dType;
+		}
 		switch (type) {
 		case ARRAY_INITIALIZER:
 		{
-			TypeMapEntry elemType = null;
+			Type elemType = null;
 			for (Expression elem: children) {
-				TypeMapEntry entry = elem.inferType(_typeMap);
-				if (entry != null) {
+				Type elType = elem.inferType(_typeMap, _cacheTypes, _overwrite);
+				if (elType != null) {
 					if (elemType == null) {
-						elemType = entry;
+						elemType = elType;
 					}
-					else if (entry != elemType && !entry.getCanonicalType(true, true).equals(elemType.getCanonicalType(true, true))) {
-						elemType = null;
-						break;
+					else if (!elemType.getName().equals("dummy")
+							&& elType != elemType && !elType.toString().equals(elemType.toString())) {
+						elemType = TypeRegistry.getDummyType();
+						if (!_cacheTypes && !_overwrite) {
+							// No further retrieval necessary
+							break;
+						}
 					}
 				}
 			}
-			if (elemType == null) {
-				typeEntry = new TypeMapEntry("array of object", null, _typeMap, null, 0, false, false);
+			// Create an anonymous array type that won't be cached or registered
+			try {
+				dType = new ArrayType(null, elemType, children.size());
+			} catch (SyntaxException exc) {
+				// FIXME Auto-generated catch block
+				exc.printStackTrace();
 			}
-			else {
-				typeEntry = new TypeMapEntry("array of " + elemType.getCanonicalType(true, true), null, _typeMap, null, 0, false, false);
-			}
-		}
 			break;
+		}
 		case COMPONENT:
-			// FIXME How to we know the record type of the entire expression?
-//		{
-//			TypeMapEntry recType = _typeMap.get(":" + text);
-//			if (recType != null && recType.isRecord()) {
-//				typeEntry = recType.getComponentInfo(true).get(children.get(0).text);
-//			}
-//			if (typeEntry == null) {
-//				typeEntry = children.get(1).inferType(_typeMap);
-//			}
-//		}
+			if (children.size() >= 1) {
+				dType = children.getFirst().inferType(_typeMap, _cacheTypes, _overwrite);
+			}
 			break;
 		case FUNCTION:
 			/* TODO: We should have a list of all built-in functions, scan all controller
 			 * functions and investigate the Arranger routines
 			 */
+		{
+			// FIXME: obsolete
+			Function fun = new Function(this.toString());
+			String typName = "???";
+			if (fun.isFunction() && (typName = fun.getResultType("???")) != null) {
+				dType = _typeMap.getType(typName);
+			}
+		}
 			break;
-//		case INDEX:	// obsolete
-//			break;
 		case LITERAL:
-			// TODO find the code that derives the type in other modules
+			if (BOOL_LITERALS.contains(text)) {
+				dType = TypeRegistry.getStandardType("boolean");
+			}
+			else if (text.startsWith("'") && text.endsWith("'")) {
+				if (text.length() == 3) {
+					dType = TypeRegistry.getStandardType("char");
+				}
+				else {
+					dType = TypeRegistry.getStandardType("string");
+				}
+			}
+			else if (text.length() > 2 && text.startsWith("\"") && text.endsWith("\"")) {
+				dType = TypeRegistry.getStandardType("string");
+			}
+			else {
+				try {
+					Double.parseDouble(text);
+					dType = TypeRegistry.getStandardType("double");
+				}
+				catch (NumberFormatException exc) {
+				}
+				try {
+					Long.parseLong(text);
+					dType = TypeRegistry.getStandardType("long");
+				}
+				catch (NumberFormatException exc) {
+				}
+				try {
+					Integer.parseInt(text);
+					dType = TypeRegistry.getStandardType("int");
+				}
+				catch (NumberFormatException exc) {
+				}
+			}
 			break;
 		case OPERATOR:
-			if (StringList.explode("=,==,!=,<>,<,>,<=,>=,and,or,not,!", ",").contains(text)) {
-				typeEntry = new TypeMapEntry("bool","bool", _typeMap, null, 0, false, false);
+			if (BOOL_OPERATORS.contains(text)
+					|| RELATION_OPERATORS.contains(text)
+					|| NEGATION_OPERATORS.contains(text) && !"~".equals(text)) {
+				if (_typeMap != null) {
+					dType = _typeMap.getType("boolean");
+				}
 			}
 			else if (text.equals("[]")) {
-				TypeMapEntry arrType = children.get(0).inferType(_typeMap);
-				if (arrType != null && arrType.isArray() && arrType.isConflictFree()) {
-					StringList typeDescrs = arrType.getTypes(false);
-					if (!typeDescrs.isEmpty()) {
-						String typeName = typeDescrs.get(0);
-						if (typeName.startsWith("@")) {	// Should do so
-							typeName = typeName.substring(1);
-							if ((typeEntry = _typeMap.get(":" + typeName)) == null) {
-								// FIXME this is somewhat quick and dirty - what about possible record components?
-								typeEntry = new TypeMapEntry(typeName.replace("@", "array of "), null, _typeMap, null, 0, false, false);
-							}
-						}
-					}
+				if (_typeMap != null) {
+					dType = TypeRegistry.getStandardType("boolean");
 				}
 			}
 			else if (text.equals(".")) {
-				TypeMapEntry recType = children.get(0).inferType(_typeMap);
-				if (recType != null && recType.isRecord()) {
-					typeEntry = recType.getComponentInfo(true).get(children.get(1).text);
+				if (children.size() == 2) {
+					Type recType = children.getFirst().inferType(_typeMap, _cacheTypes, _overwrite);
+					if (recType != null && recType instanceof RecordType) {
+						dType = ((RecordType)recType).getComponentType(children.getLast().text);
+					}
+				}
+			}
+			else if (text.equals("<-") || text.equals(":=")) {
+				if (children.size() == 2) {
+					// First check whether the target has a type
+					Expression leftSide = children.getFirst();
+					Type varType = leftSide.inferType(_typeMap, _cacheTypes, _overwrite);
+					// Then try with the right-hand side expression
+					dType = children.getLast().inferType(_typeMap, _cacheTypes, _overwrite);
+					if (dType == null) {
+						dType = varType;
+					}
+					// We may set the type of the left side ...
+					else if (varType == null && _cacheTypes) {
+						leftSide.dataType = dType;
+						// ... possibly even register the variable type
+						if (leftSide.type == NodeType.VARIABLE && _typeMap != null) {
+							_typeMap.putTypeFor(leftSide.text, dType, _overwrite);
+						}
+					}
 				}
 			}
 			else {
-				TypeMapEntry[] operandTypes = new TypeMapEntry[children.size()];
+				Type[] operandTypes = new Type[children.size()];
 				boolean allSame = true;
 				boolean allNumeric = true;
-				TypeMapEntry stringEntry = null;
-				TypeMapEntry floatEntry = null;
+				Type stringEntry = null;
+				Type floatEntry = null;
 				for (int i = 0; i < children.size(); i++) {
-					operandTypes[i] = children.get(i).inferType(_typeMap);
-					String canonical = null;
+					operandTypes[i] = children.get(i).inferType(_typeMap, _cacheTypes, _overwrite);
 					if (operandTypes[i] != null) {
-						canonical = operandTypes[i].getCanonicalType(true, true);
-						if (!operandTypes[i].isNumeric(true)) {
+						String typeName = operandTypes[i].getName();
+						if (!operandTypes[i].isNumeric()) {
 							allNumeric = false;
 						}
-						else if (stringEntry == null && canonical.equals("string")) {
+						else if (stringEntry == null && typeName.equals("string")) {
 							stringEntry = operandTypes[i];
 						}
-						else if (canonical.equals("double") || floatEntry == null && canonical.equals("float")) {
+						else if (typeName.equals("double") || floatEntry == null && typeName.equals("float")) {
 							floatEntry = operandTypes[i];
 						}
 					}
-					if (i > 0 && (canonical == null || operandTypes[i-1] == null
-							|| canonical.equals(operandTypes[i-1].getCanonicalType(true, true)))) {
+					if (i > 0 && (operandTypes[i] == null || operandTypes[i-1] == null
+							|| !operandTypes[i].toString().equals(operandTypes[i-1].toString()))) {
 						allSame = false;
 						break;
 					}
 				}
 				if (text.equals("+")) {
 					if (allSame) {
-						typeEntry = operandTypes[0];
+						dType = operandTypes[0];
 					}
 					else if (stringEntry != null) {
-						typeEntry = stringEntry;
+						dType = stringEntry;
 					}
 					else if (floatEntry != null) {
-						typeEntry = floatEntry;
+						dType = floatEntry;
 					}
 				}
-				else if (StringList.explode("%,div,mod,<<,>>,>>>,shl,shr,|,&,^,xor", ",").contains(text)) {
+				else if (StringList.explode("%,div,mod,<<,>>,>>>,shl,shr,|,&,^,xor,~", ",").contains(text)) {
 					if (allSame && allNumeric) {
-						typeEntry = operandTypes[0];
+						dType = operandTypes[0];
 					}
-					else if ((typeEntry = _typeMap.get(":int")) == null) {
-						typeEntry = new TypeMapEntry("int", "int", _typeMap, null, 0, false, false);
+					else {
+						dType = TypeRegistry.getStandardType("int");
 					}
 				}
 				else if (StringList.explode("-,*,/,+1,-1", ",").contains(text) && allNumeric) {
 					if (allNumeric) {
 						if (allSame) {
-							typeEntry = operandTypes[0];
+							dType = operandTypes[0];
 						}
 						else if (floatEntry != null) {
-							typeEntry = floatEntry;
+							dType = floatEntry;
 						}
 					}
 				}
 			}
 			break;
-//		case QUALIFIER:	// obsolete
-//		{
-//			// FIXME: This relies (questionably) on a variable as first operand
-//			Expression rec = children.get(0);
-//			
-//		}
-//			break;
 		case RECORD_INITIALIZER:
-			typeEntry = _typeMap.get(":" + text);
+			if (_typeMap != null) {
+				dType = _typeMap.getType(text);
+			}
+			// If the data type had not been registered - we we will define a temporary one
+			if (dType == null) {
+				LinkedHashMap<String, Type> compPairs = new LinkedHashMap<String, Type>();
+				int i = 0;
+				for (Expression child: this.children) {
+					String compName = text + "#" + i++; // For the case of an unnamed component
+					if (child.type == NodeType.COMPONENT) {
+						compName = child.text;
+					}
+					compPairs.put(compName, child.inferType(_typeMap, _cacheTypes, _overwrite));
+				}
+				try {
+					dType = new RecordType(null, compPairs);
+				} catch (SyntaxException exc) {
+					// FIXME Auto-generated catch block
+					exc.printStackTrace();
+				}
+				_cacheTypes = false;
+				_overwrite = false;
+			}
 			break;
 		case VARIABLE:
-			typeEntry = _typeMap.get(text);
+			if (_typeMap != null) {
+				dType = _typeMap.getTypeFor(text);
+			}
 			break;
 		default:
 			break;
 		}
-		return typeEntry;
+		if (dType != null) {
+			if (_cacheTypes) {
+				if (_typeMap != null) {
+					_typeMap.putType(dType, _overwrite);
+				}
+				dataType = dType;
+			}
+		}
+		else if (_overwrite) {
+			dataType = null;
+		}
+		return dType;
 	}
 	
 	/**
@@ -1100,6 +1192,89 @@ public class Expression {
 			throw new SyntaxException("«" + _cond.toString() + "» is not a Boolean expression ", _cond.tokenPos);
 		}
 		return expr;
+	}
+	
+	/**
+	 * Recursively gathers variable names occurring in this expression tree,
+	 * differentiating between assigned variables (on the left-hand side of
+	 * an assignment) and merely referenced variables (all else).
+	 * @param assignedVars - {@link StringList} to add assigned variables
+	 * @param usedVars - {@link StringList} to add referenced variables
+	 * @param isLeftSide - whether this expression was found on the left-hand
+	 * side of an assignment (may also be a record or array root)
+	 * @return {@code true} if there is no structure inconsistency, {@code false} otherwise.
+	 */
+	public boolean gatherVariables(StringList assignedVars, StringList usedVars, boolean isLeftSide)
+	{
+		boolean complete = true;
+		if (assignedVars != null || usedVars != null) {
+			switch (this.type) {
+			case PARENTH:
+				// This expression cannot have been parsed correctly, otherwise this would have been gone.
+				complete = false;
+				break;
+			case ARRAY_INITIALIZER:
+			case RECORD_INITIALIZER:
+			case COMPONENT:
+			case FUNCTION:
+				if (isLeftSide) {
+					// Non of these may occur directly on the left-hand side
+					complete = false;
+				}
+				else {
+					for (Expression child: children) {
+						complete = child.gatherVariables(assignedVars, usedVars, false) && complete;
+					}
+				}
+				break;
+			case LITERAL:
+				// No variable, but okay
+				break;
+			case OPERATOR:
+				if ("<-".equals(text) || ":=".equals(text)) {
+					if (isLeftSide) {
+						// There cannot be an assignment on the left-hand side of an assignment
+						complete = false;
+					}
+					else {
+						complete = children.getFirst().gatherVariables(assignedVars, usedVars, true) && complete;
+						complete = children.getLast().gatherVariables(assignedVars, usedVars, false) && complete;
+					}
+				}
+				else if ("[]".equals(text)) {
+					complete = children.getFirst().gatherVariables(assignedVars, usedVars, isLeftSide) && complete;
+					complete = children.getLast().gatherVariables(assignedVars, usedVars, false) && complete;
+				}
+				else if (".".equals(text)) {
+					// ignore the second operand - can only be component names
+					complete = children.getFirst().gatherVariables(assignedVars, usedVars, isLeftSide) && complete;
+				}
+				else if (isLeftSide) {
+					complete = false;
+				}
+				else {
+					for (Expression child: children) {
+						complete = child.gatherVariables(assignedVars, usedVars, false) && complete;
+					}					
+				}
+				break;
+			case VARIABLE:
+				if (isLeftSide) {
+					if (assignedVars != null) {
+						assignedVars.addIfNew(text);
+					}
+				}
+				else if (usedVars != null) {
+					usedVars.addIfNew(text);
+				}
+				break;
+			default:
+				// Something is wrong here
+				complete = false;
+				break;
+			}
+		}
+		return complete;
 	}
 
 }

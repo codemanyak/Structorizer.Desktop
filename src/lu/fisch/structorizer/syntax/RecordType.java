@@ -23,7 +23,7 @@ package lu.fisch.structorizer.syntax;
  *
  *      Author:         Kay Gürtzig
  *
- *      Description:    Type class for records/structs.
+ *      Description:    Data type class for records/structs in Structorizer.
  *
  ******************************************************************************************************
  *

@@ -116,6 +116,12 @@ public class Function
 		knownResultTypes.put("fileWrite#2", "void");
 		knownResultTypes.put("fileWriteLine#2", "void");
 		knownResultTypes.put("fileClose#1", "void");
+		knownResultTypes.put("fileWriteLine#2", "void");
+		knownResultTypes.put("fileClose#1", "void");
+		// START KGU#790 2020-11-01: Issue #800
+		knownResultTypes.put("max#2", "double");
+		knownResultTypes.put("min#2", "double");
+		// END KGU#790 2020-11-01
 	}
 	// END KGU#332 2017-01-29
 	private String str = new String();		// The original string this is derived from

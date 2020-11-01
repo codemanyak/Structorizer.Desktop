@@ -1,6 +1,5 @@
 package lu.fisch.structorizer.syntax;
 
-import lu.fisch.structorizer.executor.Function;
 import lu.fisch.utils.StringList;
 
 /******************************************************************************************************
@@ -25,12 +24,21 @@ import lu.fisch.utils.StringList;
  *
  ******************************************************************************************************///
 
+/**
+ * Base class for data type description in Structorizer
+ * @author Kay Gürtzig
+ */
 public class Type {
 
 	/**
 	 * Name to be shown for unspecified types
 	 */
 	protected static final String dummy = "???";
+
+	/**
+	 * A counter for anonymous types
+	 */
+	private static long id = 0;
 	
 	/**
 	 * The type identifier, will be tested to adhere to identifier syntax
@@ -70,7 +78,10 @@ public class Type {
 	 * @throws SyntaxException if {@code name} does not fit to identifier syntax
 	 */
 	public Type(String name, StringList modifiers) throws SyntaxException {
-		if (!Syntax.isIdentifier(name, true, null)) {
+		if (name == null) {
+			name = "#" + id++;	// Create an anonymous name
+		}
+		else if (!Syntax.isIdentifier(name, true, null)) {
 			throw new SyntaxException("Type name must be an Ascii identifier", 0);
 		}
 		this.name = name.trim();
@@ -87,7 +98,10 @@ public class Type {
 	
 	public String getName()
 	{
-		return name;
+		if (name.equals("#0")) {
+			return dummy;
+		}
+		return name.replace("#", "AnonType");
 	}
 	
 	/**
@@ -117,13 +131,28 @@ public class Type {
 		if (mods == null) {
 			mods = new StringList();
 		}
-//		if (!this.name.trim().isEmpty()) {
-//			mods.add(this.name);
-//		}
-//		else {
-//			mods.add(dummy);
-//		}
+		mods.add(getName());
 		return mods.getLongString();
 	}
+	
+	/**
+	 * @return {@code true} if this type represents numeric values
+	 */
+	public boolean isNumeric()
+	{
+		return false;
+	}
+	
+	/**
+	 * @return {@code true} if this type represents a primitive data type
+	 */
+	public boolean isPrimitive()
+	{
+		return false;
+	}
 
+	public boolean isAnonymous()
+	{
+		return name.startsWith("#");
+	}
 }
