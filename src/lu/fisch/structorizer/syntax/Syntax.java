@@ -95,6 +95,7 @@ public class Syntax {
 			// START KGU#790 2020-10-31: Issue #800 We need the bitwise and and the address operator too
 			"&",
 			"|",
+			"~",
 			// END KGU#790 2020-10-31
 			// START KGU#331 2017-01-13: Enh. #333 Precaution against unicode comparison operators
 			"\u2260",

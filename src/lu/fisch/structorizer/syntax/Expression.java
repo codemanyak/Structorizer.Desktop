@@ -119,6 +119,7 @@ public class Expression {
 		put("%", 10);
 		put("not", 11);
 		put("!", 11);
+		put("~", 11);
 		put("+1", 11);	// sign
 		put("-1", 11);	// sign
 		put("*1", 11);	// pointer deref (C)
@@ -127,7 +128,14 @@ public class Expression {
 		put(".", 12);
 	}};
 	
-	private static final StringList BOOL_LITERALS = new StringList(new String[] {"false", "true"});
+	/** Logical literals ("false" and "true") */
+	public static final StringList BOOL_LITERALS = new StringList(new String[] {"false", "true"});
+	/** Logical unary operator symbols ("~" is in here, too, though it is actually a bitwise operator) */
+	public static final StringList NEGATION_OPERATORS = new StringList(new String[] {"not", "!", "~"});
+	/** Logical binary operator symbols ("xor" is in here, too, though it is actually a bitwise operator) */
+	public static final StringList BOOL_OPERATORS = StringList.explode("&&,and,||,or,xor", ",");
+	/** Comparison operator symbols in complementary order, i.e. first is complementary to last etc. */
+	public static final StringList RELATION_OPERATORS = StringList.explode("==,=,<,>,<=,>=,<>,!=", ",");
 	
 	/**
 	 * Export operator specification for expression mapping. Operator names from the
@@ -182,6 +190,7 @@ public class Expression {
 		put("%", new Operator("mod", 10));
 		//put("not", new Operator("not", 11));
 		put("!", new Operator("not", 11));
+		//put("~", new Operator("~", 11));
 		put("+1", new Operator("+1", 11));	// sign
 		put("-1", new Operator("-1", 11));	// sign
 		put("*1", new Operator("1^", 11));	// pointer deref (C)
@@ -192,7 +201,7 @@ public class Expression {
 	
 	/** COMPONENT means the colon separating a component name and a component value in a record initializer,<br/>
 	 * QUALIFIER is the dot separating a record and a component name (whereas the dot in a method call is handled as OPERATOR) <br/>
-	 * PARENTH symbolizes an opening parenthesis and is only temporarily used within the shunting yard algorithm in {@link Expression#parse(StringList, StringList, StringList)} */
+	 * PARENTH symbolizes an opening parenthesis and is only temporarily used within the shunting yard algorithm in {@link Expression#parse(StringList, StringList)} */
 	public static enum NodeType {LITERAL, VARIABLE, OPERATOR, FUNCTION, /*QUALIFIER, INDEX,*/ ARRAY_INITIALIZER, RECORD_INITIALIZER, COMPONENT, PARENTH};
 	public NodeType type;
 	public String text;
@@ -217,7 +226,7 @@ public class Expression {
 	
 	/**
 	 * Derives the tree from the given tokens.
-	 * Use {@link #parse(StringList, StringList, StringList)} instead.
+	 * Use {@link #parse(StringList, StringList)} instead.
 	 * @param _tokens
 	 */
 	@Deprecated
@@ -694,13 +703,11 @@ public class Expression {
 	 * consumed from {@code unifiedTokens}. If being {@code null} then stops without
 	 * exception at the first token not being expected, provided the stack is empty
 	 * and output is already containing an Expression.
-	 * @param varNames - List of variable names if known (otherwise all identifiers without
-	 * following argument list would be interpreted as values)
 	 * @return the syntax tree or null.
 	 * @throws ExpressionException
 	 * @see {@link #parseList(StringList, String, String, StringList)}
 	 */
-	public static LinkedList<Expression> parse(StringList tokens, StringList stopTokens, StringList varNames) throws SyntaxException
+	public static LinkedList<Expression> parse(StringList tokens, StringList stopTokens) throws SyntaxException
 	{
 		// Basically, this follows Dijkstra's shunting yard algorithm
 		Expression expr = null;
@@ -726,11 +733,11 @@ public class Expression {
 				while ((expr = stack.peekLast()) != null
 						&& expr.type == NodeType.OPERATOR
 						&& !mayBeSign
-						&& !token.equals("!") && !token.equalsIgnoreCase("not")	// is left-associative
+						&& !NEGATION_OPERATORS.contains(token, false)	// is left-associative
 						&& prec <= OPERATOR_PRECEDENCE.get(expr.text.toLowerCase())) {
 					try {
 						expr.children.addFirst(output.removeLast());	// second operand
-						if (!expr.text.equals("!") && !expr.text.equalsIgnoreCase("not") && !expr.text.endsWith("1")) {
+						if (!NEGATION_OPERATORS.contains(expr.text, false) && !expr.text.endsWith("1")) {
 							expr.children.addFirst(output.removeLast());	// first operand
 						}
 					}
@@ -761,22 +768,26 @@ public class Expression {
 					nextToken = tokens.get(1);
 				}
 				if (BOOL_LITERALS.contains(token)) {
+					// Boolean literal
 					expr = new Expression(NodeType.LITERAL, token, position);
 					output.addLast((expr));
 					wasOpd = true;
 				}
 				else if ("(".equals(nextToken)) {
+					// Function name
 					expr = new Expression(NodeType.FUNCTION, token, position);
 					stack.addLast(expr);
 					wasOpd = false;
 				}
 				else if ("{".equals(nextToken)) {
+					// Record type name
 					// TODO: Identify record type name to verify the record initializer entry
 					expr = new Expression(NodeType.RECORD_INITIALIZER, token, position);
 					stack.addLast(expr);
 					wasOpd = false;
 				}
 				else if (":".equals(nextToken)) {
+					// Record component name
 					// Check that we are within a record initializer context
 					Expression paren = stack.peekLast();
 					if (paren == null || paren.type != NodeType.PARENTH || !"{".equals(paren.text)) {
@@ -801,7 +812,7 @@ public class Expression {
 					tokens.remove(0); position++;
 					wasOpd = false;
 				}
-				else /*if (varNames == null || varNames.contains(token))*/ {
+				else {
 					// If the previous token was an operand then a new expression might start here, so clean up
 					if (wasOpd) {
 						if (nestingLevel > 0) {
@@ -970,7 +981,7 @@ public class Expression {
 			}
 			int nOpds = expr.children.size();
 			if (expr.type == NodeType.OPERATOR && !expr.text.equals("[]")) {
-				if (expr.text.equals("!") || expr.text.equalsIgnoreCase("not") || expr.text.endsWith("1")) {
+				if (NEGATION_OPERATORS.contains(expr.text, false) || expr.text.endsWith("1")) {
 					nOpds = 1;
 				}
 				else if (!expr.text.equals("[]")) {
@@ -1006,7 +1017,7 @@ public class Expression {
 		if (expr.type == NodeType.OPERATOR) {
 			try {
 				expr.children.addFirst(operands.removeLast());
-				if (!expr.text.equals("!") && !expr.text.equalsIgnoreCase("not") && !expr.text.endsWith("1")) {
+				if (!NEGATION_OPERATORS.contains(expr.text, false) && !expr.text.endsWith("1")) {
 					expr.children.addFirst(operands.removeLast());
 				}
 			}
@@ -1034,15 +1045,13 @@ public class Expression {
 	 * Returns a negated condition for the expression {@code _cond}<br/>
 	 * @param _cond - an expression supposed to represent a condition (i.e.
 	 * a Boolean expression) - <b>may get modified as well!</b>
+	 * @param _verbose - if {@code true} then "not" will be used instead of "!" if a
+	 * negation operator is to be added.
 	 * @return a condition that is the negation of the original {@code _cond}
 	 * @throws SyntaxException if the expression was definitely not a Boolean expression
 	 */
-	public static Expression negateCondition(Expression _cond) throws SyntaxException
+	public static Expression negateCondition(Expression _cond, boolean _verbose) throws SyntaxException
 	{
-		// Comparison operators in complementary order, i.e. first is complementary to last etc. 
-		final StringList compOperators = StringList.explode("==,=,<,>,<=,>=,<>,!=", ",");
-		// Binary Boolean operators - just for verification
-		final StringList boolOperators = StringList.explode("&&,and,||,or,^,xor", ",");
 		int ix = -1;
 		boolean okay = false;
 		Expression expr = _cond;
@@ -1061,24 +1070,24 @@ public class Expression {
 		case FUNCTION:
 			// TODO: Should we check the expression data type?
 			// We assume it might be of Boolean type
-			expr = new Expression(NodeType.OPERATOR, "not", _cond.tokenPos);
+			expr = new Expression(NodeType.OPERATOR, _verbose ? "not" : "!", _cond.tokenPos);
 			expr.children.add(_cond);
 			okay = true;
 			break;
 		case OPERATOR:
 		{
-			if (_cond.text.equals("!") || _cond.text.equals("not")) {
+			if (_cond.text.equals("!") || _cond.text.equalsIgnoreCase("not")) {
 				// Just drop the negation
 				expr = _cond.children.getFirst();
 				okay = true;
 			}
-			else if ((ix = compOperators.indexOf(_cond.text)) >= 0) {
+			else if ((ix = RELATION_OPERATORS.indexOf(_cond.text)) >= 0) {
 				// Replace by its respective complement
-				expr.text = compOperators.get(compOperators.count()-1 - ix);
+				expr.text = RELATION_OPERATORS.get(RELATION_OPERATORS.count()-1 - ix);
 				okay = true;
 			}
-			else if (boolOperators.contains(_cond.text)) {
-				expr = new Expression(NodeType.OPERATOR, "not", _cond.tokenPos);
+			else if (BOOL_OPERATORS.contains(_cond.text)) {
+				expr = new Expression(NodeType.OPERATOR, _verbose ? "not" : "!", _cond.tokenPos);
 				expr.children.add(_cond);
 				okay = true;
 			}

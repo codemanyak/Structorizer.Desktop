@@ -263,13 +263,11 @@ public class Line {
 	 * @param tokens - the tokenized text line (without operator unification!)
 	 * @param expectedType - optionally an expected line type (may depend on the
 	 * Element type or {@code null}. If given, controls the validity.
-	 * @param varNames - list of variable names if known (otherwise, i.e. if {@code null},
-	 * all identifiers without following argument list would be interpreted as values)
 	 * @return a Line object or {@code null} (e.g. in case of an empty line)
 	 * @throws SyntaxException if there is a syntactic error in the text
-	 * @see #parse(String, LineType, StringList, StringList)
+	 * @see #parse(String, LineType, StringList)
 	 */
-	public static Line parse(StringList tokens, LineType expectedType, StringList varNames) throws SyntaxException
+	public static Line parse(StringList tokens, LineType expectedType) throws SyntaxException
 	{
 		// Check if the line starts with a command keyword
 		LineType lType = null;	// Detected line type
@@ -330,7 +328,7 @@ public class Line {
 			lType = expectedType;
 		}
 		// Identify the separators and extract the expressions
-		lType = extractExpressions(tokens, lType, varNames, exprs);
+		lType = extractExpressions(tokens, lType, exprs);
 		return new Line(lType, exprs.toArray(new Expression[exprs.size()]));
 	}
 
@@ -341,13 +339,11 @@ public class Line {
 	 * @param _tokens - The token list without an identified leading keyword (this should
 	 * reflect in the given {@code _type}). May still contain blanks and non-unified operators.
 	 * @param _type - the {@link LineType} as far as already detected or expected (or {@code null})
-	 * @param _varNames - possibly a list of variable names known so far (or {@code null})
 	 * @param _exprs - the {@link ArrayList} to which the parsed expressions are to be added.
 	 * @return the eventual line type
 	 * @throws SyntaxException if there are syntactic errors
 	 */
-	private static LineType extractExpressions(StringList _tokens, LineType _type, StringList _varNames,
-			ArrayList<Expression> _exprs) throws SyntaxException {
+	private static LineType extractExpressions(StringList _tokens, LineType _type, ArrayList<Expression> _exprs) throws SyntaxException {
 		if (_type == null) {
 			_type = LineType.LT_RAW;
 		}
@@ -362,7 +358,7 @@ public class Line {
 		case LT_PROC_CALL:
 			// We expect exactly one expression and no further keywords in general
 			{
-				List<Expression> parsed = Expression.parse(_tokens, null, _varNames);
+				List<Expression> parsed = Expression.parse(_tokens, null);
 				if (_tokens.isEmpty() && parsed.size() == 1) {
 					_exprs.add(parsed.get(0));
 				}
@@ -399,7 +395,7 @@ public class Line {
 				int ix0 = isForIn ? ixIn : ixTo;
 				// This should contain the first expression (an assignment or a variable name, respectively)
 				StringList tokens0 = _tokens.subSequence(0, ix0);
-				List<Expression> parsed = Expression.parse(tokens0, null, _varNames);
+				List<Expression> parsed = Expression.parse(tokens0, null);
 				if (tokens0.isEmpty() && parsed.size() == 1) {
 					Expression varSpec = parsed.get(0);
 					if (isForIn && varSpec.type != NodeType.VARIABLE
@@ -417,7 +413,7 @@ public class Line {
 				_tokens = _tokens.trim();
 				if (isForIn) {
 					// Extract the item list (may be an array initializer, a variable or a sequence of expressions)
-					parsed = Expression.parse(_tokens, null, _varNames);
+					parsed = Expression.parse(_tokens, null);
 					if (_tokens.isEmpty() && !parsed.isEmpty()) {
 						_exprs.addAll(parsed);
 					}
@@ -428,7 +424,7 @@ public class Line {
 				else {
 					// First extract the end value expression
 					String stepKey = Syntax.getKeyword("stepFor");
-					parsed = Expression.parse(_tokens, StringList.getNew(stepKey), _varNames);
+					parsed = Expression.parse(_tokens, StringList.getNew(stepKey));
 					if (parsed.size() == 1) {
 						_exprs.addAll(parsed);
 					}
@@ -439,7 +435,7 @@ public class Line {
 					if (!_tokens.isEmpty()) {
 						if (_tokens.get(0).equals(stepKey)) {
 							_tokens.remove(0);
-							parsed = Expression.parse(_tokens, null, _varNames);
+							parsed = Expression.parse(_tokens, null);
 							if (parsed.size() == 1) {
 								_exprs.addAll(parsed);
 								// TODO we might check for signed or unsigned literal
@@ -457,7 +453,7 @@ public class Line {
 			break;
 		case LT_INPUT:
 			{
-				List<Expression> parsed = Expression.parse(_tokens, null, _varNames);
+				List<Expression> parsed = Expression.parse(_tokens, null);
 				if (!parsed.isEmpty()) {
 					Expression first = parsed.get(0);
 					if (first.type != Expression.NodeType.LITERAL) {
@@ -471,7 +467,7 @@ public class Line {
 		case LT_LEAVE:
 		case LT_RETURN:
 			{
-				List<Expression> parsed = Expression.parse(_tokens, null, _varNames);
+				List<Expression> parsed = Expression.parse(_tokens, null);
 				if (_tokens.isEmpty() && parsed.size() <= 1) {
 					// TODO: In case of leave we ought to check that it is a cardinal number
 					_exprs.addAll(parsed);
@@ -486,7 +482,7 @@ public class Line {
 			{
 				// Just give it a try, we will only attach expressions if they cover the entire line
 				try {
-					List<Expression> parsed = Expression.parse(_tokens, null, _varNames);
+					List<Expression> parsed = Expression.parse(_tokens, null);
 					if (_tokens.isEmpty()) {
 						_exprs.addAll(parsed);
 					}
@@ -495,7 +491,7 @@ public class Line {
 			}
 		case LT_OUTPUT:
 			// Just extract all available expressions
-			_exprs.addAll(Expression.parse(_tokens, null, _varNames));
+			_exprs.addAll(Expression.parse(_tokens, null));
 			break;
 		case LT_TYPE_DEF:
 		{
@@ -517,7 +513,7 @@ public class Line {
 				// FIXME: For now we will just call the Instruction method
 				String varName = Instruction.getAssignedVarname(left, true);
 				_tokens.insert(Syntax.splitLexically(varName, true), 0);
-				List<Expression> parsed = Expression.parse(_tokens, null, _varNames);
+				List<Expression> parsed = Expression.parse(_tokens, null);
 				if (parsed.size() == 1) {
 					_exprs.add(parsed.get(0));
 				}
@@ -535,24 +531,23 @@ public class Line {
 	 * @param textLine - the (unbroken) text line as string
 	 * @param expectedType - optionally an expected line type (may depend on the
 	 * Element type or {@code null}. If given, controls the validity.
-	 * @param varNames - list of variable names if known (otherwise, i.e. if {@code null},
-	 * all identifiers without following argument list would be interpreted as values)
 	 * @param errors - all detected errors and warnings will be appended to this {@link StringList}.
 	 * @return a Line object. In case of syntactic errors, a Line of type {@link LineType#LT_RAW}
 	 * would be returned.
 	 */
-	public static Line parse(String textLine, LineType expectedType, StringList varNames, StringList errors)
+	public static Line parse(String textLine, LineType expectedType, StringList errors)
 	{
 		StringList tokens = Syntax.splitLexically(textLine, true);
 		if (!tokens.isEmpty()) {
 			try {
-				return parse(tokens, null, varNames);
+				return parse(tokens, null);
 			} catch (SyntaxException exc) {
-				errors.add(exc.getMessage());
-				return new Line(LineType.LT_RAW, null);
+				if (errors != null) {
+					errors.add(exc.getMessage());
+				}
 			}
 		}
-		return null;
+		return new Line(LineType.LT_RAW, null);
 	}
 	
 	@Override
@@ -581,24 +576,25 @@ public class Line {
 		
 		String[] exprTests = new String[] {
 				// "good" expressions
-				"a <- 7 * (15 - sin(1.3))",
-				"a <- 7 * (15 - sin(b))",
-				"a[i+1] <- { 16, \"doof\", 45+9, b}",
-				"7 * (15 - sin(1.3)), { 16, \"doof\", 45+9, b}",
-				"7 * (15 - pow(-18, 1.3)) + len({ 16, \"doof\", 45+9, b})",
-				"rec <- Date{2020, a + 4, max(29, d)}",
-				"rec <- Date{year: 2020, month: a + 4, day: max(29, d)}",
-				"test[top-1]",
-				"25 * -a - b",
-				"a < 5 && b >= c || isDone",
-				"not hasFun(person)",
-				"28 - b % 13 > 4.5 / sqrt(23) * x",
-				"*p <- 17 + &x",
+//				"a <- 7 * (15 - sin(1.3))",
+//				"a <- 7 * (15 - sin(b))",
+//				"a[i+1] <- { 16, \"doof\", 45+9, b}",
+//				"7 * (15 - sin(1.3)), { 16, \"doof\", 45+9, b}",
+//				"7 * (15 - pow(-18, 1.3)) + len({ 16, \"doof\", 45+9, b})",
+//				"rec <- Date{2020, a + 4, max(29, d)}",
+//				"rec <- Date{year: 2020, month: a + 4, day: max(29, d)}",
+//				"test[top-1]",
+//				"25 * -a - b",
+//				"a < 5 && b >= c || isDone",
+//				"not hasFun(person)",
+//				"28 - b % 13 > 4.5 / sqrt(23) * x",
+//				"*p <- 17 + &x",
+				"a & ~(17 | 86) ^ ~b | ~c | ~1",
 				// Defective lines
 				"7 * (15 - sin(1.3)) }, { 16, \"doof\", 45+9, b}",
 				"6[-6 * -a] + 34",
 				"(23 + * 6",
-				"(23 + * / 6)"
+				"(23 + * / 6)",
 		};
 		String[] lineTests = new String[] {
 				"foreach i in {17+ 9, -3, pow(17.4, -8.1), \"doof\"}",
@@ -627,14 +623,14 @@ public class Line {
 				"length({8, 34, 9.7}) = 4",
 				"2 != sqrt(8)",
 				"true",
-				"28 - b * 13 > 4.5 / sqrt(23) * x"
+				"not (28 - b * 13 > 4.5 / sqrt(23) * x)"
 		};
 		
 		for (String test: exprTests) {
 			try {
 				StringList tokens = Syntax.splitLexically(test, true);
 				System.out.println("===== " + test + " =====");
-				List<Expression> exprs = Expression.parse(tokens, /*sepas/**/ /**/null/**/, null);
+				List<Expression> exprs = Expression.parse(tokens, /*sepas/**/ /**/null/**/);
 				int i = 1;
 				for (Expression expr: exprs) {
 					System.out.println(i + ": " + expr.toString());
@@ -649,7 +645,7 @@ public class Line {
 		for (String line: lineTests) {
 			System.out.println("===== " + line + " =====");
 			StringList errors = new StringList();
-			Line aLine = Line.parse(line, null, null, errors);
+			Line aLine = Line.parse(line, null, errors);
 			System.out.println(aLine);
 			System.err.println(errors.getText());
 		}
@@ -658,12 +654,12 @@ public class Line {
 			StringList tokens = Syntax.splitLexically(test, true);
 			System.out.println("===== " + test + " =====");
 			try {
-				List<Expression> exprs = Expression.parse(tokens, null, null);
+				List<Expression> exprs = Expression.parse(tokens, null);
 				Expression cond = exprs.get(0);
 				System.out.println(cond.toString());
-				Expression neg = Expression.negateCondition(cond);
+				Expression neg = Expression.negateCondition(cond, false);
 				System.out.print(neg.toString() + " <-> ");
-				System.out.println(Expression.negateCondition(neg));
+				System.out.println(Expression.negateCondition(neg, false));
 			} catch (SyntaxException exc) {
 				System.err.println(exc.getMessage() + " at " + exc.getPosition());
 			}

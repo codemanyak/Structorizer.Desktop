@@ -112,7 +112,6 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig     2020-04-25      Bugfix #863/1: Duplicate routine export to PapDesigner and StrukTex
  *      Kay Gürtzig     2020-04-28      Bugfix #828: Unreferenced subroutines were missing on group export with 1 main
  *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
- *      Kay Gürtzig     2020-10-31      Bugfix #881: Wrong keyword retrieval in method transform(String, boolean) mended.
  *
  ******************************************************************************************************
  *
@@ -1744,31 +1743,19 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		/* This is somewhat redundant because most of the keywords have already been cut out
 		 * but it's still needed for the meaningful ones.
 		 */
-		// START KGU#883 2020-10-31: Bugfix #881 This was inconsistent and tended to cause NullPointer exceptions
-//		String[] keywords = Syntax.getAllProperties();
-//		for (int kw = 0; kw < keywords.length; kw++)
-//		{
-//			String keyword = keywords[kw];
 		for (Map.Entry<String, String> keyEntry: Syntax.getPropertyMap(false).entrySet())
 		{
 			String keyword = keyEntry.getValue();
 			String key = keyEntry.getKey();
-		// END KGU#883 2020-10-31
 			if (keyword.trim().length() > 0)
 			{
-				// START KGU#883 2020-10-31: Bugfix #881
-//				StringList keyTokens = Syntax.getSplitKeyword(keywords[kw]);
 				StringList keyTokens = Syntax.getSplitKeyword(key);
-				// END KGU#883 2020-10-31
 				int keyLength = keyTokens.count();
 				int pos = -1;
 				while ((pos = tokens.indexOf(keyTokens, pos + 1, !Syntax.ignoreCase)) >= 0)
 				{
 					// Replace the first token of the keyword by the entire keyword
-					// START KGU#883 2020-10-31: Bugfix #881
-					//tokens.set(pos, keywords[kw]);
 					tokens.set(pos, keyword);
-					// END KGU#883 2020-10-31
 					// Remove the remaining tokens of the split keyword
 					for (int j=1; j < keyLength; j++)
 					{

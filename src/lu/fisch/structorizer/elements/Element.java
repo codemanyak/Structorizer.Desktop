@@ -205,7 +205,10 @@ import java.awt.FontMetrics;
 
 import lu.fisch.utils.*;
 import lu.fisch.graphics.*;
+import lu.fisch.structorizer.syntax.Expression;
+import lu.fisch.structorizer.syntax.Line;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.SyntaxException;
 import lu.fisch.structorizer.executor.Executor;
 import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.gui.FindAndReplace;
@@ -219,6 +222,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
@@ -1141,6 +1145,40 @@ public abstract class Element {
 		return sl;
 	}
 	// END KGU#413 2017-06-09
+	
+	// START KGU#790 2020-11-01: Issue #800 new syntax engine
+	/**
+	 * 
+	 * @param problems
+	 * @return
+	 */
+	public Line[] getParsedText(StringList problems)
+	{
+		StringList unbrText = this.getUnbrokenText();
+		Line[] lines = new Line[unbrText.count()];
+		for (int i = 0; i < lines.length; i++) {
+			lines[i] = Line.parse(unbrText.get(i), null, problems);
+		}
+		return lines;
+	}
+
+	/**
+	 * 
+	 * @param declaredVars
+	 * @param usedVars
+	 * @param problems
+	 * @return
+	 */
+	public Line[] getParsedText(StringList declaredVars, StringList usedVars, StringList problems)
+	{
+		StringList unbrText = this.getUnbrokenText();
+		Line[] lines = new Line[unbrText.count()];
+		for (int i = 0; i < lines.length; i++) {
+			lines[i] = Line.parse(unbrText.get(i), null, problems);
+		}
+		return lines;
+	}
+	// END KGU#790 2020-11-01
 	
 	// START KGU#602 2018-10-25: Issue #419 - Tool to break very long lines is requested
 	/**
@@ -3178,10 +3216,14 @@ public abstract class Element {
 						specialSigns.add("<=");
 						specialSigns.add(">=");
 						// END KGU#872 2020-10-17
-						// START KGU 2020-10-31
+						// START KGU#790 2020-10-31: Issue #800
 						specialSigns.add("false");
 						specialSigns.add("true");
-						// END KGU 2020-10-31
+						specialSigns.add("&");
+						specialSigns.add("|");
+						specialSigns.add("~");
+						specialSigns.add("^");
+						// END KGU#790 2020-10-31
 					}
 					// START KGU#611/KGU843 2020-04-12: Issue #643, bugfix #847
 					if (specialSignsCi == null) {
@@ -4144,20 +4186,32 @@ public abstract class Element {
 	{
 		String negCondition = null;
 		StringList condTokens = Syntax.splitLexically(condition, true);
-		int length = condTokens.count();
-		String first = condTokens.get(0);
-		// Already explicitly negated?
-		if (first.equals("not") || first.equals("!")) {
-			int i = 1;
-			while (i < length && condTokens.get(i).trim().isEmpty()) i++;
-			if (i == length-1) {
-				// Obviously a single negated token, so just drop the operator
-				negCondition = condTokens.get(i); 
+		// START KGU#790 2020-11-01: Issue #800 Replaced by new syntax stuff
+		//int length = condTokens.count();
+		//String first = condTokens.get(0);
+		//// Already explicitly negated?
+		//if (first.equals("not") || first.equals("!")) {
+		//	int i = 1;
+		//	while (i < length && condTokens.get(i).trim().isEmpty()) i++;
+		//	if (i == length-1) {
+		//		// Obviously a single negated token, so just drop the operator
+		//		negCondition = condTokens.get(i); 
+		//	}
+		//	else if (i < length && Element.isParenthesized(condTokens.subSequence(i, length))) {
+		//		negCondition = condTokens.subSequence(i+1, length-1).concatenate();
+		//	}
+		//}
+		try {
+			List<Expression> exprs = Expression.parse(condTokens, null);
+			if (exprs.size() == 1) {
+				Expression cond = exprs.get(0);
+				cond = Expression.negateCondition(cond, true);
+				negCondition = cond.toString();
 			}
-			else if (i < length && Element.isParenthesized(condTokens.subSequence(i, length))) {
-				negCondition = condTokens.subSequence(i+1, length-1).concatenate();
-			}
+		} catch (SyntaxException exc) {
+			logger.log(Level.WARNING, "Trouble with negating " + condition, exc);
 		}
+		// END KGU#790 2020-11-01
 		if (negCondition == null) {
 			if (!Element.isParenthesized(condTokens)) {
 				condition = "(" + condition + ")";
