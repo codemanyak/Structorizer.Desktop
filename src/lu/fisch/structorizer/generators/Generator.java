@@ -112,6 +112,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig     2020-04-25      Bugfix #863/1: Duplicate routine export to PapDesigner and StrukTex
  *      Kay Gürtzig     2020-04-28      Bugfix #828: Unreferenced subroutines were missing on group export with 1 main
  *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
+ *      Kay Gürtzig     2020-10-31      Bugfix #881: Wrong keyword retrieval in method transform(String, boolean) mended.
  *
  ******************************************************************************************************
  *
@@ -168,6 +169,7 @@ import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.SortedMap;
@@ -180,6 +182,8 @@ import java.util.regex.Pattern;
 
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
+
+//import com.sun.org.apache.xpath.internal.Expression;
 
 import lu.fisch.structorizer.archivar.ArchivePool;
 import lu.fisch.structorizer.archivar.IRoutinePool;
@@ -206,6 +210,9 @@ import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.helpers.IPluginClass;
 import lu.fisch.structorizer.io.Ini;
 import lu.fisch.structorizer.io.LicFilter;
+import lu.fisch.structorizer.syntax.Expression;
+import lu.fisch.structorizer.syntax.Expression.Operator;
+import lu.fisch.structorizer.syntax.Line;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.BString;
 import lu.fisch.utils.BTextfile;
@@ -1607,6 +1614,56 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		}
 	}
 	// END KGU#376/KGU#388 2017-09-25
+	
+	// START KGU#790 2020-10-31: Issue #800 New approach for exact syntactical processing
+	/**
+	 * Translates the given parsed Structorizer line {@code _line} or (if of type
+	 * {@code LT_RAW}) the raw line {@code _rawLine} into a list of strings for the
+	 * generated output stream.
+	 * @param _line - a {@link Line} object representing the syntax structure of the
+	 * raw text line {@code _rawLine} if possible.
+	 * @param _rawLine - the original text line
+	 * @return a list of code lines for the translation result
+	 */
+	protected StringList transform(Line _line, String _rawLine)
+	{
+		// Dummy implementation
+		StringList result = new StringList();
+		if (_line.getType() == Line.LineType.LT_RAW) {
+			result.add(transform(_rawLine));
+		}
+		else {
+			for (int i = 0; i < _line.getExprCount(); i++) {
+				StringList exprs = transform(_line.getExpression(i));
+				result.add(exprs);
+			}
+		}
+		return result;
+	}
+	
+	/**
+	 * Transforms the given expression {@code _expr} into equivalent expression
+	 * string for this language.
+	 * @param _expr - a syntax tree representing an expression in Structorizer syntax
+	 * @return the respectively transformed expression represented by a {@link StringList}.
+	 */
+	protected StringList transform(Expression _expr)
+	{
+		HashMap<String, Operator> transOprs = getOperatorMap();
+		String transExpr = _expr.translate(transOprs);
+		return StringList.getNew(transExpr);
+	}
+
+	/**
+	 * Overridable general configuration method for expression translation.
+	 * @return the language-specific operator map (providing symbol and precedence
+	 * for every Structorizer operator if they differ from {@link Expression#OPERATOR_PRECEDENCE}).
+	 */
+	protected HashMap<String, Operator> getOperatorMap() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+	// END KGU#790 2020-10-31
 
 	/**
 	 * Overridable general text transformation routine, performing the following steps:<br/>
@@ -1684,21 +1741,34 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		// END KGU#162 2016-03-31
 		
 		// START KGU 2016-03-29: Unify all parser keywords
-		// This is somewhat redundant because most of the keywords have already been cut out
-		// but it's still needed for the meaningful ones.
-		String[] keywords = Syntax.getAllProperties();
-		for (int kw = 0; kw < keywords.length; kw++)
+		/* This is somewhat redundant because most of the keywords have already been cut out
+		 * but it's still needed for the meaningful ones.
+		 */
+		// START KGU#883 2020-10-31: Bugfix #881 This was inconsistent and tended to cause NullPointer exceptions
+//		String[] keywords = Syntax.getAllProperties();
+//		for (int kw = 0; kw < keywords.length; kw++)
+//		{
+//			String keyword = keywords[kw];
+		for (Map.Entry<String, String> keyEntry: Syntax.getPropertyMap(false).entrySet())
 		{
-			String keyword = keywords[kw];
+			String keyword = keyEntry.getValue();
+			String key = keyEntry.getKey();
+		// END KGU#883 2020-10-31
 			if (keyword.trim().length() > 0)
 			{
-				StringList keyTokens = Syntax.getSplitKeyword(keywords[kw]);
+				// START KGU#883 2020-10-31: Bugfix #881
+//				StringList keyTokens = Syntax.getSplitKeyword(keywords[kw]);
+				StringList keyTokens = Syntax.getSplitKeyword(key);
+				// END KGU#883 2020-10-31
 				int keyLength = keyTokens.count();
 				int pos = -1;
 				while ((pos = tokens.indexOf(keyTokens, pos + 1, !Syntax.ignoreCase)) >= 0)
 				{
 					// Replace the first token of the keyword by the entire keyword
-					tokens.set(pos, keywords[kw]);
+					// START KGU#883 2020-10-31: Bugfix #881
+					//tokens.set(pos, keywords[kw]);
+					tokens.set(pos, keyword);
+					// END KGU#883 2020-10-31
 					// Remove the remaining tokens of the split keyword
 					for (int j=1; j < keyLength; j++)
 					{
@@ -3211,7 +3281,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		//this.varNames = _root.getVarNames(_root, false, true);	// FOR loop vars are missing
 		// START KGU#691 2019-03-21: Bugfix - the variable highlighting and detection was inflicted
 		//this.varNames = _root.getVarNames();
-		this.varNames = _root.retrieveVarNames().copy();
+		this.varNames = new StringList(_root.retrieveVarNames());
 		// END KGU#691 2019-03-21
 		for (int p = 0; p < paramNames.count(); p++) {
 			this.varNames.removeAll(paramNames.get(p));

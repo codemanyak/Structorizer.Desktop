@@ -229,7 +229,7 @@ public class Jump extends Instruction {
 
 	public Element copy()
 	{
-		Element ele = new Jump(this.getText().copy());
+		Element ele = new Jump(new StringList(this.getText()));
 		// START KGU#199 2016-07-07: Enh. #188, D.R.Y.
 		return copyDetails(ele, false, false);
 		// END KGU#199 2016-07-07

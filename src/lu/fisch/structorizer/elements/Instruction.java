@@ -133,7 +133,7 @@ public class Instruction extends Element {
 	// START KGU#199 2016-07-07: Enh. #188 - also serves subclasses for "up-casting"
 	public Instruction(Instruction instr)
 	{
-		super(instr.text.copy());
+		super(new StringList(instr.text));
 		instr.copyDetails(this, true, true);
 	}
 	// END KGU#199 2016-07-07
@@ -479,7 +479,7 @@ public class Instruction extends Element {
 
 	public Element copy()
 	{
-		Element ele = new Instruction(this.getText().copy());
+		Element ele = new Instruction(new StringList(this.getText()));
 		// START KGU#199 2016-07-06: Enh. #188 specific conversions enabled
 		return copyDetails(ele, false, false);
 	}
@@ -1254,7 +1254,7 @@ public class Instruction extends Element {
 	public static String getAssignedVarname(StringList tokens, boolean entireTarget) {
 		String varName = null;
 		// START KGU#689 2019-03-21: Issue #706 - get along with named parameter calls
-		tokens = coagulateSubexpressions(tokens.copy());		
+		tokens = coagulateSubexpressions(new StringList(tokens));		
 		// END KGU689 2019-03-21
 		int posAsgn = tokens.indexOf("<-");
 		if (posAsgn > 0) {

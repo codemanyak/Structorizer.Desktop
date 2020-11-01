@@ -6,7 +6,7 @@ import lu.fisch.utils.StringList;
  *
  *      Author:         Kay Gürtzig
  *
- *      Description:    Base class for type descriptions
+ *      Description:    New base class for type descriptions
  *
  ******************************************************************************************************
  *
@@ -14,7 +14,7 @@ import lu.fisch.utils.StringList;
  *
  *      Author          Date            Description
  *      ------          ----            -----------
- *      Kay Gürtzig     20198-12-19     First Issue
+ *      Kay Gürtzig     2019-12-19      First Issue (#800)
  *
  ******************************************************************************************************
  *
@@ -23,7 +23,7 @@ import lu.fisch.utils.StringList;
  *
  ******************************************************************************************************///
 
-public class Type implements Entity {
+public class Type {
 
 	protected static final String dummy = "???";
 	
@@ -49,14 +49,14 @@ public class Type implements Entity {
 
 	/**
 	 * Constructs the type from the given {@code name} and {@code modifiers}
-	 * list (which will be reduced, i.e. blanks and empty parts will be removed.
+	 * list (which will be reduced, i.e. blanks and empty parts will be removed).
 	 * @param name - type name
 	 * @param modifiers - list of modifiers or null
 	 */
 	public Type(String name, StringList modifiers) {
 		this.name = (name != null ? name.trim() : "");
 		if (modifiers != null) {
-			modifiers.copy();
+			modifiers = new StringList(modifiers);
 			modifiers.removeAll(" ");
 			modifiers.removeAll("");
 		}

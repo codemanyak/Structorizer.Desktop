@@ -1865,7 +1865,7 @@ public class OberonGenerator extends Generator {
 		// END KGU#504 2018-03-13
 			// START KGU#762 2019-11-13: Bugfix #776 - we must not repeat mere declarations from Includables here
 			//introPlaced = generateVarDecls(_root, _indent, _varNames, _complexConsts, introPlaced);
-			StringList ownVarNames = _varNames.copy();
+			StringList ownVarNames = new StringList(_varNames);
 			if (!topLevel && _root.includeList != null) {
 				for (Root incl: includedRoots) {
 					// Because of recursiveness of declaration retrieval, we may restrict to the

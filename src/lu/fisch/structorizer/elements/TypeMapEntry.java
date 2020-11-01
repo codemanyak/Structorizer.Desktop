@@ -781,7 +781,7 @@ public class TypeMapEntry {
 			for (VarDeclaration varDecl: this.declarations) {
 				if (varDecl.isEnum()) {
 					if (varDecl.valueNames != null) {
-						return varDecl.valueNames.copy();
+						return new StringList(varDecl.valueNames);
 					}
 				} //if (varDecl.isEnum())
 			} // for (VarDeclaration varDecl: this.declarations)

@@ -1789,7 +1789,7 @@ public class Root extends Element {
     @Override
     public Element copy()
     {
-            Root ele = new Root(this.getText().copy());
+            Root ele = new Root(new StringList(this.getText()));
             copyDetails(ele, false);
             ele.isBoxed=this.isBoxed;
             ele.diagrType = this.diagrType;
@@ -1800,7 +1800,7 @@ public class Root extends Element {
             // END KGU#2 (#9) 2015-11-13
             // START KGU#704 2019-03-30: Bugfix #699 - we must not forget to clone the includeList
             if (this.includeList != null) {
-                ele.includeList = this.includeList.copy();
+                ele.includeList = new StringList(this.includeList);
             }
             // END KGU#704 2019-03-30
             // START KGU#363 2017-03-10: Enh. #372
@@ -1925,8 +1925,8 @@ public class Root extends Element {
 
 		Subqueue oldChildren = (Subqueue)children.copy(); 
 		// START KGU#120 2016-01-02: Bugfix #85 - park my StringList attributes on the stack top
-		oldChildren.setText(this.text.copy());
-		oldChildren.setComment(this.comment.copy());
+		oldChildren.setText(new StringList(this.text));
+		oldChildren.setComment(new StringList(this.comment));
 		// END KGU#120 2016-01-02
 		// START KGU#363 2017-05-21: Enh. #372: Care for the new attributes
 		if (_cacheAttributes) oldChildren.rootAttributes = new RootAttributes(this);
@@ -2067,8 +2067,8 @@ public class Root extends Element {
             // END KGU#365 2017-03-19
                 redoList.add((Subqueue)children.copy());
                 // START KGU#120 2016-01-02: Bugfix #85 - park my StringList attributes in the stack top
-                redoList.peek().setText(this.text.copy());
-                redoList.peek().setComment(this.comment.copy());
+                redoList.peek().setText(new StringList(this.text));
+                redoList.peek().setComment(new StringList(this.comment));
                 // END KGU#120 2016-01-02
                 // START KGU#507 2018-03-15: Bugfix #523
                 if (this.includeList != null) {
@@ -2084,8 +2084,8 @@ public class Root extends Element {
             children = undoList.pop();
             children.parent = this;
             // START KGU#120 2016-01-02: Bugfix #85 - restore my StringList attributes from stack
-            this.setText(children.getText().copy());
-            this.setComment(children.getComment().copy());
+            this.setText(new StringList(children.getText()));
+            this.setComment(new StringList(children.getComment()));
             children.text.clear();
             children.comment.clear();
             // END KGU#120 2016-01-02
@@ -2159,8 +2159,8 @@ public class Root extends Element {
             // END KGU#137 2016-01-11
             undoList.add((Subqueue)children.copy());
             // START KGU#120 2016-01-02: Bugfix #85 - park my StringList attributes on the stack top
-            undoList.peek().setText(this.text.copy());
-            undoList.peek().setComment(this.comment.copy());
+            undoList.peek().setText(new StringList(this.text));
+            undoList.peek().setComment(new StringList(this.comment));
             // END KGU#120 2016-01-02
             // START KGU#507 2018-03-15: Bugfix #523
             if (this.includeList != null) {
@@ -2173,8 +2173,8 @@ public class Root extends Element {
             children = redoList.pop();
             children.parent = this;
             // START KGU#120 2016-01-02: Bugfix #85 - restore my StringList attributes from the stack
-            this.setText(children.getText().copy());
-            this.setComment(children.getComment().copy());
+            this.setText(new StringList(children.getText()));
+            this.setComment(new StringList(children.getComment()));
             children.text.clear();
             children.comment.clear();
             // END KGU#120 2016-01-02
@@ -3422,7 +3422,7 @@ public class Root extends Element {
     			@SuppressWarnings("unchecked")
     			HashMap<String, String> constantDefs = (HashMap<String, String>)_constants.clone();
     			String[] keywords = Syntax.getAllProperties();
-    			StringList initVars = _vars.copy();
+    			StringList initVars = new StringList(_vars);
     			// START KGU#423 2017-09-13: Enh. #416 - cope with user-defined line breaks
     			//for (int j = 0; j < ele.getText().count(); j++) {
     			StringList unbrokenText = ele.getUnbrokenText();
@@ -3544,12 +3544,12 @@ public class Root extends Element {
     		}
     		else if (eleClassName.equals("Parallel"))
     		{
-    			StringList initialVars = _vars.copy();
+    			StringList initialVars = new StringList(_vars);
     			Iterator<Subqueue> iter = ((Parallel)ele).qs.iterator();
     			while (iter.hasNext())
     			{
     				// For the thread, propagate only variables known before the parallel section
-    				StringList threadVars = initialVars.copy();
+    				StringList threadVars = new StringList(initialVars);
     				analyse(iter.next(), _errors, threadVars, _uncertainVars, _constants, _resultFlags, _types);
     				// Any variable introduced by one of the threads will be known after all threads have terminated
     				_vars.addIfNew(threadVars);
@@ -3557,8 +3557,8 @@ public class Root extends Element {
     		}
     		else if(eleClassName.equals("Alternative"))
     		{
-    			StringList tVars = _vars.copy();
-    			StringList fVars = _vars.copy();
+    			StringList tVars = new StringList(_vars);
+    			StringList fVars = new StringList(_vars);
 
     			analyse(((Alternative)ele).qTrue, _errors, tVars, _uncertainVars, _constants, _resultFlags, _types);
     			analyse(((Alternative)ele).qFalse, _errors, fVars, _uncertainVars, _constants, _resultFlags, _types);
@@ -3584,7 +3584,7 @@ public class Root extends Element {
     		{
     			Case caseEle = ((Case) ele);
 				int si = caseEle.qs.size();	// Number of branches
-    			StringList initialVars = _vars.copy();
+    			StringList initialVars = new StringList(_vars);
     			// START KGU#758 2019-11-08: Enh. #770
     			analyse_27_28(caseEle, _errors);
     			// END KGU#758 2019-11-08
@@ -3594,7 +3594,7 @@ public class Root extends Element {
     			Hashtable<String, String> myInitVars = new Hashtable<String, String>();
     			for (int j=0; j < si; j++)
     			{
-    				StringList caseVars = initialVars.copy();
+    				StringList caseVars = new StringList(initialVars);
     				analyse((Subqueue) caseEle.qs.get(j),_errors, caseVars, _uncertainVars, _constants, _resultFlags, _types);
     				for(int v = 0; v < caseVars.count(); v++)
     				{
@@ -3640,9 +3640,9 @@ public class Root extends Element {
     		}
     		// START KGU#812 2020-02-21: Bugfix #825 forgotten to descend recursively
     		else if (eleClassName.equals("Try")) {
-    			StringList tVars = _vars.copy();
-    			StringList cVars = _vars.copy();
-    			StringList fVars = _vars.copy();
+    			StringList tVars = new StringList(_vars);
+    			StringList cVars = new StringList(_vars);
+    			StringList fVars = new StringList(_vars);
 
     			cVars.addIfNew(((Try)ele).getText().trim());
     			
@@ -3849,7 +3849,7 @@ public class Root extends Element {
 	{
 		// START KGU#812 2020-02-21: Bugfix #825 We check the error variable of a TRY block too
 		if (ele instanceof Try) {
-			_myVars = _myVars.copy();
+			_myVars = new StringList(_myVars);
 			_myVars.addIfNew(((Try)ele).getExceptionVarName());			
 		}
 		// END KGU#812 2020-02-21
@@ -4569,7 +4569,7 @@ public class Root extends Element {
 	 */
 	private void analyse_22_24(Instruction _instr, Vector<DetectedError> _errors, StringList _vars, StringList _uncertainVars, HashMap<String, String> _definedConsts, HashMap<String, TypeMapEntry> _types)
 	{
-		StringList knownVars = _vars.copy();
+		StringList knownVars = new StringList(_vars);
 		String[] keywords = Syntax.getAllProperties();
 		// START KGU#413 2017-09-17: Enh. #416 cope with user-inserted line breaks
 		//for (int i = 0; i < _instr.getText().count(); i++) {
@@ -4891,7 +4891,7 @@ public class Root extends Element {
 					}
 					importedRoot.analyse_23(impErrors, importedVars, importedUncVars, _constants, _importStack, _analysedImports, importedTypes);
 					analyse(importedRoot.children, impErrors, importedVars, importedUncVars, _constants, subResultFlags, importedTypes);
-					_analysedImports.put(name, _importStack.copy());
+					_analysedImports.put(name, new StringList(_importStack));
 					if (this.isInclude()) {
 						_importStack.remove(_importStack.count()-1);
 					}
@@ -6263,12 +6263,12 @@ public class Root extends Element {
 			}
 			else if (eleClassName.equals("Parallel"))
 			{
-				StringList initialVars = _vars.copy();
+				StringList initialVars = new StringList(_vars);
 				Iterator<Subqueue> iter = ((Parallel)ele).qs.iterator();
 				while (iter.hasNext())
 				{
 					// For the thread, propagate only variables known before the parallel section
-					StringList threadVars = initialVars.copy();
+					StringList threadVars = new StringList(initialVars);
 					getUninitializedVars(iter.next(), threadVars, _args);
 					// Any variable introduced by one of the threads will be known after all threads have terminated
 					_vars.addIfNew(threadVars);
@@ -6276,8 +6276,8 @@ public class Root extends Element {
 			}
 			else if(eleClassName.equals("Alternative"))
 			{
-				StringList tVars = _vars.copy();
-				StringList fVars = _vars.copy();
+				StringList tVars = new StringList(_vars);
+				StringList fVars = new StringList(_vars);
 
 				getUninitializedVars(((Alternative)ele).qTrue, tVars, _args);
 				getUninitializedVars(((Alternative)ele).qFalse, fVars, _args);
@@ -6292,7 +6292,7 @@ public class Root extends Element {
 			{
 				Case caseEle = ((Case) ele);
 				int nBranches = caseEle.qs.size();	// Number of branches
-				StringList initialVars = _vars.copy();
+				StringList initialVars = new StringList(_vars);
 				// An entry of this Hashtable will contain the number of the branches
 				// having initialized the variable represeneted by the key - so in the
 				// end we can see which variables aren't always initialized.
@@ -6304,7 +6304,7 @@ public class Root extends Element {
 				}
 				for (int j=0; j < nBranches; j++)
 				{
-					StringList caseVars = initialVars.copy();
+					StringList caseVars = new StringList(initialVars);
 					getUninitializedVars((Subqueue) caseEle.qs.get(j),caseVars,_args);
 					for(int v = 0; v<caseVars.count(); v++)
 					{

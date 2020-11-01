@@ -26,6 +26,7 @@ import java.util.Vector;
 
 import lu.fisch.structorizer.elements.Element;
 import lu.fisch.structorizer.elements.Instruction;
+import lu.fisch.structorizer.io.Ini;
 import lu.fisch.structorizer.syntax.Expression.NodeType;
 import lu.fisch.utils.StringList;
 
@@ -197,19 +198,19 @@ public class Line {
 		case LT_EXIT:
 		case LT_PROC_CALL:
 		case LT_THROW:
-		case LT_TYPE_DEF:
 		case LT_INPUT:
 			count = 1;
 			break;
 		case LT_FOR_LOOP:
 		case LT_FOREACH_LOOP:
-		case LT_VAR_DECL:
 			count = 2;
 			break;
 		case LT_LEAVE:
 		case LT_OUTPUT:
 		case LT_RAW:
 		case LT_RETURN:
+		case LT_TYPE_DEF:
+		case LT_VAR_DECL:
 			count = 0;
 			break;
 		}
@@ -238,7 +239,7 @@ public class Line {
 		case LT_THROW:
 		case LT_RETURN:
 		case LT_PROC_CALL:
-		case LT_TYPE_DEF:
+		case LT_VAR_DECL:
 			count = 1;
 			break;
 		case LT_FOR_LOOP:
@@ -247,13 +248,11 @@ public class Line {
 		case LT_INPUT:
 		case LT_OUTPUT:
 		case LT_FOREACH_LOOP:
+		case LT_RAW:
 			count = Integer.MAX_VALUE;
 			break;
-		case LT_RAW:
+		case LT_TYPE_DEF:
 			count = 0;
-			break;
-		case LT_VAR_DECL:
-			count = 2;
 			break;
 		}
 		return count;		
@@ -484,6 +483,16 @@ public class Line {
 			}
 			break;
 		case LT_RAW:
+			{
+				// Just give it a try, we will only attach expressions if they cover the entire line
+				try {
+					List<Expression> parsed = Expression.parse(_tokens, null, _varNames);
+					if (_tokens.isEmpty()) {
+						_exprs.addAll(parsed);
+					}
+				}
+				catch (SyntaxException exc) {}
+			}
 		case LT_OUTPUT:
 			// Just extract all available expressions
 			_exprs.addAll(Expression.parse(_tokens, null, _varNames));
@@ -556,7 +565,10 @@ public class Line {
 			String sepa = "";
 			for (Expression expr: this.expressions) {
 				sb.append(sepa);
-				sb.append(expr.toString());
+				// In an LT_INPUT line, the first expression may be null
+				if (expr != null) {
+					sb.append(expr.toString());
+				}
 				sepa = "; ";
 			}
 			sb.append("]");
@@ -565,38 +577,74 @@ public class Line {
 	}
 	
 	public static void main(String[] args) {
+		//Syntax.loadFromINI();
+		
 		String[] exprTests = new String[] {
-				//				"a <- 7 * (15 - sin(1.3))",
-				//				"a <- 7 * (15 - sin(b))",
+				// "good" expressions
+				"a <- 7 * (15 - sin(1.3))",
+				"a <- 7 * (15 - sin(b))",
 				"a[i+1] <- { 16, \"doof\", 45+9, b}",
 				"7 * (15 - sin(1.3)), { 16, \"doof\", 45+9, b}",
 				"7 * (15 - pow(-18, 1.3)) + len({ 16, \"doof\", 45+9, b})",
 				"rec <- Date{2020, a + 4, max(29, d)}",
 				"rec <- Date{year: 2020, month: a + 4, day: max(29, d)}",
-				"7 * (15 - sin(1.3)) }, { 16, \"doof\", 45+9, b}"
+				"test[top-1]",
+				"25 * -a - b",
+				"a < 5 && b >= c || isDone",
+				"not hasFun(person)",
+				"28 - b % 13 > 4.5 / sqrt(23) * x",
+				"*p <- 17 + &x",
+				// Defective lines
+				"7 * (15 - sin(1.3)) }, { 16, \"doof\", 45+9, b}",
+				"6[-6 * -a] + 34",
+				"(23 + * 6",
+				"(23 + * / 6)"
 		};
 		String[] lineTests = new String[] {
-//				"foreach i in {17+ 9, -3, pow(17.4, -8.1), \"doof\"}",
-				"for k <- 23/4 to pow(2, 6) by 2",
-//				"foreach val in 34 + 8 19 true \"doof\"",
-//				"foreach thing in 67/5 + 8, \"fun\" + \"ny\", pow(67, 3)"
+				"foreach i in {17+ 9, -3, pow(17.4, -8.1), \"doof\"}",
+				"for k <- 23/4 to pow(2, 6) " + Syntax.getKeyword("stepFor") + " 2",
+				"foreach val in 34 + 8 19 true \"doof\"",
+				"foreach thing in 67/5 + 8, \"fun\" + \"ny\", pow(67, 3)",
+				"if not isNice",
+				"while answer == 'J' or answer == 'N'",
+				"until (value < 15.5) and not (length(array)*2 >= 5) or a <> b",
+				"leave",
+				"leave 3",
+				"RETURN",
+				"return {\"dull\", \"silly\", \"braindead\", \"as thick as the wall\"}",
+				"exit 5",
+				"throw \"all wrong here\"",
+				"input",
+				"INPUT a, b[3]",
+				"input \"prompt\" date.year, date.month",
+				"output",
+				"OUTPUT 17, a*z, 18 + \" km/h\""
+		};
+		String[] negationTests = new String[] {
+				"a < 5 && b >= c || isDone",
+				"not hasFun(person)",
+				"q >= 5",
+				"length({8, 34, 9.7}) = 4",
+				"2 != sqrt(8)",
+				"true",
+				"28 - b * 13 > 4.5 / sqrt(23) * x"
 		};
 		
-//		for (String test: exprTests) {
-//			try {
-//				StringList tokens = Syntax.splitLexically(test, true);
-//				System.out.println("===== " + test + " =====");
-//				List<Expression> exprs = Expression.parse(tokens, /*sepas/**/ /**/null/**/, null);
-//				int i = 1;
-//				for (Expression expr: exprs) {
-//					System.out.println(i + ": " + expr.toString());
-//					i++;
-//				}
-//			} catch (SyntaxException exc) {
-//				// TODO Auto-generated catch block
-//				System.err.println(exc.getMessage() + " at " + exc.getPosition());
-//			}
-//		}
+		for (String test: exprTests) {
+			try {
+				StringList tokens = Syntax.splitLexically(test, true);
+				System.out.println("===== " + test + " =====");
+				List<Expression> exprs = Expression.parse(tokens, /*sepas/**/ /**/null/**/, null);
+				int i = 1;
+				for (Expression expr: exprs) {
+					System.out.println(i + ": " + expr.toString());
+					System.out.println(i + ": " + expr.translate(Expression.verboseOperators));
+					i++;
+				}
+			} catch (SyntaxException exc) {
+				System.err.println(exc.getMessage() + " at " + exc.getPosition());
+			}
+		}
 		
 		for (String line: lineTests) {
 			System.out.println("===== " + line + " =====");
@@ -604,6 +652,21 @@ public class Line {
 			Line aLine = Line.parse(line, null, null, errors);
 			System.out.println(aLine);
 			System.err.println(errors.getText());
+		}
+		
+		for (String test: negationTests) {
+			StringList tokens = Syntax.splitLexically(test, true);
+			System.out.println("===== " + test + " =====");
+			try {
+				List<Expression> exprs = Expression.parse(tokens, null, null);
+				Expression cond = exprs.get(0);
+				System.out.println(cond.toString());
+				Expression neg = Expression.negateCondition(cond);
+				System.out.print(neg.toString() + " <-> ");
+				System.out.println(Expression.negateCondition(neg));
+			} catch (SyntaxException exc) {
+				System.err.println(exc.getMessage() + " at " + exc.getPosition());
+			}
 		}
 	}
 

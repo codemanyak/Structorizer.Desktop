@@ -286,7 +286,7 @@ public class Try extends Element {
 	 */
 	@Override
 	public lu.fisch.structorizer.elements.Element copy() {
-		Try ele = new Try(this.getText().copy());
+		Try ele = new Try(new StringList(this.getText()));
 		copyDetails(ele, true);
 		ele.qTry     = (Subqueue)this.qTry.copy();
 		ele.qCatch   = (Subqueue)this.qCatch.copy();

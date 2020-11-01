@@ -316,7 +316,7 @@ public class Repeat extends Element implements ILoop {
 	    
 	public Element copy()
 	{
-		Element ele = new Repeat(this.getText().copy());
+		Element ele = new Repeat(new StringList(this.getText()));
 		copyDetails(ele, false);
 		((Repeat) ele).q=(Subqueue) this.q.copy();
 		((Repeat) ele).q.parent=ele;

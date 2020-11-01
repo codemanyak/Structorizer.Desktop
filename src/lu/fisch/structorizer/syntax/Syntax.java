@@ -91,6 +91,10 @@ public class Syntax {
 			"\"",
 			"\\",
 			"%",
+			// START KGU#790 2020-10-31: Issue #800 We need the bitwise and and the address operator too
+			"&",
+			"|",
+			// END KGU#790 2020-10-31
 			// START KGU#331 2017-01-13: Enh. #333 Precaution against unicode comparison operators
 			"\u2260",
 			"\u2264",
@@ -262,8 +266,7 @@ public class Syntax {
 	 */
 	public static String[] getAllProperties()
 	{
-		String[] props = new String[]{};
-		return keywordMap.values().toArray(props);
+		return keywordMap.values().toArray(new String[keywordMap.size()]);
 	}
 	// END KGU#163 2016-03-25
 
@@ -721,6 +724,40 @@ public class Syntax {
 		return count;
 	}
 	// END KGU#92 2015-12-01
+
+	/**
+	 * Removes redundant marker keywords (as configured in the Parser Preferences) from
+	 * the given token list {@code _tokens}.
+	 * @param _tokens - the lexically split text with already condensed keywords
+	 * @param _preMarkers
+	 * @param _postMarkers
+	 */
+	public static void removeRedundantMarkers(StringList _tokens, boolean _preMarkers, boolean _postMarkers)
+	{
+		// Collect redundant placemarkers to be deleted from the text
+		StringList redundantMarkers = new StringList();
+		if (_preMarkers) {
+			redundantMarkers.addByLength(Syntax.getKeyword("preAlt"));
+			redundantMarkers.addByLength(Syntax.getKeyword("preCase"));
+			redundantMarkers.addByLength(Syntax.getKeyword("preWhile"));
+			redundantMarkers.addByLength(Syntax.getKeyword("preRepeat"));
+		}
+		if (_postMarkers) {
+			redundantMarkers.addByLength(Syntax.getKeyword("postAlt"));
+			redundantMarkers.addByLength(Syntax.getKeyword("postCase"));
+			redundantMarkers.addByLength(Syntax.getKeyword("postWhile"));
+			redundantMarkers.addByLength(Syntax.getKeyword("postRepeat"));
+		}
+
+		for (int i = 0; i < redundantMarkers.count(); i++)
+		{
+			String marker = redundantMarkers.get(i);
+			if (!marker.trim().isEmpty())
+			{
+				_tokens.removeAll(marker, !Syntax.ignoreCase);
+			}
+		}
+	}
 
 	/**
 	 * Stores the syntactical representation of the given Element text {@code _lines}

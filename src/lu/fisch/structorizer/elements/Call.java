@@ -223,7 +223,7 @@ public class Call extends Instruction {
 	@Override
 	public Element copy()
 	{
-		Element ele = new Call(this.getText().copy());
+		Element ele = new Call(new StringList(this.getText()));
 		// START KGU#199 2016-07-07: Enh. #188, D.R.Y.
 		return copyDetails(ele, false, true);
 		// END KGU#199 2016-07-07

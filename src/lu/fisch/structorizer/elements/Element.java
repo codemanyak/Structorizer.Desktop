@@ -273,7 +273,7 @@ public abstract class Element {
 	public static final String E_HELP_FILE = "structorizer_user_guide.pdf";
 	public static final String E_DOWNLOAD_PAGE = "https://www.fisch.lu/Php/download.php";
 	// END KGU#791 2020-01-20
-	public static final String E_VERSION = "3.30-11";
+	public static final String E_VERSION = "3.30-12";
 	public static final String E_THANKS =
 	"Developed and maintained by\n"+
 	" - Robert Fisch <robert.fisch@education.lu>\n"+
@@ -863,11 +863,11 @@ public abstract class Element {
 		// START KGU#261 2017-01-19: Enh. #259 (type map)
 		_ele.id = this.id;
 		// END KGU#261 2017-01-19
-		_ele.setComment(this.getComment().copy());
+		_ele.setComment(new StringList(this.getComment()));
 		_ele.setColor(this.getColor());
 		_ele.breakpoint = this.breakpoint;
 		_ele.breakTriggerCount = this.breakTriggerCount;
-    	this.copyRuntimeData(_ele, _simplyCoveredToo);
+		this.copyRuntimeData(_ele, _simplyCoveredToo);
 		// START KGU#183 2016-04-24: Issue #169
 		_ele.selected = this.selected;
 		// END KGU#183 2016-04-24
@@ -936,6 +936,9 @@ public abstract class Element {
 	// draw point
 	Point drawPoint = new Point(0,0);
 
+	/**
+	 * @return the top left drawing coordinate of the containing diagram's root element
+	 */
 	public Point getDrawPoint()
 	{
 		Element ele = this;
@@ -943,6 +946,10 @@ public abstract class Element {
 		return ele.drawPoint;
 	}
 
+	/**
+	 * Sets the top left drawing coordinate for the containing diagram's root element.
+	 * @param point
+	 */
 	public void setDrawPoint(Point point)
 	{
 		Element ele = this;
@@ -960,11 +967,19 @@ public abstract class Element {
 	}
 	// END KGU#227 2016-07-30
 
+	/**
+	 * Splits the given string {@code _text} into lines and assigns them as new text.
+	 * @param _text - the (possibly multi-line) new text as single string
+	 */
 	public void setText(String _text)
 	{
 		text.setText(_text);
 	}
 
+	/**
+	 * Adopts the given StringList {@code _text} as is for the text.
+	 * @param _text - the new text (<b>this will just be assigned, not copied!</b>)
+	 */
 	public void setText(StringList _text)
 	{
 		text = _text;
@@ -2668,8 +2683,8 @@ public abstract class Element {
 	// START KGU#689 2019-03-21 Issue #706
 	/**
 	 * Coagulates all token sequences starting with some kind of brackets, parenthesis,
-	 * or brace and ending with its pendant (or with a level underflow).
-	 * @param tokens - lexically split tokens.
+	 * or brace and ending with its counterpart (or with a level underflow).
+	 * @param tokens - lexically split tokens (<b>may get modified!</b>).
 	 * @return a sequence of level 0 lexical tokens and coagulated sub expressions
 	 * @see Syntax#splitLexically(String, boolean)
 	 * @see #splitExpressionList(String, String)
@@ -3021,7 +3036,7 @@ public abstract class Element {
 			catch (NumberFormatException ex) {}
 		}
 		// Check for boolean literals
-		if (typeSpec.isEmpty() && (expr.equalsIgnoreCase("true") || expr.equalsIgnoreCase("false"))) {
+		if (typeSpec.isEmpty() && (expr.equals("true") || expr.equals("false"))) {
 			typeSpec = "boolean";
 		}
 		return typeSpec;
@@ -3163,6 +3178,10 @@ public abstract class Element {
 						specialSigns.add("<=");
 						specialSigns.add(">=");
 						// END KGU#872 2020-10-17
+						// START KGU 2020-10-31
+						specialSigns.add("false");
+						specialSigns.add("true");
+						// END KGU 2020-10-31
 					}
 					// START KGU#611/KGU843 2020-04-12: Issue #643, bugfix #847
 					if (specialSignsCi == null) {
@@ -3754,14 +3773,11 @@ public abstract class Element {
         StringList redundantMarkers = new StringList();
         redundantMarkers.addByLength(Syntax.getKeyword("preAlt"));
         redundantMarkers.addByLength(Syntax.getKeyword("preCase"));
-        //redundantMarkers.addByLength(CodeParser.preFor);	// will be handled separately
         redundantMarkers.addByLength(Syntax.getKeyword("preWhile"));
         redundantMarkers.addByLength(Syntax.getKeyword("preRepeat"));
 
         redundantMarkers.addByLength(Syntax.getKeyword("postAlt"));
         redundantMarkers.addByLength(Syntax.getKeyword("postCase"));
-        //redundantMarkers.addByLength(CodeParser.postFor);	// will be handled separately
-        //redundantMarkers.addByLength(CodeParser.stepFor);	// will be handled separately
         redundantMarkers.addByLength(Syntax.getKeyword("postWhile"));
         redundantMarkers.addByLength(Syntax.getKeyword("postRepeat"));
         

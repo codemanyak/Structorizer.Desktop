@@ -1145,7 +1145,7 @@ public class CGenerator extends Generator {
 		// START KGU#796 2020-02-10: Bugfix #808
 		Syntax.unifyOperators(tokens, false);
 		// END KGU#796 2020-02-10
-		StringList pureTokens = tokens.copy();	// will not contain separating space
+		StringList pureTokens = new StringList(tokens);	// will not contain separating space
 		StringList exprTokens = null;	// Tokens of the expression in case of an assignment
 		StringList pureExprTokens = null;	// as before, will not contain separating space
 		pureTokens.removeAll(" ");

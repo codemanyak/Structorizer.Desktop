@@ -263,10 +263,10 @@ public class While extends Element implements ILoop {
 	    
 	public Element copy()
 	{
-		Element ele = new While(this.getText().copy());
+		Element ele = new While(new StringList(this.getText()));
 		copyDetails(ele, false);
-		((While) ele).q=(Subqueue) this.q.copy();
-		((While) ele).q.parent=ele;
+		((While) ele).q = (Subqueue) this.q.copy();
+		((While) ele).q.parent = ele;
 		return ele;
 	}
 	

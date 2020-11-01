@@ -298,7 +298,7 @@ public class PerlGenerator extends Generator {
 	{
 		// START KGU#388/KGU#542 2019-11-19: Enh. #423, #739 transferred the stuff from transform(String) hitherto
 		// Manipulate a condensed token list copy simultaneously (makes it easier to locate neighbouring tokens)
-		StringList denseTokens = tokens.copy();
+		StringList denseTokens = new StringList(tokens);
 		denseTokens.removeAll(" ");	// Condense
 		// Now transform all array and record initializers
 		// To go from right to left should ensure we advance from the innermost to the outermost brace

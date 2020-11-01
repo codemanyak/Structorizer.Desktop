@@ -139,6 +139,7 @@ package lu.fisch.structorizer.generators;
 
 import lu.fisch.utils.*;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.Expression.Operator;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -274,6 +275,59 @@ public class PasGenerator extends Generator
 	// END KGU#311/KGU#828 2020-03-22
 	
 	/************ Code Generation **************/
+	
+	// START KGU#790 2020-10-31: Issue #800
+	/**
+	 * Maps operator symbols from the key set of {@link #OPERATOR_PRECEDENCE} to
+	 * pairs of an alternative (more verbose equivalent) symbol and precedence,
+	 * e.g. to be used with {@link #transform(Expression)}
+	 */
+	@SuppressWarnings("serial")
+	public static final HashMap<String, Operator> pascalOperators = new HashMap<String, Operator>() {{
+		put("<-", new Operator(":=", 0));
+		put("or", new Operator("or", 9));
+		put("||", new Operator("or", 9));
+		put("and", new Operator("and", 10));
+		put("&&", new Operator("and", 10));
+		put("|", new Operator("|", 9));
+		put("^", new Operator("xor", 9));
+		put("xor", new Operator("xor", 9));
+		put("&", new Operator("&", 10));
+		//put("=", new Operator("=", 6));	// Does not change anything
+		put("==", new Operator("=", 6));
+		//put("<>", new Operator("<>", 6));	// Does not change anything
+		put("!=", new Operator("=", 6));
+		put("<", new Operator("<", 6));
+		put(">", new Operator(">", 6));
+		put("<=", new Operator("<=", 6));
+		put(">=", new Operator(">=", 6));
+		//put("shl", new Operator("shl", 8));
+		//put("<<", new Operator("<<", 8));
+		//put("shr", new Operator("shr", 8));
+		//put(">>", new Operator(">>", 8));
+		//put(">>>", new Operator(">>>", 8));
+		//put("+", new Operator("+", 9));
+		//put("-", new Operator("-", 9));
+		//put("*", new Operator("*", 10));
+		//put("/", new Operator("/", 10));
+		//put("div", new Operator("div", 10));
+		//put("mod", new Operator("mod", 10));
+		put("%", new Operator("mod", 10));
+		//put("not", new Operator("not", 11));
+		put("!", new Operator("not", 11));
+		put("+1", new Operator("+1", 11));	// sign
+		put("-1", new Operator("-1", 11));	// sign
+		put("*1", new Operator("1^", 11));	// pointer deref (C)
+		put("&1", new Operator("@1", 11));	// address (C)
+		//put("[]", new Operator("[]", 12));
+		//put(".", new Operator(".", 12));
+	}};
+	
+	@Override
+	protected HashMap<String, Operator> getOperatorMap() {
+		return pascalOperators;
+	}
+		// END KGU#790 2020-10-31
 	
 	// START KGU#559/KGU#560 2018-07-22: Enh. #563, bugfix #564
 	private Map<String,TypeMapEntry> typeMap;
@@ -1894,7 +1948,7 @@ public class PasGenerator extends Generator
 		// END KGU#504 2018-03-13
 			// START KGU#762 2019-11-13: Bugfix #776 - we must not repeat mere decalartions from Includables here
 			//introPlaced = generateVarDecls(_root, _indent, _varNames, _complexConsts, introPlaced);
-			StringList ownVarNames = _varNames.copy();
+			StringList ownVarNames = new StringList(_varNames);
 			if (!topLevel && _root.includeList != null) {
 				for (Root incl: includedRoots) {
 					// Because of recursiveness of declaration retrieval, we may restrict to the

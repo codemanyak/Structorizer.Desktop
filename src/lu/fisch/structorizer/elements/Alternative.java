@@ -665,7 +665,7 @@ public class Alternative extends Element implements IFork {
 	
 	public Element copy()
 	{
-		Alternative ele = new Alternative(this.getText().copy());
+		Alternative ele = new Alternative(new StringList(this.getText()));
 		copyDetails(ele, true);
 		ele.qTrue  = (Subqueue)this.qTrue.copy();
 		ele.qFalse = (Subqueue)this.qFalse.copy();

@@ -52,7 +52,9 @@ package lu.fisch.utils;
  *      Kay Gürtzig     2019-03-05      New method variants explodeWithDelimiter() for case-independent splitting
  *      Kay Gürtzig     2019-11-20      New methods count(String), count(String, boolean), insert(StringList, int)
  *      Kay Gürtzig     2020-03-18      Internal bugfix KGU#827 in toString, getCommaText() - caused errors with null elements
- *      Kay Gürtzig     2020-10-25      saveToFile() and loadFromFile now with return value, both write error message to err.
+ *      Kay Gürtzig     2020-10-25      saveToFile() and loadFromFile() now with return value, both write error message to err.
+ *      Kay Gürtzig     2020-10-30      Additional argument check in addByLength()
+ *      Kay Gürtzig     2020-10-31      Javadoc revised and complemented, setCommaText() with additional argument
  *
  ******************************************************************************************************
  *
@@ -80,17 +82,31 @@ public class StringList {
 	 * Constructs this as empty StringList
 	 * @param _strings
 	 * @see #StringList(String[])
+	 * @see #StringList(StringList)
 	 * @see #getNew(String)
 	 * @see #explode(String, String)
 	 */
 	public StringList()
 	{}
 	
+	// START KGU 2020-10-31 Introduced to provide a more efficient copy mechanism than copy()
+	/**
+	 * Creates a copy of the given StringList {@code other}.
+	 * @see #StringList(String[])
+	 * @see #copy()
+	 */
+	public StringList(StringList other)
+	{
+		this.strings.addAll(other.strings);
+	}
+	// END KGU 2020-10-31
+	
 	// START KGU 2017-06-18: New constructor as pendant to toArray()
 	/**
 	 * Constructs this from the given String array
 	 * @param _strings
 	 * @see #StringList()
+	 * @see #StringList(StringList)
 	 * @see #getNew(String)
 	 * @see #explode(String, String)
 	 */
@@ -117,15 +133,16 @@ public class StringList {
 	}
 	
 	/**
-	 * Splits string {@code _source} around matches of the given REGULAR EXPRESSION(!) {@code _by}.
-	 * Trailing empty strings are not included in the resulting StringList.
-	 * The string "boo:and:foo", for example, yields the following results with
+	 * Splits string {@code _source} around matches of the given <b>regular expression(!)</b>
+	 * {@code _by}.
+	 * Trailing empty strings are not included in the resulting StringList.<br/>
+	 * A string {@code "boo:and:foo"}, for example, yields the following results with
 	 * these expressions:<br/>
 	 * <table>
 	 * <tbody>
 	 * <tr><td>Regex</td><td>Result</td></tr>
-	 * <tr><td>":"</td><td>{ "boo", "and", "foo" }</td></tr>
-	 * <tr><td>"o"</td><td>{ "b", "", ":and:f" }</td></tr>
+	 * <tr><td>{@code ":"}</td><td>{ {@code "boo", "and", "foo"} }</td></tr>
+	 * <tr><td>{@code "o"}</td><td>{ {@code "b", "", ":and:f"} }</td></tr>
 	 * </tbody>
 	 * </table>
 	 * @see #explodeFirstOnly(String, String)
@@ -140,7 +157,7 @@ public class StringList {
 		String[] multi = _source.split(_by);
 		StringList sl = new StringList();
 
-		for(int i=0;i<multi.length;i++)
+		for(int i = 0; i < multi.length; i++)
 		{
 			sl.add(multi[i]);
 		}
@@ -149,15 +166,16 @@ public class StringList {
 	}
 
 	/**
-	 * Splits string {@code _source} around the first match of the given REGULAR EXPRESSION(!) {@code _by}.
-	 * A trailing empty string is not included in the resulting StringList.
-	 * The string "boo:and:foo", for example, yields the following results with
+	 * Splits string {@code _source} around the first match of the given <b>regular
+	 * expression(!)</b> {@code _by}.
+	 * A trailing empty string is not included in the resulting StringList.<br/>
+	 * A string {@code "boo:and:foo"}, for example, yields the following results with
 	 * these expressions:<br/>
 	 * <table>
 	 * <tbody>
 	 * <tr><td>Regex</td><td>Result</td></tr>
-	 * <tr><td>":"</td><td>{ "boo", "and:foo" }</td></tr>
-	 * <tr><td>"o"</td><td>{ "b", "o:and:f" }</td></tr>
+	 * <tr><td>{@code ":"}</td><td>{ {@code "boo", "and:foo"} }</td></tr>
+	 * <tr><td>{@code "o"}</td><td>{ {@code "b", "o:and:f"} }</td></tr>
 	 * </tbody>
 	 * </table>
 	 * @see #explode(String, String)
@@ -191,14 +209,15 @@ public class StringList {
 	}
 
 	/**
-	 * Splits all strings contained in {@code _source} around matches of the given REGULAR EXPRESSION(!) {@code _by}
-	 * and returns a single StringList containing all split results of all element strngs in sequential order.
+	 * Splits all strings contained in {@code _source} around matches of the given
+	 * <b>regular expression(!)</b> {@code _by} and returns a single StringList containing
+	 * all split results of all element strings in sequential order.
 	 * Trailing empty strings are not included in the resulting StringList.
 	 * @see #explode(String, String)
 	 * @see #explodeFirstOnly(String, String)
 	 * @see #explodeWithDelimiter(StringList, String, boolean)
 	 * @param _source - the StringList further to be split
-	 * @param _by - the separator (delimiter) pattern (regex!)
+	 * @param _by - the separator (delimiter) pattern (<b>regex!</b>)
 	 * @return The split results as StringList
 	 */
 	public static StringList explode(StringList _source, String _by)
@@ -224,8 +243,11 @@ public class StringList {
 	 * delimiters in order of occurrence.<br/>
 	 * Note that the resulting StringList may be empty!
 	 * @param _source - the string to be split
-	 * @param _by - the separating string (plain string, no regex!)
+	 * @param _by - the separating string (<b>plain string, no regular expression!</b>)
 	 * @return the split result
+	 * @see #explode(String, String)
+	 * @see #explodeWithDelimiter(String, String, boolean)
+	 * @see #explodeWithDelimiter(StringList, String)
 	 */
 	public static StringList explodeWithDelimiter(String _source, String _by)
 	{
@@ -238,9 +260,12 @@ public class StringList {
 	 * delimiters in order of occurrence.<br/>
 	 * Note that the resulting StringList may be empty!
 	 * @param _source - the string to be split
-	 * @param _by - the separating string (plain string, no regex!)
+	 * @param _by - the separating string (<b>plain string, no regular expression!</b>)
 	 * @param _matchCase - if false then splitting will be case-ignorant
 	 * @return the split result
+	 * @see #explode(String, String)
+	 * @see #explodeWithDelimiter(String, String)
+	 * @see #explodeWithDelimiter(StringList, String, boolean)
 	 */
 	public static StringList explodeWithDelimiter(String _source, String _by, boolean _matchCase)
 	{
@@ -296,6 +321,9 @@ public class StringList {
 	 * @param _source - the string to be split
 	 * @param _by - the separating string (plain string, no regex!)
 	 * @return the split result
+	 * @see #explode(String, String)
+	 * @see #explode(StringList, String)
+	 * @see #explodeWithDelimiter(StringList, String, boolean)
 	 */
 	public static StringList explodeWithDelimiter(StringList _source, String _by)
 	{
@@ -310,6 +338,9 @@ public class StringList {
 	 * @param _by - the separating string (plain string, no regex!)
 	 * @param _matchCase - if false then splitting will be case-ignorant
 	 * @return the split result
+	 * @see #explode(StringList, String)
+	 * @see #explodeWithDelimiter(StringList, String)
+	 * @see #explodeWithDelimiter(String, String, boolean)
 	 */
 	public static StringList explodeWithDelimiter(StringList _source, String _by, boolean _matchCase)
 	{
@@ -330,21 +361,25 @@ public class StringList {
 	/**
 	 * Creates a copy of this StringList via a representation in CSV format.
 	 * @return an equivalent StringList
+	 * @see #
 	 */
 	public StringList copy()
+	// END KGU 2020-10-31
 	{
 		// FIXME (KGU) Why this complicated detour?
 		StringList sl = new StringList();
 		//sl.add("TEXT");
-		sl.setCommaText(this.getCommaText()+"");
+		sl.setCommaText(this.getCommaText()+"", true);
 		return sl;
 	}
 	
 	// START KGU 2016-03-26
 	/**
-	 * Returns a StringList consisting of the elements with position {@code _start} through (but not including) {@code _end} of this.
-	 * If {@code _start} is less than 0 then the result starts at element 0, if {@code _end} is greater than {@link #count()} then
-	 * the result simply contains copies of all remaining elements.
+	 * Returns a StringList consisting of the elements with position {@code _start}
+	 * through (but not including) {@code _end} of this.<br/>
+	 * If {@code _start} is less than 0 then the result starts at element 0, if
+	 * {@code _end} is greater than {@link #count()} then the result simply contains
+	 * copies of all remaining elements.
 	 * @param _start - position (index) of the first element to be copied.
 	 * @param _end - position (index) beyond the last element to be copied.
 	 * @return The partial copy of this.
@@ -371,11 +406,11 @@ public class StringList {
 	}
 
 	/**
-	 * Inserts the given String {@code _string} at the appropriate place assuming that this is
-	 * a sorted StringList. Sorting criterion for the strings is lexicographic order according
-	 * to {@code String.compareTo(String)}.
-	 * Multiple String values may occur i.e. if you add a string that has already been member then
-	 * another copy of the string will be inserted.
+	 * Inserts the given String {@code _string} at the appropriate place assuming
+	 * that this is a sorted StringList. Sorting criterion for the strings is
+	 * lexicographic order according to {@code String.compareTo(String)}.<br/>
+	 * Multiple String values may occur, i.e., if you add a string that has already
+	 * been member then another copy of the string will be inserted.
 	 * @param _string
 	 * @see #add(String)
 	 * @see #addOrderedIfNew(String)
@@ -406,14 +441,14 @@ public class StringList {
 	}
 
 	/**
-	 * Inserts _string such that the elements be ordered by decreasing length
-	 * (longest ones first!). If _string is empty then it won't be added at all.
-	 * Elements of same length occur in order of insertion.<br/>
+	 * Inserts {@code _string} such that the elements be ordered by decreasing length
+	 * (longest ones first!). If {@code _string} is {@code null} or empty then it will
+	 * not be added at all. Elements of same length occur in order of insertion.<br/>
 	 * (Only works if the already contained elements represent the order described
-	 * above.)
-	 * Multiple String values may occur i.e. if you add a string that has already been member then
-	 * another copy of the string will be inserted.
-	 * @param _string the string to be inserted
+	 * above.)<br/>
+	 * Multiple String values may occur i.e. if you add a string that has already
+	 * been member then another copy of the string will be inserted.
+	 * @param _string - the string to be inserted
 	 * @see #add(String)
 	 * @see #addIfNew(String)
 	 * @see #addOrdered(String)
@@ -423,20 +458,23 @@ public class StringList {
 	public void addByLength(String _string)
 	{
 		boolean inserted = false;
-		if (!_string.equals(""))
+		// START KGU 2020-10-30: More safety...
+		//if (!_string.equals(""))
+		if (_string != null && !_string.equals(""))
+		// END KGU 2020-10-30
 		{
-			for(int i=0;i<strings.size();i++)
+			for (int i = 0; i < strings.size(); i++)
 			{
 				// FIXME: Shouldn't strings of the same length be ordered lexicographically?
-				if ((strings.get(i)).length()<_string.length())
+				if ((strings.get(i)).length() < _string.length())
 				{
-					strings.insertElementAt(_string,i);
+					strings.insertElementAt(_string, i);
 					inserted = true;
 					break;
 				}
 			}
 
-			if (inserted==false)
+			if (!inserted)
 			{
 				add(_string);
 			}
@@ -444,10 +482,9 @@ public class StringList {
 	}
 
 	/**
-	 * Inserts the string _string if it had not been
-	 * contained in this StringList. 
+	 * Inserts the string {@code _string} if it had not been contained before.
 	 * @param _string - The string to be added
-	 * @return true if the string was new
+	 * @return {@code true} if the string was new
 	 * @see #add(String)
 	 * @see #addOrdered(String)
 	 * @see #addOrderedIfNew(String)
@@ -465,10 +502,12 @@ public class StringList {
 	}
 
 	/**
-	 * Inserts the string _string (in lexicographic order) if it had not been
-	 * contained in this StringList. 
+	 * Inserts the string {@code _string} (in lexicographic order) if it had not been
+	 * contained in this StringList.<br/>
+	 * (Only works if the already contained elements represent the order described
+	 * above.)
 	 * @param _string - The string to be added
-	 * @return true if the string was new
+	 * @return {@code true} if the string was new
 	 * @see #add(String)
 	 * @see #addIfNew(String)
 	 * @see #addOrdered(String)
@@ -481,12 +520,13 @@ public class StringList {
 	}
 
 	/**
-	 * Inserts _string such that the elements be ordered by decreasing length
-	 * (longest ones first!). If _string is empty then it won't be added at all.
-	 * Elements of same length occur in order of insertion.
+	 * Inserts {@code _string} such that the elements be ordered by decreasing length
+	 * (longest ones first!). If {@code _string} is empty then it will not be added at all.
+	 * Elements of same length occur in order of insertion.<br/>
 	 * (Only works if the already contained elements represent the order described
-	 * above.
+	 * above.)
 	 * @param _string the string to be inserted
+	 * @return {@code true} if the string was new
 	 * @see #add(String)
 	 * @see #addIfNew(String)
 	 * @see #addOrdered(String)
@@ -505,7 +545,7 @@ public class StringList {
 
 	/**
 	 * Appends a copy of each element of {@code _stringList} to this StringList
-	 * no matter whether there might already be an equal string element in this.
+	 * no matter whether an equal string element might already have been contained.
 	 * @param _string - The string to be added
 	 * @see #add(String)
 	 * @see #addIfNew(String)
@@ -524,10 +564,10 @@ public class StringList {
 	}
 
 	/**
-	 * Appends each elements of _stringList that had not been
+	 * Appends each elements of {@code _stringList} that had not been
 	 * contained in this StringList.
 	 * @param _string - The string to be added
-	 * @return true if some of the strings of _stringList was added
+	 * @return {@code true} if some of the strings of {@code _stringList} was added
 	 * @see #add(String)
 	 * @see #addIfNew(String)
 	 * @see #add(StringList)
@@ -552,14 +592,11 @@ public class StringList {
 
 	// START KGU 2015-11-04: New, more performant and informative searchers
 	/**
-	 * Returns the last element position of a string element exactly equal to {@code _string} or -1
-	 * if there is no such element in this.
-	 * @param _string - the search string (plain string, no regex!)
+	 * Returns the last element position of a string element exactly equal to
+	 * {@code _string}, or -1 if there is no such element in this.
+	 * @param _string - the search string (<b>plain string, no regex!</b>)
 	 * @return element index or -1
 	 * @see #indexOf(String)
-	 * @see #indexOf(String, boolean)
-	 * @see #indexOf(String, int)
-	 * @see #indexOf(String, int, boolean)
 	 * @see #lastIndexOf(String, boolean)
 	 * @see #lastIndexOf(String, int)
 	 * @see #lastIndexOf(String, int, boolean)
@@ -570,15 +607,14 @@ public class StringList {
 	}
 
 	/**
-	 * Returns the last element position of a string element exactly equal to {@code _string} or -1
-	 * if there is no such element in this.
-	 * @param _string - the search string (plain string, no regex!)
-	 * @param _backwardFrom - the index of the element from which (including!) {@code _string} is looked for backwards.  
+	 * Returns the last element position of a string element exactly equal to
+	 * {@code _string}, or -1 if there is no such element in this.
+	 * @param _string - the search string (<b>plain string, no regex!</b>)
+	 * @param _backwardFrom - the index of the element from which (including!)
+	 * {@code _string} is looked for in backward direction.
 	 * @return element index or -1
-	 * @see #indexOf(String)
-	 * @see #indexOf(String, boolean)
 	 * @see #indexOf(String, int)
-	 * @see #indexOf(String, int, boolean)
+	 * @see #lastIndexOf(String)
 	 * @see #lastIndexOf(String, boolean)
 	 * @see #lastIndexOf(String, int, boolean)
 	 */
@@ -587,11 +623,36 @@ public class StringList {
 		return this.strings.lastIndexOf(_string, _backwardFrom);
 	}
 
+	/**
+	 * Returns the last element position of a string element being equal to
+	 * {@code _string}, or -1 if there is no such element in this.
+	 * @param _string - the search string (<b>plain string, no regex!</b>)
+	 * @param _matchCase - if {@code false} then case will be ignored
+	 * @return element index or -1
+	 * @see #indexOf(String, boolean)
+	 * @see #lastIndexOf(String)
+	 * @see #lastIndexOf(String, int)
+	 * @see #lastIndexOf(String, int, boolean)
+	 */
 	public int lastIndexOf(String _string, boolean _matchCase)
 	{
 		return lastIndexOf(_string, 0, _matchCase);
 	}
 	
+	/**
+	 * Returns the last element position of a string element being equal to
+	 * {@code _string}, or -1 if there is no such element in this.
+	 * @param _string - the search string (<b>plain string, no regex!</b>)
+	 * @param _backwardFrom - the index of the element from which (including!)
+	 * {@code _string} is looked for in backward direction.
+	 * @param _matchCase - if {@code false} then case will be ignored
+	 * @return element index or -1
+	 * @see #indexOf(String, int, boolean)
+	 * @see #lastIndexOf(String)
+	 * @see #lastIndexOf(String, int)
+	 * @see #lastIndexOf(String, boolean)
+	 * @see #indexOf(StringList, int, boolean)
+	 */
 	public int lastIndexOf(String _string, int _backwardFrom, boolean _matchCase)
 	{
 		if (_matchCase)
@@ -608,21 +669,71 @@ public class StringList {
 		return -1;
 	}
 
+	/**
+	 * Returns the first element position of a string element exactly equal to
+	 * {@code _string}, or -1 if there is no such element in this.
+	 * @param _string - the search string (<b>plain string, no regex!</b>)
+	 * @return element index or -1
+	 * @see #indexOf(String, boolean)
+	 * @see #indexOf(String, int)
+	 * @see #indexOf(String, int, boolean)
+	 * @see #lastIndexOf(String)
+	 * @see #indexOf(StringList, int, boolean)
+	 */
 	public int indexOf(String _string)
 	{
 		return this.strings.indexOf(_string);
 	}
 
+	/**
+	 * Returns the first element position of a string element exactly equal to
+	 * {@code _string}, or -1 if there is no such element in this.
+	 * @param _string - the search string (<b>plain string, no regex!</b>)
+	 * @param _from - the initial element index from which on (including!)
+	 * {@code _string} is looked for in forward direction.
+	 * @return element index or -1
+	 * @see #indexOf(String)
+	 * @see #indexOf(String, boolean)
+	 * @see #indexOf(String, int, boolean)
+	 * @see #lastIndexOf(String, int)
+	 * @see #indexOf(StringList, int, boolean)
+	 */
 	public int indexOf(String _string, int _from)
 	{
 		return this.strings.indexOf(_string, _from);
 	}
 
+	/**
+	 * Returns the first element position of a string element being equal to
+	 * {@code _string}, or -1 if there is no such element in this.
+	 * @param _string - the search string (<b>plain string, no regex!</b>)
+	 * @param _matchCase - if {@code false} then case will be ignored
+	 * @return element index or -1
+	 * @see #indexOf(String)
+	 * @see #indexOf(String, int)
+	 * @see #indexOf(String, int, boolean)
+	 * @see #lastIndexOf(String, boolean)
+	 * @see #indexOf(StringList, int, boolean)
+	 */
 	public int indexOf(String _string, boolean _matchCase)
 	{
 		return indexOf(_string, 0, _matchCase);
 	}
 	
+	/**
+	 * Returns the first element position of a string element being equal to
+	 * {@code _string}, or -1 if there is no such element in this.
+	 * @param _string - the search string (<b>plain string, no regex!</b>)
+	 * @param _from - the initial element index from which on (including!)
+	 * {@code _string} is looked for in forward direction.
+	 * @param _matchCase - if {@code false} then case will be ignored
+	 * @return element index or -1
+	 * @see #indexOf(String)
+	 * @see #indexOf(String, int)
+	 * @see #indexOf(String, boolean)
+	 * @see #lastIndexOf(String, int, boolean)
+	 * @see #indexOf(StringList, int, boolean)
+	 */
 	public int indexOf(String _string, int _from, boolean _matchCase)
 	{
 		if (_matchCase)
@@ -639,6 +750,17 @@ public class StringList {
 		return -1;
 	}
 
+	/**
+	 * Returns the starting position of a first subsequence being equal to
+	 * StringList {@code _subList} from index {@code _from} on, or -1 if no
+	 * such string sequence is contained at position {@code _from} or beyond.
+	 * @param _string - the search string (<b>plain string, no regex!</b>)
+	 * @param _from - the initial element index from which on (including!)
+	 * {@code _subList} is looked for in forward direction.
+	 * @param _matchCase - if {@code false} then case will be ignored
+	 * @return element index or -1
+	 * @see #indexOf(String, int, boolean)
+	 */
 	public int indexOf(StringList _subList, int _from, boolean _matchCase)
 	{
 		int foundAt = -1;
@@ -667,6 +789,15 @@ public class StringList {
 		return foundAt;
 	}
 
+	/**
+	 * Checks whether or not a string element exactly equal to {@code _string}
+	 * is contained.
+	 * @param _string - the search string (<b>plain string, no regex!</b>)
+	 * @return {@code true} iff there is at least one element equal to {@code _string}
+	 * @see #contains(String, boolean)
+	 * @see #indexOf(String)
+	 * @see #lastIndexOf(String)
+	 */
 	public boolean contains(String _string)
 	{
 		// START KGU 2015-11-04: Just use the more performant and informative find method 
@@ -683,6 +814,16 @@ public class StringList {
 		// END KGU 2015-11-04
 	}
 
+	/**
+	 * Checks whether or not a string element exactly or case-ignorantly equal to
+	 * {@code _string} is contained.
+	 * @param _string - the search string (<b>plain string, no regex!</b>)
+	 * @param _matchCase - if {@code false} then case will be ignored
+	 * @return {@code true} iff there is at least one element equal to {@code _string}
+	 * @see #contains(String)
+	 * @see #indexOf(String, boolean)
+	 * @see #lastIndexOf(String, boolean)
+	 */
 	public boolean contains(String _string, boolean _matchCase)
 	{
 		// START KGU 2015-11-04: Just use the more performant and informative find method 
@@ -799,6 +940,16 @@ public class StringList {
 		}
 	}
 
+	/**
+	 * Replaces the current content by the sequence of text lines {@code _text}
+	 * is consisting of. If {@code _text} does not contain newline characters then
+	 * a this will contain {@code _text} as single element. Note that trailing empty
+	 * lines will be cut off.
+	 * @param _text - the text to be adopted as line sequence
+	 * @see #explode(String, String)
+	 * @see #getText()
+	 * @see #setCommaText(String, boolean)
+	 */
 	public void setText(String _text)
 	{
 		String[] lines = _text.split("\n");
@@ -826,16 +977,19 @@ public class StringList {
 	}
 	
 	/**
-	 * Concatenates all elements, putting the _separator string between them.<br/>
-	 * NEW: If {@code _separator} is {@code null} then an empty separator is
+	 * Concatenates all elements between indices {@code _start} and {@code _end}
+	 * (the letter not included), putting the {@code _separator} string between them.<br/>
+	 * <b>Note:</b> If {@code _separator} is {@code null} then an empty separator is
 	 * used unless a preceding string ending with an identifier character
-	 * would meet a beginning identifier character of the current string in
+	 * would meet a beginning identifier character of the current string, in
 	 * which case a single space would be inserted, thus preserving a lexical
 	 * gap.
 	 * @param _separator - a string placed between the elements of this
 	 * @param _start - index of the first element to be included
-	 * @param _end - index beyond the last element to be included 
+	 * @param _end - index <i>beyond</i> the last element to be included 
 	 * @return the concatenated string
+	 * @see #concatenate()
+	 * @see #concatenate(String, int)
 	 */
 	public String concatenate(String _separator, int _start, int _end)
 	{
@@ -878,15 +1032,30 @@ public class StringList {
 		return text.toString();
 	}
 	
+	/**
+	 * Concatenates all elements from index {@code _start} on, putting the
+	 * {@code _separator} string between them.<br/>
+	 * <b>Note:</b> If {@code _separator} is {@code null} then an empty separator is
+	 * used unless a preceding string ending with an identifier character
+	 * would meet a beginning identifier character of the current string, in
+	 * which case a single space would be inserted, thus preserving a lexical
+	 * gap.
+	 * @param _separator - a string placed between the elements of this
+	 * @param _start - index of the first element to be included
+	 * @return the concatenated string
+	 */
 	public String concatenate(String _separator, int _start)
 	{
 		return concatenate(_separator, _start, this.count());
 	}
 	
 	/**
-	 * Concatenates the elements without separating string (exact reconstruction
-	 * of a string having produced this StringList by explodeWithDelimiter())
+	 * Concatenates the elements without any separating string (actually the
+	 * same as {@code this.concatenate("")}).
 	 * @return a continuous string composed of all elements
+	 * @see #concatenate(String)
+	 * @see #getLongString()
+	 * @see #getText()
 	 */
 	public String concatenate()
 	{
@@ -895,7 +1064,7 @@ public class StringList {
 
 	/**
 	 * Multi-line text formed from the list elements as lines (actually the
-	 * same as this.concatenate("\n"))
+	 * same as {@code this.concatenate("\n")}).
 	 * @return multi-line string, each element being copied to a line
 	 */
 	public String getText()
@@ -904,7 +1073,8 @@ public class StringList {
 	}
 
 	/**
-	 * Concatenates elements with blanks between them.
+	 * Concatenates elements with blanks between them  (actually the
+	 * same as {@code this.concatenate(" ")}).
 	 * @return the concatenation of all elements separated by single blanks
 	 */
 	public String getLongString()
@@ -922,8 +1092,8 @@ public class StringList {
 	}
 	
 	/**
-	 * Counts the occurrences of the given string {@code str} among the elements
-	 * @param str - the string to search for
+	 * Counts the exact occurrences of the given string {@code _str} among the elements
+	 * @param _str - the string to search for
 	 * @return the number of occurrences
 	 * @see #count(String, boolean)
 	 */
@@ -933,9 +1103,10 @@ public class StringList {
 	}
 	
 	/**
-	 * Counts the occurrences of the given string {@code str} among the elements
-	 * @param str - the string to search for
-	 * @param matchCase - whether upper/lower case should make a difference
+	 * Counts the (exact or case-ignorant) occurrences of the given string {@code _str}
+	 * among the elements
+	 * @param _str - the string to search for
+	 * @param _matchCase - whether upper/lower case should make a difference
 	 * @return the number of occurrences
 	 */
 	public int count(String _str, boolean _matchCase)
@@ -958,13 +1129,57 @@ public class StringList {
 		return strings.isEmpty();
 	}
 
+	/**
+	 * Fill this from the given {@code _input} string, which is assumed to
+	 * represent a CSV-typical syntax, meaning that only quoted (enclosed by {@code "})
+	 * text parts will be adopted, each quoted character sequence forming an element,
+	 * i.e. the separating character (comma, tab, or whatever) does not play a role.
+	 * Note that a series of separator characters without a quote pair between them
+	 * will therefore <b>not</b> induce empty elements.<br/>
+	 * Duplicate quotes within quoted text will be interpreted as a single quote being
+	 * part of the string.<br/>
+	 * If {@code _input} does not start or end with a quote then enclosing quotes will
+	 * be added before.<br/>
+	 * Prior content will be overwritten.
+	 * @param _input - the string
+	 * @see #getCommaText()
+	 * @see #setCommaText(String, boolean)
+	 */
 	public void setCommaText(String _input)
+	// START KGU 2020-10-31
+	{
+		setCommaText(_input, true);
+	}
+	
+	/**
+	 * Fill this from the given {@code _input} string, which is assumed to
+	 * represent a CSV-typical syntax, meaning that only quoted (enclosed by {@code "})
+	 * text parts will be adopted, each quoted character sequence forming an element,
+	 * i.e. the separating character (comma, tab, or whatever) does not play a role.
+	 * Note that a series of separator characters without a quote pair between them
+	 * will therefore <b>not</b> induce empty elements.<br/>
+	 * Duplicate quotes within quoted text will be interpreted as a single quote being
+	 * part of the string.<br/>
+	 * @param _input - the string
+	 * @param _ensureOuterQuotes - if {@code true} then at start and end of {@code _input}
+	 * a quote is inserted if missing there. Note that this might invert the content
+	 * raster if {@code _input} deliberately started with separators symbolising empty
+	 * columns.
+	 * @see #getCommaText()
+	 */
+	public void setCommaText(String _input, boolean _ensureOuterQuotes)
+	// END KGU 2020-10-31
 	{
 		String input = _input+"";
 
 		// if not CSV, make it CSV
-		if (input.length()>0)
+		// START KGU 2020-10-31
+		if (input.length() > 0 && _ensureOuterQuotes)
+		// END KGU 2020-10-31
 		{
+			/* FIXME: This completion is somehow inconsistent as start and end
+			 * should not be considered independently
+			 */
 			String first = Character.toString(input.charAt(0));
 			if (!first.equals("\""))
 			{
@@ -979,95 +1194,109 @@ public class StringList {
 
 		strings.clear();
 
-		String tmp = new String();
-		boolean isOpen = false;
+		StringBuilder tmp = new StringBuilder();
+		boolean withinQuotes = false;
 
 		for(int i=0; i<input.length(); i++)
 		{
-			String chr = Character.toString(input.charAt(i));
-			if (chr.equals("\""))
+			char chr = input.charAt(i);
+			if (chr == '\"')
 			{
-				if (i+1<input.length())
+				// Is the quote the very last character?
+				if (i+1 < input.length())
 				{
-					if (!isOpen)
+					// No, more characters are following
+					if (!withinQuotes)
 					{
-						isOpen = true;
+						withinQuotes = true;
 					}
 					else
 					{
-						String next = Character.toString(input.charAt(i+1));
-						if (next.equals("\""))
+						char next = input.charAt(i+1);
+						if (next == '\"')
 						{
-							tmp += "\"";
+							// Duplicate quotes meaning the quote sign is part of the text
+							tmp.append(next);
 							i++;
 						}
 						else
 						{
+							// Apparently the quoting ends here
 							//if(!((strings.size()==0)&&(tmp.trim().equals(""))))
 							{
-								strings.add(tmp);
+								strings.add(tmp.toString());
 							}
-							tmp = new String();
-							isOpen = false;
+							tmp.delete(0, tmp.length());
+							withinQuotes = false;
 						}
 					}
 				}
 				else
 				{
-					if (!((strings.size()==0) && (tmp.trim().isEmpty())))
+					// The quote is the very last character
+					
+					// Avoid a single empty string as content
+					String str = tmp.toString();
+					if (!(strings.isEmpty() && str.trim().isEmpty()))
 					{
-						strings.add(tmp);
+						strings.add(str);
 					}
-					tmp = new String();
-					isOpen = false;
+					tmp.delete(0, tmp.length());
+					withinQuotes = false;
 				}
 			}
 			else
 			{
-				if (isOpen)
+				// Only accept the character if it is within quotes
+				if (withinQuotes)
 				{
-					tmp += chr;
+					tmp.append(chr);
 				}
 			}
 		}
-		if (!(tmp.trim().isEmpty()))
+		String str = tmp.toString();
+		if (!(str.isEmpty()))
 		{
-			strings.add(tmp);
+			strings.add(str);
 		}
 	}
 
+	/**
+	 * Returns the content as a CSV-compatible string line, i.e., each element
+	 * will be enclosed in quotes, internally contained quotes will be doubled,
+	 * and the quoted string will be separated by commas. No further encoding
+	 * will be done.
+	 * @return the content as a CSV-ready line
+	 * @see #setCommaText(String)
+	 * @see #setCommaText(String, boolean)
+	 */
 	public String getCommaText()
 	{
-		String res = new String();
+		StringBuilder res = new StringBuilder();
 
 		for (int i = 0; i<strings.size(); i++)
 		{
-			// START KGU#827 2020-02-18: Bugfix for the case of null elements
 			String elem = get(i);
+			// START KGU#827 2020-02-18: Bugfix for the case of null elements
 			if (elem == null) {
 				elem = "null";
 			}
 			else {
+				// Enclose the string in quotes and double internal quotes
 				elem = "\"" + elem.replace("\"", "\"\"") + "\"";
 			}
 			// END KGU#827 2020-02-18
-			if (i==0)
+			if (i != 0)
 			{
-				// START KGU#827 2020-02-18: Bugfix for the case of null elements
-				//res+= "\"" + get(i).replace("\"", "\"\"") + "\"";
-				res += elem;
-				// END KGU#827 2020-02-18
+				res.append(',');
 			}
-			else
-			{
-				// START KGU#827 2020-02-18: Bugfix for the case of null elements
-				//res+= ",\"" + elem.replace("\"", "\"\"") + "\"";
-				res += "," + elem;
-				// END KGU#827 2020-02-18
-			}
+			// START KGU#827 2020-02-18: Bugfix for the case of null elements
+			//res+= elem.replace("\"", "\"\"") + "\"";
+			res.append(elem);
+			// END KGU#827 2020-02-18
 		}
 
-		return res;
+		return res.toString();
 	}
 
 	/**
@@ -1477,7 +1706,7 @@ public class StringList {
     public static void main(String[] args)
     {
         StringList sl = new StringList();
-        sl.setCommaText("\"\",\"1\",\"2\",\"3\",\"sinon\"");
+        sl.setCommaText("\"\",\"1\",\"2\",\"3\",\"sinon\"", true);
         System.out.println(sl.getText());
         StringList sl1 = sl.copy();
         System.out.println(sl1.getText());

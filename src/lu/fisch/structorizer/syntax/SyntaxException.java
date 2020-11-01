@@ -100,6 +100,7 @@ public class SyntaxException extends Exception {
 	 */
 	public SyntaxException(String message, int position, Throwable cause) {
 		super(message, cause);
+		tokenIndex = position;
 	}
 
 	/**

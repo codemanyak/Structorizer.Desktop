@@ -1079,7 +1079,7 @@ public class PythonGenerator extends Generator
 					continue;
 				}
 				// Variables assigned here will be made global
-				StringList setVars = _root.getVarNames(sq, false).copy();
+				StringList setVars = new StringList(_root.getVarNames(sq, false));
 				// Variables used here without being assigned will be made arguments
 				StringList usedVars = _root.getUsedVarNames(sq, false, false);
 				for (int v = 0; v < setVars.count(); v++) {

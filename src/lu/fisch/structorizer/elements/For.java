@@ -395,7 +395,7 @@ public class For extends Element implements ILoop {
 	    
 	public Element copy()
 	{
-		For ele = new For(this.getText().copy());
+		For ele = new For(new StringList(this.getText()));
 		copyDetails(ele, false);
 		// START KGU#81 (bug #28) 2015-11-14: New fields must be copied, too!
 		ele.counterVar = this.counterVar + "";
