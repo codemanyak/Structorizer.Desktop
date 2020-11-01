@@ -116,6 +116,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2020-08-12      Enh. #800: Started to delegate syntactic analysis to class Syntax
  *      Kay Gürtzig     2020-10-17/19   Enh. #872: New mode to display operators in C style
  *      Kay Gürtzig     2020-10-30      Enh. #800: Methods unifyOperators moved to class Syntax
+ *      Kay Gürtzig     2020-11-01      Issue #881: Highlighting of bit operators and Boolean literals
  *
  ******************************************************************************************************
  *
@@ -275,6 +276,8 @@ public abstract class Element {
 	// END KGU#563 2018-007-26
 	// START KGU#791 2020-01-20: Enh. #801 - support for offline help
 	public static final String E_HELP_FILE = "structorizer_user_guide.pdf";
+	/** Estimated size of the User Guide PDF file (to be adapted when User Guide significantly grows) */
+	public static final long E_HELP_FILE_SIZE = 10000000;
 	public static final String E_DOWNLOAD_PAGE = "https://www.fisch.lu/Php/download.php";
 	// END KGU#791 2020-01-20
 	public static final String E_VERSION = "3.30-12";
@@ -3216,14 +3219,14 @@ public abstract class Element {
 						specialSigns.add("<=");
 						specialSigns.add(">=");
 						// END KGU#872 2020-10-17
-						// START KGU#790 2020-10-31: Issue #800
+						// START KGU#883 2020-11-01: Enh. #881 bit operators and Boolean literal were missing
 						specialSigns.add("false");
 						specialSigns.add("true");
 						specialSigns.add("&");
 						specialSigns.add("|");
-						specialSigns.add("~");
 						specialSigns.add("^");
-						// END KGU#790 2020-10-31
+						specialSigns.add("~");
+						// END KGU#883 2020-11-01
 					}
 					// START KGU#611/KGU843 2020-04-12: Issue #643, bugfix #847
 					if (specialSignsCi == null) {
@@ -3239,7 +3242,7 @@ public abstract class Element {
 						// START KGU#115 2015-12-23: Issue #74 - These Pascal operators hadn't been supported
 						specialSignsCi.add("shl");
 						specialSignsCi.add("shr");
-						// END KGU#115 2015-12-23						
+						// END KGU#115 2015-12-23
 					}
 					// END KGU#611/KGU#843 2020-04-12
 					// END KGU#64 2015-11-03
