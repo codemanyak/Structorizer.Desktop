@@ -21,6 +21,7 @@
 package lu.fisch.structorizer.syntax;
 
 import java.util.HashMap;
+import java.util.regex.Pattern;
 
 /******************************************************************************************************
  *
@@ -49,7 +50,27 @@ import java.util.HashMap;
  */
 public class TypeRegistry {
 
-	private static final HashMap<String, Type> globalMap = new HashMap<String, Type>();
+	private static final Pattern BIN_PATTERN = Pattern.compile("0b[01]+");
+	private static final Pattern OCT_PATTERN = Pattern.compile("0[0-7]+");
+	private static final Pattern HEX_PATTERN = Pattern.compile("0x[0-9A-Fa-f]+");
+
+	@SuppressWarnings("serial")
+	private static final HashMap<String, Type> globalMap = new HashMap<String, Type>() {{
+		try {
+			put(":dummy", Type.getDummyType());
+			put(":byte", new PrimitiveType("byte", Byte.valueOf((byte)0)));
+			put(":short", new PrimitiveType("short", Short.valueOf((short)0)));
+			put(":int", new PrimitiveType("int", Integer.valueOf((int)0)));
+			put(":long", new PrimitiveType("long", Long.valueOf((long)0)));
+			put(":float", new PrimitiveType("float", Float.valueOf((float)0.0)));
+			put(":double", new PrimitiveType("double", Double.valueOf((double)0.0)));
+			put(":char", new PrimitiveType("char", Character.valueOf('\0')));
+			put(":string", new PrimitiveType("string", new String()));
+			put(":boolean", new PrimitiveType("boolean", Boolean.valueOf(false)));
+		}
+		catch (Exception exc)
+		{}
+	}};
 	
 	private HashMap<String, Type> typeMap = null;
 	
@@ -74,20 +95,6 @@ public class TypeRegistry {
 	
 	private TypeRegistry(boolean asGlobalInstance) {
 		typeMap = globalMap;
-		try {
-			globalMap.put(":dummy", new Type(null, null));
-			globalMap.put(":byte", new PrimitiveType("byte", Byte.valueOf((byte)0)));
-			globalMap.put(":short", new PrimitiveType("short", Short.valueOf((short)0)));
-			globalMap.put(":int", new PrimitiveType("int", Integer.valueOf((int)0)));
-			globalMap.put(":long", new PrimitiveType("long", Long.valueOf((long)0)));
-			globalMap.put(":float", new PrimitiveType("float", Float.valueOf((float)0.0)));
-			globalMap.put(":double", new PrimitiveType("double", Double.valueOf((double)0.0)));
-			globalMap.put(":char", new PrimitiveType("char", Character.valueOf('\0')));
-			globalMap.put(":string", new PrimitiveType("string", new String()));
-			globalMap.put(":boolean", new PrimitiveType("boolean", Boolean.valueOf(false)));
-		}
-		catch (Exception exc)
-		{}
 	}
 	
 	private static TypeRegistry getGlobalInstance()
@@ -101,17 +108,54 @@ public class TypeRegistry {
 	@Override
 	public String toString()
 	{
-		return this.getClass().getName() + this.typeMap.toString();
-	}
-	
-	public static Type getDummyType()
-	{
-		return getGlobalInstance().getType("dummy");
+		return this.getClass().getSimpleName() + this.typeMap.toString();
 	}
 	
 	public static Type getStandardType(String name)
 	{
 		return getGlobalInstance().getType(name);
+	}
+	
+	public static Type getStandardTypeFor(String literal)
+	{
+		Type stdType = Type.getDummyType();
+		if (Expression.BOOL_LITERALS.contains(literal)) {
+			stdType = TypeRegistry.getStandardType("boolean");
+		}
+		else if (literal.startsWith("'") && literal.endsWith("'")) {
+			// This is a very rough heuristics but not worse than before in Element.identifyExprType()
+			if (literal.length() == 3 || literal.length() == 4 && literal.charAt(1) == '\\') {
+				stdType = getStandardType("char");
+			}
+			else {
+				stdType = getStandardType("string");
+			}
+		}
+		else if (literal.length() > 2 && literal.startsWith("\"") && literal.endsWith("\"")) {
+			stdType = getStandardType("string");
+		}
+		// START KGU#354 2017-05-22: Enh. #354
+		// These literals cause errors with Double.parseDouble(expr) and Integer.parseInt(expr)
+		else if (BIN_PATTERN.matcher(literal).matches()
+				|| OCT_PATTERN.matcher(literal).matches()
+				|| HEX_PATTERN.matcher(literal).matches()) {
+			stdType = getStandardType("int");
+		}
+		// END KGU#354 2017-05-22
+		else {
+			// In this cascade the last successful try simply wins the game
+			try {
+				Double.parseDouble(literal);
+				stdType = getStandardType("double");
+				Long.parseLong(literal);
+				stdType = getStandardType("long");
+				Integer.parseInt(literal);
+				stdType = getStandardType("int");
+			}
+			catch (NumberFormatException exc) {
+			}
+		}
+		return stdType;
 	}
 	
 	/**
@@ -151,6 +195,7 @@ public class TypeRegistry {
 	 */
 	public Type putType(Type type, boolean force)
 	{
+		// TODO: Check for equivalent type
 		Type result = null;
 		if (getStandardType(type.getName()) == null &&
 				(force || !type.isAnonymous() && !typeMap.containsKey(":" + type.getName()))) {
@@ -183,6 +228,7 @@ public class TypeRegistry {
 		Type prevType = null;
 		if (force || !typeMap.containsKey(varName)
 				&& ((prevType = getType(type.getName())) == null || prevType == type)) {
+			// TODO: Check for equivalent type
 			result = typeMap.put(varName, type);
 			if (result == null) {
 				result = type;

@@ -42,6 +42,7 @@ package lu.fisch.structorizer.executor;
  *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *      Kay Gürtzig     2020-11-01      Issue #800: Moved testIdentifier to Syntax and countChar to BString,
  *                                      indentation aligned
+ *      Kay Gürtzig     2020-11-02      Issue #800: Completely revised, now using Syntax and Expression
  *
  ******************************************************************************************************
  *
@@ -50,11 +51,13 @@ package lu.fisch.structorizer.executor;
  ******************************************************************************************************///
 
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
 
-import lu.fisch.structorizer.elements.Element;
+import lu.fisch.structorizer.syntax.Expression;
 import lu.fisch.structorizer.syntax.Syntax;
-import lu.fisch.utils.BString;
+import lu.fisch.structorizer.syntax.SyntaxException;
+import lu.fisch.structorizer.syntax.Type;
 import lu.fisch.utils.StringList;
 
 /**
@@ -116,8 +119,6 @@ public class Function
 		knownResultTypes.put("fileWrite#2", "void");
 		knownResultTypes.put("fileWriteLine#2", "void");
 		knownResultTypes.put("fileClose#1", "void");
-		knownResultTypes.put("fileWriteLine#2", "void");
-		knownResultTypes.put("fileClose#1", "void");
 		// START KGU#790 2020-11-01: Issue #800
 		knownResultTypes.put("max#2", "double");
 		knownResultTypes.put("min#2", "double");
@@ -125,39 +126,43 @@ public class Function
 	}
 	// END KGU#332 2017-01-29
 	private String str = new String();		// The original string this is derived from
+	// START KGU#790 2020-11-02: Issue #800 No longer needed
 	// START KGU#56 2015-10-27: Performance improvement approach (bug fixed 2015-11-09)
-	private StringList parameters = null;	// parameter strings as split by commas
-	private boolean isFunc = false;			// basic syntactic plausibility check result
-	private String name = null;				// The string before the opening parenthesis
+	//private StringList parameters = null;	// parameter strings as split by commas
+	//private boolean isFunc = false;			// basic syntactic plausibility check result
+	//private String name = null;				// The string before the opening parenthesis
 	// END KGU#56 2015-10-27
+	private Expression expr = null;			// The parsed input string
+	// END KGU#790 2020-11-02
 
 	public Function(String exp)
 	{
 		this.str = exp.trim();
-		// START KGU#56 2015-10-27
-		// START KGU#332 2017-01-29: Enh. #335 We need a more precise test
-		//int posLP = str.indexOf("(");
-		//this.isFunc =
-		//		posLP < str.indexOf(")") && posLP >=0 &&
-		//        countChar(str,'(') == countChar(str,')') &&
-		//        str.endsWith(")");
-		this.isFunc = isFunction(this.str);
-		// END KGU#332 2017-01-29
-		if (this.isFunc)
-		{
-			int posLP = str.indexOf("(");
-			// START KGU#2 (#9) 2015-11-13: In general, we don't want to flatten the case!
-			//this.name = str.substring(0, posLP).trim().toLowerCase();
-			this.name = str.substring(0, posLP).trim();
-			// END KGU#2 (#9) 2015-11-13
-			String params = str.substring(posLP+1, str.length()-1).trim();
-			if (!params.equals(""))
-			{
-				// START KGU#106 2015-12-12: Face nested function calls with comma-separated arguments!
-				//this.parameters = StringList.explode(params, ",");
-				this.parameters = Element.splitExpressionList(params, ",");
-				// END KGU#106 2015-12-12
-			}
+		// START KGU#790 2020-11-02: Issue #800 - totally redesigned
+//		// START KGU#56 2015-10-27
+//		// START KGU#332 2017-01-29: Enh. #335 We need a more precise test
+//		//int posLP = str.indexOf("(");
+//		//this.isFunc =
+//		//		posLP < str.indexOf(")") && posLP >=0 &&
+//		//        countChar(str,'(') == countChar(str,')') &&
+//		//        str.endsWith(")");
+//		this.isFunc = isFunction(this.str);
+//		// END KGU#332 2017-01-29
+//		if (this.isFunc)
+//		{
+//			int posLP = str.indexOf("(");
+//			// START KGU#2 (#9) 2015-11-13: In general, we don't want to flatten the case!
+//			//this.name = str.substring(0, posLP).trim().toLowerCase();
+//			this.name = str.substring(0, posLP).trim();
+//			// END KGU#2 (#9) 2015-11-13
+//			String params = str.substring(posLP+1, str.length()-1).trim();
+//			if (!params.equals(""))
+//			{
+//				// START KGU#106 2015-12-12: Face nested function calls with comma-separated arguments!
+//				//this.parameters = StringList.explode(params, ",");
+//				this.parameters = Element.splitExpressionList(params, ",");
+//				// END KGU#106 2015-12-12
+//			}
 //            // START KGU#341 2017-02-06
 //            String nPars = Integer.toString(this.parameters.count());
 //            for (String key: knownResultTypes.keySet()) {
@@ -168,9 +173,37 @@ public class Function
 //                }
 //            }
 //            // END KGU#341 2017-02-06
+//		}
+//		// END KGU#56 2015-10-27
+		StringList tokens = Syntax.splitLexically(exp, true);
+		try {
+			LinkedList<Expression> exprs = Expression.parse(tokens, null);
+			if (exprs.size() == 1) {
+				if (isFunction(exprs.get(0))) {
+					expr = exprs.get(0);
+				}
+			}
+		} catch (SyntaxException exc) {
+			// Not a function, it seems.
 		}
-		// END KGU#56 2015-10-27
+		// END KGU#790 2002-11-02
 	}
+	
+	/**
+	 * Formally creates a Function object for the given {@link Expression}
+	 * {@code expr}, but this does not necessarily mean it is a valid function
+	 * call - you will have to check via {@link #isFunction()} or {@link #isFunction()}
+	 * to be sure (and before trying to retrieve name and arguments or the like).
+	 * @param expr - the syntax tree to be form this object for.
+	 */
+	public Function(Expression expr)
+	{
+		this.str = expr.toString();
+		if (isFunction(expr)) {
+			this.expr = expr;
+		}
+	}
+	
 
 // START KGU 2020-11-01: Moved to lu.fisch.utils.BString
 //    // This is just a very general string helper function 
@@ -188,22 +221,46 @@ public class Function
 //    }
 // END KGU 2020-11-01
 
+	/**
+	 * @return {@code true} if this object represents a syntactically correct
+	 * function or method call, i.e. one of
+	 * <ul>
+	 * <li>{@code <functionname>(<arg>,...)}</li>
+	 * <li>{@code <object>.<methodname>(<arg>, ...) }</li>
+	 * </ul>
+	 * @see #isMethod()
+	 */
 	public boolean isFunction()
 	{
-		// START KGU#56 2015-10-27 Analysis now already done by constructor
-//        return str.indexOf("(")<str.indexOf(")") &&
-//               str.indexOf("(")>=0 &&
-//               countChar(str,'(')==countChar(str,')') &&
-//               str.endsWith(")");
-		// START KGU#61 2016-03-22: We must not accept names containing e.g. blanks
-		// (though dots as in method invocations should be accepted)
-		//return this.isFunc;
-		return this.isFunc && Syntax.isIdentifier(this.name, false, ".");
-
-		// END KGU#61 2016-03-22
-		// END KGU#56 2015-10-27
+		return expr != null;
 	}
 
+	// START KGU#790 2020-11-02: New for issue #800
+	/**
+	 * @return {@code true} if this object represents a syntactically correct
+	 * method call, i.e. something like {@code <object>.<methodname>(<arg>, ...) }.
+	 * @see #isFunction()
+	 */
+	public boolean isMethod()
+	{
+		return expr != null && ".".equals(expr.text);
+	}
+	
+	/**
+	 * Checks the given {@link Expression} for correct function or method
+	 * call syntax.
+	 * @param expr - an {@link Expression} to be checked for method
+	 * or function call syntax.
+	 * @return {@code true} if this is either a method or function call
+	 * @see #isFunction(String)
+	 */
+	public static boolean isFunction(Expression expr)
+	{
+		return expr.isFunctionCall() || expr.isMethodCall();
+	}
+	// END KGU#790 2020-11-02
+
+	
 	// START KGU#332 2017-01-29: Enh. #335
 	/**
 	 * Tests whether the passed-in expression expr may represent a subroutine call
@@ -214,30 +271,41 @@ public class Function
 	 */
 	public static boolean isFunction(String expr)
 	{
-		expr = expr.trim();
-		int posLP = expr.indexOf("(");
-		// START KGU#560 2018-07-22: Bugfix #564 - Parenthesis may not be on index 0
-		//boolean isFunc = posLP < expr.indexOf(")") && posLP >=0 &&
-		boolean isFunc = posLP < expr.indexOf(")") && posLP >0 &&
-				// END KGU#560 2018-07
-				BString.countChar(expr,'(') == BString.countChar(expr,')') &&
-				expr.endsWith(")");
-		// The test above is way too easy, it would also hold for e.g. "(a+b)*(c+d)";
-		// So we restrict the result in the following
-		if (isFunc) {
-			isFunc = Syntax.isIdentifier(expr.substring(0, posLP), false, null);
-			// Tokenize string between the outer parentheses 
-			StringList tokens = Syntax.splitLexically(expr.substring(posLP+1, expr.length()-1), true);
-			int parLevel = 0;	// parenthesis level, must never get < 0
-			for (int i = 0; isFunc && i < tokens.count(); i++) {
-				String token = tokens.get(i);
-				if (token.equals("(")) parLevel++;
-				else if (token.equals(")")) {
-					isFunc = --parLevel >= 0;
-				}
-			}
+		// START KGU#790 2020-11-02: Issue #800 Completely revised
+//		expr = expr.trim();
+//		int posLP = expr.indexOf("(");
+//		// START KGU#560 2018-07-22: Bugfix #564 - Parenthesis may not be on index 0
+//		//boolean isFunc = posLP < expr.indexOf(")") && posLP >=0 &&
+//		boolean isFunc = posLP < expr.indexOf(")") && posLP >0 &&
+//				// END KGU#560 2018-07
+//				BString.countChar(expr,'(') == BString.countChar(expr,')') &&
+//				expr.endsWith(")");
+//		// The test above is way too easy, it would also hold for e.g. "(a+b)*(c+d)";
+//		// So we restrict the result in the following
+//		if (isFunc) {
+//			isFunc = Syntax.isIdentifier(expr.substring(0, posLP), false, null);
+//			// Tokenize string between the outer parentheses 
+//			StringList tokens = Syntax.splitLexically(expr.substring(posLP+1, expr.length()-1), true);
+//			int parLevel = 0;	// parenthesis level, must never get < 0
+//			for (int i = 0; isFunc && i < tokens.count(); i++) {
+//				String token = tokens.get(i);
+//				if (token.equals("(")) parLevel++;
+//				else if (token.equals(")")) {
+//					isFunc = --parLevel >= 0;
+//				}
+//			}
+//		}
+//		return isFunc;
+		StringList tokens = Syntax.splitLexically(expr, true);
+		LinkedList<Expression> exprs = null;
+		try {
+			exprs = Expression.parse(tokens, null);
+		} catch (SyntaxException exc) {}
+		if (exprs != null && exprs.size() == 1) {
+			return isFunction(exprs.getFirst());
 		}
-		return isFunc;
+		return false;
+		// END KGU#790 2020-11-02
 	}
 	// END KGU#332 2017-01-29
 
@@ -250,7 +318,10 @@ public class Function
 	public String getSignatureString()
 	{
 		String sigStr = null;
-		if (this.isFunc) {
+		// START KGU#790 2020-11-02: Issue #800
+		//if (this.isFunc) {
+		if (this.isFunction()) {
+		// END KGU#790 2020-11-02
 			sigStr = this.getName() + "(" + this.paramCount() + ")";
 		}
 		return sigStr;
@@ -265,7 +336,20 @@ public class Function
 		//else
 		//    return null;
 		// END KGU#56 2015-10-27
-		return this.name;
+		// START KGU#790 2020-11-02: Issue #800
+		//return this.name;
+		String name = null;
+		if (expr != null) {
+			if (expr.type == Expression.NodeType.OPERATOR) {
+				// FIXME might it be necessary to enclose the left side in parentheses?
+				name = expr.children.getFirst().toString() + "." + expr.children.getLast().text;
+			}
+			else {
+				name = expr.text;
+			}
+		}
+		return name;
+		// END KGU#790 2020-11-02
 	}
 
 //    // START KGU 2017-02-06: Support for case-ignorant mode
@@ -309,15 +393,24 @@ public class Function
 //            }
 //            else return 0;
 //        }
-		if (this.parameters != null)
-		{
-			return this.parameters.count();
+		// START KGU#790 2020-11-02: Issue #800
+//		if (this.parameters != null)
+//		{
+//			return this.parameters.count();
+//		}
+		if (this.expr != null) {
+			Expression funcNode = expr;
+			if (expr.type == Expression.NodeType.OPERATOR) {
+				funcNode = expr.children.getLast();
+			}
+			return funcNode.children.size();
 		}
+		// END KGU#790 2020-11-02
 		// END KGU#56 2015-10-27
 		else return 0;
 	}
 
-	public String getParam(int count)
+	public String getParam(int index)
 	{
 		// START KGU#56 2015-10-27: Analysis now only done once by the constructor
 //        if (isFunction())
@@ -326,16 +419,28 @@ public class Function
 //            if(!params.equals(""))
 //            {
 //                StringList sl = StringList.explode(params,",");
-//                return sl.get(count);
+//                return sl.get(index);
 //            }
 //            else return null;
 //        }
-		if (this.parameters != null)
-		{
-			return this.parameters.get(count);
+		// START KGU#790 2020-11-02: Issue #800
+		//if (this.parameters != null)
+		//{
+		//	return this.parameters.get(index);
+		//}
+		//else return null;
+		if (this.expr != null) {
+			Expression funcNode = expr;
+			if (expr.type == Expression.NodeType.OPERATOR) {
+				funcNode = expr.children.getLast();
+			}
+			if (index >= 0 && index < funcNode.children.size()) {
+				return funcNode.children.get(index).toString();
+			}
 		}
+		return null;
+		// END KGU#790 2020-11-02
 		// END KGU#56 2015-10-27
-		else return null;
 	}
 
 	// START KGU#332 2017-01-29: Enh. #335 - type map
@@ -345,15 +450,34 @@ public class Function
 	 * If this is known as built-in procedure then it returns "void".
 	 * If unknown then returns the given defaultType
 	 * @param defaultType - null or some default type name for unsuccessful retrieval
-	 * @return name of the result type (Java type name)
+	 * @return name of the result type (Java type name), or {@code null} in case
+	 * this function does not actually represent a function
+	 * @see #isFunction()
 	 */
 	public String getResultType(String defaultType)
 	{
 //		return getResultType(false, defaultType);
-		String type = knownResultTypes.get(this.name + "#" + this.paramCount());
-		if (type == null) {
-			type = defaultType;
+		// START KGU#790 2020-11-02: Issue #800
+		//String type = knownResultTypes.get(this.name + "#" + this.paramCount());
+		//if (type == null) {
+		//	// START KGU
+		//	type = defaultType;
+		//}
+		String type = null;
+		if (expr != null) {
+			type = knownResultTypes.get(this.getName() + "#" + this.paramCount());
+			if (type == null) {
+				// We must not call expr.inferType() here because this in turn calls getResultType()
+				Type dataType = expr.dataType;
+				if (dataType != null) {
+					type = dataType.getName();
+				}
+			}
+			if (type == null) {
+				type = defaultType;
+			}
 		}
+		// END KGU#790 2020-11-02
 		return type;
 	}
 
@@ -431,9 +555,17 @@ public class Function
 	// START KGU 2016-10-16: More informative self-description
 	public String toString()
 	{
-		String paramNames = this.parameters == null ? "" : this.parameters.concatenate(", ");
+		// START KGU#790 2020-11-02: Issue #800
+		//String paramNames = this.parameters == null ? "" : this.parameters.concatenate(", ");
+		//return getClass().getSimpleName() + '@' + Integer.toHexString(hashCode()) +
+		//		": " + this.getName() + "(" + paramNames + ")";
+		String description = "---";
+		if (expr != null) {
+			description = expr.toString();
+		}
 		return getClass().getSimpleName() + '@' + Integer.toHexString(hashCode()) +
-				": " + this.getName() + "(" + paramNames + ")";
+				": " + description;
+		// END KGU#790 2020-11-02
 	}
 	// END KGU# 2016-10-16
 

@@ -44,7 +44,9 @@ package lu.fisch.structorizer.syntax;
  ******************************************************************************************************///
 
 /**
- * 
+ * Data type class for array types. Multidimensional arrays are to be represented
+ * as nested array types.
+ * In the self-description string a prefix '@' is used.
  * @author Kay Gürtzig
  */
 public class ArrayType extends Type {
@@ -110,6 +112,12 @@ public class ArrayType extends Type {
 		}
 	}
 
+	@Override
+	public boolean isStructured()
+	{
+		return true;
+	}
+
 	/**
 	 * Returns a string expressing the type structure either in a shallow way
 	 * ({@code deep = false}) or in a completely recursive way ({@code deep = true}).
@@ -117,23 +125,28 @@ public class ArrayType extends Type {
 	 * and the element type specification, the index start offset and the number of elements
 	 * in parentheses, e.g.:<br/>
 	 * {@code @id(elType,0,100)}
+	 * @param altName - an alternative name to be used instead of {@link #getName()}
+	 * if {@code null} then the internal identifier will be used.
 	 * @param deep - whether possible substructure is to be fully described (otherwise
 	 * embedded types will just be represented by their names (if the are named).
 	 * @return the composed string
 	 */
 	@Override
-	public String toString(boolean deep)
+	protected String toStringWithName(String altName, boolean deep)
 	{
-		String elTypeStr = dummy;
-		if (this.elType != null) {
-			if (deep) {
-				elTypeStr = elType.toString(true);
-			}
-			else {
-				elTypeStr = elType.getName();
-			}
+		Type eType = this.elType;
+		if (eType == null) {
+			eType = getDummyType();
 		}
-		return "@" + this.name + "(" + elTypeStr + "," + offset + "," + size + ")";
+		String elTypeStr = null;
+		if (deep) {
+			elTypeStr = eType.toString(true);
+		}
+		else {
+			elTypeStr = eType.getName();
+		}
+		return "@" + (altName != null ? altName : this.name)
+				+ "(" + elTypeStr + "," + offset + "," + size + ")";
 	}
 	
 	/**

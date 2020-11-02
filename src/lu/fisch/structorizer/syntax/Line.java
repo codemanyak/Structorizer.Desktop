@@ -661,6 +661,14 @@ public class Line {
 	public static void main(String[] args) {
 		Syntax.loadFromINI();
 		
+		try {
+			Type testType = new Type(StringList.explode("dick,dumm,gefraessig", ","));
+			System.out.println(testType);
+		} catch (SyntaxException exc1) {
+			// TODO Auto-generated catch block
+			exc1.printStackTrace();
+		}
+		
 		String[] exprTests = new String[] {
 				// "good" expressions
 				"a <- 7 * (15 - sin(1.3))",
@@ -677,14 +685,20 @@ public class Line {
 				"28 - b % 13 > 4.5 / sqrt(23) * x",
 				"*p <- 17 + &x",
 				"a & ~(17 | 86) ^ ~b | ~c | ~1",
+				"m := date.month",
+				"len <- str.length()",
+				"0b01101",
+				"hx <- 0xaedf",
 				// Defective lines - are to provoke SyntaxExceptions
 				"7 * (15 - sin(1.3)) }, { 16, \"doof\", 45+9, b}",
 				"6[-6 * -a] + 34",
 				"(23 + * 6",
 				"(23 + * / 6)",
+				"z * y.98",		// a double literal following to a variable
+				"w <- 76[56].(aha)"	// non-identifier following to a '.' operator
 		};
 		String[] lineTests = new String[] {
-				"foreach i in {17+ 9, -3, pow(17.4, -8.1), \"doof\"}",
+				"foreach i in {17+ 9, -3, pow(17, 11.4, -8.1), \"doof\"}",
 				"for k <- 23/4 to pow(2, 6) " + Syntax.getKeyword("stepFor") + " 2",
 				"foreach val in 34 + 8 19 true \"doof\"",
 				"foreach thing in 67/5 + 8, \"fun\" + \"ny\", pow(67, 3)",
@@ -729,9 +743,9 @@ public class Line {
 					boolean okay = expr.gatherVariables(vars1, vars2, false);
 					System.out.println("Assigned: " + vars1.toString() +
 							", used: " + vars2.toString() + (okay ? "" : ", errors"));
-					Type exprType = expr.inferType(types, true, false);
+					Type exprType = expr.inferType(types, true);
 					if (exprType != null) {
-						System.out.println(exprType.toString(true));
+						System.out.println(exprType.toString(true) + " (" + expr.isDataTypeSafe + ")");
 					}
 					else {
 						System.out.println("No type retrieved");
@@ -754,7 +768,7 @@ public class Line {
 			System.err.println(errors.getText());
 			boolean okay = aLine.gatherVariables(vars1, vars2, vars3);
 			System.out.println("Assigned: " + vars1.toString() +
-					", decalred: " + vars2.toString() + 
+					", declared: " + vars2.toString() + 
 					", used: " + vars3.toString() + (okay ? "" : ", errors"));
 		}
 		
@@ -765,7 +779,7 @@ public class Line {
 				List<Expression> exprs = Expression.parse(tokens, null);
 				Expression cond = exprs.get(0);
 				System.out.println(cond.toString());
-				Type exprType = cond.inferType(types, false, false);
+				Type exprType = cond.inferType(types, false);
 				if (exprType != null) {
 					System.out.println(exprType.toString(true));
 				}
@@ -774,7 +788,7 @@ public class Line {
 				}
 				Expression neg = Expression.negateCondition(cond, false);
 				System.out.print(neg.toString() + " <-> ");
-				exprType = neg.inferType(types, false, false);
+				exprType = neg.inferType(types, false);
 				System.out.println(Expression.negateCondition(neg, false));
 				if (exprType != null) {
 					System.out.println(exprType.toString(true));

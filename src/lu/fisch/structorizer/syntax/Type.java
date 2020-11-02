@@ -31,14 +31,15 @@ import lu.fisch.utils.StringList;
 public class Type {
 
 	/**
-	 * Name to be shown for unspecified types
+	 * Dummy type for unspecified types
+	 * @see #getDummyType()
 	 */
-	protected static final String dummy = "???";
-
+	private static Type dummyType = null;
+	
 	/**
 	 * A counter for anonymous types
 	 */
-	private static long id = 0;
+	private static long nextId = 0;
 	
 	/**
 	 * The type identifier, will be tested to adhere to identifier syntax
@@ -47,7 +48,15 @@ public class Type {
 	/**
 	 * {@code null} or a list of modifiers (each of which ought to be an identifier)
 	 */
+	// FIXME: Do we really need this (it does not make much sense as does not contribute to the key)
 	protected StringList modifiers = null;
+	
+	/** Internal constructor, only used by {@link #getDummyType()} */
+	private Type()
+	{
+		this.name = "???";
+		this.modifiers = new StringList();
+	}
 
 	/**
 	 * Extracts name and modifiers from the given type specification tokens
@@ -79,7 +88,7 @@ public class Type {
 	 */
 	public Type(String name, StringList modifiers) throws SyntaxException {
 		if (name == null) {
-			name = "#" + id++;	// Create an anonymous name
+			name = "%" + nextId++;	// Create an anonymous name
 		}
 		else if (!Syntax.isIdentifier(name, true, null)) {
 			throw new SyntaxException("Type name must be an Ascii identifier", 0);
@@ -96,12 +105,17 @@ public class Type {
 		this.modifiers = modifiers;
 	}
 	
+	public static Type getDummyType()
+	{
+		if (dummyType == null) {
+			dummyType = new Type();
+		}
+		return dummyType;
+	}
+	
 	public String getName()
 	{
-		if (name.equals("#0")) {
-			return dummy;
-		}
-		return name.replace("#", "AnonType");
+		return name.replace("%", "AnonType");
 	}
 	
 	/**
@@ -127,16 +141,35 @@ public class Type {
 	 */
 	public String toString(boolean deep)
 	{
+		return toStringWithName(getName(), deep);
+	}
+	
+	/**
+	 * Returns a string expressing name and type structure either in a shallow way
+	 * ({@code deep = false}) or in a completely recursive way ({@code deep = true}).
+	 * The result will either use {@code altName}, or the internal name if {@code altName}
+	 * is {@code null}.
+	 * @param altName - an alternative name to be used instead of {@link #getName()},
+	 * if {@code null} then the internal identifier will be used.
+	 * @param deep - whether possible substructure is to be fully described (otherwise
+	 * embedded types will just be represented by their names (if the are named).
+	 * @return the composed string
+	 * @see #toString()
+	 */
+	protected String toStringWithName(String altName, boolean deep)
+	{
 		StringList mods = this.modifiers;
 		if (mods == null) {
 			mods = new StringList();
 		}
-		mods.add(getName());
+		mods.add(altName != null ? altName : this.name);
 		return mods.getLongString();
 	}
 	
 	/**
 	 * @return {@code true} if this type represents numeric values
+	 * @see #isPrimitive()
+	 * @see #isAnonymous()
 	 */
 	public boolean isNumeric()
 	{
@@ -145,14 +178,66 @@ public class Type {
 	
 	/**
 	 * @return {@code true} if this type represents a primitive data type
+	 * @see #isNumeric()
+	 * @see #isAnonymous()
 	 */
 	public boolean isPrimitive()
 	{
 		return false;
 	}
 
+	/**
+	 * @return {@code true} iff this is the dummy type or a nameless type
+	 * @see #isDummy()
+	 */
 	public boolean isAnonymous()
 	{
-		return name.startsWith("#");
+		return isDummy() || name.startsWith("%");
+	}
+	
+	/**
+	 * @return {@code true} iff this is the dummy type or a nameless type
+	 * @see #isAnonymous()
+	 */
+	public boolean isDummy()
+	{
+		return "???".equals(name);
+	}
+	
+	/**
+	 * @return {@code true} if the type is composed
+	 */
+	public boolean isStructured()
+	{
+		return false;
+	}
+	
+	/**
+	 * Checks whether this type and {@code another} are structurally equal
+	 * and have the same name. In case of anonymous types, the comparison
+	 * of the top-level name will be suppressed.<br/>
+	 * (The comparison is simply done via the textual representation.)
+	 * @param another - the type to compare with
+	 * @return {@code true} if both types are structurally equivalent.
+	 */
+	public boolean equals(Type another)
+	{
+		if (this == another) {
+			return true;
+		}
+		String str1 = toString(true);
+		String str2 = another.toString(true);
+		boolean equiv = str1.equals(str2);
+		if (!equiv) {
+			// In case of anonymous types compare with equalised nmes
+			if (isAnonymous()) {
+					str1 = toStringWithName(another.getName(), true);
+			}
+			else if (another.isAnonymous()) {
+				str2 = another.toStringWithName(this.getName(), true);
+			}
+			equiv = str1.equals(str2);
+		}
+		return equiv;
 	}
 }

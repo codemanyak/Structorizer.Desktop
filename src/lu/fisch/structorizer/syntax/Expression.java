@@ -84,49 +84,49 @@ public class Expression {
 	 * @see #toString()
 	 * @see #toString(int)
 	 * @see #appendToTokenList(StringList, HashMap)
-	 * @see #appendToTokenList(StringList, HashMap, Integer)
+	 * @see #appendToTokenList(StringList, HashMap, Byte)
 	 */
 	@SuppressWarnings("serial")
-	public static final HashMap<String, Integer> OPERATOR_PRECEDENCE = new HashMap<String, Integer>() {{
-		put("<-", 0);
-		put(":=", 0);
-		put("or", 1);
-		put("||", 1);
-		put("and", 2);
-		put("&&", 2);
-		put("|", 3);
-		put("^", 4);
-		put("xor", 4);
-		put("&", 5);
-		put("=", 6);
-		put("==", 6);
-		put("<>", 6);
-		put("!=", 6);
-		put("<", 7);
-		put(">", 7);
-		put("<=", 7);
-		put(">=", 7);
-		put("shl", 8);
-		put("<<", 8);
-		put("shr", 8);
-		put(">>", 8);
-		put(">>>", 8);
-		put("+", 9);
-		put("-", 9);
-		put("*", 10);
-		put("/", 10);
-		put("div", 10);
-		put("mod", 10);
-		put("%", 10);
-		put("not", 11);
-		put("!", 11);
-		put("~", 11);
-		put("+1", 11);	// sign
-		put("-1", 11);	// sign
-		put("*1", 11);	// pointer deref (C)
-		put("&1", 11);	// address (C)
-		put("[]", 12);
-		put(".", 12);
+	public static final HashMap<String, Byte> OPERATOR_PRECEDENCE = new HashMap<String, Byte>() {{
+		put("<-", (byte) 0);
+		put(":=", (byte) 0);
+		put("or", (byte) 1);
+		put("||", (byte) 1);
+		put("and", (byte) 2);
+		put("&&", (byte) 2);
+		put("|", (byte) 3);
+		put("^", (byte) 4);
+		put("xor", (byte) 4);
+		put("&", (byte) 5);
+		put("=", (byte) 6);
+		put("==", (byte) 6);
+		put("<>", (byte) 6);
+		put("!=", (byte) 6);
+		put("<", (byte) 7);
+		put(">", (byte) 7);
+		put("<=", (byte) 7);
+		put(">=", (byte) 7);
+		put("shl", (byte) 8);
+		put("<<", (byte) 8);
+		put("shr", (byte) 8);
+		put(">>", (byte) 8);
+		put(">>>", (byte) 8);
+		put("+", (byte) 9);
+		put("-", (byte) 9);
+		put("*", (byte) 10);
+		put("/", (byte) 10);
+		put("div", (byte) 10);
+		put("mod", (byte) 10);
+		put("%", (byte) 10);
+		put("not", (byte) 11);
+		put("!", (byte) 11);
+		put("~", (byte) 11);
+		put("+1", (byte) 11);	// sign
+		put("-1", (byte) 11);	// sign
+		put("*1", (byte) 11);	// pointer deref (C)
+		put("&1", (byte) 11);	// address (C)
+		put("[]", (byte) 12);
+		put(".", (byte) 12);
 	}};
 	
 	/** Logical literals ("false" and "true") */
@@ -146,10 +146,10 @@ public class Expression {
 	 */
 	public static final class Operator {
 		public final String symbol;
-		public final int precedence;
+		public final byte precedence;
 		public Operator(String symbol, int precedence) {
 			this.symbol = symbol;
-			this.precedence = precedence;
+			this.precedence = (byte)precedence;
 		}
 	};
 	
@@ -206,19 +206,20 @@ public class Expression {
 	public static enum NodeType {LITERAL, VARIABLE, OPERATOR, FUNCTION, /*QUALIFIER, INDEX,*/ ARRAY_INITIALIZER, RECORD_INITIALIZER, COMPONENT, PARENTH};
 	public NodeType type;
 	public String text;
-	public LinkedList<Expression> children;
+	public final LinkedList<Expression> children = new LinkedList<Expression>();
 	public short tokenPos = 0;
 	/**
 	 * May hold a retrieved expression data type
-	 * Type retrieval can be forced by {@link #inferType(HashMap, boolean, boolean)}
+	 * Type retrieval can be forced by {@link #inferType(HashMap, boolean)}
 	 */
 	public Type dataType = null;
+	/** Signals whether {@link #dataType} is final (e.g. with literals or function results) */
+	public boolean isDataTypeSafe = false;
 	
 	public Expression(NodeType _type, String _text, short _position)
 	{
 		type = _type;
 		text = _text;
-		children = new LinkedList<Expression>();
 		tokenPos = _position;
 	}
 	
@@ -226,8 +227,8 @@ public class Expression {
 	{
 		type = _type;
 		text = _text;
-		children = new LinkedList<Expression>(_children);
 		tokenPos = _position;
+		this.children.addAll(_children);
 	}
 	
 	/**
@@ -241,7 +242,6 @@ public class Expression {
 		// FIXME: Derive the tree from _tokens
 		type = NodeType.LITERAL;
 		text = "";
-		children = new LinkedList<Expression>();
 	}
 	
 	/* (non-Javadoc)
@@ -262,120 +262,123 @@ public class Expression {
 	 * @see #OPERATOR_PRECEDENCE
 	 * @see #appendToTokenList(StringList)
 	 * @see #appendToTokenList(StringList, HashMap)
-	 * @see #appendToTokenList(StringList, HashMap, Integer)
+	 * @see #appendToTokenList(StringList, byte, HashMap)
 	 */
 	private String toString(int parentPrec, HashMap<String, Operator> _alternOprs)
 	{
-		StringBuilder sb = new StringBuilder();
-		String sepa = "";	// separator
-		Iterator<Expression> iter = null;
-		switch (type) {
-		case LITERAL:
-		case VARIABLE:
-			sb.append(text);
-			break;
-		case OPERATOR: {
-			// May be unary or binary
-			Operator opr = null;
-			if (_alternOprs != null) {
-				opr = _alternOprs.get(text);
-			}
-			int myPrec = OPERATOR_PRECEDENCE.get(text);
-			String symbol = text;
-			if (opr != null) {
-				myPrec = opr.precedence;
-				symbol = opr.symbol;
-			}
-			if (children.size() <= 1 && !symbol.startsWith("1")) {
-				// Unary prefix operator
-				if (symbol.endsWith("1")) {
-					sb.append(symbol.substring(0, symbol.length()-1));
-				}
-				else if (children.isEmpty() || !text.equals("[]")) {
-					sb.append(symbol);
-				}
-				// Insert a gap if the operator is an identifier (word)
-				if (Syntax.isIdentifier(symbol, false, null)) {
-					sb.append(" ");
-				}
-			}
-			// Without pointers, there is no need to put parentheses if parent is . or []
-			else if (myPrec < parentPrec && !(myPrec < 11 && parentPrec == 12)) {
-				sepa = "(";
-			}
-			iter = children.iterator();
-			while (iter.hasNext()) {
-				sb.append(sepa + iter.next().toString(myPrec, _alternOprs));
-				if (text.equals("[]")) {
-					sepa = sepa.isEmpty() ? symbol.substring(0, 1) : ", ";	// usually '['
-				}
-				else if (!text.equals(".")) {
-					sepa = " " + symbol + " ";
-				}
-				else {
-					sepa = symbol;
-				}
-			}
-			if (text.equals("[]") && !children.isEmpty()) {
-				sb.append(symbol.substring(1));	// usually ']'
-			}
-			if ((children.size() > 1 || symbol.startsWith("1"))
-					&& myPrec < parentPrec && !(myPrec < 11 && parentPrec == 12)) {
-				sb.append(')');
-			}
-			if ((children.size() <= 1) && symbol.startsWith("1")) {
-				sb.append(symbol.substring(1));
-			}
-			break;
-		}
-//		case INDEX:	// obsolete
-//			// First child expresses the array
-//			sb.append(children.getFirst().toString(OPERATOR_PRECEDENCE.get("[]")) + "[");
-//			iter = children.listIterator(1);
+//		StringBuilder sb = new StringBuilder();
+//		String sepa = "";	// separator
+//		Iterator<Expression> iter = null;
+//		switch (type) {
+//		case LITERAL:
+//		case VARIABLE:
+//			sb.append(text);
+//			break;
+//		case OPERATOR: {
+//			// May be unary or binary
+//			Operator opr = null;
+//			if (_alternOprs != null) {
+//				opr = _alternOprs.get(text);
+//			}
+//			int myPrec = OPERATOR_PRECEDENCE.get(text);
+//			String symbol = text;
+//			if (opr != null) {
+//				myPrec = opr.precedence;
+//				symbol = opr.symbol;
+//			}
+//			if (children.size() <= 1 && !symbol.startsWith("1")) {
+//				// Unary prefix operator
+//				if (symbol.endsWith("1")) {
+//					sb.append(symbol.substring(0, symbol.length()-1));
+//				}
+//				else if (children.isEmpty() || !text.equals("[]")) {
+//					sb.append(symbol);
+//				}
+//				// Insert a gap if the operator is an identifier (word)
+//				if (Syntax.isIdentifier(symbol, false, null)) {
+//					sb.append(" ");
+//				}
+//			}
+//			// Without pointers, there is no need to put parentheses if parent is . or []
+//			else if (myPrec < parentPrec && !(myPrec < 11 && parentPrec == 12)) {
+//				sepa = "(";
+//			}
+//			iter = children.iterator();
+//			while (iter.hasNext()) {
+//				sb.append(sepa + iter.next().toString(myPrec, _alternOprs));
+//				if (text.equals("[]")) {
+//					sepa = sepa.isEmpty() ? symbol.substring(0, 1) : ", ";	// usually '['
+//				}
+//				else if (!text.equals(".")) {
+//					sepa = " " + symbol + " ";
+//				}
+//				else {
+//					sepa = symbol;
+//				}
+//			}
+//			if (text.equals("[]") && !children.isEmpty()) {
+//				sb.append(symbol.substring(1));	// usually ']'
+//			}
+//			if ((children.size() > 1 || symbol.startsWith("1"))
+//					&& myPrec < parentPrec && !(myPrec < 11 && parentPrec == 12)) {
+//				sb.append(')');
+//			}
+//			if ((children.size() <= 1) && symbol.startsWith("1")) {
+//				sb.append(symbol.substring(1));
+//			}
+//			break;
+//		}
+////		case INDEX:	// obsolete
+////			// First child expresses the array
+////			sb.append(children.getFirst().toString(OPERATOR_PRECEDENCE.get("[]")) + "[");
+////			iter = children.listIterator(1);
+////			while (iter.hasNext()) {
+////				sb.append(sepa + iter.next().toString());
+////				sepa = ", ";
+////			}
+////			sb.append(']');
+////			break;
+//		case RECORD_INITIALIZER:
+//			sb.append(text);
+//		case ARRAY_INITIALIZER:
+//			sb.append('{');
+//			iter = children.iterator();
 //			while (iter.hasNext()) {
 //				sb.append(sepa + iter.next().toString());
 //				sepa = ", ";
 //			}
-//			sb.append(']');
+//			sb.append('}');
 //			break;
-		case RECORD_INITIALIZER:
-			sb.append(text);
-		case ARRAY_INITIALIZER:
-			sb.append('{');
-			iter = children.iterator();
-			while (iter.hasNext()) {
-				sb.append(sepa + iter.next().toString());
-				sepa = ", ";
-			}
-			sb.append('}');
-			break;
-		case COMPONENT:
-			sb.append(text + ": ");
-			if (!children.isEmpty()) {
-				sb.append(children.getFirst().toString());
-			}
-			break;
-		case FUNCTION:
-			sb.append(text + "(");
-			iter = children.iterator();
-			while (iter.hasNext()) {
-				sb.append(sepa + iter.next().toString());
-				sepa = ", ";
-			}
-			sb.append(')');
-			break;
-//		case QUALIFIER:	// obsolete
-//			sb.append(children.getFirst().toString(OPERATOR_PRECEDENCE.get(".")));
-//			sb.append("." + text);
+//		case COMPONENT:
+//			sb.append(text + ": ");
+//			if (!children.isEmpty()) {
+//				sb.append(children.getFirst().toString());
+//			}
 //			break;
-		case PARENTH:
-			sb.append(text);
-			sb.append(children.size());	// This element counts aggregated expressions by adding null entries
-			break;
-		default:
-			break;		
-		}
-		return sb.toString();
+//		case FUNCTION:
+//			sb.append(text + "(");
+//			iter = children.iterator();
+//			while (iter.hasNext()) {
+//				sb.append(sepa + iter.next().toString());
+//				sepa = ", ";
+//			}
+//			sb.append(')');
+//			break;
+////		case QUALIFIER:	// obsolete
+////			sb.append(children.getFirst().toString(OPERATOR_PRECEDENCE.get(".")));
+////			sb.append("." + text);
+////			break;
+//		case PARENTH:
+//			sb.append(text);
+//			sb.append(children.size());	// This element counts aggregated expressions by adding null entries
+//			break;
+//		default:
+//			break;		
+//		}
+//		return sb.toString();
+		StringList tokens = new StringList();
+		appendToTokenList(tokens, (byte)parentPrec, _alternOprs);
+		return tokens.concatenate(null);
 	}
 	
 	/**
@@ -401,42 +404,44 @@ public class Expression {
 	 */
 	public void appendToTokenList(StringList tokens)
 	{
-		appendToTokenList(tokens, OPERATOR_PRECEDENCE, -1);
+		appendToTokenList(tokens, (byte)-1, null);
 	}
 	/**
-	 * Append this expression tree in tokenized form to the given token list {@code tokens}.
-	 * Uses the given operator precedence table @{@code precMap} instead of
-	 * {@link #OPERATOR_PRECEDENCE} to decide whether parentheses must be used. This way,
-	 * differing precedence orders for target languages may be addressed. An empty map will
+	 * Append this expression tree in tokenized form (with beautifying blanks around operator
+	 * symbols) to the given token list {@code tokens}.<br/>
+	 * If given, uses the alternative operator mapping table @{@code precMap} instead of
+	 * {@link #OPERATOR_PRECEDENCE} to use differing symbols and possibly differing precedence
+	 * ranks, which has an impact where parentheses must be placed. This way, an
+	 * equivalent translation to target languages may be addressed. A given empty map will
 	 * force parentheses around any non-atomic sub-expression.
-	 * @param tokens - a non-null {@link #toString(int)} to append my tokens to.
-	 * @param precMap - a customized operator precedence map (if an operator is not found there,
-	 * then composed operand expressions will be parenthesized).
+	 * @param tokens - a non-null {@link StringList} to append my tokens to.
+	 * @param alternOprs - a customized operator precedence map (if empty, then composed
+	 * operand expressions will be parenthesized).
 	 * @see #appendToTokenList(StringList)
-	 * @see #appendToTokenList(StringList, HashMap, Integer)
+	 * @see #appendToTokenList(StringList, byte, HashMap)
 	 */
-	public void appendToTokenList(StringList tokens, HashMap<String, Integer> precMap)
+	public void appendToTokenList(StringList tokens, HashMap<String, Operator> precMap)
 	{
-		appendToTokenList(tokens, precMap, -1);
+		appendToTokenList(tokens, (byte)-1, precMap);
 	}
 	/**
-	 * Append this expression tree in tokenized form to the given token list {@code tokens}.
-	 * Uses the given operator precedence table @{@code precMap} instead of
-	 * {@link #OPERATOR_PRECEDENCE} to decide whether parentheses must be used. This way,
-	 * differing precedence orders for target languages may be addressed. An empty map will
+	 * Append this expression tree in tokenized form (with beautifying blanks around operator
+	 * symbols) to the given token list {@code tokens}.<br/>
+	 * If given, uses the alternative operator mapping table @{@code alternOprs} instead of
+	 * {@link #OPERATOR_PRECEDENCE} to use differing symbols and possibly differing precedence
+	 * ranks, which has an impact where parentheses must be placed. This way, an
+	 * equivalent translation to target languages may be addressed. A given empty map will
 	 * force parentheses around any non-atomic sub-expression.
-	 * @param tokens - a non-null {@link #toString(int)} to append my tokens to.
-	 * @param precMap - a customized operator precedence map (if an operator is not found there,
-	 * then composed operand expressions will be parenthesized).
+	 * @param tokens - a non-null {@link StringList} to append my tokens to.
 	 * @param parentPrec - the operator precedence of the operator this expression forms an
-	 * operand for. -1 means there is no parent operator, {@code null} forces parentheses if
-	 * non-atomic.
+	 * operand for. -1 means there is no parent operator.
+	 * @param alternOprs - a customized operator precedence map (if empty, then composed
+	 * operand expressions will be parenthesized).
 	 * @see #appendToTokenList(StringList)
-	 * @see #appendToTokenList(StringList, HashMap, Integer)
 	 */
-	public void appendToTokenList(StringList tokens, HashMap<String, Integer> precMap, Integer parentPrec)
+	private void appendToTokenList(StringList tokens, byte parentPrec, HashMap<String, Operator> alternOprs)
 	{
-		String sepa = "";
+		String[] sepa = new String[]{};
 		Iterator<Expression> iter = null;
 		switch (type) {
 		case LITERAL:
@@ -444,138 +449,201 @@ public class Expression {
 			tokens.add(text);
 			break;
 		case OPERATOR: {
-			Integer myPrec = precMap.get(text);
-			if (children.size() <= 1) {
-				if (text.endsWith("1")) {
+			// May be unary or binary
+			Operator opr = null;
+			boolean noPrec = false;
+			if (alternOprs != null) {
+				opr = alternOprs.get(text);
+				noPrec =  alternOprs.isEmpty();
+			}
+			Byte myPrec = OPERATOR_PRECEDENCE.get(text);
+			String symbol = text;
+			if (opr != null) {
+				myPrec = opr.precedence;
+				symbol = opr.symbol;
+			}
+			if (children.size() <= 1 && !symbol.startsWith("1")) {
+				// Unary prefix operator
+				if (symbol.endsWith("1")) {
 					tokens.add(text.substring(0, text.length()-1));
 				}
 				else if (children.isEmpty() || !text.equals("[]")){
 					tokens.add(text);
 				}
-				if (text.equals("+") || text.equals("-")) {
-					// Seems to be a sign operator - same precedence level as negation
-					myPrec = OPERATOR_PRECEDENCE.get("!");
+				//if (text.equals("+") || text.equals("-")) {
+				//	// Seems to be a sign operator - same precedence level as negation
+				//	myPrec = OPERATOR_PRECEDENCE.get("!");
+				//}
+				// Insert a gap if the operator is an identifier (word)
+				if (Syntax.isIdentifier(symbol, false, null)) {
+					tokens.add(" ");
 				}
 			}
 			// Without pointers, there is no need to put parentheses if parent is . or []
-			else if (myPrec == null || parentPrec == null || myPrec < parentPrec && !(myPrec < 11 && parentPrec == 12)) {
-				sepa = "(";
+			else if (noPrec
+				|| myPrec < parentPrec && !(myPrec < 11 && parentPrec == 12)) {
+				sepa = new String[]{"("};
 			}
 			iter = children.iterator();
 			while (iter.hasNext()) {
-				tokens.add(sepa);
-				iter.next().appendToTokenList(tokens, precMap, myPrec);
+				for (int i = 0; i < sepa.length; i++) tokens.add(sepa[i]);
+				iter.next().appendToTokenList(tokens, myPrec, alternOprs);
 				if (text.equals("[]")) {
-					sepa = sepa.isEmpty() ? "[" : ", ";
+					if (sepa.length == 0) {
+						sepa = new String[]{symbol.substring(0, 1)};
+					}
+					else {
+						sepa = new String[]{",", " "};
+					}
+				}
+				// Put a gap around all operators except "."
+				else if (!text.equals(".")) {
+					sepa = new String[]{" ", symbol, " "};
 				}
 				else {
-					sepa = text;
+					sepa = new String[]{symbol};
 				}
 			}
-			if (text.equals("[]")) {
-				tokens.add("]");
+			if (text.equals("[]") && !children.isEmpty()) {
+				tokens.add(symbol.substring(1));	// usually "]"
 			}
-			if (children.size() > 1
-					&& (myPrec == null || parentPrec == null
+			if ((children.size() > 1 || symbol.startsWith("1"))
+					&& (noPrec
 					|| myPrec < parentPrec && !(myPrec < 11 && parentPrec == 12))) {
 				tokens.add(")");
 			}
+			if ((children.size() <= 1) && symbol.startsWith("1")) {
+				tokens.add(symbol.substring(1));
+			}
 			break;
 		}
-//		case INDEX:	// obsolete
-//			children.getFirst().appendToTokenList(tokens, precMap, precMap.get("[]"));
-//			iter = children.listIterator(1);
-//			while (iter.hasNext()) {
-//				tokens.add(sepa);
-//				iter.next().appendToTokenList(tokens, precMap);
-//				sepa = ",";
-//			}
-//			tokens.add("]");
-//			break;
 		case RECORD_INITIALIZER:
-			tokens.add(text);
+			tokens.add(text);	// The record type name
 		case ARRAY_INITIALIZER:
 			tokens.add("{");
 			iter = children.iterator();
 			while (iter.hasNext()) {
-				tokens.add(sepa);
-				iter.next().appendToTokenList(tokens, precMap);;
-				sepa = ",";
+				for (int i = 0; i < sepa.length; i++) tokens.add(sepa[i]);
+				iter.next().appendToTokenList(tokens, alternOprs);;
+				sepa = new String[]{",", " "};
 			}
 			tokens.add("}");
 			break;
 		case COMPONENT:
 			tokens.add(text);
 			tokens.add(":");
-			children.getFirst().appendToTokenList(tokens, precMap);
+			tokens.add(" ");
+			if (!children.isEmpty()) {
+				children.getFirst().appendToTokenList(tokens, alternOprs);
+			}
 			break;
 		case FUNCTION:
 			tokens.add(text);
 			tokens.add("(");
 			iter = children.iterator();
 			while (iter.hasNext()) {
-				tokens.add(sepa);
-				iter.next().appendToTokenList(tokens, precMap);
-				sepa = ",";
+				for (int i = 0; i < sepa.length; i++) tokens.add(sepa[i]);
+				iter.next().appendToTokenList(tokens, alternOprs);
+				sepa = new String[]{",", " "};
 			}
 			tokens.add(")");
 			break;
-//		case QUALIFIER:	// obsolete
-//			children.getFirst().appendToTokenList(tokens, precMap, precMap.get("."));
-//			tokens.add(".");
-//			tokens.add(text);
-//			break;
+		case PARENTH:
+			tokens.add(text);
+			tokens.add(Integer.toString(children.size()));	// This element counts aggregated expressions by adding null entries
+			break;
 		default:
 			break;		
 		}		
 	}
 	
-	public boolean isFunction()
+	/**
+	 * Checks whether this expression represents a function call, i.e. something like
+	 * {@code <function_name>(<arg>, ...)}.
+	 * @return {@code true} if the expression represents a function call
+	 * @see #isMethodCall()
+	 */
+	public boolean isFunctionCall()
 	{
-		return type == NodeType.FUNCTION;
+		return type == NodeType.FUNCTION && Syntax.isIdentifier(text, false, null);
 	}
 	
+	/**
+	 * Checks whether this expression represents a method call, i.e. something like
+	 * {@code <object>.<method_name>(<arg>, ...)}.
+	 * @return {@code true} if the expression represents a method call
+	 */
+	public boolean isMethodCall()
+	{
+		return type == NodeType.OPERATOR && ".".equals(text) &&
+				children.size() == 2 && children.getLast().isFunctionCall();
+	}
+	
+	/**
+	 * Checks whether the inferred data type of this expression is numeric
+	 * (i.e. integral or floating-point of some size and precision)
+	 * @param _typeMap - a {@link TypeRegistry} helping to retrieve the
+	 * operand types if variables are involved.
+	 * @param _trueIfUnknown - the given default value if a definite data
+	 * type could not be detected.
+	 * @return {@code true} if the data type is definitely numeric or if it
+	 * is unknown and {@code _trueIfUnkbown} is {@code true}
+	 */
 	public boolean isNumeric(TypeRegistry _typeMap, boolean _trueIfUnknown)
 	{
-		Type dataType = inferType(_typeMap, true, false);
-		if (dataType == null) {
+		Type dataType = inferType(_typeMap, true);
+		if (dataType == null || dataType.isDummy()) {
 			return _trueIfUnknown;	// there is no "maybe"
 		}
-		
 		return dataType.isNumeric();
 	}
 	
-	// TODO - We might rather need a method working on the Type class hierarchy
-	public Type inferType(TypeRegistry _typeMap, boolean _cacheTypes, boolean _overwrite)
+	/**
+	 * Recursively tries to infer the data type of this expression (bottom up).
+	 * Relies on types already associated to sub-expressions (to renew all,
+	 * consider calling {@link #clearDataTypes(boolean)} before).
+	 * If {@code _typeMap} is given then new identified types and type associations
+	 * will be cached both at the expression substructure and in the {@code _typeMap}.
+	 * @param _typeMap - a {@link TypeRegistry} to be used for variable type retrieval
+	 * and putting new type associations, or {@code null}.
+	 * @param _cacheTypes
+	 * @return The top type if identified. May be an anonymous (or temporarily composed)
+	 * type, in particular if {@code _typeMap} is not given for retrieval of variable types
+	 */
+	public Type inferType(TypeRegistry _typeMap, boolean _cacheTypes)
 	{
-		Type dType = _overwrite? null : this.dataType;
+		Type dType = this.dataType;
 		if (dType != null) {
-			if (_cacheTypes && _typeMap != null) {
+			if (_typeMap != null) {
 				_typeMap.putType(dType, false);
 			}
+			// We adopt the associated type and are ready
 			return dType;
 		}
+		boolean isSafe = false;
 		switch (type) {
 		case ARRAY_INITIALIZER:
 		{
+			// Check the types of all listed element expressions
 			Type elemType = null;
 			for (Expression elem: children) {
-				Type elType = elem.inferType(_typeMap, _cacheTypes, _overwrite);
+				Type elType = elem.inferType(_typeMap, _cacheTypes);
 				if (elType != null) {
 					if (elemType == null) {
 						elemType = elType;
 					}
 					else if (!elemType.getName().equals("dummy")
-							&& elType != elemType && !elType.toString().equals(elemType.toString())) {
-						elemType = TypeRegistry.getDummyType();
-						if (!_cacheTypes && !_overwrite) {
-							// No further retrieval necessary
+							&& !elType.equals(elemType)) {
+						// Types differ, so return the dummy type
+						elemType = Type.getDummyType();
+						if (_typeMap == null) {
+							// No further retrieval necessary, nothing to cache
 							break;
 						}
 					}
 				}
 			}
-			// Create an anonymous array type that won't be cached or registered
+			// Create an anonymous array type that won't be registered
 			try {
 				dType = new ArrayType(null, elemType, children.size());
 			} catch (SyntaxException exc) {
@@ -585,66 +653,43 @@ public class Expression {
 			break;
 		}
 		case COMPONENT:
+			/* The type of a component initializer is the type of the assigned expression.
+			 * If we can't retrieve a component type then we are done because there is no
+			 * chance to know the enclosing record initialiser time name. It will be up to
+			 * the RECORD_INITIALIZER node above to make sense of the components
+			 */
 			if (children.size() >= 1) {
-				dType = children.getFirst().inferType(_typeMap, _cacheTypes, _overwrite);
+				dType = children.getFirst().inferType(_typeMap, _cacheTypes);
 			}
 			break;
 		case FUNCTION:
-			/* TODO: We should have a list of all built-in functions, scan all controller
-			 * functions and investigate the Arranger routines
+			/* We have class Function check for built-in functions
+			 * TODO: We might look for a way to scan all controller
+			 * functions as well and to investigate the Arranger routines
 			 */
-		{
-			// FIXME: obsolete
-			Function fun = new Function(this.toString());
-			String typName = "???";
-			if (fun.isFunction() && (typName = fun.getResultType("???")) != null) {
-				dType = _typeMap.getType(typName);
+			{
+				Function fun = new Function(this.toString());
+				String typName = "???";
+				if (fun.isFunction() && (typName = fun.getResultType("???")) != null) {
+					if (_typeMap != null) {
+						dType = _typeMap.getType(typName);
+					}
+					else {
+						dType = TypeRegistry.getStandardType(typName);
+					}
+				}
 			}
-		}
 			break;
 		case LITERAL:
-			if (BOOL_LITERALS.contains(text)) {
-				dType = TypeRegistry.getStandardType("boolean");
-			}
-			else if (text.startsWith("'") && text.endsWith("'")) {
-				if (text.length() == 3) {
-					dType = TypeRegistry.getStandardType("char");
-				}
-				else {
-					dType = TypeRegistry.getStandardType("string");
-				}
-			}
-			else if (text.length() > 2 && text.startsWith("\"") && text.endsWith("\"")) {
-				dType = TypeRegistry.getStandardType("string");
-			}
-			else {
-				try {
-					Double.parseDouble(text);
-					dType = TypeRegistry.getStandardType("double");
-				}
-				catch (NumberFormatException exc) {
-				}
-				try {
-					Long.parseLong(text);
-					dType = TypeRegistry.getStandardType("long");
-				}
-				catch (NumberFormatException exc) {
-				}
-				try {
-					Integer.parseInt(text);
-					dType = TypeRegistry.getStandardType("int");
-				}
-				catch (NumberFormatException exc) {
-				}
-			}
+			dType = TypeRegistry.getStandardTypeFor(text);
+			isSafe = true;
 			break;
 		case OPERATOR:
 			if (BOOL_OPERATORS.contains(text)
 					|| RELATION_OPERATORS.contains(text)
 					|| NEGATION_OPERATORS.contains(text) && !"~".equals(text)) {
-				if (_typeMap != null) {
-					dType = _typeMap.getType("boolean");
-				}
+				dType = TypeRegistry.getStandardType("boolean");
+				isSafe = true;
 			}
 			else if (text.equals("[]")) {
 				if (_typeMap != null) {
@@ -653,9 +698,10 @@ public class Expression {
 			}
 			else if (text.equals(".")) {
 				if (children.size() == 2) {
-					Type recType = children.getFirst().inferType(_typeMap, _cacheTypes, _overwrite);
+					Type recType = children.getFirst().inferType(_typeMap, _cacheTypes);
 					if (recType != null && recType instanceof RecordType) {
 						dType = ((RecordType)recType).getComponentType(children.getLast().text);
+						isSafe = children.getFirst().isDataTypeSafe && !dType.isAnonymous();
 					}
 				}
 			}
@@ -663,18 +709,18 @@ public class Expression {
 				if (children.size() == 2) {
 					// First check whether the target has a type
 					Expression leftSide = children.getFirst();
-					Type varType = leftSide.inferType(_typeMap, _cacheTypes, _overwrite);
+					Type varType = leftSide.inferType(_typeMap, _cacheTypes);
 					// Then try with the right-hand side expression
-					dType = children.getLast().inferType(_typeMap, _cacheTypes, _overwrite);
+					dType = children.getLast().inferType(_typeMap, _cacheTypes);
 					if (dType == null) {
 						dType = varType;
 					}
 					// We may set the type of the left side ...
-					else if (varType == null && _cacheTypes) {
+					else if (varType == null && _typeMap != null) {
 						leftSide.dataType = dType;
 						// ... possibly even register the variable type
-						if (leftSide.type == NodeType.VARIABLE && _typeMap != null) {
-							_typeMap.putTypeFor(leftSide.text, dType, _overwrite);
+						if (leftSide.type == NodeType.VARIABLE) {
+							_typeMap.putTypeFor(leftSide.text, dType, false);
 						}
 					}
 				}
@@ -683,11 +729,14 @@ public class Expression {
 				Type[] operandTypes = new Type[children.size()];
 				boolean allSame = true;
 				boolean allNumeric = true;
+				boolean allSafe = true;
 				Type stringEntry = null;
 				Type floatEntry = null;
-				for (int i = 0; i < children.size(); i++) {
-					operandTypes[i] = children.get(i).inferType(_typeMap, _cacheTypes, _overwrite);
+				int i = 0;
+				for (Expression child: children) {
+					operandTypes[i] = child.inferType(_typeMap, _cacheTypes);
 					if (operandTypes[i] != null) {
+						allSafe = child.isDataTypeSafe && allSafe;
 						String typeName = operandTypes[i].getName();
 						if (!operandTypes[i].isNumeric()) {
 							allNumeric = false;
@@ -699,11 +748,16 @@ public class Expression {
 							floatEntry = operandTypes[i];
 						}
 					}
+					else {
+						allSafe = false;
+					}
 					if (i > 0 && (operandTypes[i] == null || operandTypes[i-1] == null
-							|| !operandTypes[i].toString().equals(operandTypes[i-1].toString()))) {
+							|| !operandTypes[i].equals(operandTypes[i-1]))) {
 						allSame = false;
+						// Wouldn't we leave the loop now anyway?
 						break;
 					}
+					i++;
 				}
 				if (text.equals("+")) {
 					if (allSame) {
@@ -717,8 +771,10 @@ public class Expression {
 					}
 				}
 				else if (StringList.explode("%,div,mod,<<,>>,>>>,shl,shr,|,&,^,xor,~", ",").contains(text)) {
-					if (allSame && allNumeric) {
+					if (allSame && allNumeric && floatEntry == null) {
+						// Should actually better be integer
 						dType = operandTypes[0];
+						isSafe = true;
 					}
 					else {
 						dType = TypeRegistry.getStandardType("int");
@@ -728,6 +784,7 @@ public class Expression {
 					if (allNumeric) {
 						if (allSame) {
 							dType = operandTypes[0];
+							isSafe = allSafe;
 						}
 						else if (floatEntry != null) {
 							dType = floatEntry;
@@ -739,6 +796,7 @@ public class Expression {
 		case RECORD_INITIALIZER:
 			if (_typeMap != null) {
 				dType = _typeMap.getType(text);
+				isSafe = dType != null && !dType.isAnonymous();
 			}
 			// If the data type had not been registered - we we will define a temporary one
 			if (dType == null) {
@@ -749,38 +807,77 @@ public class Expression {
 					if (child.type == NodeType.COMPONENT) {
 						compName = child.text;
 					}
-					compPairs.put(compName, child.inferType(_typeMap, _cacheTypes, _overwrite));
+					compPairs.put(compName, child.inferType(_typeMap, _cacheTypes));
 				}
 				try {
-					dType = new RecordType(null, compPairs);
+					dType = new RecordType(text, compPairs);
 				} catch (SyntaxException exc) {
 					// FIXME Auto-generated catch block
 					exc.printStackTrace();
 				}
 				_cacheTypes = false;
-				_overwrite = false;
 			}
 			break;
 		case VARIABLE:
 			if (_typeMap != null) {
 				dType = _typeMap.getTypeFor(text);
+				isSafe = dType != null && !dType.isAnonymous();
 			}
 			break;
 		default:
 			break;
 		}
 		if (dType != null) {
-			if (_cacheTypes) {
-				if (_typeMap != null) {
-					_typeMap.putType(dType, _overwrite);
-				}
+			if (isSafe && !dType.isDummy()) {
 				dataType = dType;
+				isDataTypeSafe = !dType.isAnonymous();
+			}
+			if (_typeMap != null) {
+				dataType = dType;
+				isDataTypeSafe = isSafe && !dType.isAnonymous();
+				// FIXME really force?
+				_typeMap.putType(dType, false);
 			}
 		}
-		else if (_overwrite) {
-			dataType = null;
-		}
+
 		return dType;
+	}
+	
+	/**
+	 * Wipes off all data type associations to give way for an updating
+	 * type inference. If {@code onlyUnsafe} is true then safe data type
+	 * associations (as for literals) will remain.
+	 * @see #inferType(TypeRegistry, boolean)
+	 * @see #copy(boolean)
+	 */
+	public void clearDataTypes(boolean onlyUnsafe)
+	{
+		if (!onlyUnsafe || !isDataTypeSafe) {
+			dataType = null;
+			for (Expression child: children) {
+				child.clearDataTypes(onlyUnsafe);
+			}
+		}
+	}
+	
+	/**
+	 * Produces a copy of this, either including inferred type references
+	 * (if {@code withTypes=true}) or without them (if {@code withTypes=false}).
+	 * @param withTypes - whether already attached data type info is to be
+	 * copied as well, no matter whether safe or not. (This way, the expression
+	 * copy can be transferred to another {@link TypeRegistry} context.)
+	 * @return the copy of this
+	 * @see #inferType(TypeRegistry, boolean)
+	 * @see #clearDataTypes(boolean)
+	 */
+	public Expression copy(boolean withTypes)
+	{
+		Expression myCopy = new Expression(this.type, this.text, this.tokenPos, this.children);
+		if (withTypes) {
+			myCopy.dataType = this.dataType;
+			myCopy.isDataTypeSafe = this.isDataTypeSafe;
+		}
+		return myCopy;
 	}
 	
 	/**
@@ -839,6 +936,11 @@ public class Expression {
 					output.addLast(expr);
 					stack.removeLast();
 				}
+				if (token.equals(".")) {
+					if (tokens.count() < 2 || !Syntax.isIdentifier(tokens.get(1), false, null)) {
+						throw new SyntaxException("An operator '.' must be followed by an identifier!", position);
+					}
+				}
 				expr = new Expression(NodeType.OPERATOR, mayBeSign ? token+"1" : token, position);
 				stack.addLast(expr);
 				if (token.equals("[]")) {
@@ -850,7 +952,7 @@ public class Expression {
 					stack.addLast(expr);
 					nestingLevel++;
 				}
-				signPos = true;
+				signPos = !token.equals(".");
 				wasOpd = false;
 			}
 			else if (Syntax.isIdentifier(token, false, null)
@@ -883,14 +985,14 @@ public class Expression {
 					// Check that we are within a record initializer context
 					Expression paren = stack.peekLast();
 					if (paren == null || paren.type != NodeType.PARENTH || !"{".equals(paren.text)) {
-						throw new SyntaxException("Found '" + token + ":' outside a record initializer.", position);
+						throw new SyntaxException("Found «" + token + ":' outside a record initializer.", position);
 					}
 					// now provisionally remove the stack top (which is already cached in paren)
 					stack.removeLast();
 					// beneath the opening brace there must be a recod initializer node
 					try {
 						if ((expr = stack.peekLast()) == null || expr.type != NodeType.RECORD_INITIALIZER) {
-							throw new SyntaxException("Found '" + token + ":' outside a record initializer.", position);
+							throw new SyntaxException("Found «" + token + ":' outside a record initializer.", position);
 						}
 					}
 					finally {
@@ -924,7 +1026,9 @@ public class Expression {
 			}
 			else if (token.startsWith("\"") || token.startsWith("'")
 					|| token.equals("false") || token.equals("true")
-					|| !token.isEmpty() && Character.isDigit(token.charAt(0))) {
+					|| !token.isEmpty() && Character.isDigit(token.charAt(0))
+					// floating-point literal with leading decimal point?
+					|| token.length() > 1 && token.charAt(0) == '.' && Character.isDigit(token.charAt(1))) {
 				// If the previous token was an operand then a new expression might start here, so clean up
 				if (wasOpd) {
 					if (nestingLevel > 0) {

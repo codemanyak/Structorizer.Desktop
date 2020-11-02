@@ -620,6 +620,13 @@ public abstract class Element {
 	protected HashMap<String, Vector<HighlightUnit>> highlightCache = new HashMap<String, Vector<HighlightUnit>>();
 	// END KGU#701 2019-03-29
 	
+	// START KGU#790 2020-11-02: Issue #800
+	/**
+	 * Caches the syntax structure for the unbroken lines of text, to be cleared on every change
+	 */
+	protected Line[] parsedLines = null;
+	// END KGU#790 2020-11-03
+	
 	/** If the element is to be displayed rotated by 90° counter-clockwise (only used within CASE structures) */
 	public boolean rotated = false;
 
@@ -886,6 +893,14 @@ public abstract class Element {
 		// START KGU#701 2019-03-29: Issue #718 It should not cause harm to share this info (it's a map!)
 		_ele.highlightCache = this.highlightCache;
 		// END KGU#701 2019-03-29
+
+		/* TODO (KGU#790 2020-11-02: Issue #800) It is to be decided whether
+		 * it might be a good idea to copy (i.e. initially to share) the cached
+		 * parsedLines - would only be wrong if a different text had been copied.
+		 * And it could cause trouble if the copied element lies in a different
+		 * TypeRegistry context (i.e. belongs to a different Root). So we better
+		 * don't do it for now. */
+		//_ele.parsedLines = parsedLines;
 	}
 	// END KGU#213 2016-08-01
 
@@ -981,6 +996,9 @@ public abstract class Element {
 	public void setText(String _text)
 	{
 		text.setText(_text);
+		// START KGU#790 2020-11-02: Issue #800 This is quite obvious but how to catch text alterations?
+		parsedLines = null;
+		// END KGU#790 2020-11-02
 	}
 
 	/**
@@ -990,6 +1008,9 @@ public abstract class Element {
 	public void setText(StringList _text)
 	{
 		text = _text;
+		// START KGU#790 2020-11-02: Issue #800 This is quite obvious but how to catch text alterations?
+		parsedLines = null;
+		// END KGU#790 2020-11-02
 	}
 
 	// START KGU#91 2015-12-01: We need a way to get the true value
@@ -4232,4 +4253,48 @@ public abstract class Element {
 		}
 	}
 	
+	// START KGU#790 2020-11-02: Issue #800
+	/**
+	 * Get the parsed line structure for the text line {@code lineNo} if
+	 * it exists. If the line type (to be obtained with {@link Line#getType()})
+	 * is {@link Line.LineType#LT_RAW} then something will have gone wrong and
+	 * the original text line is all you can rely on.
+	 * @param lineNo - index of the text line (w.r.t. unbroken text) - must be between
+	 * 0 and the number of lines - 1.
+	 * @return a {@link Line} structure for the requested text line.
+	 */
+	public Line getParsedLine(int lineNo)
+	{
+		if (parsedLines == null) {
+			parseLines();
+		}
+		return parsedLines[lineNo];
+	}
+	
+	/**
+	 * Re-parses all text lines no matter whether there have already been parsed
+	 * lines in the cache.
+	 * @return A {@link StringList} of possible error descriptions
+	 */
+	protected StringList parseLines()
+	{
+		StringList errors = new StringList();
+		StringList unbrokenLines = this.getUnbrokenText();
+		parsedLines = new Line[unbrokenLines.count()];
+		for (int i = 0; i < parsedLines.length; i++) {
+			// FIXME guess a suited line type, ought to be delegated to subclasses, though
+			parsedLines[i] = Line.parse(unbrokenLines.get(i), null, errors);
+		}
+		return errors;
+	}
+	
+	/**
+	 * Wipes the parsing results for all text lines, thus forcing a reparsing
+	 * on next {@link #getParsedLine(int)} call. This methd should be called
+	 * whenever the text was changed.
+	 */
+	public void resetParsedLines()
+	{
+		parsedLines = null;
+	}
 }

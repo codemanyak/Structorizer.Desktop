@@ -48,6 +48,7 @@ import lu.fisch.utils.StringList;
 
 /**
  * Data type class for records/structs, consists of named components.
+ * In the self-description string a name prefix '$' is used.
  * @author Kay Gürtzig
  */
 public class RecordType extends Type {
@@ -101,36 +102,47 @@ public class RecordType extends Type {
 		this.compTypes = components;
 	}
 	
+	@Override
+	public boolean isStructured()
+	{
+		return true;
+	}
+
 	/**
 	 * Returns a string expressing the type structure either in a shallow way
 	 * ({@code deep = false}) or in a completely recursive way ({@code deep = true}).
 	 * The result will start with symbol {@code $}, followed by the identifier and the
 	 * component specifications in parentheses, e.g.:<br/>
 	 * {@code $id(compId1: type1; compId2: type2 ...)}
+	 * @param altName - an alternative name to be used instead of {@link #getName()},
+	 * if {@code null} then the internal identifier will be used.
 	 * @param deep - whether possible substructure is to be fully described (otherwise
 	 * embedded types will just be represented by their names (if the are named).
 	 * @return the composed string
 	 * @see #toString()
 	 */
 	@Override
-	public String toString(boolean deep)
+	protected String toStringWithName(String altName, boolean deep)
 	{
 		StringList compStr = new StringList();
 		if (this.compTypes != null) {
 			for (Entry<String, Type> entry: this.compTypes.entrySet()) {
-				String compType = dummy;
-				if (entry.getValue() != null) {
-					if (deep) {
-						compType = entry.getValue().toString(true);
-					}
-					else {
-						compType = entry.getValue().getName();
-					}
+				Type compType = entry.getValue();
+				if (compType == null) {
+					compType = getDummyType();
 				}
-				compStr.add(entry.getKey() + ":" + compType);
+				String compTypeStr = "";
+				if (deep) {
+					compTypeStr = compType.toString(true);
+				}
+				else {
+					compTypeStr = compType.getName();
+				}
+				compStr.add(entry.getKey() + ":" + compTypeStr);
 			}
 		}
-		return "$" + this.name + "(" + compStr.concatenate(";") + ")";
+		return "$" + (altName != null ? altName : this.name) 
+				+ "(" + compStr.concatenate(";") + ")";
 	}
 	
 	/**

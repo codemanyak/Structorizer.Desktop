@@ -47,6 +47,7 @@ import lu.fisch.utils.StringList;
 
 /**
  * Data type class for enumeration types
+ * In the self-description string a name prefix '#' is used.
  * @author Kay Gürtzig
  */
 public class EnumType extends Type {
@@ -93,30 +94,34 @@ public class EnumType extends Type {
 	
 	/**
 	 * Returns a string expressing the type structure either in a shallow way
-	 * ({@code deep = false}, which means just its name here) or with all item
+	 * ({@code deep = false}, meaning only name and item number) or with all item
 	 * specifications ({@code deep = true}).<br/>
-	 * The deep result will start with symbol {@code #}, followed by the identifier
-	 * and the item specifications in parentheses, e.g.:<br/>
+	 * Both results will start with prefix {@code #}, followed by the identifier
+	 * and a parenthesis, which contains just the number of items (not deep) or
+	 * all item specifications (deep), e.g.:<br/>
 	 * {@code #id(name1[=val1], name2[=val2] ...)}
-	 * @param deep - whether possible substructure is to be fully described (otherwise
-	 * embedded types will just be represented by their names (if the are named).
+	 * @param deep - whether the items are to be fully described (otherwise
+	 * only their number is included).
 	 * @return the composed string
 	 * @see #toString()
 	 */
 	@Override
-	public String toString(boolean deep)
+	protected String toStringWithName(String altName, boolean deep)
 	{
-		if (!deep) {
-			return this.name;
-		}
 		StringList itemStrs = new StringList();
-		for (Entry<String, String> entry: this.items.entrySet()) {
-			String itemVal = "";
-			if (entry.getValue() != null) {
-			}
-			itemStrs.add(entry.getKey() + itemVal);
+		if (!deep) {
+			itemStrs.add(Integer.toString(this.items.size()));
 		}
-		return "#" + this.getName() + "(" + itemStrs.concatenate(",") + ")";
+		else {
+			for (Entry<String, String> entry: this.items.entrySet()) {
+				String itemVal = "";
+				if (entry.getValue() != null) {
+					itemVal = entry.getValue();
+				}
+				itemStrs.add(entry.getKey() + itemVal);
+			}
+		}
+		return "#" + (altName != null ? altName : this.name) + "(" + itemStrs.concatenate(",") + ")";
 	}
 
 }

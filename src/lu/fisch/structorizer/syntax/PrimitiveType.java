@@ -20,11 +20,13 @@
 
 package lu.fisch.structorizer.syntax;
 
+import lu.fisch.utils.StringList;
+
 /******************************************************************************************************
  *
  *      Author:         Kay Gürtzig
  *
- *      Description:    Type class for pointer types
+ *      Description:    Data type class for primitive types
  *
  ******************************************************************************************************
  *
@@ -42,39 +44,64 @@ package lu.fisch.structorizer.syntax;
  ******************************************************************************************************///
 
 /**
- * Data type class for pointer types.
- * In the self-description string a name prefix '^' is used.
+ * Data type class for primitive types, contains a prototype object and allows several tests.
  * @author Kay Gürtzig
  */
-public class PointerType extends Type {
+public class PrimitiveType extends Type {
 	
-	private Type refType;
+	private static final StringList FLOAT_NAMES = new StringList(new String[] {"Double", "Float"});
+
+	private Object proto;
 
 	/**
-	 * Constructs a new pointer type with given {@code name} and pointing to
-	 * {@code referencedType}.
-	 * @param name - name of the pointer type
-	 * @param referencedType - the {@link Type} this type is pointing to
-	 * @throws SyntaxException if {@code name} does not fit to strict identifier syntax
+	 * Creates a primitive type with given {@code name} for expressions of the
+	 * type represented by the {@code prototype} value.
+	 * @param name - the type name
+	 * @throws SyntaxException
 	 */
-	public PointerType(String name, Type referencedType) throws SyntaxException {
+	protected PrimitiveType(String name, Object prototype) throws SyntaxException {
 		super(name, null);
-		refType = referencedType;
+		System.out.println(prototype.getClass().getTypeName());
+		proto = prototype;
+	}
+
+	@Override
+	public boolean isNumeric()
+	{
+		return proto instanceof Number;
 	}
 	
 	@Override
-	protected String toStringWithName(String altName, boolean deep)
+	public boolean isPrimitive()
 	{
-		Type rType = (refType != null ? refType : getDummyType());
-		return "^" + this.name + "(" + (deep ? rType.toString(true) : rType.getName()) + ")";
+		return true;
 	}
 	
-	/**
-	 * @return the referenced data {@link Type}, or {@code null} if unspecified
-	 */
-	public Type getReferencedType()
+	public boolean representsValue(Object value)
 	{
-		return this.refType;
+		return value != null && proto.getClass().getName().equals(value.getClass().getName());
+	}
+	
+	public boolean acceptsValue(Object value)
+	{
+		boolean canBeCast = false;
+		try {
+			proto.getClass().cast(value);
+			canBeCast = true;
+		}
+		catch (ClassCastException exc) {	
+		}
+		return canBeCast;
+	}
+	
+	public boolean isFloating()
+	{
+		return FLOAT_NAMES.contains(proto.getClass().getName());
 	}
 
+	public boolean isIntegral()
+	{
+		return isNumeric() && !isFloating();
+	}
+	
 }

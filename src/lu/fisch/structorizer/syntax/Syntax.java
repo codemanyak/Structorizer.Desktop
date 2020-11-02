@@ -108,12 +108,12 @@ public class Syntax {
 
 	private static Syntax instance = null;
 	
-	/**
-	 * Maps Element IDs to vectors of syntactical representations of the
-	 * respective unbroken lines of the Element text.
-	 */
-	private HashMap<Long, Line[]> syntaxMap = new HashMap<Long, Line[]>();
-	
+//	/**
+//	 * Maps Element IDs to vectors of syntactical representations of the
+//	 * respective unbroken lines of the Element text.
+//	 */
+//	private HashMap<Long, Line[]> syntaxMap = new HashMap<Long, Line[]>();
+//	
 	/**
 	 * @return the instance of this class
 	 */
@@ -813,59 +813,60 @@ public class Syntax {
 		}
 	}
 
-	/**
-	 * Stores the syntactical representation of the given Element text {@code _lines}
-	 * in the central syntax map under the Element ID {@code _id}.
-	 * @param _id - Element ID
-	 * @param _lines - unbroken lines of Element text
-	 * @return true if syntax analysis succeeded, false otherwise (no entry then)
-	 */
-	public static boolean registerElementSyntax(long _id, StringList _lines)
-	{
-		Line[] parsedLines = new Line[_lines.count()];
-		getInstance().syntaxMap.put(_id, parsedLines);
-		// TODO Do the syntactical analysis
-		for (int i = 0; i < _lines.count(); i++) {
-			StringList tokens = splitLexically(_lines.get(i), true);
-			tokens.trim();
-			parsedLines[i] = getInstance().parseLine(tokens);
-		}
-		return true;
-	}
-	
-	/**
-	 * Retrieves the parsed syntax of the lines of Element with the given
-	 * ID {@code _id} if it has been in the map, null otherwise
-	 * @param _id - the element id.
-	 * @return An array of {@link Line} structures or {@code null}
-	 */
-	public static Line[] getElementSyntax(long _id)
-	{
-		return instance.syntaxMap.get(_id);
-	}
-	
-	/**
-	 * Retrieves the parsed syntax of line {@code _lineNo} of the Element with
-	 * the given ID {@code _id} if it has been in the map, null otherwise
-	 * @param _id
-	 * @param _lineNo
-	 * @return
-	 */
-	public static Line getLineSyntax(long _id, int _lineNo)
-	{
-		Line[] lines = getElementSyntax(_id);
-		if (lines != null && _lineNo < lines.length) {
-			return lines[_lineNo];
-		}
-		return null;
-	}
-	
-	/**
-	 * @param tokens
-	 * @return
-	 */
-	private Line parseLine(StringList tokens) {
-		return null;
-	}
+// This was just an obsolete draft
+//	/**
+//	 * Stores the syntactical representation of the given Element text {@code _lines}
+//	 * in the central syntax map under the Element ID {@code _id}.
+//	 * @param _id - Element ID
+//	 * @param _lines - unbroken lines of Element text
+//	 * @return true if syntax analysis succeeded, false otherwise (no entry then)
+//	 */
+//	public static boolean registerElementSyntax(long _id, StringList _lines)
+//	{
+//		Line[] parsedLines = new Line[_lines.count()];
+//		getInstance().syntaxMap.put(_id, parsedLines);
+//		// TODO Do the syntactical analysis
+//		for (int i = 0; i < _lines.count(); i++) {
+//			StringList tokens = splitLexically(_lines.get(i), true);
+//			tokens.trim();
+//			parsedLines[i] = getInstance().parseLine(tokens);
+//		}
+//		return true;
+//	}
+//	
+//	/**
+//	 * Retrieves the parsed syntax of the lines of Element with the given
+//	 * ID {@code _id} if it has been in the map, null otherwise
+//	 * @param _id - the element id.
+//	 * @return An array of {@link Line} structures or {@code null}
+//	 */
+//	public static Line[] getElementSyntax(long _id)
+//	{
+//		return instance.syntaxMap.get(_id);
+//	}
+//	
+//	/**
+//	 * Retrieves the parsed syntax of line {@code _lineNo} of the Element with
+//	 * the given ID {@code _id} if it has been in the map, null otherwise
+//	 * @param _id
+//	 * @param _lineNo
+//	 * @return
+//	 */
+//	public static Line getLineSyntax(long _id, int _lineNo)
+//	{
+//		Line[] lines = getElementSyntax(_id);
+//		if (lines != null && _lineNo < lines.length) {
+//			return lines[_lineNo];
+//		}
+//		return null;
+//	}
+//	
+//	/**
+//	 * @param tokens
+//	 * @return
+//	 */
+//	private Line parseLine(StringList tokens) {
+//		return null;
+//	}
 	
 }

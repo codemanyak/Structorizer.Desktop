@@ -228,6 +228,7 @@ import java.util.Date;
 import lu.fisch.graphics.*;
 import lu.fisch.utils.*;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TypeRegistry;
 import lu.fisch.structorizer.helpers.GENPlugin;
 import lu.fisch.structorizer.io.*;
 import lu.fisch.structorizer.locales.LangTextHolder;
@@ -645,8 +646,12 @@ public class Root extends Element {
 	// START KGU#261 2017-01-19: Enh. #259 (type map: (var name | type name) -> type info)
 	// START KGU#502 2018-03-12: Bugfix #518 - distinguish between uninitialized and resulting empty map 
 	//private HashMap<String, TypeMapEntry> typeMap = new HashMap<String, TypeMapEntry>();
+	@Deprecated
 	private HashMap<String, TypeMapEntry> typeMap = null;
 	// END KGU#502 2018-03-12
+	// START KGU#790 2020-11-02: Issue #800
+	private TypeRegistry dataTypes = null;
+	// END KGU#790 2020-11-02
 	// END KGU#261 2017-01-19
 	// START KGU#163 2016-03-25: Added to solve the complete detection of unknown/uninitialised identifiers
 	// Pre-processed parser preference keywords to match them against tokenized strings
@@ -5681,7 +5686,7 @@ public class Root extends Element {
 //        		definedConsts.put(para, this.constants.get(para));
 //        	}
 //        }
-        // START KGU#388 2017-09-17: Enh. #423
+        // START KGU#388 2017-09-17: Enh. #423 Use a local type registry
         HashMap<String, TypeMapEntry> typeDefinitions = new HashMap<String, TypeMapEntry>(); 
         // END KGU#388 2017-09-17
 
