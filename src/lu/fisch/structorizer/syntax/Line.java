@@ -20,12 +20,14 @@
 package lu.fisch.structorizer.syntax;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
 import lu.fisch.structorizer.elements.Element;
 import lu.fisch.structorizer.elements.Instruction;
 import lu.fisch.structorizer.syntax.Expression.NodeType;
+import lu.fisch.structorizer.syntax.Expression.Operator;
 import lu.fisch.utils.StringList;
 
 /******************************************************************************************************
@@ -67,6 +69,7 @@ public class Line {
 	 * @author Kay Gürtzig
 	 */
 	public static enum LineType {
+		// FIXME Since class Declaration, possibly a distinction between LT_CONST_DEF and LT_VAR_DECL is no longer needed
 		/** Line could not be parsed, 0 expr. */
 		LT_RAW,
 		/** Assignment without declaration, 1 expr. */
@@ -97,10 +100,12 @@ public class Line {
 		LT_CATCH,
 		/** Type definition, 1 expr. (= type name)  */
 		LT_TYPE_DEF,
-		/** Constant definition, 1 expr. */
+		/** Constant definition, 1 Declaration */
 		LT_CONST_DEF,
-		/** Variable declaration, 2 expr. (type, variable name or assignment */
-		LT_VAR_DECL
+		/** Variable declaration, 1 Declaration (variable list or assignment) */
+		LT_VAR_DECL,
+		/** Routine header, 1 Routine */
+		LT_ROUTINE
 	};
 	
 	private static final HashMap<String, LineType> lineStartsToTypes = new HashMap<String, LineType>();
@@ -192,11 +197,12 @@ public class Line {
 		case LT_CASE:
 		case LT_CATCH:
 		case LT_CONDITION:
-		case LT_CONST_DEF:
 		case LT_EXIT:
 		case LT_PROC_CALL:
 		case LT_THROW:
 		case LT_INPUT:
+		case LT_CONST_DEF:
+		case LT_VAR_DECL:
 			count = 1;
 			break;
 		case LT_FOR_LOOP:
@@ -208,8 +214,11 @@ public class Line {
 		case LT_RAW:
 		case LT_RETURN:
 		case LT_TYPE_DEF:
-		case LT_VAR_DECL:
 			count = 0;
+		case LT_ROUTINE:
+			count = 1;
+			break;
+		default:
 			break;
 		}
 		return count;
@@ -238,6 +247,7 @@ public class Line {
 		case LT_RETURN:
 		case LT_PROC_CALL:
 		case LT_VAR_DECL:
+		case LT_ROUTINE:
 			count = 1;
 			break;
 		case LT_FOR_LOOP:
@@ -251,6 +261,8 @@ public class Line {
 			break;
 		case LT_TYPE_DEF:
 			count = 0;
+			break;
+		default:
 			break;
 		}
 		return count;		
@@ -654,6 +666,10 @@ public class Line {
 		return okay;
 	}
 	
+	//========================================================================
+	// Provisional test stuff
+	//========================================================================
+	
 	/**
 	 * Test method
 	 * @param args
@@ -661,13 +677,59 @@ public class Line {
 	public static void main(String[] args) {
 		Syntax.loadFromINI();
 		
-		try {
-			Type testType = new Type(StringList.explode("dick,dumm,gefraessig", ","));
-			System.out.println(testType);
-		} catch (SyntaxException exc1) {
-			// TODO Auto-generated catch block
-			exc1.printStackTrace();
-		}
+//		byte[] opdpos = new byte[] {(byte)1, (byte)0, (byte)2};
+//		System.out.println(Arrays.toString(opdpos));
+
+		// C priorities but some operators as functions or methods
+		@SuppressWarnings("serial")
+		HashMap<String, Operator> someAsFunctionOrMethod = new HashMap<String, Operator>() {{
+			put("<-", new Operator(":=", 0));
+			put("||", new Operator("or", new int[] {1, 2}));	// as method
+			put("&&", new Operator("and", new int[] {0,2,1}));	// as function with swapped operands
+			put("^", new Operator("xor", 4));
+			put("==", new Operator("equals", new int[] {1, 2}));// as method
+			put("!=", new Operator("<>", 6));
+			put("<", new Operator("<", 7));
+			put(">", new Operator(">", 7));
+			put("<=", new Operator("<=", 7));
+			put(">=", new Operator(">=", 7));
+			put("%", new Operator("mod"));	// As function
+			put("!", new Operator("not", 11));
+			put("+1", new Operator("+1", 11));	// sign
+			put("-1", new Operator("-1", 11));	// sign
+			put("*1", new Operator("1^", 11));	// pointer deref (Pascal)
+			put("&1", new Operator("@1", 11));	// address (Pascal)
+		}};
+		
+		System.out.println(someAsFunctionOrMethod);
+		
+		// C priorities but some operators as functions or methods
+		HashMap<String, Operator> flatPriorities = new HashMap<String, Operator>();
+		
+		@SuppressWarnings("serial")
+		HashMap<String, Operator> pascalOperators = new HashMap<String, Operator>() {{
+			put("<-", new Operator(":=", 0));
+			put("or", new Operator("or", 9));
+			put("||", new Operator("or", 9));
+			put("and", new Operator("and", 10));
+			put("&&", new Operator("and", 10));
+			put("|", new Operator("|", 9));
+			put("^", new Operator("xor", 9));
+			put("xor", new Operator("xor", 9));
+			put("&", new Operator("&", 10));
+			put("==", new Operator("=", 6));
+			put("!=", new Operator("=", 6));
+			put("<", new Operator("<", 6));
+			put(">", new Operator(">", 6));
+			put("<=", new Operator("<=", 6));
+			put(">=", new Operator(">=", 6));
+			put("%", new Operator("mod", 10));
+			put("!", new Operator("not", 11));
+			put("+1", new Operator("+1", 11));	// sign
+			put("-1", new Operator("-1", 11));	// sign
+			put("*1", new Operator("1^", 11));	// pointer deref (Pascal)
+			put("&1", new Operator("@1", 11));	// address (Pascal)
+		}};
 		
 		String[] exprTests = new String[] {
 				// "good" expressions
@@ -682,6 +744,9 @@ public class Line {
 				"25 * -a - b",
 				"a < 5 && b >= c || isDone",
 				"not hasFun(person)",
+				"a = 17 and (c != 5)",
+				"word == \"nonsense\"",
+				"(18 + b) % (a + (23 * c))",
 				"28 - b % 13 > 4.5 / sqrt(23) * x",
 				"*p <- 17 + &x",
 				"a & ~(17 | 86) ^ ~b | ~c | ~1",
@@ -740,6 +805,9 @@ public class Line {
 					StringList vars2 = new StringList();
 					System.out.println(i + ": " + expr.toString());
 					System.out.println(i + ": " + expr.translate(Expression.verboseOperators));
+					System.out.println(i + ": " + expr.translate(flatPriorities));
+					System.out.println(i + ": " + expr.translate(someAsFunctionOrMethod));
+					System.out.println(i + ": " + expr.translate(pascalOperators));
 					boolean okay = expr.gatherVariables(vars1, vars2, false);
 					System.out.println("Assigned: " + vars1.toString() +
 							", used: " + vars2.toString() + (okay ? "" : ", errors"));

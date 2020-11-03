@@ -19,6 +19,8 @@
  */
 package lu.fisch.structorizer.syntax;
 
+import java.util.Arrays;
+
 /******************************************************************************************************
  *
  *      Author:         Kay Gürtzig
@@ -36,6 +38,9 @@ package lu.fisch.structorizer.syntax;
  *      Kay Gürtzig     2019-12-19      Signature change of TypeMapEntry constructor integrated
  *      Kay Gürtzig     2020-10-26      Opportunity of null delimiter in parseList(...) added.
  *      Kay Gürtzig     2020-11-01      Reliable variable gathering and type retrieval mechanism implemented
+ *      Kay Gürtzig     2020-11-03      toString() delegated to (the less performant but more more versatile)
+ *                                      appendToTokenList() method family,
+ *                                      embedded Operator class extended with a translation option to function/method
  *
  ******************************************************************************************************
  *
@@ -47,7 +52,6 @@ package lu.fisch.structorizer.syntax;
  ******************************************************************************************************///
 
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.NoSuchElementException;
@@ -72,7 +76,11 @@ import lu.fisch.utils.StringList;
  * <tr><td>ARRAY_INITIALIZATION</td><td>type name (if any)</td><td>elements</td></tr>
  * <tr><td>RECORD_INITIALIZATION</td><td>type name</td><td>components</td></tr>
  * <tr><td>COMPONENT</td><td>comp name</td><td>comp value</td></tr>
+ * <tr><td>DECLARATION</td><td>-</td><td>assignment or variables</td></tr>
+ * <tr><td>ROUTINE</td><td>routine name</td><td>argument declarations</td></tr>
  * </table>
+ * Types {@link NodeType#DECLARATION} and {@link NodeType#ROUTINE} are reserved
+ * for subclasses.
  * @author Kay Gürtzig
  */
 public class Expression {
@@ -145,11 +153,86 @@ public class Expression {
 	 * @author Kay Gürtzig
 	 */
 	public static final class Operator {
+		/** The operator symbol - may be an identifier or a sequence of symbol characters */
 		public final String symbol;
+		/** Operator priority: the higher the value the higher the precedence */
 		public final byte precedence;
+		/**
+		 * Specifies function or method syntax if not {@code null}. An empty array
+		 * induces a function with consecutive operand placement as arguments,
+		 * otherwise the array lists the operand numbers (index + 1) to place as
+		 * method executing object (position 0), 1st argument, 2nd argument etc.
+		 * If the array element 0 is 0 then a function will be created, otherwise
+		 * a method call, e.g.
+		 * <ul>
+		 * <li>{{@code }} function with "natural" argument order: {@code <symbol>(<opd1>, <opd2> ,...)}</li>
+		 * <li>{{@code 0, 2, 1}} would swap operands: {@code <symbol>(<opd2>, <opd1>)}</li>
+		 * <li>{{@code 1, 2}} would produce method syntax: {@code <opd1>.<symbol>(<opd2>)}</li>
+		 * </ul>
+		 */
+		public final byte[] argumentOrder;
+		
+		/**
+		 * Specifies an (infix) operator with given {@code symbol} and {@code precedence}.
+		 * @param symbol - the operator symbol (a leading '1' will make it a
+		 * postfix operator, if unary).
+		 * @param precedence - the priority (the higher the more precedent)
+		 * @see #Operator(String)
+		 * @see #Operator(String, int[])
+		 */
 		public Operator(String symbol, int precedence) {
 			this.symbol = symbol;
 			this.precedence = (byte)precedence;
+			this.argumentOrder = null;
+		}
+		
+		/**
+		 * Specifies a function with given {@code name} that is to replace an
+		 * operator, with the operands as arguments in the same order. It will
+		 * automatically get highest priority.
+		 * @param name - the function name
+		 * @see #Operator(String, int)
+		 * @see #Operator(String, int[])
+		 */
+		public Operator(String name) {
+			this.symbol = name;
+			this.precedence = Byte.MAX_VALUE;
+			this.argumentOrder = new byte[]{};
+		}
+		
+		/**
+		 * Specifies a function or method with given {@code name} that is to replace
+		 * an operator, with the operands as arguments in the order specified by
+		 * {@code argOrder}. It will automatically get highest priority.
+		 * @param name - the function name
+		 * @param argOrder - array of operand position numbers, see #argumentOrder
+		 * @see #Operator(String)
+		 * @see #Operator(String, int)
+		 */
+		public Operator(String name, int[] argOrder) {
+			this.symbol = name;
+			this.precedence = Byte.MAX_VALUE;
+			this.argumentOrder = new byte[argOrder.length];
+			for (int i = 0; i < argOrder.length; i++) {
+				this.argumentOrder[i] = (byte)argOrder[i];
+			}
+		}
+		
+		@Override
+		public String toString()
+		{
+			StringBuilder sb = new StringBuilder();
+			sb.append(this.getClass().getSimpleName());
+			sb.append("(");
+			sb.append(this.symbol);
+			sb.append(",");
+			sb.append(this.precedence);
+			if (this.argumentOrder != null) {
+				sb.append(",");
+				sb.append(Arrays.toString(this.argumentOrder));
+			}
+			sb.append(")");
+			return sb.toString();
 		}
 	};
 	
@@ -161,49 +244,69 @@ public class Expression {
 	@SuppressWarnings("serial")
 	public static final HashMap<String, Operator> verboseOperators = new HashMap<String, Operator>() {{
 		put("<-", new Operator(":=", 0));
-		//put("or", new Operator("or", 1));
+		//put("or", new Operator("or", 1));	// Does not change anything
 		put("||", new Operator("or", 1));
-		//put("and", new Operator("and", 2));
+		//put("and", new Operator("and", 2));	// Does not change anything
 		put("&&", new Operator("and", 2));
 		//put("|", new Operator("|", 3));
 		put("^", new Operator("xor", 4));
-		//put("xor", new Operator("xor", 4));
-		//put("&", new Operator("&", 5));
+		//put("xor", new Operator("xor", 4));	// Does not change anything
+		//put("&", new Operator("&", 5));	// Does not change anything
 		//put("=", new Operator("=", 6));	// Does not change anything
 		put("==", new Operator("=", 6));
 		//put("<>", new Operator("<>", 6));	// Does not change anything
-		put("!=", new Operator("=", 6));
+		put("!=", new Operator("<>", 6));
 		put("<", new Operator("<", 7));
 		put(">", new Operator(">", 7));
 		put("<=", new Operator("<=", 7));
 		put(">=", new Operator(">=", 7));
-		//put("shl", new Operator("shl", 8));
-		//put("<<", new Operator("<<", 8));
-		//put("shr", new Operator("shr", 8));
-		//put(">>", new Operator(">>", 8));
-		//put(">>>", new Operator(">>>", 8));
-		//put("+", new Operator("+", 9));
-		//put("-", new Operator("-", 9));
-		//put("*", new Operator("*", 10));
-		//put("/", new Operator("/", 10));
-		//put("div", new Operator("div", 10));
-		//put("mod", new Operator("mod", 10));
+		//put("shl", new Operator("shl", 8));	// Does not change anything
+		//put("<<", new Operator("<<", 8));	// Does not change anything
+		//put("shr", new Operator("shr", 8));	// Does not change anything
+		//put(">>", new Operator(">>", 8));	// Does not change anything
+		//put(">>>", new Operator(">>>", 8));	// Does not change anything
+		//put("+", new Operator("+", 9));	// Does not change anything
+		//put("-", new Operator("-", 9));	// Does not change anything
+		//put("*", new Operator("*", 10));	// Does not change anything
+		//put("/", new Operator("/", 10));	// Does not change anything
+		//put("div", new Operator("div", 10));	// Does not change anything
+		//put("mod", new Operator("mod", 10));	// Does not change anything
 		put("%", new Operator("mod", 10));
-		//put("not", new Operator("not", 11));
+		//put("not", new Operator("not", 11));	// Does not change anything
 		put("!", new Operator("not", 11));
-		//put("~", new Operator("~", 11));
+		//put("~", new Operator("~", 11));	// Does not change anything
 		put("+1", new Operator("+1", 11));	// sign
 		put("-1", new Operator("-1", 11));	// sign
 		put("*1", new Operator("1^", 11));	// pointer deref (C)
 		put("&1", new Operator("@1", 11));	// address (C)
-		//put("[]", new Operator("[]", 12));
-		//put(".", new Operator(".", 12));
+		//put("[]", new Operator("[]", 12));	// Does not change anything
+		//put(".", new Operator(".", 12));	// Does not change anything
 	}};
 	
 	/** COMPONENT means the colon separating a component name and a component value in a record initializer,<br/>
 	 * QUALIFIER is the dot separating a record and a component name (whereas the dot in a method call is handled as OPERATOR) <br/>
 	 * PARENTH symbolizes an opening parenthesis and is only temporarily used within the shunting yard algorithm in {@link Expression#parse(StringList, StringList)} */
-	public static enum NodeType {LITERAL, VARIABLE, OPERATOR, FUNCTION, /*QUALIFIER, INDEX,*/ ARRAY_INITIALIZER, RECORD_INITIALIZER, COMPONENT, PARENTH};
+	public static enum NodeType {
+		/** leaf node, a literal of an unambiguous data type (safe) */
+		LITERAL,
+		/** leaf node, a variable (i.e. its identifier), data type may be declared or inferred */
+		VARIABLE,
+		/** an operator (its symbol), parent of operand expressions, data type usually inferred */
+		OPERATOR,
+		/** function call (its identifier), parent of argument expressions, data type declared */
+		FUNCTION,
+		/** an array initializer, parent of element expressions, data type determined by elements */
+		ARRAY_INITIALIZER,
+		/** a record initializer (record type name), parent of {@link #COMPONENT}s */
+		RECORD_INITIALIZER,
+		/** a component inside a {@link #RECORD_INITIALIZER}: [component id +] value expression */
+		COMPONENT,
+		/** temporary type (during parsing): parentheses, brackets or braces, parent of expressions */
+		PARENTH,
+		/** a variable initialisation or a list of variables, data type is declared (safe) */
+		DECLARATION,
+		/** a routine header (its name), parent of parameter {@link #DECLARATION}s, data type is declared for result */
+		ROUTINE};
 	public NodeType type;
 	public String text;
 	public final LinkedList<Expression> children = new LinkedList<Expression>();
@@ -266,6 +369,7 @@ public class Expression {
 	 */
 	private String toString(int parentPrec, HashMap<String, Operator> _alternOprs)
 	{
+		// Now delegated to appendToTokenList, which is less efficient but more versatile
 //		StringBuilder sb = new StringBuilder();
 //		String sepa = "";	// separator
 //		Iterator<Expression> iter = null;
@@ -442,7 +546,6 @@ public class Expression {
 	private void appendToTokenList(StringList tokens, byte parentPrec, HashMap<String, Operator> alternOprs)
 	{
 		String[] sepa = new String[]{};
-		Iterator<Expression> iter = null;
 		switch (type) {
 		case LITERAL:
 		case VARIABLE:
@@ -451,7 +554,9 @@ public class Expression {
 		case OPERATOR: {
 			// May be unary or binary
 			Operator opr = null;
-			boolean noPrec = false;
+			boolean asFunc = false;	// express the operator as function call?
+			int methObjIx = -1;		// if >= 0, express the operator as method call
+			boolean noPrec = false;	// put all expressions in parentheses?
 			if (alternOprs != null) {
 				opr = alternOprs.get(text);
 				noPrec =  alternOprs.isEmpty();
@@ -461,21 +566,36 @@ public class Expression {
 			if (opr != null) {
 				myPrec = opr.precedence;
 				symbol = opr.symbol;
-			}
-			if (children.size() <= 1 && !symbol.startsWith("1")) {
-				// Unary prefix operator
-				if (symbol.endsWith("1")) {
-					tokens.add(text.substring(0, text.length()-1));
+				asFunc = opr.argumentOrder != null;
+				if (asFunc && opr.argumentOrder.length > 0) {
+					methObjIx = opr.argumentOrder[0] - 1;
 				}
+			}
+			if (asFunc || children.size() <= 1 && !symbol.startsWith("1")) {
+				// Explicit unary prefix operator
+				if (!asFunc && symbol.endsWith("1")) {
+					tokens.add(symbol.substring(0, symbol.length()-1));
+				}
+				// Other unary prefix operator or empty array brackets (during parsing)
 				else if (children.isEmpty() || !text.equals("[]")){
-					tokens.add(text);
+					if (methObjIx >= 0 && methObjIx < children.size()) {
+						children.get(methObjIx).appendToTokenList(tokens,
+								OPERATOR_PRECEDENCE.get("."), alternOprs);
+						// TODO Check whether alternOprs contains a different symbol!
+						tokens.add(".");
+					}
+					tokens.add(symbol);
 				}
 				//if (text.equals("+") || text.equals("-")) {
 				//	// Seems to be a sign operator - same precedence level as negation
 				//	myPrec = OPERATOR_PRECEDENCE.get("!");
 				//}
+				// Insert an opening parenthesis in function style
+				if (asFunc) {
+					sepa = new String[]{"("};
+				}
 				// Insert a gap if the operator is an identifier (word)
-				if (Syntax.isIdentifier(symbol, false, null)) {
+				else if (Syntax.isIdentifier(symbol, false, null)) {
 					tokens.add(" ");
 				}
 			}
@@ -484,35 +604,61 @@ public class Expression {
 				|| myPrec < parentPrec && !(myPrec < 11 && parentPrec == 12)) {
 				sepa = new String[]{"("};
 			}
-			iter = children.iterator();
-			while (iter.hasNext()) {
+			if (asFunc && opr.argumentOrder.length > 0) {
+				// Specific processing for functions/methods with specified order
 				for (int i = 0; i < sepa.length; i++) tokens.add(sepa[i]);
-				iter.next().appendToTokenList(tokens, myPrec, alternOprs);
-				if (text.equals("[]")) {
-					if (sepa.length == 0) {
-						sepa = new String[]{symbol.substring(0, 1)};
+				for (int i = 1; i < opr.argumentOrder.length; i++) {
+					if (i > 1) {
+						tokens.add(",");
+						tokens.add(" ");
+					}
+					int pos = opr.argumentOrder[i] - 1;
+					if (pos < this.children.size()) {
+						this.children.get(pos).appendToTokenList(tokens, alternOprs);
+					}
+				}
+			}
+			else {
+				// Standard processing for operators and functions
+				boolean isFirst = true;
+				final String[] comma =  new String[]{",", " "};
+				for (Expression child: children) {
+					for (int i = 0; i < sepa.length; i++) tokens.add(sepa[i]);
+					child.appendToTokenList(tokens, asFunc ? 0 : myPrec, alternOprs);
+					if (asFunc) {
+						sepa = comma;
+					}
+					else if (text.equals("[]")) {
+						// The first operand was the array, now the indices will follow
+						if (isFirst) {
+							sepa = new String[]{symbol.substring(0, 1)};
+						}
+						else {
+							sepa = comma;
+						}
+					}
+					// Put a gap around all operators except "."
+					else if (!text.equals(".")) {
+						sepa = new String[]{" ", symbol, " "};
 					}
 					else {
-						sepa = new String[]{",", " "};
+						sepa = new String[]{symbol};
 					}
-				}
-				// Put a gap around all operators except "."
-				else if (!text.equals(".")) {
-					sepa = new String[]{" ", symbol, " "};
-				}
-				else {
-					sepa = new String[]{symbol};
+					isFirst = false;
 				}
 			}
 			if (text.equals("[]") && !children.isEmpty()) {
 				tokens.add(symbol.substring(1));	// usually "]"
 			}
-			if ((children.size() > 1 || symbol.startsWith("1"))
+			// Closing parenthesis?
+			if (asFunc ||
+					(children.size() > 1 || symbol.startsWith("1"))
 					&& (noPrec
 					|| myPrec < parentPrec && !(myPrec < 11 && parentPrec == 12))) {
 				tokens.add(")");
 			}
-			if ((children.size() <= 1) && symbol.startsWith("1")) {
+			// Postfix operator
+			if (!asFunc && (children.size() <= 1) && symbol.startsWith("1")) {
 				tokens.add(symbol.substring(1));
 			}
 			break;
@@ -521,10 +667,9 @@ public class Expression {
 			tokens.add(text);	// The record type name
 		case ARRAY_INITIALIZER:
 			tokens.add("{");
-			iter = children.iterator();
-			while (iter.hasNext()) {
+			for (Expression child: children) {
 				for (int i = 0; i < sepa.length; i++) tokens.add(sepa[i]);
-				iter.next().appendToTokenList(tokens, alternOprs);;
+				child.appendToTokenList(tokens, alternOprs);;
 				sepa = new String[]{",", " "};
 			}
 			tokens.add("}");
@@ -540,21 +685,21 @@ public class Expression {
 		case FUNCTION:
 			tokens.add(text);
 			tokens.add("(");
-			iter = children.iterator();
-			while (iter.hasNext()) {
+			for (Expression child: children) {
 				for (int i = 0; i < sepa.length; i++) tokens.add(sepa[i]);
-				iter.next().appendToTokenList(tokens, alternOprs);
+				child.appendToTokenList(tokens, alternOprs);
 				sepa = new String[]{",", " "};
 			}
 			tokens.add(")");
 			break;
 		case PARENTH:
+			// Only relevant during parsing (i.e. for debugging purposes)
 			tokens.add(text);
 			tokens.add(Integer.toString(children.size()));	// This element counts aggregated expressions by adding null entries
 			break;
 		default:
-			break;		
-		}		
+			break;
+		}
 	}
 	
 	/**
