@@ -58,15 +58,18 @@ public class TypeRegistry {
 	private static final HashMap<String, Type> globalMap = new HashMap<String, Type>() {{
 		try {
 			put(":dummy", Type.getDummyType());
+			put(":boolean", new PrimitiveType("boolean", Boolean.valueOf(false)));
 			put(":byte", new PrimitiveType("byte", Byte.valueOf((byte)0)));
 			put(":short", new PrimitiveType("short", Short.valueOf((short)0)));
 			put(":int", new PrimitiveType("int", Integer.valueOf((int)0)));
 			put(":long", new PrimitiveType("long", Long.valueOf((long)0)));
+			put(":ushort", new PrimitiveType("ushort", Short.valueOf((short)0)));
+			put(":uint", new PrimitiveType("uint", Integer.valueOf((int)0)));
+			put(":ulong", new PrimitiveType("ulong", Long.valueOf((long)0)));
 			put(":float", new PrimitiveType("float", Float.valueOf((float)0.0)));
 			put(":double", new PrimitiveType("double", Double.valueOf((double)0.0)));
 			put(":char", new PrimitiveType("char", Character.valueOf('\0')));
 			put(":string", new PrimitiveType("string", new String()));
-			put(":boolean", new PrimitiveType("boolean", Boolean.valueOf(false)));
 		}
 		catch (Exception exc)
 		{}
@@ -200,6 +203,7 @@ public class TypeRegistry {
 		if (getStandardType(type.getName()) == null &&
 				(force || !type.isAnonymous() && !typeMap.containsKey(":" + type.getName()))) {
 			result = typeMap.put(":" + type.getName(), type);
+			type.registry = this;
 			if (result == null) {
 				result = type;
 			}
@@ -230,6 +234,7 @@ public class TypeRegistry {
 				&& ((prevType = getType(type.getName())) == null || prevType == type)) {
 			// TODO: Check for equivalent type
 			result = typeMap.put(varName, type);
+			type.registry = this;
 			if (result == null) {
 				result = type;
 			}

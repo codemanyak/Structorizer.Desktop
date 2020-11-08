@@ -55,6 +55,21 @@ import lu.fisch.utils.StringList;
 public class Declaration extends Expression {
 	
 	/**
+	 * Declaration context - needed for parsing to cover the slight differences
+	 * @author Kay Gürtzig
+	 */
+	public static enum Context{
+		/** Variable declaration in an instruction line after having cut off a "var" or "dim" keyword */
+		DC_VAR,
+		/** Variable declaration in an instruction line in assumed C style i.e. {@code <type> <id>} */
+		DC_CSTYLE,
+		/** Parameter declaration within a routine header */
+		DC_PARAM,
+		/** Record component declaration in a type definition */
+		DC_RECORD
+		};
+	
+	/**
 	 * Specifies the declaration syntax for translation - It can make sense to provide
 	 * several declaration specifications for a target language, depending on the
 	 * context (e.g. for variable declarations, parameter declarations, record
@@ -139,18 +154,24 @@ public class Declaration extends Expression {
 	 * according to the structure. Copes with all Structorizer declaration styles
 	 * (Pascal, BASIC, C, Java)
 	 * @param tokens - the token list the output is to be added to
-	 * @param inParamList - whether we are parsing a parameter list
+	 * @param context - specifies the declaration context (because of syntactic differences)
 	 * @param typeMap - a {@link TypeRegistry} for data type retrieval from names
 	 * @return One or more Declaration objects if nothing goes wrong
 	 * @throws SyntaxException in case of syntactical errors
 	 */
-	public static LinkedList<Declaration> parse(StringList tokens, boolean inParamList, TypeRegistry typeMap) throws SyntaxException
+	public static LinkedList<Declaration> parse(StringList tokens, Context context, TypeRegistry typeMap) throws SyntaxException
 	{
 		// TODO
 		return null;
 	}
 	
-	public void appendToTokenList(StringList tokens, boolean inParamList, DeclarationSpec declSpec)
+	/**
+	 * 
+	 * @param tokens
+	 * @param context
+	 * @param declSpec
+	 */
+	public void appendToTokenList(StringList tokens, Context context, DeclarationSpec declSpec)
 	{
 		if (isConstant) {
 			tokens.add(declSpec.constKeyword);

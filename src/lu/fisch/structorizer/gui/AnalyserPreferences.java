@@ -77,7 +77,10 @@ import javax.swing.border.*;
 @SuppressWarnings("serial")
 public class AnalyserPreferences extends LangDialog {
 
-	// DO NOT CHANGE THE ORDER OF THE STRINGS HERE - use checkboxOrder to rearrange checks! 
+	// DO NOT CHANGE THE ORDER OF THE STRINGS HERE - use checkboxOrder to rearrange checks!
+	/**
+	 * These are the strings decoding the check categories, ordered by code (1, 2, ...)
+	 */
 	private static final String[] checkCaptions = {
 		/*1*/"Check for modified loop variable.",
 		/*2*/"Check for endless loop (as far as detectable!).",
@@ -113,8 +116,10 @@ public class AnalyserPreferences extends LangDialog {
 		// text added here (and of course the checking code itself)!
 	};
 	// START KGU#290 2016-11-10: Enh. #286 (grouping and distribution over several tabs)
-	// The order in which the checks (numbering starts with 1, index 0 induces an
-	// empty line) are to be presented and distributed over several tabs
+	/**
+	 * The order in which the checks (numbering starts with 1, index 0 induces an
+	 * empty line) are to be presented and distributed over several tabs
+	 * */
 	private static final LinkedHashMap<String, int[]> checkboxTabs = new LinkedHashMap<String, int[]>();
 	static {
 		checkboxTabs.put("Algorithmic", new int[]{

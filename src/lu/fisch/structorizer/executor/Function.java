@@ -222,8 +222,12 @@ public class Function
 // END KGU 2020-11-01
 
 	/**
+	 * For historical reasons, this method does not differentiate between
+	 * function and method. So if you want to know whether this is a pure
+	 * function, you will also have to check that {@link #isMethod()} does
+	 * <i>not</i> return {@code true}.
 	 * @return {@code true} if this object represents a syntactically correct
-	 * function or method call, i.e. one of
+	 * function or method call, i.e. one of:
 	 * <ul>
 	 * <li>{@code <functionname>(<arg>,...)}</li>
 	 * <li>{@code <object>.<methodname>(<arg>, ...) }</li>
@@ -237,6 +241,8 @@ public class Function
 
 	// START KGU#790 2020-11-02: New for issue #800
 	/**
+	 * Checks that this represents a method call (OOP); will return {@code false}
+	 * if this is a mere function (not-OO).
 	 * @return {@code true} if this object represents a syntactically correct
 	 * method call, i.e. something like {@code <object>.<methodname>(<arg>, ...) }.
 	 * @see #isFunction()
@@ -263,11 +269,12 @@ public class Function
 	
 	// START KGU#332 2017-01-29: Enh. #335
 	/**
-	 * Tests whether the passed-in expression expr may represent a subroutine call
-	 * i.e. consists of an identifier followed by a parenthesized comma-separated
-	 * list of argument expressions
-	 * @param expr - an expression
-	 * @return true if the expression has got function call syntax
+	 * Tests whether the passed-in expression string {@code expr} may represent a
+	 * routine or method call, i.e., consists of an identifier or component access
+	 * followed by a parenthesized comma-separated list of argument expressions.
+	 * @param expr - an expression as string
+	 * @return {@code true} if the expression has got function or method call syntax
+	 * @see #isFunction(Expression)
 	 */
 	public static boolean isFunction(String expr)
 	{

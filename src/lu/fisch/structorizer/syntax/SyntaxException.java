@@ -55,6 +55,8 @@ public class SyntaxException extends Exception {
 	
 	/** Number of the token where the error was detected */
 	private int tokenIndex = 0;
+	/** Analyser check category (if any), otherwise 0 (which stands for general syntax error) */
+	private int errorNo = 0;
 
 	/**
 	 * Constructs a new SyntaxException with the specified detail message.  The
@@ -64,10 +66,30 @@ public class SyntaxException extends Exception {
 	 *          later retrieval by the {@link #getMessage()} method.
 	 * @param position - the index of the inducing token (in a condensed token
 	 *          list)
+	 * @see #SyntaxException(String, int, int)
+	 * @see #SyntaxException(String, int, Throwable, int)
+	 * @see #SyntaxException(String, String[], int, Throwable, int)
 	 */
 	public SyntaxException(String message, int position) {
 		super(message);
 		tokenIndex = position;
+	}
+
+	/**
+	 * Constructs a new SyntaxException with the specified detail message.  The
+	 * cause is not initialized, and may subsequently be initialized by
+	 * a call to {@link #initCause}.
+	 * @param message - the detail message. The detail message is saved for
+	 *          later retrieval by the {@link #getMessage()} method.
+	 * @param position - the index of the inducing token (in a condensed token
+	 *          list)
+	 * @param errorCode - the code number of an Analyser check category (see
+	 *          {@link lu.fisch.structorizer.gui.AnalyserPreferences#checkCaptions})
+	 */
+	public SyntaxException(String message, int position, int errorCode) {
+		super(message);
+		tokenIndex = position;
+		errorNo = errorCode;
 	}
 
 	/**
@@ -79,10 +101,13 @@ public class SyntaxException extends Exception {
 	 * @param cause - the cause (which is saved for later retrieval by the
 	 * {@link #getCause()} method). (A {@code null} value is permitted, and indicates
 	 * that the cause is nonexistent or unknown.)
+	 * @param errorCode - the code number of an Analyser check category (see
+	 * {@link lu.fisch.structorizer.gui.AnalyserPreferences#checkCaptions})
 	 */
-	public SyntaxException(int position, Throwable cause) {
+	public SyntaxException(int position, Throwable cause, int errorCode) {
 		super(cause);
 		tokenIndex = position;
+		errorNo = errorCode;
 	}
 
 	/**
@@ -97,10 +122,13 @@ public class SyntaxException extends Exception {
 	 *         {@link #getCause()} method). (A {@code null} value is
 	 *         permitted, and indicates that the cause is nonexistent or
 	 *         unknown.)
+	 * @param errorCode - the code number of an Analyser check category (see
+	 *          {@link lu.fisch.structorizer.gui.AnalyserPreferences#checkCaptions})
 	 */
-	public SyntaxException(String message, int position, Throwable cause) {
+	public SyntaxException(String message, int position, Throwable cause, int errorCode) {
 		super(message, cause);
 		tokenIndex = position;
+		errorNo = errorCode;
 	}
 
 	/**
@@ -114,10 +142,13 @@ public class SyntaxException extends Exception {
 	 * @param position  - the index of the inducing token (in a condensed token
 	 * list)
 	 * @param cause - a possible directly causing exception
+	 * @param errorCode - the code number of an Analyser check category (see
+	 * {@link lu.fisch.structorizer.gui.AnalyserPreferences#checkCaptions})
 	 */
-	public SyntaxException(String msgKey, String[] msgDetails, int position, Throwable cause) {
+	public SyntaxException(String msgKey, String[] msgDetails, int position, Throwable cause, int errorCode) {
 		super(composeMessage(msgKey, msgDetails), cause);
 		tokenIndex = position;
+		errorNo = errorCode;
 	}
 
 	/**
@@ -158,5 +189,13 @@ public class SyntaxException extends Exception {
 	public int getPosition()
 	{
 		return this.tokenIndex;
+	}
+	
+	/**
+	 * @return the error code corresponding with some Analyser check category or 0
+	 */
+	public int getErrorNo()
+	{
+		return this.errorNo;
 	}
 }

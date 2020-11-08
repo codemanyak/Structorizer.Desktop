@@ -210,6 +210,7 @@ import lu.fisch.structorizer.syntax.Expression;
 import lu.fisch.structorizer.syntax.Line;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.structorizer.syntax.SyntaxException;
+import lu.fisch.structorizer.syntax.TypeRegistry;
 import lu.fisch.structorizer.executor.Executor;
 import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.gui.FindAndReplace;
@@ -1174,14 +1175,15 @@ public abstract class Element {
 	/**
 	 * 
 	 * @param problems
+	 * @param typeMap TODO
 	 * @return
 	 */
-	public Line[] getParsedText(StringList problems)
+	public Line[] getParsedText(StringList problems, TypeRegistry typeMap)
 	{
 		StringList unbrText = this.getUnbrokenText();
 		Line[] lines = new Line[unbrText.count()];
 		for (int i = 0; i < lines.length; i++) {
-			lines[i] = Line.parse(unbrText.get(i), null, problems);
+			lines[i] = Line.parse(unbrText.get(i), null, typeMap, problems);
 		}
 		return lines;
 	}
@@ -1190,15 +1192,16 @@ public abstract class Element {
 	 * 
 	 * @param declaredVars
 	 * @param usedVars
+	 * @param typeMap - a data type map to retrieve from and add to, or {@code null}
 	 * @param problems
 	 * @return
 	 */
-	public Line[] getParsedText(StringList declaredVars, StringList usedVars, StringList problems)
+	public Line[] getParsedText(StringList declaredVars, StringList usedVars, TypeRegistry typeMap, StringList problems)
 	{
 		StringList unbrText = this.getUnbrokenText();
 		Line[] lines = new Line[unbrText.count()];
 		for (int i = 0; i < lines.length; i++) {
-			lines[i] = Line.parse(unbrText.get(i), null, problems);
+			lines[i] = Line.parse(unbrText.get(i), null, typeMap, problems);
 		}
 		return lines;
 	}
@@ -4283,7 +4286,7 @@ public abstract class Element {
 		parsedLines = new Line[unbrokenLines.count()];
 		for (int i = 0; i < parsedLines.length; i++) {
 			// FIXME guess a suited line type, ought to be delegated to subclasses, though
-			parsedLines[i] = Line.parse(unbrokenLines.get(i), null, errors);
+			parsedLines[i] = Line.parse(unbrokenLines.get(i), null, null, errors);
 		}
 		return errors;
 	}

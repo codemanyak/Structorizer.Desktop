@@ -16,6 +16,7 @@ import lu.fisch.utils.StringList;
  *      ------          ----            -----------
  *      Kay Gürtzig     2019-12-19      First Issue (#800)
  *      Kay Gürtzig     2020-11-01      Name check inserted
+ *      Kay Gürtzig     2020-11-06      Uplink to a TypeRegistry added
  *
  ******************************************************************************************************
  *
@@ -25,7 +26,9 @@ import lu.fisch.utils.StringList;
  ******************************************************************************************************///
 
 /**
- * Base class for data type description in Structorizer
+ * Base class for data type description in Structorizer. Can be used as mere
+ * type name reference (while an owning {@link TypeRegistry} is not available
+ * (t be replaced by a specified Type subclass object as soon as possible).
  * @author Kay Gürtzig
  */
 public class Type {
@@ -50,6 +53,11 @@ public class Type {
 	 */
 	// FIXME: Do we really need this (it does not make much sense as does not contribute to the key)
 	protected StringList modifiers = null;
+	
+	/**
+	 * Link to the owning {@link TypeRegistry}
+	 */
+	protected TypeRegistry registry = null;
 	
 	/** Internal constructor, only used by {@link #getDummyType()} */
 	private Type()

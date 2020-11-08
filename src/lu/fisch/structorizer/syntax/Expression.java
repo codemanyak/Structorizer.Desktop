@@ -289,8 +289,8 @@ public class Expression {
 	public static enum NodeType {
 		/** leaf node, a literal of an unambiguous data type (safe) */
 		LITERAL,
-		/** leaf node, a variable (i.e. its identifier), data type may be declared or inferred */
-		VARIABLE,
+		/** leaf node, an identifier (variable, constant, type), data type may be declared or inferred */
+		IDENTIFIER,
 		/** an operator (its symbol), parent of operand expressions, data type usually inferred */
 		OPERATOR,
 		/** function call (its identifier), parent of argument expressions, data type declared */
@@ -548,7 +548,7 @@ public class Expression {
 		String[] sepa = new String[]{};
 		switch (type) {
 		case LITERAL:
-		case VARIABLE:
+		case IDENTIFIER:
 			tokens.add(text);
 			break;
 		case OPERATOR: {
@@ -864,7 +864,7 @@ public class Expression {
 					else if (varType == null && _typeMap != null) {
 						leftSide.dataType = dType;
 						// ... possibly even register the variable type
-						if (leftSide.type == NodeType.VARIABLE) {
+						if (leftSide.type == NodeType.IDENTIFIER) {
 							_typeMap.putTypeFor(leftSide.text, dType, false);
 						}
 					}
@@ -963,7 +963,7 @@ public class Expression {
 				_cacheTypes = false;
 			}
 			break;
-		case VARIABLE:
+		case IDENTIFIER:
 			if (_typeMap != null) {
 				dType = _typeMap.getTypeFor(text);
 				isSafe = dType != null && !dType.isAnonymous();
@@ -1076,7 +1076,7 @@ public class Expression {
 						}
 					}
 					catch (NoSuchElementException ex) {
-						throw new SyntaxException("Too few operands for operator '" + expr.text + "'.", expr.tokenPos, ex);
+						throw new SyntaxException("Too few operands for operator '" + expr.text + "'.", expr.tokenPos, ex, 0);
 					}
 					output.addLast(expr);
 					stack.removeLast();
@@ -1163,7 +1163,7 @@ public class Expression {
 							stack.removeLast();
 						}
 					}
-					expr = new Expression(NodeType.VARIABLE, token, position);
+					expr = new Expression(NodeType.IDENTIFIER, token, position);
 					output.addLast(expr);
 					signPos = false;
 					wasOpd = true;
@@ -1292,7 +1292,7 @@ public class Expression {
 								expr.children.addFirst(output.removeLast());
 							}
 							catch (NoSuchElementException ex) {
-								throw new SyntaxException("Lost arguments / items / indices for " + expr.text, expr.tokenPos, ex);
+								throw new SyntaxException("Lost arguments / items / indices for " + expr.text, expr.tokenPos, ex, 0);
 							}
 						}
 						output.addLast(stack.removeLast());
@@ -1335,7 +1335,7 @@ public class Expression {
 				}
 			}
 			catch (NoSuchElementException ex) {
-				throw new SyntaxException("Too few operands for operator '" + expr.text + "'.", expr.tokenPos, ex);
+				throw new SyntaxException("Too few operands for operator '" + expr.text + "'.", expr.tokenPos, ex, 0);
 			}
 			output.addLast(expr);
 		}
@@ -1363,7 +1363,7 @@ public class Expression {
 				}
 			}
 			catch (NoSuchElementException ex) {
-				throw new SyntaxException("Too few operands for operator '" + expr.text + "'", expr.tokenPos, ex);
+				throw new SyntaxException("Too few operands for operator '" + expr.text + "'", expr.tokenPos, ex, 0);
 			}
 		}
 		else if (expr.type == NodeType.COMPONENT) {
@@ -1371,7 +1371,7 @@ public class Expression {
 				expr.children.addFirst(operands.removeLast());
 			}
 			catch (NoSuchElementException ex) {
-				throw new SyntaxException("Missing value for record component «" + expr.text + "»", 0, ex);
+				throw new SyntaxException("Missing value for record component «" + expr.text + "»", 0, ex, 0);
 			}
 		}
 		else {
@@ -1407,7 +1407,7 @@ public class Expression {
 			}
 			break;
 		}
-		case VARIABLE:
+		case IDENTIFIER:
 		case FUNCTION:
 			// TODO: Should we check the expression data type?
 			// We assume it might be of Boolean type
@@ -1507,7 +1507,7 @@ public class Expression {
 					}					
 				}
 				break;
-			case VARIABLE:
+			case IDENTIFIER:
 				if (isLeftSide) {
 					if (assignedVars != null) {
 						assignedVars.addIfNew(text);

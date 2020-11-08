@@ -861,12 +861,13 @@ public class Instruction extends Element {
 	// START KGU#388 2017-07-03: Enh. #423
 	/**
 	 * Returns true if the given {@code line} of code is a type definition of one of the following forms:<br>
-	 * a) type &lt;id&gt; = record{ &lt;id&gt; {, &lt;id&gt;} : &lt;type&gt; {; &lt;id&gt; {, &lt;id&gt;} : &lt;type&gt;} };<br>
-	 * b) type &lt;id&gt; = record{ &lt;id&gt; {, &lt;id&gt;} as &lt;type&gt; {; &lt;id&gt; {, &lt;id&gt;} as &lt;type&gt;} };<br>
-	 * c) type &lt;id&gt; = record{ &lt;type&gt; &lt;id&gt; {, &lt;id&gt;}; {; &lt;type&gt; &lt;id&gt; {, &lt;id&gt;}} };<br>
-	 * d)...f) same as a)...c) but with struct instead of record;<br/>
-	 * g) type &lt;id&gt; = enum{ &lt;id&gt [ = &lt;value&gt; ] {, &lt;id&gt [ = &lt;value&gt; ]} };<br/>
-	 * h) type &lt;id&gt; = &lt;type&gt.<br/>
+	 * a) type &lt;id&gt; = &lt;record&gt;{ &lt;id&gt; {, &lt;id&gt;} &lt;as&gt; &lt;type&gt; {; &lt;id&gt; {, &lt;id&gt;} &lt;as&gt; &lt;type&gt;} };<br>
+	 * b) type &lt;id&gt; = &lt;record&gt;{ &lt;type&gt; &lt;id&gt; {, &lt;id&gt;}; {; &lt;type&gt; &lt;id&gt; {, &lt;id&gt;}} };<br>
+	 * c) type &lt;id&gt; = enum{ &lt;id&gt [ = &lt;value&gt; ] {, &lt;id&gt [ = &lt;value&gt; ]} };<br/>
+	 * d) type &lt;id&gt; = &lt;type&gt;<br/>
+	 * where
+	 * &lt;record&gt; ::= record | struct
+	 * &lt;as&gt; ::= ':' | as | AS
 	 * @param line - String comprising one line of code
 	 * @return true iff line is of one of the forms a) through e)
 	 * @see #isTypeDefinition(String, HashMap)
@@ -879,13 +880,13 @@ public class Instruction extends Element {
 	}
 	/**
 	 * Returns true if the given {@code line} of code is a type definition (with possibly registered type, see argument {@code typeMap})
-	 * of one of the following forms:<br>
-	 * a) type &lt;id&gt; = record{ &lt;id&gt; {, &lt;id&gt;} : &lt;type&gt; {; &lt;id&gt; {, &lt;id&gt;} : &lt;type&gt;} };<br/>
-	 * b) type &lt;id&gt; = record{ &lt;id&gt; {, &lt;id&gt;} as &lt;type&gt; {; &lt;id&gt; {, &lt;id&gt;} as &lt;type&gt;} };<br/>
-	 * c) type &lt;id&gt; = record{ &lt;type&gt; &lt;id&gt; {, &lt;id&gt;}; {; &lt;type&gt; &lt;id&gt; {, &lt;id&gt;}} };<br/>
-	 * d)...f) same as a)...c) but with struct instead of record;<br/>
-	 * g) type &lt;id&gt; = enum{ &lt;id&gt [ = &lt;value&gt; ] {, &lt;id&gt [ = &lt;value&gt; ]} };<br/>
-	 * h) type &lt;id&gt; = &lt;type&gt.<br/>
+	 * a) type &lt;id&gt; = &lt;record&gt;{ &lt;id&gt; {, &lt;id&gt;} &lt;as&gt; &lt;type&gt; {; &lt;id&gt; {, &lt;id&gt;} &lt;as&gt; &lt;type&gt;} };<br>
+	 * b) type &lt;id&gt; = &lt;record&gt;{ &lt;type&gt; &lt;id&gt; {, &lt;id&gt;}; {; &lt;type&gt; &lt;id&gt; {, &lt;id&gt;}} };<br>
+	 * c) type &lt;id&gt; = enum{ &lt;id&gt [ = &lt;value&gt; ] {, &lt;id&gt [ = &lt;value&gt; ]} };<br/>
+	 * d) type &lt;id&gt; = &lt;type&gt;<br/>
+	 * where
+	 * &lt;record&gt; ::= record | struct
+	 * &lt;as&gt; ::= ':' | as | AS
 	 * Type names and descriptions &lt;type&gt; are checked against existing types in {@code typeMap} if given.
 	 * @param line - String comprising one line of code
 	 * @param typeMap - if given then the type name must have been registered in typeMap in order to be accepted (otherwise

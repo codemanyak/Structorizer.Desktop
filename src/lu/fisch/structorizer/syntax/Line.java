@@ -273,11 +273,12 @@ public class Line {
 	 * @param tokens - the tokenized text line (without operator unification!)
 	 * @param expectedType - optionally an expected line type (may depend on the
 	 * Element type or {@code null}. If given, controls the validity.
+	 * @param typeMap TODO
 	 * @return a Line object or {@code null} (e.g. in case of an empty line)
 	 * @throws SyntaxException if there is a syntactic error in the text
-	 * @see #parse(String, LineType, StringList)
+	 * @see #parse(String, LineType, TypeRegistry, StringList)
 	 */
-	public static Line parse(StringList tokens, LineType expectedType) throws SyntaxException
+	public static Line parse(StringList tokens, LineType expectedType, TypeRegistry typeMap) throws SyntaxException
 	{
 		// Check if the line starts with a command keyword
 		LineType lType = null;	// Detected line type
@@ -331,7 +332,7 @@ public class Line {
 			// Something is wrong here
 			throw new SyntaxException("wrongLineType",
 					new String[] {lType.toString(), expectedType.toString()},
-					0, null);
+					0, null, 0);
 		}
 		else if (lType == null) {
 			// Adopt the expected type if imposed
@@ -357,7 +358,7 @@ public class Line {
 		if (_type == null) {
 			_type = LineType.LT_RAW;
 		}
-		Syntax.unifyOperators(_tokens, false);
+		Syntax.unifyOperators(_tokens, false);	// Can we make this an option (argument)?
 		switch (_type) {
 		case LT_ASSIGNMENT:
 		case LT_CASE:
@@ -400,7 +401,7 @@ public class Line {
 									(isForIn ? "@f" : "@e"),
 									(isForIn ? Syntax.getKeyword("postFor") : Syntax.getKeyword("postForIn"))
 									},
-							Math.max(ixTo, ixIn), null);
+							Math.max(ixTo, ixIn), null, 0);
 				}
 				int ix0 = isForIn ? ixIn : ixTo;
 				// This should contain the first expression (an assignment or a variable name, respectively)
@@ -408,11 +409,11 @@ public class Line {
 				List<Expression> parsed = Expression.parse(tokens0, null);
 				if (tokens0.isEmpty() && parsed.size() == 1) {
 					Expression varSpec = parsed.get(0);
-					if (isForIn && varSpec.type != NodeType.VARIABLE ||
+					if (isForIn && varSpec.type != NodeType.IDENTIFIER ||
 							!isForIn && (varSpec.type != NodeType.OPERATOR
 							|| !varSpec.text.equals("<-") && !varSpec.text.equals(":=")
 							|| varSpec.children.size() != 2
-							|| varSpec.children.getFirst().type != Expression.NodeType.VARIABLE)) {
+							|| varSpec.children.getFirst().type != Expression.NodeType.IDENTIFIER)) {
 						throw new SyntaxException("Wrong loop variable specification: " + parsed.toString(), 0);
 					}
 					if (isForIn) {
@@ -514,10 +515,25 @@ public class Line {
 			break;
 		case LT_TYPE_DEF:
 		{
-			/* TODO Do we need to describe type definition syntax recursively
-			 * (semicolons, component declarations, value definitions) or can we
-			 * omit it and have the original string parsed in the traditional way?
+			/* TODO
+			 * These are the possible syntax variants to detect:
+			 * a) type <id> = <record>{ <id> {, <id>} <as> <type>; {; <id> {, <id>} <as> <type>} };
+			 * b) type <id> = <record>{ <type> <id> {, <id> {; <type> <id> {, <id>}} };
+			 * g) type <id> = enum{ <id> [ = <value> ] {, <id> [ = <value> ]} };
+			 * h) type <id> = <type>
+			 * where:
+			 * <as> ::= ':' | as | AS
+			 * <record> ::= record | struct
+			 * It would be great and sufficient simply to store
+			 * the defined type as Type object - but there is no such field that would
+			 * make any sense for other line types. So the way out may be a dummy
+			 * Expression holding the resulting type. A Declaration object?
 			 */
+			StringList pureTokens = new StringList(_tokens);
+			pureTokens.removeAll(" ");
+			if (pureTokens.count() < 3 || pureTokens.get(1).equals("=")) {
+				throw new SyntaxException("Wrong type definition syntax: missing '='", 2);
+			}
 		}
 			break;
 		case LT_VAR_DECL:
@@ -542,6 +558,8 @@ public class Line {
 			}
 		}
 			break;
+		case LT_ROUTINE:
+			break;
 		default:
 			break;
 		}
@@ -553,16 +571,17 @@ public class Line {
 	 * @param textLine - the (unbroken) text line as string
 	 * @param expectedType - optionally an expected line type (may depend on the
 	 * Element type or {@code null}. If given, controls the validity.
+	 * @param typeMap - a data type map to retrieve from and add to, or {@code null}
 	 * @param errors - all detected errors and warnings will be appended to this {@link StringList}.
 	 * @return a Line object. In case of syntactic errors, a Line of type {@link LineType#LT_RAW}
 	 * would be returned.
 	 */
-	public static Line parse(String textLine, LineType expectedType, StringList errors)
+	public static Line parse(String textLine, LineType expectedType, TypeRegistry typeMap, StringList errors)
 	{
 		StringList tokens = Syntax.splitLexically(textLine, true);
 		if (!tokens.isEmpty()) {
 			try {
-				return parse(tokens, null);
+				return parse(tokens, null, typeMap);
 			} catch (SyntaxException exc) {
 				if (errors != null) {
 					errors.add(exc.getMessage());
@@ -652,12 +671,15 @@ public class Line {
 				}
 				else if (declaredVars != null) {
 					for (Expression expr: expressions) {
-						if (firstExpr.type == Expression.NodeType.VARIABLE) {
+						if (firstExpr.type == Expression.NodeType.IDENTIFIER) {
 							declaredVars.addIfNew(expr.text);
 						}
 					}
 				}
 			}
+			break;
+		case LT_ROUTINE:
+			// TODO fetch the parameters
 			break;
 		default:
 			okay = false;
@@ -831,7 +853,7 @@ public class Line {
 			StringList vars1 = new StringList();
 			StringList vars2 = new StringList();
 			StringList vars3 = new StringList();
-			Line aLine = Line.parse(line, null, errors);
+			Line aLine = Line.parse(line, null, null, errors);
 			System.out.println(aLine);
 			System.err.println(errors.getText());
 			boolean okay = aLine.gatherVariables(vars1, vars2, vars3);
