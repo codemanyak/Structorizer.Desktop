@@ -20,6 +20,8 @@
 
 package lu.fisch.structorizer.syntax;
 
+import java.util.ArrayList;
+
 /******************************************************************************************************
  *
  *      Author:         Kay Gürtzig
@@ -46,6 +48,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.Stack;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
@@ -719,6 +722,87 @@ public class Syntax {
 	}
 	// END KGU#18/KGU#23 2015-11-04
 	
+	/**
+	 * Splits the token list {@code _tokens}, which is supposed to represent a sequence of
+	 * expressions separated by separators {@code _listSeparator}, into a list of
+	 * {@link StringList}s, each comprising one of the listed expressions in tokenized form.<br/>
+	 * This is aware of string literals, argument lists of function calls etc. (These must
+	 * not be broken.)
+	 * The analysis stops as soon as there is a level underflow (i.e. an unmatched right
+	 * parenthesis, bracket, or the like).<br/>
+	 * The list of the remaining tokens from the unsatisfied right parenthesis, bracket, or
+	 * brace on will be added as last element to the result if {@code _appendTail} is true.
+	 * If the last result element is empty then the expression list was syntactically "clean".<br/>
+	 * FIXME If the expression was given without some parentheses as delimiters then a tail won't be added.
+	 * @param _tokens - {@link StringList} containing one or more expressions in tokenized form
+	 * @param _listSeparator - a character sequence serving as separator among the expressions (default: ",") 
+	 * @return a list consisting of the separated tokenized expressions and the tail.
+	 */
+	public static ArrayList<StringList> splitExpressionList(StringList _tokens, String _listSeparator)
+	{
+
+		ArrayList<StringList> expressionList = new ArrayList<StringList>();
+		if (_listSeparator == null) _listSeparator = ",";
+		int parenthDepth = 0;
+		boolean isWellFormed = true;
+		Stack<String> enclosings = new Stack<String>();
+		int tokenCount = _tokens.count();
+		StringList currExpr = new StringList();
+		StringList tail = new StringList();
+		for (int i = 0; isWellFormed && parenthDepth >= 0 && i < tokenCount; i++)
+		{
+			String token = _tokens.get(i);
+			if (token.equals(_listSeparator) && enclosings.isEmpty())
+			{
+				// store the current expression and start a new one
+				expressionList.add(currExpr.trim());
+				currExpr = new StringList();
+			}
+			else
+			{ 
+				if (token.equals("("))
+				{
+					enclosings.push(")");
+					parenthDepth++;
+				}
+				else if (token.equals("["))
+				{
+					enclosings.push("]");
+					parenthDepth++;
+				}
+				else if (token.equals("{"))
+				{
+					enclosings.push("}");
+					parenthDepth++;
+				}
+				else if ((token.equals(")") || token.equals("]") || token.equals("}")))
+				{
+					isWellFormed = parenthDepth > 0 && token.equals(enclosings.pop());
+					parenthDepth--;
+				}
+				if (isWellFormed)
+				{
+					currExpr.add(token);
+				}
+				else
+				{
+					expressionList.add(currExpr.trim());
+					currExpr = new StringList();
+					tail = _tokens.subSequence(i, _tokens.count()).trim();
+				}
+			}
+		}
+		// add the last expression if it's not empty
+		if (!(currExpr = currExpr.trim()).isEmpty())
+		{
+			expressionList.add(currExpr);
+		}
+		// Add the tail. Empty if there is no bad tail
+		expressionList.add(tail);
+		return expressionList;
+	}
+	// END KGU#101 2015-12-11
+
 	// START KGU#18/KGU#23 2015-10-24 intermediate transformation added and decomposed
 	/**
 	 * Converts the operator symbols accepted by Structorizer into Java operators:

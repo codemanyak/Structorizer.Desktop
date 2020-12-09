@@ -56,6 +56,7 @@ public class RecordType extends Type {
 	/**
 	 * Ordered map of component name and type
 	 */
+	// FIXME It may be sensible to replace Type by a mere type name (for registry consistency)
 	private LinkedHashMap<String, Type> compTypes = null;
 
 //	/**

@@ -67,6 +67,21 @@ public class Type {
 	}
 
 	/**
+	 * Constructs the type from the given {@code name}.
+	 * @param name - type name, must be an Ascii identifier
+	 * @throws SyntaxException if {@code name} does not fit to identifier syntax
+	 */
+	public Type(String name) throws SyntaxException {
+		if (name == null) {
+			name = "%" + nextId++;	// Create an anonymous name
+		}
+		else if (!Syntax.isIdentifier(name, true, null)) {
+			throw new SyntaxException("Type name must be an Ascii identifier", 0);
+		}
+		this.name = name.trim();
+	}
+	
+	/**
 	 * Extracts name and modifiers from the given type specification tokens
 	 * {@code specTokens}. Assumed cases:<br/>
 	 * <ul>
@@ -75,6 +90,7 @@ public class Type {
 	 * @param specTokens blank-free token list
 	 * @throws SyntaxException if the name does not fit to identifier syntax
 	 */
+	@Deprecated
 	public Type(StringList specTokens) throws SyntaxException {
 		// TODO: somewhat rough, we ought to check for non-identifiers
 		int length = specTokens.count();
@@ -90,11 +106,14 @@ public class Type {
 	/**
 	 * Constructs the type from the given {@code name} and {@code modifiers}
 	 * list (which will be reduced, i.e. blanks and empty parts will be removed).
+	 * The modifiers must not be essential for the type (e.g. "unsigned") in a way
+	 * that there several possible types with same name only distinguished by the
+	 * modifiers.
 	 * @param name - type name, must be an Ascii identifier
 	 * @param modifiers - list of modifiers or null
 	 * @throws SyntaxException if {@code name} does not fit to identifier syntax
 	 */
-	public Type(String name, StringList modifiers) throws SyntaxException {
+	protected Type(String name, StringList modifiers) throws SyntaxException {
 		if (name == null) {
 			name = "%" + nextId++;	// Create an anonymous name
 		}
@@ -113,6 +132,9 @@ public class Type {
 		this.modifiers = modifiers;
 	}
 	
+	/**
+	 * @return the dummy type, used as default for unspecified types
+	 */
 	public static Type getDummyType()
 	{
 		if (dummyType == null) {
@@ -121,6 +143,10 @@ public class Type {
 		return dummyType;
 	}
 	
+	/**
+	 * @return the name of this type (where the name starts with "AnonType" in case of
+	 * an anonymous type)
+	 */
 	public String getName()
 	{
 		return name.replace("%", "AnonType");
@@ -155,8 +181,8 @@ public class Type {
 	/**
 	 * Returns a string expressing name and type structure either in a shallow way
 	 * ({@code deep = false}) or in a completely recursive way ({@code deep = true}).
-	 * The result will either use {@code altName}, or the internal name if {@code altName}
-	 * is {@code null}.
+	 * The result will either involve the passed-in {@code altName}, or the internal
+	 * name if {@code altName} is {@code null}.
 	 * @param altName - an alternative name to be used instead of {@link #getName()},
 	 * if {@code null} then the internal identifier will be used.
 	 * @param deep - whether possible substructure is to be fully described (otherwise
@@ -172,6 +198,21 @@ public class Type {
 		}
 		mods.add(altName != null ? altName : this.name);
 		return mods.getLongString();
+	}
+	
+	/**
+	 * Convenience method for internal retrieval of referenced types within
+	 * the same {@link TypeRegistry}.
+	 * @param name
+	 * @return the type corresponding to the given  or {@code null}
+	 */
+	protected Type getType(String typeName)
+	{
+		Type foundType = null;
+		if (this.registry != null) {
+			foundType = this.registry.getType(typeName);
+		}
+		return foundType;
 	}
 	
 	/**

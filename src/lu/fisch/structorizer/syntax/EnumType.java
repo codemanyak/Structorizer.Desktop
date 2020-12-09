@@ -68,12 +68,12 @@ public class EnumType extends Type {
 	 * Items without explicitly given value are generically coded (by incrementing
 	 * the value assigned to the previous element.
 	 * @param name - type name
-	 * @param modificators - possible specification of the underlying integral type
+	 * @param modifiers - possible specification of the underlying integral type
 	 * @param items - a sequential map of names to value descriptions or null.
 	 * @throws SyntaxException if the name does not fit to identifier syntax
 	 */
-	public EnumType(String name, StringList modificators, LinkedHashMap<String, String> items) throws SyntaxException {
-		super(name, modificators);
+	public EnumType(String name, StringList modifiers, LinkedHashMap<String, String> items) throws SyntaxException {
+		super(name, modifiers);
 		this.items.putAll(items);
 	}
 
@@ -81,12 +81,12 @@ public class EnumType extends Type {
 	 * Constructs an enumeration type from its name, possible modifiers, and a list
 	 * of value names with strictly generic coding (i.e. incrementing from 0 on).
 	 * @param name - type name
-	 * @param modificators - possible specification of the underlying integral type
+	 * @param modifiers - possible specification of the underlying integral type
 	 * @param itemNames - sequence of constant names for this type.
 	 * @throws SyntaxException if the name does not fit to identifier syntax
 	 */
-	public EnumType(String name, StringList modificators, StringList itemNames) throws SyntaxException {
-		super(name, modificators);
+	public EnumType(String name, StringList modifiers, StringList itemNames) throws SyntaxException {
+		super(name, modifiers);
 		for (int i = 0; i < itemNames.count(); i++) {
 			this.items.put(itemNames.get(i), null);
 		}

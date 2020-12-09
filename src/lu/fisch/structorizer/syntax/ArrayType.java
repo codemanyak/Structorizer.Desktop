@@ -51,6 +51,7 @@ package lu.fisch.structorizer.syntax;
  */
 public class ArrayType extends Type {
 
+	// FIXME It may be sensible to replace this with a type name (for registry consistency)
 	private Type elType = null;
 	int size = 0;	// 0 means unknown or flexible
 	int offset = 0;	// By default, indexing starts at 0
