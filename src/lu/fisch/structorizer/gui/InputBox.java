@@ -32,24 +32,25 @@ package lu.fisch.structorizer.gui;
  *
  *      Author          Date        Description
  *      ------          ----        -----------
- *      Bob Fisch       2007.12.23  First Issue
- *      Kay Gürtzig     2015.10.12  A checkbox added for breakpoint control (KGU#43)
- *      Kay Gürtzig     2015.10.14  Element-class-specific language support (KGU#42)
- *      Kay Gürtzig     2015.10.25  Hook for subclassing added to method create() (KGU#3)
- *      Kay Gürtzig     2016.04.26  Issue #165: Focus transfer reset to Tab and Shift-Tab
- *      Kay Gürtzig     2016.07.14  Enh. #180: Initial focus dependent on switchTextComment mode (KGU#169)
- *      Kay Gürtzig     2016.08.02  Enh. #215: Breakpoint trigger counts partially implemented
- *      Kay Gürtzig     2016.09.13  Bugfix #241: Obsolete mechanisms removed (remnants of KGU#42)
- *      Kay Gürtzig     2016.09.22  Bugfix #241 revised by help of a LangDialog API modification
- *      Kay Gürtzig     2016.10.13  Enh. #270: New checkbox chkDisabled
- *      Kay Gürtzig     2016.11.02  Issue #81: Workaround for lacking DPI awareness
- *      Kay Gürtzig     2016.11.09  Issue #81: Scale factor no longer rounded but ensured to be >= 1
- *      Kay Gürtzig     2016.11.11  Issue #81: DPI-awareness workaround for checkboxes
- *      Kay Gürtzig     2016.11.21  Issue #284: Opportunity to scale up/down the TextField fonts by Ctrl-Numpad+/-
- *      Kay Gürtzig     2017.01.07  Bugfix #330 (issue #81): checkbox scaling suppressed for "Nimbus" l&f
- *      Kay Gürtzig     2017.01.09  Bugfix #330 (issue #81): Basic scaling outsourced to class GUIScaler
- *      Kay Gürtzig     2017.03.14  Enh. #372: Additional hook for subclass InputBoxRoot.
- *      Kay Gürtzig     2017.10.06  Enh. #430: The scaled TextField font size (#284) is now kept during the session
+ *      Bob Fisch       2007-12-23  First Issue
+ *      Kay Gürtzig     2015-10-12  A checkbox added for breakpoint control (KGU#43)
+ *      Kay Gürtzig     2015-10-14  Element-class-specific language support (KGU#42)
+ *      Kay Gürtzig     2015-10-25  Hook for subclassing added to method create() (KGU#3)
+ *      Kay Gürtzig     2016-04-26  Issue #165: Focus transfer reset to Tab and Shift-Tab
+ *      Kay Gürtzig     2016-07-14  Enh. #180: Initial focus dependent on switchTextComment mode (KGU#169)
+ *      Kay Gürtzig     2016-08-02  Enh. #215: Breakpoint trigger counts partially implemented
+ *      Kay Gürtzig     2016-09-13  Bugfix #241: Obsolete mechanisms removed (remnants of KGU#42)
+ *      Kay Gürtzig     2016-09-22  Bugfix #241 revised by help of a LangDialog API modification
+ *      Kay Gürtzig     2016-10-13  Enh. #270: New checkbox chkDisabled
+ *      Kay Gürtzig     2016-11-02  Issue #81: Workaround for lacking DPI awareness
+ *      Kay Gürtzig     2016-11-09  Issue #81: Scale factor no longer rounded but ensured to be >= 1
+ *      Kay Gürtzig     2016-11-11  Issue #81: DPI-awareness workaround for checkboxes
+ *      Kay Gürtzig     2016-11-21  Issue #284: Opportunity to scale up/down the TextField fonts by Ctrl-Numpad+/-
+ *      Kay Gürtzig     2017-01-07  Bugfix #330 (issue #81): checkbox scaling suppressed for "Nimbus" l&f
+ *      Kay Gürtzig     2017-01-09  Bugfix #330 (issue #81): Basic scaling outsourced to class GUIScaler
+ *      Kay Gürtzig     2017-03-14  Enh. #372: Additional hook for subclass InputBoxRoot.
+ *      Kay Gürtzig     2017-10-06  Enh. #430: The scaled TextField font size (#284) is now kept during the session
+ *      Kay Gürtzig     2020-12-15  Bugfix #885 Focus rule was flawed (ignored suppression of switch text/comments mode)
  *
  ******************************************************************************************************
  *
@@ -359,7 +360,10 @@ public class InputBox extends LangDialog implements ActionListener, KeyListener 
         // START KGU#91+KGU#169 2016-07-14: Enh. #180 (also see #39 and #142)
         this.pack();	// This makes focus control possible but must precede the size setting
         setPreferredSize(scaleFactor);
-        if (Element.E_TOGGLETC) {
+        // START KGU#887 2020-12-15: Bugfix #885 Don't put the focus to comment if TC mode is suppressed
+        //if (Element.E_TOGGLETC) {
+        if (Element.isSwitchTextCommentMode()) {
+        // END KGU#887 2020-12-15
             txtComment.requestFocusInWindow();
         } else {
             txtText.requestFocusInWindow();

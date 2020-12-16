@@ -197,6 +197,7 @@ package lu.fisch.structorizer.executor;
  *      Kay Gürtzig     2020-04-28      Issue #822: Empty CALL lines should cause more sensible error messages
  *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *      Kay Gürtzig     2020-10-19      Issue #879: Inappropriate handling of input looking like initializers
+ *      Kay Gürtzig     2020-12-14      Issue #829 revoked (Control will by default close after execution)
  *
  ******************************************************************************************************
  *
@@ -793,11 +794,11 @@ public class Executor implements Runnable
 				errText = errText.replace("?", " (\"" + root.getMethodName() + "\")?");
 			}
 			int res = JOptionPane.showOptionDialog(diagram,
-					   errText,
-					   mySelf.control.msgTitleQuestion.getText(),
-					   JOptionPane.YES_NO_OPTION,
-					   JOptionPane.QUESTION_MESSAGE,
-					   null,null,null);
+					errText,
+					mySelf.control.msgTitleQuestion.getText(),
+					JOptionPane.YES_NO_OPTION,
+					JOptionPane.QUESTION_MESSAGE,
+					null,null,null);
 			if (res == 0)
 			{
 				// START KGU 2018-08-08: If it had already been stopped make sure new start will be possible
@@ -3078,9 +3079,9 @@ public class Executor implements Runnable
 		// closes after execution.
 		control.setVisible(false);
 		// START KGU#157 2016-03-16: Bugfix #131 - postponed Control start?
-		// START KGU#817 2020-04-04: Issue #829 mawa290669 requested to keep control always open
-		//boolean reopen = false;
-		boolean reopen = true;
+		// START KGU#817 2020-04-04: Issue #829, revoked on 2020-12-14
+		boolean reopen = false;
+		//boolean reopen = true;
 		// END KGU#817 2020-04-04
 		if (this.reopenFor != null)
 		{
