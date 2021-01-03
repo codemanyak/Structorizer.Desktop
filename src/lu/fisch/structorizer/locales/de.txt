@@ -589,6 +589,7 @@ AnalyserPreferences.checkboxes.25.text=Empfehlungen für erste Programm-Anweisun
 AnalyserPreferences.checkboxes.26.text=Kurzer "Hallo Welt"-Kurs
 AnalyserPreferences.checkboxes.27.text=Prüfen, dass Fallauswahl-Werte Ganzzahlkonstanten sind.
 AnalyserPreferences.checkboxes.28.text=Prüfen, dass keine Fallauswahl-Überschneidungen vorkommen.
+AnalyserPreferences.chkDrawWarningSign.text=Zeichne Warndreieck in betroffenen Elementen
 AnalyserPreferences.okButton.text=OK
 
 
@@ -1390,6 +1391,7 @@ ArrangerIndex.msgMembersComplete.text=Gruppe ist vollständig: Keine Verweise na
 ArrangerIndex.msgGroupMembersChanged.text=Die Menge der enthaltenen Diagramme hat sich geändert.
 ArrangerIndex.msgGroupMembersMoved.text=Die Koordinaten einiger enthaltener Diagramme wurden verändert.
 ArrangerIndex.msgNewGroupName.text=Neuer Name für die ausgewählte Gruppe:
+ArrangerIndex.msgConfirmDissolve.text=Sicher, diese Gruppe(n) aufzulösen?\n%
 
 -----> Executor
 -----[ Control ]-----

@@ -588,6 +588,7 @@ AnalyserPreferences.checkboxes.25.text=Guide to first program instructions (IPO 
 AnalyserPreferences.checkboxes.26.text=Short "hello world" tour
 AnalyserPreferences.checkboxes.27.text=Check that @c selector items are integer constants.
 AnalyserPreferences.checkboxes.28.text=Check that @c selector lists are disjoint.
+AnalyserPreferences.chkDrawWarningSign.text=Draw warning sign in affected elements
 AnalyserPreferences.okButton.text=OK
 
 
@@ -1390,6 +1391,7 @@ ArrangerIndex.msgMembersComplete.text=Group is complete: No outward references
 ArrangerIndex.msgGroupMembersChanged.text=The set of member diagrams was modified.
 ArrangerIndex.msgGroupMembersMoved.text=The coordinates of some member diagrams were changed.
 ArrangerIndex.msgNewGroupName.text=New name for the selected group: 
+ArrangerIndex.msgConfirmDissolve.text=Sure to dissolve these group(s)?\n%
 
 -----> Executor
 -----[ Control ]-----

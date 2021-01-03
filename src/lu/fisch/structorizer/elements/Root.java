@@ -160,6 +160,8 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2020-10-19      Issue #875: New public method for the retrieval of potential arguments
  *      Kay Gürtzig     2020-10-30      Enh. #800: Calls of unifyOperators redirected to class Syntax
  *
+ *      Kay Gürtzig     2021-01-02      Enh. #905: Mechanism to draw a warning symbol on related DetectedError
+ *      
  ******************************************************************************************************
  *
  *      Comment:		/
@@ -1223,6 +1225,10 @@ public class Root extends Element {
 		this.writeOutRuntimeInfo(canvas, myRect.right - textPadding, myRect.top);
 		// END KGU#216 2016-07-25
 		
+		// START KGU#906 2021-01-02: Enh. #905
+		this.drawWarningSignOnError(canvas, myRect);
+		// END KGU#906 2021-01-02
+
 		canvas.setFont(Element.font);
 		
 		// Draw the frame around the body
@@ -1723,6 +1729,11 @@ public class Root extends Element {
         }
 
         Canvas canvas = new Canvas((Graphics2D) _g);
+        // START KGU#906 2021-01-02: Enh. #905
+        if (_drawingContext == DrawingContext.DC_STRUCTORIZER) {
+            canvas.setFlag(CANVAS_FLAGNO_ERROR_CHECK);
+        }
+        // END KGU#906 2021-01-02
         canvas.setFont(Element.getFont()); //?
         Rect myrect = this.prepareDraw(canvas);
         myrect.left += _point.x;
@@ -5928,7 +5939,7 @@ public class Root extends Element {
         }
         /**/
 
-        this.errors=errors;
+        this.errors = errors;
         return errors;
     }
 
@@ -5991,14 +6002,20 @@ public class Root extends Element {
 	// START KGU#466 2019-08-02: Issue #733
 	public static String[] getPreferenceKeys()
 	{
-		String[] prefKeys = new String[analyserChecks.length];
-		for (int i = 0; i < prefKeys.length; i++) {
+		// START KGU#906 2021-01-02: Enh. #905
+		//String[] prefKeys = new String[analyserChecks.length];
+		String[] prefKeys = new String[analyserChecks.length + 1];
+		// END KGU#906 2021-01-02
+		for (int i = 0; i < analyserChecks.length; i++) {
 			prefKeys[i] = "check" + (i+1);
 		}
+		// START KGU#906 2021-01-02: Enh. #905
+		prefKeys[analyserChecks.length] = "drawAnalyserMarks";
+		// END KGU#906 2021-01-02
 		return prefKeys;
 	}
 	// END KGU#466 2019-08-02
-    
+
     public static void saveToINI()
     {
         try
@@ -6012,6 +6029,9 @@ public class Root extends Element {
                 ini.setProperty("check" + (i+1), (check(i+1) ? "1" : "0"));
             }
             // END KGU#239 2016-08-12
+            // START KGU#906 2021-01-02: Enh. #905
+            ini.setProperty("drawAnalyserMarks", E_ANALYSER_MARKER ? "1" : "0");
+            // END KGU#906 2021-01-02
             ini.save();
         }
         catch (Exception e)
@@ -6019,7 +6039,6 @@ public class Root extends Element {
         	logger.logp(Level.SEVERE, Root.class.getName(), "saveToINI()", "", e);
         }
     }
-
 
 // START KGU#91 2015-12-04: No longer needed
 //  public void setSwitchTextAndComments(boolean switchTextAndComments) {
