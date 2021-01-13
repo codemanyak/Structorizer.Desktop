@@ -371,7 +371,7 @@ Menu.msgImportTooltip.text=<html>Diagrambestanden aangemaakt met de bewerker<br/
 Menu.msgExportTooltip.text=<html>Exporteren als diagrambestanden voor de bewerker<br/>van <a href="%">%</a></html>
 Menu.msgImportFileReadError.text=Bestand "%" bestaat niet of is onleesbaar.
 Menu.msgUnsupportedFileFormat.text=Deze bestanden konden niet worden ingelezen, omdat hun bestandstype niet bekend is, of ondersteund:\n%
-Menu.msgGuidedTours.text=U heeft om begeleiding gevraagd.\n\nU vindt aanbevelingen\nof instructies\nin het tekstgebied onderaan\n(Analyse meldlijst).
+Menu.msgGuidedTours.text=U heeft om begeleiding gevraagd.\n\nU vindt aanbevelingen\nof instructies\nin het tekstgebied onderaan\n(Analyse meldlijst).\nU wordt er aan herinnerd\ndoor blauwe of rode driehoekjes\nin de elementen.
 Menu.msgGuidedTourDone.text=Gefeliciteerd  -  U bent klaar met de les «%».
 Menu.msgGuidedTourNext.text=%1\n Les «%2» gaat nu beginnen.\nMisschien wilt u eerst het diagram wissen: → Menu "%3"
 Menu.ttlGuidedTours.text=Begeleide rondleiding
@@ -519,7 +519,7 @@ AnalyserPreferences.checkboxes.25.text=Gids voor de eerste programma-instructies
 AnalyserPreferences.checkboxes.26.text=Korte rondleiding "hallo wereld"
 AnalyserPreferences.checkboxes.27.text=Controle of @c-keuzewaarden constante gehele getallen zijn.
 AnalyserPreferences.checkboxes.28.text=Controle of @c-keuzelijsten gemeenschappelijke elementen hebben.
-AnalyserPreferences.chkDrawWarningSign.text=Plaats waarschuwingsdriehoekje in gemankeerde elementen
+AnalyserPreferences.chkDrawWarningSign.text=Plaats waarschuwingsdriehoekje in foutieve elementen
 AnalyserPreferences.okButton.text=OK
 
 
@@ -1292,8 +1292,8 @@ ArrangerIndex.popupIndexExpandGroup.text=Groep uitbreiden ...
 ArrangerIndex.popupIndexDissolve.text=Groep ontbinden
 ArrangerIndex.popupIndexDetach.text=Uit groep losmaken
 ArrangerIndex.popupIndexAttach.text=Toevoegen aan/verplaatsen naar groep ...
-ArrangerIndex.popupIndexDrawGroup.text=Grenzen van de groep tonen
-ArrangerIndex.popupIndexDrawGroup.tooltip=Afzonderlijk zichtbaar zijn van de geselecteerde groep in de Arranger
+ArrangerIndex.popupIndexDrawGroup.text=Groep tonen
+ArrangerIndex.popupIndexDrawGroup.tooltip=Zichtbaar zijn van de geselecteerde groep en zijn diagrammen in de Arranger
 ArrangerIndex.popupIndexRenameGroup.text=Groep hernoemen ...
 ArrangerIndex.popupIndexExport.text=Diagram/groep exporteren
 ArrangerIndex.popupIndexRenameGroup.tooltip=Staat toe de geselecteerde groep te hernoemen, optioneel samen met bijbehorende bestand

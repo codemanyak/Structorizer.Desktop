@@ -1371,7 +1371,7 @@ public class D7Parser extends CodeParser
 						elem.parent = includable.children;
 						includable.children.addElement(elem);
 					}
-					includable.setInclude();
+					includable.setInclude(true);
 					prevRoot.children.removeElements();
 					prevRoot.addToIncludeList(unitName + DEFAULT_GLOBAL_SUFFIX);
 					// START KGU#586 2018-09-28: Bugfix #613 - Register the inclusion, allowing the postprocess to check it
@@ -2053,7 +2053,7 @@ public class D7Parser extends CodeParser
 		getLogger().config(root.getSignatureString(false));
 		if (unitName != null && root.isProgram() && root.getMethodName().equals("???")) {
 			root.setText(unitName + DEFAULT_GLOBAL_SUFFIX);
-			root.setInclude();
+			root.setInclude(true);
 			root.getComment().insert("(UNIT " + unitName + ")", 0);
 		}
 		// START KGU#821 2020-03-08: Issue #833
