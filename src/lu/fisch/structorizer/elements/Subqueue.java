@@ -75,6 +75,7 @@ import java.awt.Point;
 import java.awt.Rectangle;
 
 import lu.fisch.graphics.*;
+import lu.fisch.structorizer.syntax.Line;
 import lu.fisch.utils.*;
 
 public class Subqueue extends Element implements IElementSequence {
@@ -767,4 +768,11 @@ public class Subqueue extends Element implements IElementSequence {
 		return maxLen;
 	}
 	// END KGU#602 2018-10-25
+
+	// START KGU#790 2021-01-17: Enh. #800
+	@Override
+	protected int getLineTypeSet(int lineNo) {
+		return 0;
+	}
+	// END KGU#790 2021-01-17
 }

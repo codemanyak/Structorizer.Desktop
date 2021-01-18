@@ -230,6 +230,7 @@ import java.util.Date;
 
 import lu.fisch.graphics.*;
 import lu.fisch.utils.*;
+import lu.fisch.structorizer.syntax.Line;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.structorizer.syntax.TypeRegistry;
 import lu.fisch.structorizer.helpers.GENPlugin;
@@ -6684,4 +6685,13 @@ public class Root extends Element {
 	}
 	// END KGU#178/KGU#624 2018-12-26
 
+	// START KGU#790 2021-01-17: Enh. #800
+	@Override
+	protected int getLineTypeSet(int lineNo) {
+		if (this.isSubroutine()) {
+			return Line.LT_ROUTINE_MASK;
+		}
+		return 0;
+	}
+	// END KGU#790 2021-01-17
 }

@@ -55,6 +55,7 @@ import lu.fisch.graphics.Canvas;
 import lu.fisch.graphics.Rect;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
+import lu.fisch.structorizer.syntax.Line;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.StringList;
 
@@ -538,4 +539,10 @@ public class Try extends Element {
 				);
 	}
 
+	// START KGU#790 2021-01-17: Enh. #800
+	@Override
+	protected int getLineTypeSet(int lineNo) {
+		return Line.LT_CATCH_MASK;
+	}
+	// END KGU#790 2021-01-17
 }

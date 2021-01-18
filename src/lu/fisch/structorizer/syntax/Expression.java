@@ -68,16 +68,16 @@ import lu.fisch.utils.StringList;
  * <table>
  * <tr><th>Type</th><th>String</th><th>Children</th></tr>
  * <tr><td>LITERAL</td><td>the literal</td><td>(empty)</td></tr>
- * <tr><td>VARIABLE</td><td>variable name</td><td>(empty)</td></tr>
+ * <tr><td>VARIABLE</td><td>variable id</td><td>(empty)</td></tr>
  * <tr><td>OPERATOR</td><td>operator symbol</td><td>operands</td></tr>
  * <tr><td>INDEX</td><td>""</td><td>array, index expressions</td></tr>
- * <tr><td>FUNCTION</td><td>function name</td><td>arguments</td></tr>
- * <tr><td>QUALIFIER</td><td>comp name</td><td>record</td></tr>
- * <tr><td>ARRAY_INITIALIZATION</td><td>type name (if any)</td><td>elements</td></tr>
- * <tr><td>RECORD_INITIALIZATION</td><td>type name</td><td>components</td></tr>
- * <tr><td>COMPONENT</td><td>comp name</td><td>comp value</td></tr>
- * <tr><td>DECLARATION</td><td>-</td><td>assignment or variables</td></tr>
- * <tr><td>ROUTINE</td><td>routine name</td><td>argument declarations</td></tr>
+ * <tr><td>FUNCTION</td><td>function id</td><td>arguments</td></tr>
+ * <tr><td>QUALIFIER</td><td>comp id</td><td>record</td></tr>
+ * <tr><td>ARRAY_INITIALIZATION</td><td>type id (if any)</td><td>elements</td></tr>
+ * <tr><td>RECORD_INITIALIZATION</td><td>type id</td><td>components</td></tr>
+ * <tr><td>COMPONENT</td><td>[comp id]</td><td>comp value</td></tr>
+ * <tr><td>DECLARATION</td><td>-</td><td>subdeclarations</td></tr>
+ * <tr><td>ROUTINE</td><td>routine id</td><td>argument declaration[s]</td></tr>
  * </table>
  * Types {@link NodeType#DECLARATION} and {@link NodeType#ROUTINE} are reserved
  * for subclasses.
@@ -285,7 +285,7 @@ public class Expression {
 	
 	/** COMPONENT means the colon separating a component name and a component value in a record initializer,<br/>
 	 * QUALIFIER is the dot separating a record and a component name (whereas the dot in a method call is handled as OPERATOR) <br/>
-	 * PARENTH symbolizes an opening parenthesis and is only temporarily used within the shunting yard algorithm in {@link Expression#parse(StringList, StringList)} */
+	 * PARENTH symbolizes an opening parenthesis and is only temporarily used within the shunting yard algorithm in {@link Expression#parse(StringList, StringList, short)} */
 	public static enum NodeType {
 		/** leaf node, a literal of an unambiguous data type (safe) */
 		LITERAL,
@@ -336,7 +336,7 @@ public class Expression {
 	
 	/**
 	 * Derives the tree from the given tokens.
-	 * Use {@link #parse(StringList, StringList)} instead.
+	 * Use {@link #parse(StringList, StringList, short)} instead.
 	 * @param _tokens
 	 */
 	@Deprecated
@@ -1034,14 +1034,16 @@ public class Expression {
 	 * does not fit well. Spaces will be eliminated (if still present).
 	 * @param stopTokens - a {@link StringList} containing possible delimiters,
 	 * which, at top level, shall stop the parsing. The found stop token will not be
-	 * consumed from {@code unifiedTokens}. If being {@code null} then stops without
+	 * consumed from {@code tokens}. If being {@code null} then stops without
 	 * exception at the first token not being expected, provided the stack is empty
 	 * and output is already containing an Expression.
+	 * @param tokenNo - the number of preceding tokens of he line not contained in
+	 * {@code tokens}, i.e. the overall index of the first token within {@code tokens}
 	 * @return the syntax tree or null.
 	 * @throws ExpressionException
 	 * @see {@link #parseList(StringList, String, String, StringList)}
 	 */
-	public static LinkedList<Expression> parse(StringList tokens, StringList stopTokens) throws SyntaxException
+	public static LinkedList<Expression> parse(StringList tokens, StringList stopTokens, short tokenNo) throws SyntaxException
 	{
 		// Basically, this follows Dijkstra's shunting yard algorithm
 		Expression expr = null;
@@ -1076,20 +1078,20 @@ public class Expression {
 						}
 					}
 					catch (NoSuchElementException ex) {
-						throw new SyntaxException("Too few operands for operator '" + expr.text + "'.", expr.tokenPos, ex, 0);
+						throw new SyntaxException("Too few operands for operator «" + expr.text + "».", expr.tokenPos, ex, 0);
 					}
 					output.addLast(expr);
 					stack.removeLast();
 				}
 				if (token.equals(".")) {
 					if (tokens.count() < 2 || !Syntax.isIdentifier(tokens.get(1), false, null)) {
-						throw new SyntaxException("An operator '.' must be followed by an identifier!", position);
+						throw new SyntaxException("An operator '.' must be followed by an identifier!", tokenNo + position);
 					}
 				}
-				expr = new Expression(NodeType.OPERATOR, mayBeSign ? token+"1" : token, position);
+				expr = new Expression(NodeType.OPERATOR, mayBeSign ? token+"1" : token, (short)(tokenNo + position));
 				stack.addLast(expr);
 				if (token.equals("[]")) {
-					expr = new Expression(NodeType.PARENTH, "[", position);
+					expr = new Expression(NodeType.PARENTH, "[", (short)(tokenNo + position));
 					expr.children.addLast(null);		// one operand is the array
 					if (tokens.count() > 2 && !tokens.get(1).equals("]")) {
 						expr.children.addLast(null);	// expect at least one index
@@ -1108,20 +1110,20 @@ public class Expression {
 				}
 				if (BOOL_LITERALS.contains(token)) {
 					// Boolean literal
-					expr = new Expression(NodeType.LITERAL, token, position);
+					expr = new Expression(NodeType.LITERAL, token, (short)(tokenNo + position));
 					output.addLast((expr));
 					wasOpd = true;
 				}
 				else if ("(".equals(nextToken)) {
 					// Function name
-					expr = new Expression(NodeType.FUNCTION, token, position);
+					expr = new Expression(NodeType.FUNCTION, token, (short)(tokenNo + position));
 					stack.addLast(expr);
 					wasOpd = false;
 				}
 				else if ("{".equals(nextToken)) {
 					// Record type name
 					// TODO: Identify record type name to verify the record initializer entry
-					expr = new Expression(NodeType.RECORD_INITIALIZER, token, position);
+					expr = new Expression(NodeType.RECORD_INITIALIZER, token, (short)(tokenNo + position));
 					stack.addLast(expr);
 					wasOpd = false;
 				}
@@ -1130,14 +1132,14 @@ public class Expression {
 					// Check that we are within a record initializer context
 					Expression paren = stack.peekLast();
 					if (paren == null || paren.type != NodeType.PARENTH || !"{".equals(paren.text)) {
-						throw new SyntaxException("Found «" + token + ":' outside a record initializer.", position);
+						throw new SyntaxException("Found «" + token + ":» outside a record initializer.", tokenNo + position);
 					}
 					// now provisionally remove the stack top (which is already cached in paren)
 					stack.removeLast();
 					// beneath the opening brace there must be a recod initializer node
 					try {
 						if ((expr = stack.peekLast()) == null || expr.type != NodeType.RECORD_INITIALIZER) {
-							throw new SyntaxException("Found «" + token + ":' outside a record initializer.", position);
+							throw new SyntaxException("Found «" + token + ":» outside a record initializer.", tokenNo + position);
 						}
 					}
 					finally {
@@ -1145,7 +1147,7 @@ public class Expression {
 						stack.addLast(paren);
 					}
 					// TODO We might check for the record type and verify token is a component id
-					expr = new Expression(NodeType.COMPONENT, token, position);
+					expr = new Expression(NodeType.COMPONENT, token, (short)(tokenNo + position));
 					stack.addLast(expr);
 					// Drop the component name now, such that the loop will remove the colon
 					tokens.remove(0); position++;
@@ -1156,14 +1158,14 @@ public class Expression {
 					if (wasOpd) {
 						if (nestingLevel > 0) {
 							// Not allowed within brackets
-							throw new SyntaxException("Operand «" + token + "» immediately following another", position);
+							throw new SyntaxException("Operand «" + token + "» immediately following another",tokenNo +  position);
 						}
 						while (!stack.isEmpty() && !output.isEmpty()
 								&& composeExpression(stack.peekLast(), output)) {
 							stack.removeLast();
 						}
 					}
-					expr = new Expression(NodeType.IDENTIFIER, token, position);
+					expr = new Expression(NodeType.IDENTIFIER, token, (short)(tokenNo + position));
 					output.addLast(expr);
 					signPos = false;
 					wasOpd = true;
@@ -1178,14 +1180,14 @@ public class Expression {
 				if (wasOpd) {
 					if (nestingLevel > 0) {
 						// Not allowed within brackets
-						throw new SyntaxException("Operand «" + token + "» immediately following another", position);
+						throw new SyntaxException("Operand «" + token + "» immediately following another", tokenNo + position);
 					}
 					while (!stack.isEmpty() && !output.isEmpty()
 							&& composeExpression(stack.peekLast(), output)) {
 						stack.removeLast();
 					}
 				}
-				expr = new Expression(NodeType.LITERAL, token, position);
+				expr = new Expression(NodeType.LITERAL, token, (short)(tokenNo + position));
 				output.addLast(expr);
 				signPos = false;
 				wasOpd = true;
@@ -1202,7 +1204,7 @@ public class Expression {
 								!(stopTokens != null && (stopped = stopTokens.contains(",")))) {
 							// We leave it to the caller whether the listing of expressions is welcome
 							//throw new SyntaxException("Misplaced ',' or missing '(' or '[' or '{'.", position);
-							System.out.println("Misplaced ',' at pos. " + position + " or missing '(' or '[' or '{'");
+							System.out.println("Misplaced ',' at pos. " + (tokenNo + position) + " or missing '(' or '[' or '{'");
 						}
 						break;
 					}
@@ -1230,7 +1232,7 @@ public class Expression {
 			}
 			else if (token.equals("(")) {
 				// May be a parenthesized arithmetic expression or an argument list
-				expr = new Expression(NodeType.PARENTH, token, position);
+				expr = new Expression(NodeType.PARENTH, token, (short)(tokenNo + position));
 				stack.addLast(expr);
 				nestingLevel++;
 				if (tokens.count() > 1 && !tokens.get(1).equals(")")) {
@@ -1240,12 +1242,12 @@ public class Expression {
 				wasOpd = false;
 			}
 			else if (token.equals("{")) {
-				// May be an array or a record initializer
+				// May be an array or a record initialiser
 				expr = stack.peekLast();
 				if (expr == null || expr.type != NodeType.RECORD_INITIALIZER) {
-					stack.addLast(new Expression(NodeType.ARRAY_INITIALIZER, "{}", position));
+					stack.addLast(new Expression(NodeType.ARRAY_INITIALIZER, "{}", (short)(tokenNo + position)));
 				}
-				stack.addLast(expr = new Expression(NodeType.PARENTH, token, position));
+				stack.addLast(expr = new Expression(NodeType.PARENTH, token, (short)(tokenNo + position)));
 				nestingLevel++;
 				if (tokens.count() > 1 && !tokens.get(1).equals("}")) {
 					expr.children.add(null);	// Expect an element
@@ -1267,12 +1269,12 @@ public class Expression {
 //							return output;
 //						}
 						// END KGU#790 2020-10-26
-						throw new SyntaxException("'" + token + "' without preceding '" + opening + "'.", position);
+						throw new SyntaxException("'" + token + "' without preceding '" + opening + "'.", tokenNo + position);
 					}
 					if (parenthFound = expr.type == NodeType.PARENTH) {
 						if (!expr.text.equals(opening)) {
 							// Wrong type of opening bracket
-							throw new SyntaxException("'" + token + "' without matching '" + opening + "'.", position);
+							throw new SyntaxException("'" + token + "' without matching '" + opening + "'.", tokenNo + position);
 						}
 						nItems = expr.children.size();
 					}
@@ -1312,7 +1314,7 @@ public class Expression {
 			if (!stopped) {
 				tokens.remove(0); position++;
 			}
-		} // while (!unifiedTokens.isEmpty() && !stopped)
+		} // while (!tokens.isEmpty() && !stopped)
 		
 		// Now resolve the remaining operator stack content as far a possible
 		while (!stack.isEmpty()) {
@@ -1344,7 +1346,7 @@ public class Expression {
 
 	/**}
 	 * Given the incomplete expression node {@code expr}, which is supposed to be
-	 * an operator or a record component initializer, completes the expression by
+	 * an operator or a record component initialiser, completes the expression by
 	 * consuming elements from the operand stack {@code operands} and pushes the
 	 * composed expression node to the {@code operands} stack.
 	 * @param expr - the incomplete expression node

@@ -107,6 +107,7 @@ import lu.fisch.structorizer.arranger.Arranger;
 import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
+import lu.fisch.structorizer.syntax.Line;
 
 public class Call extends Instruction {
 	
@@ -354,4 +355,11 @@ public class Call extends Instruction {
 	}
 	// END KGU#261 2017-02-20
 	
+	// START KGU#790 2021-01-17: Enh. #800
+	@Override
+	protected int getLineTypeSet(int lineNo) {
+		return Line.LT_ASSIGNMENT_MASK | Line.LT_PROC_CALL_MASK
+				| Line.LT_VAR_INIT_MASK /*| Line.LT_CONST_DEF_MASK*/;
+	}
+	// END KGU#790 2021-01-17
 }

@@ -95,6 +95,7 @@ import lu.fisch.graphics.*;
 import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.gui.IconLoader;
 import lu.fisch.structorizer.gui.SelectedSequence;
+import lu.fisch.structorizer.syntax.Line;
 import lu.fisch.structorizer.syntax.Syntax;
 //import lu.fisch.structorizer.gui.IconLoader;
 import lu.fisch.utils.*;
@@ -1604,5 +1605,15 @@ public class Instruction extends Element {
 		}
 	}
 	// END KGU#477 2017-12-10
+
+	// START KGU#790 2021-01-17: Enh. #800
+	@Override
+	protected int getLineTypeSet(int lineNo) {
+		return Line.LT_ASSIGNMENT_MASK| Line.LT_INPUT_MASK | Line.LT_OUTPUT_MASK
+				 | Line.LT_CONST_DEF_MASK | Line.LT_TYPE_DEF_MASK
+				 | Line.LT_VAR_DECL_MASK | Line.LT_VAR_INIT_MASK
+				 | Line.LT_PROC_CALL_MASK;
+	}
+	// END KGU#790 2021-01-17
 
 }

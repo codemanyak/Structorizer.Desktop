@@ -68,6 +68,7 @@ import javax.swing.ImageIcon;
 import lu.fisch.graphics.*;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
+import lu.fisch.structorizer.syntax.Line;
 import lu.fisch.utils.*;
 
 public class Repeat extends Element implements ILoop {
@@ -461,4 +462,11 @@ public class Repeat extends Element implements ILoop {
 		return maxLen;
 	}
 	// END KGU#602 2018-10-25
+	
+	// START KGU#790 2021-01-17: Enh. #800
+	@Override
+	protected int getLineTypeSet(int lineNo) {
+		return Line.LT_CONDITION_MASK;
+	}
+	// END KGU#790 2021-01-17
 }

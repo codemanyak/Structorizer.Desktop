@@ -87,6 +87,7 @@ import javax.swing.ImageIcon;
 import lu.fisch.graphics.*;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
+import lu.fisch.structorizer.syntax.Line;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.*;
 
@@ -1305,5 +1306,10 @@ public class For extends Element implements ILoop {
 		return maxLen;
 	}
 	// END KGU#602 2018-10-25
+
+	@Override
+	protected int getLineTypeSet(int lineNo) {
+		return Line.LT_FOR_LOOP_MASK | Line.LT_FOREACH_LOOP_MASK;
+	}
 
 }

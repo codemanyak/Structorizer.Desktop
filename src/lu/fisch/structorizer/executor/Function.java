@@ -177,7 +177,7 @@ public class Function
 //		// END KGU#56 2015-10-27
 		StringList tokens = Syntax.splitLexically(exp, true);
 		try {
-			LinkedList<Expression> exprs = Expression.parse(tokens, null);
+			LinkedList<Expression> exprs = Expression.parse(tokens, null, (short)0);
 			if (exprs.size() == 1) {
 				if (isFunction(exprs.get(0))) {
 					expr = exprs.get(0);
@@ -306,7 +306,7 @@ public class Function
 		StringList tokens = Syntax.splitLexically(expr, true);
 		LinkedList<Expression> exprs = null;
 		try {
-			exprs = Expression.parse(tokens, null);
+			exprs = Expression.parse(tokens, null, (short)0);
 		} catch (SyntaxException exc) {}
 		if (exprs != null && exprs.size() == 1) {
 			return isFunction(exprs.getFirst());

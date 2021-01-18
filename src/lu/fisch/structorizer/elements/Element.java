@@ -1206,39 +1206,55 @@ public abstract class Element {
 	
 	// START KGU#790 2020-11-01: Issue #800 new syntax engine
 	/**
-	 * 
-	 * @param problems
-	 * @param typeMap TODO
-	 * @return
+	 * Parses the (unbroken) lines of the text and returns the array of associated
+	 * {@link Line} objects for each unbroken line. Does <b>not</b> overwrite
+	 * {@link #parsedLines}.
+	 * @param problems - a {@link StringList} gathering occurred syntax complaints
+	 * @param typeMap - a data type map to retrieve from and add to, or {@code null}
+	 * @return the array of parse results per line
+	 * @see #getParsedText(StringList, StringList, TypeRegistry, StringList)
+	 * @see #parseLines()
 	 */
 	public Line[] getParsedText(StringList problems, TypeRegistry typeMap)
 	{
 		StringList unbrText = this.getUnbrokenText();
 		Line[] lines = new Line[unbrText.count()];
 		for (int i = 0; i < lines.length; i++) {
-			lines[i] = Line.parse(unbrText.get(i), null, typeMap, problems);
+			lines[i] = Line.parse(unbrText.get(i), getLineTypeSet(i), typeMap, problems);
 		}
 		return lines;
 	}
 
 	/**
-	 * 
-	 * @param declaredVars
-	 * @param usedVars
+	 * Retrieves an array of parsed lines (a {@link Line} object for each unbroken line)
+	 * @param declaredVars - unused by now (is it to gather the declared variables en passant?)
+	 * @param usedVars - unused by now (is it to gather the used variables en passant?)
 	 * @param typeMap - a data type map to retrieve from and add to, or {@code null}
-	 * @param problems
-	 * @return
+	 * @param problems a {@link StringList} gathering occurred syntax complaints
+	 * @return the array of parse results per line
 	 */
 	public Line[] getParsedText(StringList declaredVars, StringList usedVars, TypeRegistry typeMap, StringList problems)
 	{
+		// TODO: What is to be done with declaredVars and usedVars here?
 		StringList unbrText = this.getUnbrokenText();
 		Line[] lines = new Line[unbrText.count()];
 		for (int i = 0; i < lines.length; i++) {
-			lines[i] = Line.parse(unbrText.get(i), null, typeMap, problems);
+			lines[i] = Line.parse(unbrText.get(i), getLineTypeSet(i), typeMap, problems);
 		}
 		return lines;
 	}
 	// END KGU#790 2020-11-01
+	
+	// START KGU#790 2021-01-17: Enh. #800 The Element should specify the expected line types
+	/**
+	 * Returns a bit pattern where set bits indicate that the associated {@link Line.LineType}
+	 * is expected and acceptable for the (unbroken) text line with index {@code lineNo}
+	 * @param lineNo - number of the line (in case it matters), might be ignored
+	 * @return a bit pattern, e.g. {@code Line.LT_RETURN_MASK | Line.LT_EXIT_MASK |
+	 * line.LT_LEAVE_MASK | Line.LT_THROW_MASK}
+	 */
+	protected abstract int getLineTypeSet(int lineNo);
+	// END KGU#790 2021-01-07
 	
 	// START KGU#602 2018-10-25: Issue #419 - Tool to break very long lines is requested
 	/**
@@ -4433,7 +4449,7 @@ public abstract class Element {
 		//	}
 		//}
 		try {
-			List<Expression> exprs = Expression.parse(condTokens, null);
+			List<Expression> exprs = Expression.parse(condTokens, null, (short)0);
 			if (exprs.size() == 1) {
 				Expression cond = exprs.get(0);
 				cond = Expression.negateCondition(cond, true);
@@ -4480,17 +4496,20 @@ public abstract class Element {
 	
 	/**
 	 * Re-parses all text lines no matter whether there have already been parsed
-	 * lines in the cache.
+	 * lines in the cache. Overwrites {@link #parsedLines}.
 	 * @return A {@link StringList} of possible error descriptions
+	 * @see #getParsedText(StringList, Typeregistry)
+	 * @see #getParsedText(StringList, StringList, Typeregistry, StringList)
 	 */
 	protected StringList parseLines()
 	{
+		// FIXME both this and getParsedText() needed?
 		StringList errors = new StringList();
 		StringList unbrokenLines = this.getUnbrokenText();
 		parsedLines = new Line[unbrokenLines.count()];
 		for (int i = 0; i < parsedLines.length; i++) {
 			// FIXME guess a suited line type, ought to be delegated to subclasses, though
-			parsedLines[i] = Line.parse(unbrokenLines.get(i), null, null, errors);
+			parsedLines[i] = Line.parse(unbrokenLines.get(i), getLineTypeSet(i), null, errors);
 		}
 		return errors;
 	}
@@ -4504,4 +4523,5 @@ public abstract class Element {
 	{
 		parsedLines = null;
 	}
+	// END KGU#790 2020-11-02
 }

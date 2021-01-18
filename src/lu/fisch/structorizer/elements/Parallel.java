@@ -99,45 +99,44 @@ public class Parallel extends Element
 //	}
     // END KGU#227 2016-07-31
 
-	/**
-	 * Returns the content of the comment field unless _alwaysTrueComment is false and
-	 * mode isSwitchedTextAndComment is active, in which case the colapsedText is
-	 * returned. 
-	 * @param _alwaysTrueText - if true then mode isSwitchTextAndComment is ignored
-	 * @return either the text or the comment
-	 */
+    /**
+     * Returns the content of the comment field unless _alwaysTrueComment is false and
+     * mode isSwitchedTextAndComment is active, in which case the colapsedText is
+     * returned. 
+     * @param _alwaysTrueText - if true then mode isSwitchTextAndComment is ignored
+     * @return either the text or the comment
+     */
     @Override
-	public StringList getComment(boolean _trueComment)
-	{
-    	// START KGU#172 2016-04.01: Issue #145
-		//return getComment();
-    	// START KGU#227 2016-07-31: Enh. #128
-//		if (!_alwaysTrueComment && this.isSwitchTextCommentMode())
-//		{
-//			return this.getCollapsedText();
-//		}
-    	if (!_trueComment)
-    	{
-    		if (this.isCollapsed(true))
-    		{
-    			return StringList.getNew(this.getGenericText());
-    		}
-    		else if (!isSwitchTextCommentMode())
-    		{
-    			return this.getComment();
-    		}
-    		else
-    		{
-    			return new StringList();
-    		}
-    	}
-		// END KGU#227 2016-07-31
-		else
-		{
-			return this.getComment();
-		}
-		// END KGU#172 2016-04-01
-	}
+    public StringList getComment(boolean _trueComment)
+    {
+        // START KGU#172 2016-04.01: Issue #145
+        //return getComment();
+        // START KGU#227 2016-07-31: Enh. #128
+//        if (!_alwaysTrueComment && this.isSwitchTextCommentMode())
+//        {
+//            return this.getCollapsedText();
+//        }
+        if (!_trueComment)
+        {
+            if (this.isCollapsed(true))
+            {
+                return StringList.getNew(this.getGenericText());
+            }
+            else if (!isSwitchTextCommentMode())
+            {
+                return this.getComment();
+            }
+            else
+            {
+                return new StringList();
+            }
+        }
+        // END KGU#227 2016-07-31
+        else {
+            return this.getComment();
+        }
+        // END KGU#172 2016-04-01
+    }
     // END KGU#91 2015-12-01
 
     // START KGU#227 2016-07-31: Enh. #128 new helper method
@@ -296,13 +295,13 @@ public class Parallel extends Element
 //              //FontMetrics fm = _canvas.getFontMetrics(Element.font);
 //              int fontHeight = getFontHeight(_canvas.getFontMetrics(Element.font));
 //              // END KGU#494 2018-09-11
-//            	for (int ci = 0; ci < this.comment.count(); ci++)
-//            	{
-//            		rect0.right = Math.max(rect0.right, getWidthOutVariables(_canvas, this.comment.get(ci), this) + 2 * E_PADDING);
-//            	}
-//            	int extraHeight = this.comment.count() * fontHeight;
-//            	rect0.bottom += extraHeight;
-//            	this.y0Branches += extraHeight;
+//              for (int ci = 0; ci < this.comment.count(); ci++)
+//              {
+//                  rect0.right = Math.max(rect0.right, getWidthOutVariables(_canvas, this.comment.get(ci), this) + 2 * E_PADDING);
+//              }
+//              int extraHeight = this.comment.count() * fontHeight;
+//              rect0.bottom += extraHeight;
+//              this.y0Branches += extraHeight;
 //            }
 //            // END KGU#172 2016-04-01
             
@@ -331,21 +330,21 @@ public class Parallel extends Element
 
             if (qs.size() != 0)
             {
-            	for (int i = 0; i < nTasks; i++)
-            	{
-            		// START KGU#136 2016-03-01: Bugfix #97
-            		x0Branches.addElement(fullWidth);
-            		// END KGU#136 2016-03-01
-            		Rect rtt = qs.get(i).prepareDraw(_canvas);
-            		// START KGU#151 2016-03-01: Additional text lines should not influence the thread width!
-            		//fullWidth += Math.max(rtt.right, getWidthOutVariables(_canvas, getText(false).get(i+1), this) + (E_PADDING / 2));
-            		fullWidth += Math.max(rtt.right, E_PADDING / 2);
-            		// END KGU#151 2016-03-01
-            		if (maxHeight < rtt.bottom)
-            		{
-            			maxHeight = rtt.bottom;
-            		}
-            	}
+                for (int i = 0; i < nTasks; i++)
+                {
+                    // START KGU#136 2016-03-01: Bugfix #97
+                    x0Branches.addElement(fullWidth);
+                    // END KGU#136 2016-03-01
+                    Rect rtt = qs.get(i).prepareDraw(_canvas);
+                    // START KGU#151 2016-03-01: Additional text lines should not influence the thread width!
+                    //fullWidth += Math.max(rtt.right, getWidthOutVariables(_canvas, getText(false).get(i+1), this) + (E_PADDING / 2));
+                    fullWidth += Math.max(rtt.right, E_PADDING / 2);
+                    // END KGU#151 2016-03-01
+                    if (maxHeight < rtt.bottom)
+                    {
+                        maxHeight = rtt.bottom;
+                    }
+                }
             }
 
             rect0.right = Math.max(rect0.right, fullWidth)+1;
@@ -778,5 +777,11 @@ public class Parallel extends Element
 		return maxLen;
 	}
 	// END KGU#602 2018-10-25
+
+	@Override
+	protected int getLineTypeSet(int lineNo) {
+		// No actual parsed lines accepted, just an integer literal
+		return 0;
+	}
 	
 }

@@ -790,4 +790,11 @@ public class SelectedSequence extends Element implements IElementSequence {
 		return this.lastActionBelow;
 	}
 	// END KGU#866 2020-05-02
+
+	// START KGU#790 2021-01-17: Enh. #800
+	@Override
+	protected int getLineTypeSet(int lineNo) {
+		return 0;
+	}
+	// END KGU#790 2021-01-17
 }

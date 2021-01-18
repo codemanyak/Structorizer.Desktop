@@ -48,6 +48,8 @@ import lu.fisch.utils.StringList;
 /**
  * Expression subclass representing a routine header with parameter declarations and result type
  * @author Kay Gürtzig
+ * @deprecated - I doubt that we need this - {@link Declaration} {@link Declaration.DeclarationRule#PAR_LIST}
+ * and result type should be held directly in the {@link Line} object
  */
 public class Routine extends Expression {
 
@@ -62,7 +64,8 @@ public class Routine extends Expression {
 		return null;
 	}
 	
-	public void appendToTokenList(StringList tokens, Declaration.DeclarationSpec declSpec)
+	// TODO We ought to add an argument specifying the declaration style (C, Java, Pascal, BASIC)
+	public void appendToTokenList(StringList tokens)
 	{
 		// TODO peek in Diagramm?
 	}
