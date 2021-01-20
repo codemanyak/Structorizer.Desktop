@@ -75,7 +75,6 @@ import java.awt.Point;
 import java.awt.Rectangle;
 
 import lu.fisch.graphics.*;
-import lu.fisch.structorizer.syntax.Line;
 import lu.fisch.utils.*;
 
 public class Subqueue extends Element implements IElementSequence {

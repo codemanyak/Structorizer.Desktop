@@ -689,7 +689,8 @@ public class Root extends Element {
 	@Deprecated
 	private HashMap<String, TypeMapEntry> typeMap = null;
 	// END KGU#502 2018-03-12
-	// START KGU#790 2020-11-02: Issue #800
+	// START KGU#790 2020-11-02: Issue #800 is to replace the obsolete typeMap
+	/** A lookup table for standard and user-defined data types */
 	private TypeRegistry dataTypes = null;
 	// END KGU#790 2020-11-02
 	// END KGU#261 2017-01-19

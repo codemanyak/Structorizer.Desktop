@@ -42,6 +42,10 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * Adapted by Kay Gürtzig on 2021-01-20, adding type arguments to the raw
+ * type ArrayList and suppressing serializable warnings
+ */
 
 package com.kobrix.notebook.gui;
 
@@ -49,12 +53,13 @@ import java.awt.*;
 import java.util.*;
 import javax.swing.*;
 
+@SuppressWarnings("serial")
 public class AKDockLayout extends BorderLayout
 {
-  private ArrayList north = new ArrayList(1);
-  private ArrayList south = new ArrayList(1);
-  private ArrayList east = new ArrayList(1);
-  private ArrayList west = new ArrayList(1);
+  private ArrayList<Component> north = new ArrayList<Component>(1);
+  private ArrayList<Component> south = new ArrayList<Component>(1);
+  private ArrayList<Component> east = new ArrayList<Component>(1);
+  private ArrayList<Component> west = new ArrayList<Component>(1);
   private Component center = null;
   private int northHeight, southHeight, eastWidth, westWidth;
 
@@ -148,7 +153,7 @@ public class AKDockLayout extends BorderLayout
 
 // Returns the ideal width for a vertically oriented toolbar
 // and the ideal height for a horizontally oriented tollbar:
-  private Dimension getPreferredDimension(ArrayList comps) {
+  private Dimension getPreferredDimension(ArrayList<Component> comps) {
     int w = 0, h = 0;
 
     for (int i = 0; i < comps.size(); i++) {
@@ -161,7 +166,7 @@ public class AKDockLayout extends BorderLayout
     return new Dimension(w, h);
   }
 
-  private void placeComponents(Container target, ArrayList comps,
+  private void placeComponents(Container target, ArrayList<Component> comps,
                                int x, int y, int w, int h, int orientation) {
     int offset = 0;
     Component c = null;
@@ -287,7 +292,7 @@ public class AKDockLayout extends BorderLayout
   /**Description: ????????? ????, ???? ????????? ???????????? ? ???? */
   public boolean containsImbeddedComp(Component c){
     for(int i=0; i<this.curImbeddedTBRs.length; i++){
-      if( ((ArrayList)curImbeddedTBRs[i]).contains(c)) return true;
+      if( ((ArrayList<?>)curImbeddedTBRs[i]).contains(c)) return true;
     }
     return false;
   }
@@ -296,7 +301,10 @@ public class AKDockLayout extends BorderLayout
    * ???????????? ??? ????? (SwingConstants top,left,bottom,right):
    * top:1, left:2, bottom:3, right:4 */
   public boolean containsImbeddedComp(Component c, int inx){
-    if(inx>0 && inx<5 && ((ArrayList)curImbeddedTBRs[inx+1]).contains(c)) return true;
+    // START KGU 2021-01-20: obvious indexing bug mended
+    //if(inx>0 && inx<5 && ((ArrayList<?>)curImbeddedTBRs[inx+1]).contains(c)) return true;
+    if (inx > 0 && inx < 5 && ((ArrayList<?>)curImbeddedTBRs[inx-1]).contains(c)) return true;
+    // END KGU 2021-01-20
     return false;
   }
 

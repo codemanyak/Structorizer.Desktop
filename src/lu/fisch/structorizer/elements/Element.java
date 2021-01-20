@@ -363,14 +363,17 @@ public abstract class Element {
 	"File dropper class by\n"+
 	" - Robert W. Harder <robertharder@mac.com>\n"+
 	"\n"+
+	"AKDocLayout class by\n"+
+	" - Kobrix Software, Inc. <http://www.kobrix.com>\n"+
+	"\n"+
 	"GOLDParser Java engine by\n"+
-	" - Ralph Iden <http://www.creativewidgetworks.com>\n"+
+	" - Ralph Iden <https://www.creativewidgetworks.com>\n"+
 	"\n"+
 	"Delphi grammar by\n"+
 	" - Rob F.M. van den Brink <R.F.M.vandenBrink@hccnet.nl>\n"+
 	"\n"+
 	"Vector graphics export by\n"+
-	" - FreeHEP Team <http://java.freehep.org/vectorgraphics>\n"+
+	" - FreeHEP Team <http://freehep.github.io/freehep-vectorgraphics/>\n"+
 	"\n"+
 	"Command interpreter provided by\n"+
 	" - Pat Niemeyer <pat@pat.net>\n"+
