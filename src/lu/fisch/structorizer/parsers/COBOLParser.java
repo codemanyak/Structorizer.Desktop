@@ -6369,7 +6369,7 @@ public class COBOLParser extends CodeParser
 	/**
 	 * Tries to parse the diagram resource specified by {@code filename} (which should be
 	 * a flat name bound to the class resource location).
-	 * @param filename - the file name of an NSD file in the resource envirmonment of this class.
+	 * @param filename - the file name of an NSD file in the resource environment of this class.
 	 * @return true if the parsing succeeded, false otherwise
 	 */
 	private boolean parseResourceDiagram(String filename)

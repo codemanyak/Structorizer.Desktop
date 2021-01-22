@@ -120,6 +120,7 @@ package lu.fisch.structorizer.elements;
  *                                      Issue #872: '=' in routine headers must not be replaced by "==" for C operator mode
  *      Kay Gürtzig     2021-01-02      Enh. #905: Method to draw a red triangle if an error entry refers to the element
  *      Kay Gürtzig     2021-01-10      Enh. #910: New method isImmutable(), synchronisation in writeOut...
+ *      Kay Gürtzig     2021-01-22      Bugfix KGU#914 in splitExpressionList(StringList,...)
  *
  ******************************************************************************************************
  *
@@ -2718,70 +2719,22 @@ public abstract class Element {
 					}
 					// END KGU 2014-10-18
 				}
-				else if (thisPart.equals(":") && nextPart.equals("="))
+				else if (thisPart.equals(":") && nextPart.equals("=")
+						|| thisPart.equals("!") && nextPart.equals("=")
+						|| thisPart.equals("=") && nextPart.equals("=")
+						|| thisPart.equals("<") && (nextPart.equals("<") || nextPart.equals("=") || nextPart.equals(">"))
+						|| thisPart.equals(">") && (nextPart.equals("=") || nextPart.equals(">"))
+						|| thisPart.equals("&") && nextPart.equals("&")
+						|| thisPart.equals("|") && nextPart.equals("|")
+						// START KGU#913 2021-01-21: Enh. #913
+						|| (thisPart.equals("+") || thisPart.equals("-")) && (nextPart.equals(thisPart) || nextPart.equals("="))
+						|| (thisPart.equals("*") || thisPart.equals("/") || thisPart.equals("%")) && (nextPart.equals("="))
+						// END KGU#913 2021-01-21
+						)
 				{
-					parts.set(i,":=");
+					parts.set(i, thisPart + nextPart);
 					parts.delete(i+1);
 				}
-				else if (thisPart.equals("!") && nextPart.equals("="))
-				{
-					parts.set(i,"!=");
-					parts.delete(i+1);
-				}
-				// START KGU 2015-11-04
-				else if (thisPart.equals("=") && nextPart.equals("="))
-				{
-					parts.set(i,"==");
-					parts.delete(i+1);
-				}
-				// END KGU 2015-11-04
-				else if (thisPart.equals("<"))
-				{
-					if (nextPart.equals(">"))
-					{
-						parts.set(i,"<>");
-						parts.delete(i+1);
-					}
-					else if (nextPart.equals("="))
-					{
-						parts.set(i,"<=");
-						parts.delete(i+1);
-					}
-					// START KGU#92 2015-12-01: Bugfix #41
-					else if (nextPart.equals("<"))
-					{
-						parts.set(i,"<<");
-						parts.delete(i+1);
-					}					
-					// END KGU#92 2015-12-01
-				}
-				else if (thisPart.equals(">"))
-				{
-					if (nextPart.equals("="))
-					{
-						parts.set(i,">=");
-						parts.delete(i+1);
-					}
-					// START KGU#92 2015-12-01: Bugfix #41
-					else if (nextPart.equals(">"))
-					{
-						parts.set(i,">>");
-						parts.delete(i+1);
-					}					
-					// END KGU#92 2015-12-01
-				}
-				// START KGU#24 2014-10-18: Logical two-character operators should be detected, too ...
-				else if (thisPart.equals("&") && nextPart.equals("&"))
-				{
-					parts.set(i,"&&");
-					parts.delete(i+1);
-				}
-				else if (thisPart.equals("|") && nextPart.equals("|"))
-				{
-					parts.set(i,"||");
-					parts.delete(i+1);
-				}
-				// END KGU#24 2014-10-18
 				// START KGU#26 2015-11-04: Find escaped quotes
 				else if (thisPart.equals("\\"))
 				{
@@ -3047,7 +3000,10 @@ public abstract class Element {
 		boolean isWellFormed = true;
 		Stack<String> enclosings = new Stack<String>();
 		int tokenCount = _tokens.count();
-		String currExpr = "";
+		// START KGU#914 2021-01-22: Bugfix - identifiers were glued in expressions if _tokens is condensed
+		//String currExpr = "";
+		StringList currExpr = new StringList();
+		// END KGU#914 2021-01-22
 		String tail = "";
 		for (int i = 0; isWellFormed && parenthDepth >= 0 && i < tokenCount; i++)
 		{
@@ -3055,8 +3011,12 @@ public abstract class Element {
 			if (token.equals(_listSeparator) && enclosings.isEmpty())
 			{
 				// store the current expression and start a new one
-				expressionList.add(currExpr.trim());
-				currExpr = new String();
+				// START KGU#914 2021-01-22: Bugfix - see above
+				//expressionList.add(currExpr.trim());
+				//currExpr = "";
+				expressionList.add(currExpr.trim().concatenate(null));
+				currExpr.clear();
+				// END KGU#914 2021-01-22
 			}
 			else
 			{ 
@@ -3082,20 +3042,27 @@ public abstract class Element {
 				}
 				if (isWellFormed)
 				{
-					currExpr += token;
+					currExpr.add(token);
 				}
 				else if (_appendTail)
 				{
-					expressionList.add(currExpr.trim());
-					currExpr = "";
-					tail = _tokens.concatenate("", i).trim();
+					// START KGU#914 2021-01-22: Bugfix - see above
+					//expressionList.add(currExpr.trim());
+					//currExpr = "";
+					expressionList.add(currExpr.trim().concatenate(null));
+					currExpr.clear();
+					// END KGU#914 2021-01-22
+					tail = _tokens.concatenate(null, i).trim();
 				}
 			}
 		}
 		// add the last expression if it's not empty
-		if (!(currExpr = currExpr.trim()).isEmpty())
+		if (!(currExpr.trim()).isEmpty())
 		{
-			expressionList.add(currExpr);
+			// START KGU#914 2021-01-22: Bugfix - see above
+			//expressionList.add(currExpr);
+			expressionList.add(currExpr.concatenate(null));
+			// END KGU#914 2021-01-22
 		}
 		// Add the tail if requested. Empty if there is no bad tail
 		if (_appendTail) {
@@ -3133,7 +3100,7 @@ public abstract class Element {
 			else if (stoppers.contains(token)) {
 				level--;
 				if (level == 0) {
-					tokens.set(ixLastStart, tokens.concatenate("", ixLastStart, ix + 1));
+					tokens.set(ixLastStart, tokens.concatenate(null, ixLastStart, ix + 1));
 					tokens.remove(ixLastStart + 1, ix+1);
 					// START KGU#693 2019-03-24: Bugfix #711
 					ix = ixLastStart;
@@ -3757,6 +3724,15 @@ public abstract class Element {
 				specialSigns.add("<=");
 				specialSigns.add(">=");
 				// END KGU#872 2020-10-17
+				// START KGU#913 2021-01-21: Enh. #913 operator symbols from Java import (revoked)
+				//specialSigns.add("++");
+				//specialSigns.add("--");
+				//specialSigns.add("+=");
+				//specialSigns.add("-=");
+				//specialSigns.add("*=");
+				//specialSigns.add("/=");
+				//specialSigns.add("%=");
+				// END KGU#913 2021-01-21
 				// START KGU#883 2020-11-01: Enh. #881 bit operators and Boolean literal were missing
 				specialSigns.add("false");
 				specialSigns.add("true");

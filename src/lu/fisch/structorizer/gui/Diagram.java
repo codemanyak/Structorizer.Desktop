@@ -218,6 +218,7 @@ package lu.fisch.structorizer.gui;
  *                                      Bugfix #907: Duplicate code in goRun() led to a skipped tutorial step,
  *                                      Issue #569: Diagram scrolling on errorlist selection improved
  *      Kay Gürtzig     2021-01-10      Enh. #910: Effective support for actual DiagramControllers
+ *      Kay Gürtzig     2021-01-21      Enh. #913: Additional option for JStruct import in Import Preferences
  *
  ******************************************************************************************************
  *
@@ -297,6 +298,7 @@ import lu.fisch.structorizer.generators.*;
 import lu.fisch.structorizer.helpers.GENPlugin;
 import lu.fisch.structorizer.helpers.IPluginClass;
 import lu.fisch.structorizer.archivar.Archivar;
+import lu.fisch.structorizer.archivar.ArchivePool;
 import lu.fisch.structorizer.archivar.IRoutinePool;
 import lu.fisch.structorizer.arranger.Arranger;
 import lu.fisch.structorizer.arranger.Group;
@@ -2297,6 +2299,10 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		// START KGU#111 2015-12-16: Bugfix #63: No error messages on failed load
 		String errorMessage = Menu.msgErrorNoFile.getText();
 		// END KGU#111 2015-12-16
+		// START KGU#901 2021-01-22: Issue #901 WAIT_CURSOR on time-consuming actions
+		Cursor origCursor = getCursor();
+		setCursor(new Cursor(Cursor.WAIT_CURSOR));	// Possibly this should have done Surface?
+		// END KGU#901 2021-01-22
 		try
 		{
 			File f = new File(_filename);
@@ -2311,7 +2317,33 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 				//boolean hil = root.highlightVars;
 				// START KGU#363 2017-05-21: Issue #372 API change
 				//root = parser.parse(f.toURI().toString());
-				root = parser.parse(f);
+				try {
+					root = parser.parse(f);
+				}
+				catch (NSDParser.NSDParserException ex) {
+					// For JStruct files we have a solution
+					if (ex.getDetectedFileType() == NSDParser.NSDFileType.JSTRUCT) {
+						JStructParser jStrParser = new JStructParser();
+						ArchivePool jClassPool = jStrParser.parse(new File(_filename));
+						Set<Root> roots = jClassPool.getAllRoots();
+						if (!roots.isEmpty()) {
+							for (Root rt: roots) {
+								if (rt.isProgram()) {
+									root = rt;
+								}
+								else {
+									if (Element.E_VARHIGHLIGHT) {
+										rt.retrieveVarNames();	// Initialise the variable table, otherwise the highlighting won't work
+									}
+								}
+								Arranger.getInstance().addToPool(rt, getFrame(), jClassPool.getName());
+							}
+						}
+					}
+					else {
+						throw ex;
+					}
+				}
 				// END KGU#363 2017-05-21
 				//root.highlightVars = hil;
 				if (Element.E_VARHIGHLIGHT) {
@@ -2365,6 +2397,11 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 			logger.log(level, "openNSD(\"" + _filename + "\"): ", e);				
 			// END KGU#111 2015-12-16
 		}
+		// START KGU#901 2021-01-22: Issue #901 WAIT_CURSOR on time-consuming actions
+		finally {
+			setCursor(origCursor);
+		}
+		// END KGU#901 2021-01-22
 		// START KGU#111 2015-12-16: Bugfix #63: No error messages on failed load
 		if (errorMessage != null)
 		{
@@ -8856,6 +8893,9 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
             //iod.chkRefactorOnLoading.setSelected(ini.getProperty("impRefactorOnLoading", "false").equals("true"));
             iod.chkRefactorOnLoading.setSelected(!ini.getProperty("impRefactorOnLoading", "true").equals("false"));
             // END KGU#362 2017-03-28
+            // START KGU#913 2021-01-21: Enh. #913 JStruct import
+            iod.chkConvertJStructSyntax.setSelected(ini.getProperty("impConvertJStruct", "false").equals("true"));
+            // END KGU#913 2021-01-21
             iod.charsetListChanged(ini.getProperty("impImportCharset", Charset.defaultCharset().name()));
             // START KGU#358 2017-03-06: Enh. #368
             iod.chkVarDeclarations.setSelected(ini.getProperty("impVarDeclarations", "false").equals("true"));
@@ -8903,6 +8943,9 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
             if(iod.goOn==true)
             {
                 ini.setProperty("impRefactorOnLoading", String.valueOf(iod.chkRefactorOnLoading.isSelected()));
+                // START KGU#913 2021-01-21: Enh. #913 (JStruct import)
+                ini.setProperty("impConvertJStruct", String.valueOf(iod.chkConvertJStructSyntax.isSelected()));
+                // END KGU#913 2021-01-21
                 ini.setProperty("impImportCharset", (String)iod.cbCharset.getSelectedItem());
                 // START KGU#358 2017-03-06: Enh. #368
                 ini.setProperty("impVarDeclarations", String.valueOf(iod.chkVarDeclarations.isSelected()));

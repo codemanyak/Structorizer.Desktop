@@ -86,6 +86,38 @@ import lu.fisch.structorizer.io.Ini;
 
 public class NSDParser extends DefaultHandler {
 	
+	/** Classifies detected deviant NSD file types */
+	public static enum NSDFileType {UNKNOWN, JSTRUCT};
+	
+	public static class NSDParserException extends Exception
+	{
+		static final long serialVersionUID = -2405966611999798224L;
+		
+		private NSDFileType incompatibleFileType;
+		/**
+		 * Constructs a new exception with the specified detail message. The
+		 * cause is not initialized, and might subsequently be initialized by
+		 * a call to {@link #initCause}.
+		 * @param message - the detail message. The detail message is saved for
+		 *          later retrieval by the {@link #getMessage()} method.
+		 * @param detectedFileType - 
+		 */
+		public NSDParserException(String message, NSDFileType detectedFileType) {
+			super(message);
+			incompatibleFileType = detectedFileType;
+		}
+		
+		/**
+		 * @return the detected incompatible ".nsd" file type for potential
+		 * further handling
+		 */
+		public NSDFileType getDetectedFileType()
+		{
+			return incompatibleFileType;
+		}
+	}
+	private boolean isJStructFile = false;
+	
 	// START KGU#484 2018-03-21: Issue #463
 	public static final Logger logger = Logger.getLogger(NSDParser.class.getName());
 	// END KGU#484 2018-03-21
@@ -145,6 +177,19 @@ public class NSDParser extends DefaultHandler {
 	@Override
 	public void startElement(String namespaceUri, String localName, String qualifiedName, Attributes attributes) throws SAXException 
 	{
+		// START KGU#913 2021-01-20: Enh. #913 JStruct file detection
+		if (isJStructFile) {
+			// Don't do anything further here if it is a JStruct file
+			return;
+		}
+		else if (qualifiedName.equals("jprogram")) {
+			// We suppress further material parsing and prepare the throwing of an exception
+			isJStructFile = true;
+			root = null;
+			return;
+		}
+		// END KGU#913 2021-01-20
+		
 //		System.out.println("start " + qualifiedName + " entry");
 //		System.out.println("stack:\t" + stack.size());
 //		System.out.println("ifStack:\t" + ifStack.size());
@@ -821,6 +866,13 @@ public class NSDParser extends DefaultHandler {
 	@Override
 	public void endElement(String namespaceUri, String localName, String qualifiedName) throws SAXException 
 	{
+		// START KGU#913 2021-01-20: Enh. #913 JStruct file detection
+		if (isJStructFile) {
+			// Don't do anything further here if it is a JStruct file
+			return;
+		}
+		// END KGU#913 2021-01-20
+		
 //		System.out.println("end " + qualifiedName + " entry");
 //		System.out.println("stack:\t" + stack.size());
 //		System.out.println("ifStack:\t" + ifStack.size());
@@ -920,8 +972,9 @@ public class NSDParser extends DefaultHandler {
 	 * @return the built diagram
 	 * @throws SAXException
 	 * @throws IOException
+	 * @throws NSDParserException 
 	 */
-	public Root parse(File _file) throws SAXException, IOException
+	public Root parse(File _file) throws SAXException, IOException, NSDParserException
 	{
 		return parse(_file, null);
 	}
@@ -934,8 +987,9 @@ public class NSDParser extends DefaultHandler {
 	 * @return the built diagram
 	 * @throws SAXException
 	 * @throws IOException
+	 * @throws NSDParserException 
 	 */
-	public Root parse(File _file, File _zipFile) throws SAXException, IOException
+	public Root parse(File _file, File _zipFile) throws SAXException, IOException, NSDParserException
 	// END KGU#363 2017-05-21
 	{
 		// setup a new root
@@ -1003,6 +1057,11 @@ public class NSDParser extends DefaultHandler {
 			}
 			// END KGU#111 2015-12-16
 		}
+		// START KGU#913 2021-01-20: Enh. #913 report a JStruct file
+		if (isJStructFile) {
+			throw new NSDParserException("JStruct file detected (modelling a Java class).",
+					NSDFileType.JSTRUCT);
+		}
 		
 		// START KGU#137 2016-01-11: In theory no longer needed - should have been initialized so
 		//root.hasChanged=false;
@@ -1016,7 +1075,7 @@ public class NSDParser extends DefaultHandler {
 	public Root parse(InputStream _is) throws SAXException, IOException
 	{
 		// setup a new root
-		root=new Root();
+		root = new Root();
 		
 		// clear stacks
 		stack.clear();

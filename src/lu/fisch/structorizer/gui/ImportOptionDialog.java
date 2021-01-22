@@ -43,6 +43,7 @@ package lu.fisch.structorizer.gui;
  *      Kay Gürtzig     2018-10-26  Enh. #419: New line length limitation option
  *      Kay Gürtzig     2019-03-29  Issue #557, #718: Limit for the max. number of roots could be enlarged
  *      Kay Gürtzig     2020-03-09  Issue #833: New option for the insertion of optional keywords (e.g. "preAlt")
+ *      Kay Gürtzig     2021-01-21  Enh. #913: New option for JStruct import
  *
  ******************************************************************************************************
  *
@@ -129,7 +130,10 @@ public class ImportOptionDialog extends LangDialog {
         pnlOptions = new javax.swing.JPanel();
         pnlCode = new javax.swing.JPanel();
         pnlNSD = new javax.swing.JPanel();
-        pnlPreference = new javax.swing.JPanel();
+        //pnlPreference = new javax.swing.JPanel();
+        // START KGU#913 2021-01-21: Enh. JStruct import
+        pnlJStruct = new javax.swing.JPanel();
+        // END KGU#913 2021-01-21
         // START KGU#553 2018-07-13: Issue #557 - new option to limit the number of displayed Roots
         javax.swing.JPanel pnlLimit = new javax.swing.JPanel();
         lblLimit = new javax.swing.JLabel();
@@ -141,6 +145,9 @@ public class ImportOptionDialog extends LangDialog {
         // END KGU#602 2018-10-25
         chkRefactorOnLoading = new javax.swing.JCheckBox();
         //chkOfferRefactoringIni = new javax.swing.JCheckBox();
+        // START KGU#913 2021-01-21: Enh. JStruct import
+        chkConvertJStructSyntax = new javax.swing.JCheckBox();
+        // END KGU#913 2021-01-21
         lbIntro = new javax.swing.JLabel();
         btnOk = new javax.swing.JButton();
         lbCharset = new javax.swing.JLabel();
@@ -294,6 +301,12 @@ public class ImportOptionDialog extends LangDialog {
         chkRefactorOnLoading.setText("Replace keywords on loading a diagram (refactoring).");
         chkRefactorOnLoading.setToolTipText("Select this option if all configurable keywords in the daiagram are to be adapted to the current parser preferences.");
         chkRefactorOnLoading.setAlignmentX(LEFT_ALIGNMENT);
+        
+        // START KGU#931 2021-01-21: Enh. #JStruct import
+        chkConvertJStructSyntax.setText("Convert Java syntax to Structorizer on JStruct import.");
+        chkConvertJStructSyntax.setToolTipText("Select this option only if the imported diagrams are to be executed or to exported to other programming languages.");
+        chkConvertJStructSyntax.setAlignmentX(LEFT_ALIGNMENT);
+        // END KGU#931 2021-01-21
 
         lbIntro.setText("Please select the options you want to activate ...");
 
@@ -406,7 +419,8 @@ public class ImportOptionDialog extends LangDialog {
 
         pnlNSD.setBorder(new TitledBorder("NSD Files"));
 //        pnlNSD.setLayout(new GridLayout(0, 1, 0, 1));
-        org.jdesktop.layout.GroupLayout pnlNSDLayout = new org.jdesktop.layout.GroupLayout(pnlNSD);
+        org.jdesktop.layout.GroupLayout pnlNSDLayout =
+                new org.jdesktop.layout.GroupLayout(pnlNSD);
         pnlNSD.setLayout(pnlNSDLayout);
         //pnlNSD.add(chkRefactorOnLoading);
         pnlNSDLayout.setHorizontalGroup(
@@ -418,9 +432,24 @@ public class ImportOptionDialog extends LangDialog {
                 .add(chkRefactorOnLoading)
                 );
         
-        pnlPreference.setBorder(new TitledBorder("Preference Files"));
-        pnlPreference.setLayout(new GridLayout(0, 1, 0, 1));
+        //pnlPreference.setBorder(new TitledBorder("Preference Files"));
+        //pnlPreference.setLayout(new GridLayout(0, 1, 0, 1));
         //pnlPreference.add(chkOfferRefactoringIni);
+        
+        // START KGU#913 2021-01-21: Enh. JStruct import
+        pnlJStruct.setBorder(new TitledBorder("JStruct Files"));
+        org.jdesktop.layout.GroupLayout pnlJStructLayout =
+                new org.jdesktop.layout.GroupLayout(pnlJStruct);
+        pnlJStruct.setLayout(pnlJStructLayout);
+        pnlJStructLayout.setHorizontalGroup(
+                pnlJStructLayout.createParallelGroup()
+                .add(chkConvertJStructSyntax)
+                );
+        pnlJStructLayout.setVerticalGroup(
+                pnlJStructLayout.createSequentialGroup()
+                .add(chkConvertJStructSyntax)
+                );
+        // END KGU#913 2021-01-21
 
         GridBagLayout gbOptions = new GridBagLayout();
         GridBagConstraints gbcOptions = new GridBagConstraints();
@@ -440,6 +469,11 @@ public class ImportOptionDialog extends LangDialog {
         gbOptions.setConstraints(pnlNSD, gbcOptions);
         pnlOptions.add(pnlNSD);
         //pnlOptions.add(pnlPreference);
+        // START KGU#913 2021-01-21: Enh. #913
+        gbcOptions.gridy = 3;
+        gbOptions.setConstraints(pnlJStruct, gbcOptions);
+        pnlOptions.add(pnlJStruct);
+        // END KGU#913 2021-01-21
          
         pnlButtons.setLayout(new BorderLayout());
         pnlButtons.setBorder(new EmptyBorder(12,12,12,12));
@@ -677,15 +711,16 @@ public class ImportOptionDialog extends LangDialog {
     
     public static String[] standardCharsets = {"ISO-8859-1", "UTF-8", "UTF-16", "windows-1250", "windows-1252", "US-ASCII"};
     
-    // Variables declaration
+    // Attribute declaration
     private javax.swing.JPanel pnlTop;
-    // START KGU#354 2017-04-27: Enh. #354 Specify a log directory
-    // END KGU#354 2017-04-27
     private javax.swing.JPanel pnlButtons;
     private javax.swing.JPanel pnlOptions;
     public javax.swing.JPanel pnlNSD;
-    public javax.swing.JPanel pnlPreference;
+    //public javax.swing.JPanel pnlPreference;
     public javax.swing.JPanel pnlCode;
+    // START KGU#913 2021-01-21: Enh. JStruct import
+    public javax.swing.JPanel pnlJStruct;
+    // END KGU#913 2021-01-21
     public javax.swing.JButton btnOk;
     public javax.swing.JLabel lbIntro;
     public javax.swing.JCheckBox chkRefactorOnLoading;
@@ -718,6 +753,9 @@ public class ImportOptionDialog extends LangDialog {
     // START KGU#354 2017-03-08: Enh. #354 - new option to save the parse tree
     public javax.swing.JCheckBox chkSaveParseTree;
     // END KGU#354 2017-03-08
+    // START KGU#913 2021-01-21: Enh. JStruct import
+    public javax.swing.JCheckBox chkConvertJStructSyntax;
+    // END KGU#913 2021-01-21
     // START KGU#354 2017-04-27: Enh. #354 Specify a log directory
     public javax.swing.JCheckBox chkLogDir;
     public javax.swing.JTextField txtLogDir;
