@@ -121,6 +121,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2021-01-02      Enh. #905: Method to draw a red triangle if an error entry refers to the element
  *      Kay Gürtzig     2021-01-10      Enh. #910: New method isImmutable(), synchronisation in writeOut...
  *      Kay Gürtzig     2021-01-22      Bugfix KGU#914 in splitExpressionList(StringList,...)
+ *      Kay Gürtzig     2021-01-25      Enh. #915: New Structures preference "useInputBoxCase"
  *
  ******************************************************************************************************
  *
@@ -574,6 +575,9 @@ public abstract class Element {
 	/** Number of CASE branches to trigger the attempt to shrink width by rotating branches */
 	public static int caseShrinkByRot = 8;
 	// END KGU#401 2017-05-17
+	// START KGU#916 2021-01-25: Enh. #915
+	public static boolean useInputBoxCase = true;
+	// END KGU#916 2021-01-25
 	
 	// START KGU 2017-09-19: Performance tuning for syntax analysis
 	private static final Pattern FLOAT_PATTERN1 = Pattern.compile("[0-9]+([eE][0-9]+)?");
@@ -2478,10 +2482,13 @@ public abstract class Element {
 			// END KGU#228 2016-07-31
 			StringList sl = new StringList();
 			sl.setCommaText(ini.getProperty("Case","\"(?)\",\"!\",\"!\",\"default\""));
-			preCase=sl.getText();
+			preCase = sl.getText();
 			// START KGU#401 2017-05-18: Issue #405 - allow to reduce CASE width by branch element rotation
 			caseShrinkByRot = Integer.parseInt(ini.getProperty("CaseShrinkRot", "8"));
 			// END KGU#401 2017-05-18
+			// START KGU#916 2021-01-25: Enh. #915
+			useInputBoxCase = ini.getProperty("CaseEditor", "true").equals("true");
+			// END KGU#916 2021-01-25
 			preFor    = ini.getProperty("For", "for ? <- ? to ?");
 			preWhile  = ini.getProperty("While", "while (?)");
 			preRepeat = ini.getProperty("Repeat", "until (?)");
@@ -2527,7 +2534,11 @@ public abstract class Element {
 	{
 		if (category.equals("structure")) {
 			return new String[] {"IfTrue", "IfFalse", "If", "altPadRight",
-					"Case", "CaseShrinkRot", "For", "While", "Repeat", "Try", "Catch", "Finally", "Import"};
+					"Case", "CaseShrinkRot",
+					// START KGU#916 2021-01-26: Enh. #915
+					"CaseEditor",
+					// END KGU#916 2021-01-26
+					"For", "While", "Repeat", "Try", "Catch", "Finally", "Import"};
 		}
 		else if (category.equals("color")) {
 			String[] colKeys = new String[defaultColors.length];
@@ -2578,8 +2589,11 @@ public abstract class Element {
 		sl.setText(preCase);
 		ini.setProperty("Case", sl.getCommaText());
 		// START KGU#401 2017-05-18: Issue #405 - allow to reduce CASE width by branch element rotation
-		ini.setProperty("CaseShrinkRot", Integer.toString(Element.caseShrinkByRot));
+		ini.setProperty("CaseShrinkRot", Integer.toString(caseShrinkByRot));
 		// END KGU#401 2017-05-18
+		// START KGU#916 2021-01-25: Enh.#915 - offer alternative CASE editor
+		ini.setProperty("CaseEditor", Boolean.toString(useInputBoxCase));
+		// END KGU#916 2021-01-25
 		ini.setProperty("For", preFor);
 		ini.setProperty("While", preWhile);
 		ini.setProperty("Repeat", preRepeat);
@@ -3013,7 +3027,7 @@ public abstract class Element {
 				// store the current expression and start a new one
 				// START KGU#914 2021-01-22: Bugfix - see above
 				//expressionList.add(currExpr.trim());
-				//currExpr = "";
+				//currExpr = new String();
 				expressionList.add(currExpr.trim().concatenate(null));
 				currExpr.clear();
 				// END KGU#914 2021-01-22
@@ -3042,17 +3056,21 @@ public abstract class Element {
 				}
 				if (isWellFormed)
 				{
+					// START KGU#914 2021-01-22: Bugfix - see above
+					//currExpr += token;
 					currExpr.add(token);
+					// END KGU#914 2021-01-22
 				}
 				else if (_appendTail)
 				{
 					// START KGU#914 2021-01-22: Bugfix - see above
 					//expressionList.add(currExpr.trim());
 					//currExpr = "";
+					//tail = _tokens.concatenate("", i).trim();
 					expressionList.add(currExpr.trim().concatenate(null));
 					currExpr.clear();
-					// END KGU#914 2021-01-22
 					tail = _tokens.concatenate(null, i).trim();
+					// END KGU#914 2021-01-22
 				}
 			}
 		}
