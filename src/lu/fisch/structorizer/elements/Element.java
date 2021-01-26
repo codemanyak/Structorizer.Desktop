@@ -122,6 +122,8 @@ package lu.fisch.structorizer.elements;
  *                                      Issue #872: '=' in routine headers must not be replaced by "==" for C operator mode
  *      Kay Gürtzig     2021-01-02      Enh. #905: Method to draw a red triangle if an error entry refers to the element
  *      Kay Gürtzig     2021-01-10      Enh. #910: New method isImmutable(), synchronisation in writeOut...
+ *      Kay Gürtzig     2021-01-22      Bugfix KGU#914 in splitExpressionList(StringList,...)
+ *      Kay Gürtzig     2021-01-25      Enh. #915: New Structures preference "useInputBoxCase"
  *
  ******************************************************************************************************
  *
@@ -583,6 +585,9 @@ public abstract class Element {
 	/** Number of CASE branches to trigger the attempt to shrink width by rotating branches */
 	public static int caseShrinkByRot = 8;
 	// END KGU#401 2017-05-17
+	// START KGU#916 2021-01-25: Enh. #915
+	public static boolean useInputBoxCase = true;
+	// END KGU#916 2021-01-25
 	
 	// START KGU 2017-09-19: Performance tuning for syntax analysis
 	private static final Pattern BIN_PATTERN = Pattern.compile("0b[01]+");
@@ -1431,7 +1436,7 @@ public abstract class Element {
 				while (++j < tokens.count() && ((nextToken = tokens.get(j).trim()).isEmpty() || nextToken.equals("\\")));
 				// Now check for a beginning parameter list
 				if ("(".equals(nextToken)) {
-					int nArgs = Element.splitExpressionList(tokens.subSequence(j+1, tokens.count()), ",", false).count();
+					int nArgs = Syntax.splitExpressionList(tokens.subSequence(j+1, tokens.count()), ",").size() - 1;
 					String key = token.toLowerCase() + "#" + nArgs;
 					String subst = substitutions.get(key);
 					if (subst != null) {
@@ -2529,10 +2534,13 @@ public abstract class Element {
 			// END KGU#228 2016-07-31
 			StringList sl = new StringList();
 			sl.setCommaText(ini.getProperty("Case","\"(?)\",\"!\",\"!\",\"default\""));
-			preCase=sl.getText();
+			preCase = sl.getText();
 			// START KGU#401 2017-05-18: Issue #405 - allow to reduce CASE width by branch element rotation
 			caseShrinkByRot = Integer.parseInt(ini.getProperty("CaseShrinkRot", "8"));
 			// END KGU#401 2017-05-18
+			// START KGU#916 2021-01-25: Enh. #915
+			useInputBoxCase = ini.getProperty("CaseEditor", "true").equals("true");
+			// END KGU#916 2021-01-25
 			preFor    = ini.getProperty("For", "for ? <- ? to ?");
 			preWhile  = ini.getProperty("While", "while (?)");
 			preRepeat = ini.getProperty("Repeat", "until (?)");
@@ -2578,7 +2586,11 @@ public abstract class Element {
 	{
 		if (category.equals("structure")) {
 			return new String[] {"IfTrue", "IfFalse", "If", "altPadRight",
-					"Case", "CaseShrinkRot", "For", "While", "Repeat", "Try", "Catch", "Finally", "Import"};
+					"Case", "CaseShrinkRot",
+					// START KGU#916 2021-01-26: Enh. #915
+					"CaseEditor",
+					// END KGU#916 2021-01-26
+					"For", "While", "Repeat", "Try", "Catch", "Finally", "Import"};
 		}
 		else if (category.equals("color")) {
 			String[] colKeys = new String[defaultColors.length];
@@ -2629,8 +2641,11 @@ public abstract class Element {
 		sl.setText(preCase);
 		ini.setProperty("Case", sl.getCommaText());
 		// START KGU#401 2017-05-18: Issue #405 - allow to reduce CASE width by branch element rotation
-		ini.setProperty("CaseShrinkRot", Integer.toString(Element.caseShrinkByRot));
+		ini.setProperty("CaseShrinkRot", Integer.toString(caseShrinkByRot));
 		// END KGU#401 2017-05-18
+		// START KGU#916 2021-01-25: Enh.#915 - offer alternative CASE editor
+		ini.setProperty("CaseEditor", Boolean.toString(useInputBoxCase));
+		// END KGU#916 2021-01-25
 		ini.setProperty("For", preFor);
 		ini.setProperty("While", preWhile);
 		ini.setProperty("Repeat", preRepeat);
@@ -2773,7 +2788,10 @@ public abstract class Element {
 		boolean isWellFormed = true;
 		Stack<String> enclosings = new Stack<String>();
 		int tokenCount = _tokens.count();
-		String currExpr = "";
+		// START KGU#914 2021-01-22: Bugfix - identifiers were glued in expressions if _tokens is condensed
+		//String currExpr = "";
+		StringList currExpr = new StringList();
+		// END KGU#914 2021-01-22
 		String tail = "";
 		for (int i = 0; isWellFormed && parenthDepth >= 0 && i < tokenCount; i++)
 		{
@@ -2781,8 +2799,12 @@ public abstract class Element {
 			if (token.equals(_listSeparator) && enclosings.isEmpty())
 			{
 				// store the current expression and start a new one
-				expressionList.add(currExpr.trim());
-				currExpr = new String();
+				// START KGU#914 2021-01-22: Bugfix - see above
+				//expressionList.add(currExpr.trim());
+				//currExpr = new String();
+				expressionList.add(currExpr.trim().concatenate(null));
+				currExpr.clear();
+				// END KGU#914 2021-01-22
 			}
 			else
 			{ 
@@ -2808,20 +2830,31 @@ public abstract class Element {
 				}
 				if (isWellFormed)
 				{
-					currExpr += token;
+					// START KGU#914 2021-01-22: Bugfix - see above
+					//currExpr += token;
+					currExpr.add(token);
+					// END KGU#914 2021-01-22
 				}
 				else if (_appendTail)
 				{
-					expressionList.add(currExpr.trim());
-					currExpr = "";
-					tail = _tokens.concatenate("", i).trim();
+					// START KGU#914 2021-01-22: Bugfix - see above
+					//expressionList.add(currExpr.trim());
+					//currExpr = "";
+					//tail = _tokens.concatenate("", i).trim();
+					expressionList.add(currExpr.trim().concatenate(null));
+					currExpr.clear();
+					tail = _tokens.concatenate(null, i).trim();
+					// END KGU#914 2021-01-22
 				}
 			}
 		}
 		// add the last expression if it's not empty
 		if (!(currExpr = currExpr.trim()).isEmpty())
 		{
-			expressionList.add(currExpr);
+			// START KGU#914 2021-01-22: Bugfix - see above
+			//expressionList.add(currExpr);
+			expressionList.add(currExpr.concatenate(null));
+			// END KGU#914 2021-01-22
 		}
 		// Add the tail if requested. Empty if there is no bad tail
 		if (_appendTail) {

@@ -219,6 +219,7 @@ package lu.fisch.structorizer.gui;
  *                                      Bugfix #907: Duplicate code in goRun() led to a skipped tutorial step,
  *                                      Issue #569: Diagram scrolling on errorlist selection improved
  *      Kay Gürtzig     2021-01-10      Enh. #910: Effective support for actual DiagramControllers
+ *      Kay Gürtzig     2021-01-23/25   Enh. #915: Special editor for Case elements (InputBoxCase) supported
  *
  ******************************************************************************************************
  *
@@ -2299,12 +2300,19 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		// START KGU#111 2015-12-16: Bugfix #63: No error messages on failed load
 		String errorMessage = Menu.msgErrorNoFile.getText();
 		// END KGU#111 2015-12-16
+		// START KGU#901 2021-01-22: Issue #901 WAIT_CURSOR on time-consuming actions
+		Cursor origCursor = getCursor();
+		setCursor(new Cursor(Cursor.WAIT_CURSOR));
+		// END KGU#901 2021-01-22
 		try
 		{
 			File f = new File(_filename);
 			//System.out.println(f.toURI().toString());
 			if (f.exists())
 			{
+				// START KGU#901 2021-01-22: Issue #901 WAIT_CURSOR on time-consuming actions
+				setCursor(new Cursor(Cursor.WAIT_CURSOR));
+				// END KGU#901 2021-01-22
 				// save current diagram (only if something has been changed)
 				saveNSD(true);
 
@@ -2367,6 +2375,11 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 			logger.log(level, "openNSD(\"" + _filename + "\"): ", e);				
 			// END KGU#111 2015-12-16
 		}
+		// START KGU#901 2021-01-22: Issue #901 WAIT_CURSOR on time-consuming actions
+		finally {
+			setCursor(origCursor);
+		}
+		// END KGU#901 2021-01-22
 		// START KGU#111 2015-12-16: Bugfix #63: No error messages on failed load
 		if (errorMessage != null)
 		{
@@ -2942,12 +2955,13 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 	}
 	
 	/**
-	 * Stores unsaved changes (if any) of the give {@link Root} {@code root}. If {@code _askToSave} is true
-	 * then the user may confirm or deny saving or cancel the inducing request.
+	 * Stores unsaved changes (if any) of the given {@link Root} {@code root}.
+	 * If {@code _askToSave} is {@code true} then the user may confirm or deny
+	 * saving or cancel the inducing request.
 	 * @param root - {@link Root} to be saved
-	 * @param _askToSave - if true and the given {@code root} has unsaved changes then a user dialog will be
-	 * popped up first.
-	 * @return true if the user did not cancel the save request
+	 * @param _askToSave - if {@code true} and the given {@code root} has unsaved
+	 * changes then a user dialog will be popped up first.
+	 * @return {@code true} if the user did not cancel the save request
 	 */
 	public boolean saveNSD(Root root, boolean _askToSave)
 	// END KGU#320 2017-01-04
@@ -3969,6 +3983,11 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 					// END KGU#376 2017-07-01
 				}
 				// END KGU#363 2017-03-14
+				// START KGU#695 2021-01-22: Enh. #714
+				else if (element instanceof Try) {
+					data.showFinally = ((Try)element).isEmptyFinallyVisible();
+				}
+				// END KGU#695 2021-01-22
 
 				// START KGU#42 2015-10-14: Enhancement for easier title localisation
 				//showInputBox(data);
@@ -3992,6 +4011,12 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 					}
 					// END KGU#684 2019-06-13
 					// END KGU#363 2017-05-21
+					// START KGU#916 2021-01-24: Enh. #915 We may preserve branch associations now
+					// This must be done before the text is updated!
+					if (element instanceof Case) {
+						((Case)element).reorderBranches(data.branchOrder);
+					}
+					// END KGU#916 2021-01-24
 					if (!(element instanceof Forever))
 					{
 						// START KGU#480 2018-01-21: Enh. #490 we have to replace DiagramController aliases by the original names
@@ -4028,6 +4053,11 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 						// END KGU#376 2017-07-01
 					}
 					// END KGU#363 2017-03-14
+					// START KGU#695 2021-01-22: Enh. #714
+					else if (element instanceof Try) {
+						((Try)element).setEmptyFinallyVisible(data.showFinally);
+					}
+					// END KGU#695 2021-01-22
 					// START KGU#137 2016-01-11: Already prepared by addUndo()
 					//root.hasChanged=true;
 					// END KGU#137 2016-01-11
@@ -4380,7 +4410,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 			//showInputBox(data);
 			showInputBox(data, _ele.getClass().getSimpleName(), true, true);
 			// END KGU 2015-10-14
-			if(data.result == true)
+			if (data.result == true)
 			{
 				if (!(_ele instanceof Forever))
 				{
@@ -4431,6 +4461,11 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 					// END KGU 2018-01-22
 				}
 				// END KGU#3 2015-10-25
+				// START KGU#695 2021-01-22: Enh. #714
+				else if (_ele instanceof Try) {
+					((Try)_ele).setEmptyFinallyVisible(data.showFinally);
+				}
+				// END KGU#695 2021-01-22
 				//root.addUndo();
 				try {
 					addUndoNSD(false);
@@ -8023,6 +8058,9 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		// START KGU#376 2017-07-02: Enh. #389
 		preferences.edtRoot.setText(Element.preImport);
 		// END KGU#376 2017-07-02
+		// START KGU#916 2021-01-25: Enh. #915
+		preferences.chkCaseEditor.setSelected(Element.useInputBoxCase);
+		// END KGU#916 2021-01-25
 		
 		// START KGU#686 2019-03-22: Enh. #56
 		preferences.edtTry.setText(Element.preTry);
@@ -8070,6 +8108,9 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 			}
 			Element.caseShrinkByRot = newShrinkThreshold;
 			// END KGU#401 2017-05-18
+			// START KGU#916 2021-01-25: Enh. #915
+			Element.useInputBoxCase = preferences.chkCaseEditor.isSelected();
+			// END KGU#916 2021-01-25
 			// START KGU#376 2017-07-02: Enh. #389
 			Element.preImport   = preferences.edtRoot.getText();
 			// END KGU#376 2017-07-02
@@ -9692,7 +9733,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 			}
 			// START KGU#363 2017-03-13: Enh. #372
 			else if (_elementType.equals("Root")) {
-				InputBoxRoot ipbRt = new InputBoxRoot(NSDControl.getFrame(), true);
+				InputBoxRoot ipbRt = new InputBoxRoot(getFrame(), true);
 //				ipbRt.licenseInfo.rootName = root.getMethodName();
 //				ipbRt.licenseInfo.licenseName = _data.licenseName;
 //				ipbRt.licenseInfo.licenseText = _data.licenseText;
@@ -9710,10 +9751,16 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 				// END KGU#376 2017-07-01
 				inputbox = ipbRt;
 			}
-			// END KGU#363 2017-03-13 
+			// END KGU#363 2017-03-13
+			// START KGU#916 2021-01-24: Enh. #915
+			else if (_elementType.equals("Case") && Element.useInputBoxCase) {
+				inputbox = new InputBoxCase(getFrame(), true);
+				inputbox.txtText.setVisible(false);
+			}
+			// END KGU#916 2021-01-24
 			else
 			{
-				inputbox = new InputBox(NSDControl.getFrame(), true);
+				inputbox = new InputBox(getFrame(), true);
 			}
 			// END KGU#3 2015-10-25
 			//Point p = getLocationOnScreen();
@@ -9722,7 +9769,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 			//inputbox.setLocation(Math.round(p.x+(this.getVisibleRect().width-inputbox.getWidth())/2+this.getVisibleRect().x),
 			//					 Math.round(p.y+(this.getVisibleRect().height-inputbox.getHeight())/2+this.getVisibleRect().y));
 
-			inputbox.setLocationRelativeTo(NSDControl.getFrame());
+			inputbox.setLocationRelativeTo(getFrame());
 
 			// set title (as default)
 			inputbox.setTitle(_data.title);
@@ -9741,6 +9788,12 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 			}
 			// END KGU#686 2019-03-17
 			// END KGU#43 2015-10-12
+			// START KGU#695 2021-01-22: Enh. #714: Special checkbox for Try elements
+			if (_elementType.equals("Try")) {
+				inputbox.chkShowFinally.setVisible(true);
+				inputbox.chkShowFinally.setSelected(_data.showFinally);
+			}
+			// END KGU#695 2021-01-22
 			// START KGU#213 2016-08-01: Enh. #215
 			// START KGU#246 2016-09-13: Bugfix #241)
 			//inputbox.lblBreakTrigger.setText(inputbox.lblBreakText.getText().replace("%", Integer.toString(_data.breakTriggerCount)));
@@ -9821,6 +9874,9 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 //				_data.breakTriggerCount = 0;
 //			}
 			// END KGU#213 2016-08-01
+			// START KGU#695 2021-01-22: Enh. #714
+			_data.showFinally = inputbox.chkShowFinally.isSelected();
+			// END KGU#695 2021-01-22
 			// START KGU#3 2015-10-25: Dedicated support for For loops
 			if (inputbox instanceof InputBoxFor)
 			{
@@ -9871,6 +9927,11 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 				// END KGU#376 2017-07-01
 			}
 			// END KGU#363 2017-03-13
+			// START KGU#916 2021-01-24: Enh. #915 additional functionality for Case elements
+			else if (inputbox instanceof InputBoxCase) {
+				_data.branchOrder = ((InputBoxCase)inputbox).branchOrder;
+			}
+			// END KGU#916 2021-01-24
 			_data.result = inputbox.OK;
 
 			inputbox.dispose();

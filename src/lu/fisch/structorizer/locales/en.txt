@@ -124,7 +124,9 @@
  *      Kay Gürtzig     2020-01-20      Enh. #801: New messages for offline help support
  *      Kay Gürtzig     2020-03-09      Issue #835: New ImportOptionDialog messages
  *      Kay Gürtzig     2020-03-17      New messages for issues #828 (ArrangerIndex) and #837 (ExportOptionDialoge)
- *      Kay Gürtzig     2020-12-12      Enh. #704: New top-level section "DiagramConroller"
+ *      Kay Gürtzig     2020-12-12      Enh. #704: New top-level section "DiagramController"
+ *      Kay Gürtzig     2021-01-23      Enh. #714: InputBox.chkShowFinally added
+ *      Kay Gürtzig     2021-01-25      Enh. #915: New class InputBoxCase added
  *
  ******************************************************************************************************
  *
@@ -726,11 +728,12 @@ InputBox.lblComment.tooltip=
 InputBox.txtText.tooltip=The content of the element.
 InputBox.txtComment.tooltip=The comment of the element.
 InputBox.btnOK.text=OK
-InputBox.btnOK.tooltip=Validate your choice.
+InputBox.btnOK.tooltip=Validate your changes.
 InputBox.btnCancel.text=Cancel
-InputBox.btnCancel.tooltip=Cancel your choice.
+InputBox.btnCancel.tooltip=Cancel your changes.
 InputBox.chkDisabled.text=Disabled (execution and export)
 InputBox.chkBreakpoint.text=Breakpoint
+InputBox.chkShowFinally.text=Show the cleanup block (FINALLY section) even if empty
 InputBox.lblBreakTriggerText.text=Break at execution count: %
 InputBox.lblText.text[elementType:Alternative]=Please enter the condition
 InputBox.lblText.text[elementType:While]=Please enter the entry condition
@@ -810,6 +813,32 @@ InputBoxRoot.btnCancel.tooltip=
 InputBoxRoot.btnAttributes.text=Attributes
 InputBoxRoot.btnAttributes.tooltip=Opens a dialog to inspect attributes and properties of this diagram.
 InputBoxRoot.btnAddIncludable.text=Add
+
+-----[ InputBoxCase ]-----
+InputBoxCase.title[getInsertionType():insert]=Add new @c statement ...
+InputBoxCase.title[getInsertionType():update]=Edit @c statement ...
+InputBoxCase.lblDiscriminator.text=Choice expression:
+InputBoxCase.lblSelectors.text=Branch selectors:
+InputBoxCase.btnAddLine.tooltip=Add a new branch line (and fill in the comma-separated list of selector constants)
+InputBoxCase.btnDelLine.tooltip=Remove the selected branch line
+InputBoxCase.btnUpLine.tooltip=Move the selected branch line one position up
+InputBoxCase.btnDnLine.tooltip=Move the selected branch line one position down
+InputBoxCase.chkMoveBranches.text=Move associated branches
+InputBoxCase.chkMoveBranches.tooltip=If selected, then the association between existing branches and moved selector lines will be preserved (recommended!).
+InputBoxCase.chkDefaultBranch.text=Default branch:
+InputBoxCase.chkDefaultBranch.tooltip=This will ensure the selection has a default branch (with the label you may enter in the neighbouring text field).
+InputBoxCase.txtDefaultLabel.tooltip=The label for the default branch (must not be "%"!), e.g. "otherwise", "default" or the like.
+InputBoxCase.lblComment.text=Comment
+InputBoxCase.lblComment.tooltip=
+InputBoxCase.txtComment.tooltip=The comment of the element.
+InputBoxCase.btnOK.text=OK
+InputBoxCase.btnOK.tooltip=Validate your changes.
+InputBoxCase.btnCancel.text=Cancel
+InputBoxCase.btnCancel.tooltip=Cancel your changes.
+InputBoxCase.chkDisabled.text=Disabled (execution and export)
+InputBoxCase.chkBreakpoint.text=Breakpoint
+InputBoxCase.lblBreakTriggerText.text=Break at execution count: %
+InputBoxCase.msgSelectorMustNotBeEmpty.text=A selector list must not be empty!
 
 -----[ AttributeInspector ]-----
 AttributeInspector.title=Diagram Attributes
@@ -914,7 +943,8 @@ Preferences.pnlCase.tooltip=
 Preferences.lblCase.text=Default content
 Preferences.lblCase.tooltip=The default content of a @c statement.
 Preferences.lblCaseRot.text=Min. branches for rotation
-Preferences.lblCaseRot.tooltip=Branch count threshold for attempts to reduce width by rotating elements (0 = off) 
+Preferences.lblCaseRot.tooltip=Branch count threshold for attempts to reduce width by rotating elements (0 = off)
+Preferences.chkCaseEditor.text=Use dedicated editor for @c elements
 Preferences.pnlRoot.border=@m Header
 Preferences.lblRoot.text=Include List Caption
 Preferences.lblRoot.tooltip=The caption for the list of @p diagrams when being drawn.
