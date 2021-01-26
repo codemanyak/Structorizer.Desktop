@@ -58,7 +58,6 @@ import java.awt.Dimension;
 import java.awt.Frame;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
-import java.awt.GridLayout;
 import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -302,7 +301,7 @@ public class ImportOptionDialog extends LangDialog {
         chkRefactorOnLoading.setToolTipText("Select this option if all configurable keywords in the daiagram are to be adapted to the current parser preferences.");
         chkRefactorOnLoading.setAlignmentX(LEFT_ALIGNMENT);
         
-        // START KGU#931 2021-01-21: Enh. #JStruct import
+        // START KGU#931 2021-01-21: Enh. #913 JStruct import
         chkConvertJStructSyntax.setText("Convert Java syntax to Structorizer on JStruct import.");
         chkConvertJStructSyntax.setToolTipText("Select this option only if the imported diagrams are to be executed or to exported to other programming languages.");
         chkConvertJStructSyntax.setAlignmentX(LEFT_ALIGNMENT);
@@ -436,7 +435,7 @@ public class ImportOptionDialog extends LangDialog {
         //pnlPreference.setLayout(new GridLayout(0, 1, 0, 1));
         //pnlPreference.add(chkOfferRefactoringIni);
         
-        // START KGU#913 2021-01-21: Enh. JStruct import
+        // START KGU#913 2021-01-21: Enh. #913 JStruct import
         pnlJStruct.setBorder(new TitledBorder("JStruct Files"));
         org.jdesktop.layout.GroupLayout pnlJStructLayout =
                 new org.jdesktop.layout.GroupLayout(pnlJStruct);
@@ -517,6 +516,9 @@ public class ImportOptionDialog extends LangDialog {
         btnPluginOptions.addKeyListener(keyListener);
         cbOptionPlugins.addKeyListener(keyListener);
         // END KGU#416 2017-06-20
+        // START KGU#931 2021-01-26: Enh. #913 JStruct import
+        chkConvertJStructSyntax.addKeyListener(keyListener);
+        // END KGU#931 2021-01-26
         // START KGU#602 2018-10-26: Issue #419
         ((JSpinner.DefaultEditor)spnLimit.getEditor()).getTextField().addKeyListener(keyListener);
         ((JSpinner.DefaultEditor)spnMaxLen.getEditor()).getTextField().addKeyListener(keyListener);
@@ -718,7 +720,7 @@ public class ImportOptionDialog extends LangDialog {
     public javax.swing.JPanel pnlNSD;
     //public javax.swing.JPanel pnlPreference;
     public javax.swing.JPanel pnlCode;
-    // START KGU#913 2021-01-21: Enh. JStruct import
+    // START KGU#913 2021-01-21: Enh. #913 JStruct import
     public javax.swing.JPanel pnlJStruct;
     // END KGU#913 2021-01-21
     public javax.swing.JButton btnOk;
@@ -753,7 +755,7 @@ public class ImportOptionDialog extends LangDialog {
     // START KGU#354 2017-03-08: Enh. #354 - new option to save the parse tree
     public javax.swing.JCheckBox chkSaveParseTree;
     // END KGU#354 2017-03-08
-    // START KGU#913 2021-01-21: Enh. JStruct import
+    // START KGU#913 2021-01-21: Enh. #913 JStruct import
     public javax.swing.JCheckBox chkConvertJStructSyntax;
     // END KGU#913 2021-01-21
     // START KGU#354 2017-04-27: Enh. #354 Specify a log directory
