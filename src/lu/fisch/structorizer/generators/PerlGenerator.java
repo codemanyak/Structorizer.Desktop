@@ -83,7 +83,8 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig         2019-12-03  Bugfix #793: var initializations like "var v: type <- val" were incorrectly translated
  *      Kay Gürtzig         2020-03-20  Enh. #828, bugfix #836: Prepared for group and improved batch export
  *      Kay Gürtzig         2020-03-23  Bugfix #840 Conditions for code transformation w.r.t File API modified
- *      Kay Gürtzig         2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
+ *      Kay Gürtzig         2020-08-12  Enh. #800: Started to redirect syntactic analysis to class Syntax
+ *      Kay Gürtzig         2021-02-03  Issue #920: Transformation for "Infinity" literal
  *
  ******************************************************************************************************
  *
@@ -283,6 +284,9 @@ public class PerlGenerator extends Generator {
 	@Override
 	protected String transformTokens(StringList tokens)
 	{
+		// START KGU#920 2021-02-03: Issue #920 Handle Infinity literal
+		tokens.replaceAll("Infinity", "\"inf\"");
+		// END KGU#920 2021-02-03
 		// START KGU#388/KGU#542 2019-11-19: Enh. #423, #739 transferred the stuff from transform(String) hitherto
 		// Manipulate a condensed token list copy simultaneously (makes it easier to locate neighbouring tokens)
 		StringList denseTokens = new StringList(tokens);

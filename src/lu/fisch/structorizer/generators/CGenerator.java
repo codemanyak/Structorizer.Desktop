@@ -109,6 +109,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig             2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *      Kay Gürtzig             2020-10-16      Bugfix #873: Type definition handling was compromised by bugfix #808
  *      Kay Gürtzig             2020-10-16      Bugfix #874: Nullpointer exception on Calls with non-ASCII letters in name
+ *      Kay Gürtzig             2021-02-03      Issue #920: Transformation for "Infinity" literal
  *
  ******************************************************************************************************
  *
@@ -520,6 +521,9 @@ public class CGenerator extends Generator {
 	@Override
 	protected String transformTokens(StringList tokens)
 	{
+		// START KGU#920 2021-02-03: Issue #920 Handle Infinity literal
+		tokens.replaceAll("Infinity", "INFINITY");
+		// END KGU#920 2021-02-03
 		tokens.replaceAll("div", "/");
 		tokens.replaceAll("<-", "=");
 		// START KGU#150 2016-04-03: Handle Pascal ord and chr function

@@ -69,6 +69,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2019-11-21      Enh. #739 Enum types considered in type compatibility check for FOR-IN lists
  *      Kay Gürtzig     2021-01-22      Result value for setStepConst(String) introduced
  *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
+ *      Kay Gürtzig     2021-02-01      Bugfix #923: Type retrieval for value lists was too weak
  *
  ******************************************************************************************************
  *

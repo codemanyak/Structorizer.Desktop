@@ -44,6 +44,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2019-11-11      Method isNumeric() introduced for convenience
  *      Kay Gürtzig     2019-11-17      Field isCStyle removed, several method signatures accordingly reduced,
  *                                      Enh. #739: Support for enum types
+ *      Kay Gürtzig     2021-02-03      Bugfix #923: Method isNamed() corrected ("unnamed" types are often named "???")
  *
  ******************************************************************************************************
  *
@@ -326,8 +327,14 @@ public class TypeMapEntry {
 			// array[1..6] of ARRAY 9 OF BOOLEAN
 			// double[5][8]
 			// array [2..9, columns] of array of char
+			// array
 			String typeDescr = this.typeDescriptor;
 			Matcher matcher;
+			// START KGU#923 2021-02-04: Bugfix #923 matcher don't catch pure "array" string
+			if (typeDescr.trim().equalsIgnoreCase("array")) {
+				typeDescr = "";	// will result in "???"
+			}
+			// END KGU#923 2021-02-04
 			while ((matcher = ARRAY_PATTERN4.matcher(typeDescr)).matches()) {
 				typeDescr = matcher.replaceAll( "$2").trim();
 			}
@@ -432,20 +439,29 @@ public class TypeMapEntry {
 	/**
 	 * Analyses the given declaration information and creates a corresponding
 	 * entry (with a single declaration object).<br/>
-	 * NOTE: For record types use {@link TypeMapEntry#TypeMapEntry(String, String, HashMap, LinkedHashMap, Element, int)}
+	 * NOTE: For record types use
+	 * {@link TypeMapEntry#TypeMapEntry(String, String, HashMap, LinkedHashMap, Element, int)}
 	 * instead.
 	 * @param _descriptor - the found type-describing or -specifying string
-	 * @param _typeName - the type name if this is a type definition, null otherwise (enh. #423, 2017-07-12)
-	 * @param _owningMap - the type map this entry is to be added to (or null if not known)
+	 * @param _typeName - the type name if this is a type definition, {@code null} otherwise
+	 *         (enh. #423, 2017-07-12)
+	 * @param _owningMap - the type map this entry is to be added to (or {@code null}
+	 *         if not known)
 	 * @param _element - the originating Structorizer element
 	 * @param _lineNo - the line number within the element text
 	 * @param _initialized - whether the variable is initialized or assigned here
-	 * @param _explicit - whether this is an explicit variable declaration (or just derived from value)
+	 * @param _explicit - whether this is an explicit variable declaration (or just
+	 *         derived from some value)
 	 * @see #addDeclaration(String _descriptor, Element _element, int _lineNo, boolean _initialized)
 	 * @see TypeMapEntry#TypeMapEntry(String, String, HashMap, LinkedHashMap, Element, int) 
 	 */
 	public TypeMapEntry(String _descriptor, String _typeName, HashMap<String, TypeMapEntry> _owningMap, Element _element, int _lineNo, boolean _initialized, boolean _explicit)
 	{
+		// START KGU#922 2021-01-31: Caution here! Nobody checks for null! Revoked.
+//		if (_typeName == null) {
+//			_typeName = "???";
+//		}
+		// END KGU#922 2021-01-31
 		// START KGU#388 2017-07-12: Enh. #423
 		this.typeName = _typeName;
 		// END KGU#388 2017-07-12
@@ -581,7 +597,7 @@ public class TypeMapEntry {
 	}
 	
 	/**
-	 * Checks if the canonicalized type description {@code typeName} is among the
+	 * Checks if the canonicalized type description of {@code typeName} is among the
 	 * canonical names of standard types.
 	 * @param typeName - a typ description (should be a name)
 	 * @return true if the type is detected.
@@ -739,12 +755,13 @@ public class TypeMapEntry {
 //		return recordType;
 //	}
 	
-	@SuppressWarnings("unchecked")
 	/**
 	 * If this is a defined record type, returns the component-type map
 	 * @param _merge - whether concurring definitions are to be merged.
-	 * @return an ordered table, mapping component names to defining TypeMapEntries, or null
+	 * @return an ordered table, mapping component names to defining
+	 * TypeMapEntries, or {@code null}
 	 */
+	@SuppressWarnings("unchecked")
 	public LinkedHashMap<String, TypeMapEntry> getComponentInfo(boolean _merge)
 	{
 		LinkedHashMap<String, TypeMapEntry> componentInfo = null;
@@ -909,7 +926,8 @@ public class TypeMapEntry {
 	 */
 	public boolean isNamed()
 	{
-		return this.typeName != null;
+		// START KGU#923 2021-02-03: Bugfix #923
+		return this.typeName != null && !this.typeName.equals("???");
 	}
 	// END KGU#388 2017-07011
 

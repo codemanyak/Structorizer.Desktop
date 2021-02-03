@@ -124,6 +124,8 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2021-01-10      Enh. #910: New method isImmutable(), synchronisation in writeOut...
  *      Kay Gürtzig     2021-01-22      Bugfix KGU#914 in splitExpressionList(StringList,...)
  *      Kay Gürtzig     2021-01-25      Enh. #915: New Structures preference "useInputBoxCase"
+ *      Kay Gürtzig     2021-02-01/03   Bugfix #923: Method identifyExprType had ignored qualified names
+ *      Kay Gürtzig     2021-02-03      Issue #920: Highlighting and tokenizing support for "Infinity" and '∞'
  *
  ******************************************************************************************************
  *
@@ -961,7 +963,7 @@ public abstract class Element {
 	public boolean isImmutable()
 	{
 		Root myRoot = getRoot(this);
-		return myRoot.isDiagramControllerRepresentative();
+		return myRoot.isRepresentingDiagramController();
 	}
 	// END KGU#911 2021-01-19
 
@@ -3172,6 +3174,65 @@ public abstract class Element {
 		TypeMapEntry typeEntry = null;
 		if (typeMap != null) {
 			typeEntry = typeMap.get(expr);
+			// START KGU#923 2021-02-03: Bugfix #923 complex access paths were ignored
+			if (typeEntry == null && (expr.contains(".") || expr.contains("["))) {
+				StringList tokens = Syntax.splitLexically(expr, true);
+				tokens.removeAll(" ");
+				String token0 = tokens.get(0);
+				if (Syntax.isIdentifier(token0, false, null)
+						&& (typeEntry = typeMap.get(token0)) != null) {
+					// Well, that is a start.
+					typeSpec = typeEntry.getCanonicalType(true, false);
+					int nTokens = tokens.count();
+					int pos = 1;
+					while (!typeSpec.isEmpty() && (pos < nTokens)) {
+						if (tokens.get(pos).equals(".")) {
+							// Record component - or not
+							if (typeEntry == null || !typeEntry.isRecord()
+									|| pos + 1 >= nTokens
+									|| !Syntax.isIdentifier(token0 = tokens.get(pos+1), false, null)) {
+								// Something wrong here
+								return "";
+							}
+							if ((typeEntry = typeEntry.getComponentInfo(true).get(token0)) == null) {
+								return "";
+							}
+							typeSpec = typeEntry.getCanonicalType(true, false);
+							pos += 2;
+						}
+						else if (tokens.get(pos).equals("[")) {
+							StringList indexExprs = Element.splitExpressionList(tokens.subSequence(pos+1, nTokens), ",", true);
+							for (int i = 0; i < indexExprs.count()-1; i++) {
+								if (!typeSpec.startsWith("@")) {
+									return "";
+								}
+								typeSpec = typeSpec.substring(1);
+							}
+							// typeSpec should not be the name of a (record) type
+							if ((typeEntry = typeMap.get(":" + typeSpec)) != null) {
+								typeSpec = typeEntry.getCanonicalType(true, false);
+							}
+							tokens.remove(pos, nTokens);
+							tokens.add(Syntax.splitLexically(indexExprs.get(indexExprs.count()-1), true));
+							nTokens = tokens.count();
+							if (nTokens > pos && tokens.get(pos).equals("]")) {
+								// Syntax correct, drop "]", prepare next cycle
+								tokens.remove(pos);
+								nTokens--;
+							}
+							else {
+								// either "]" was missing or nonsense is following
+								return "";
+							}
+						}
+						else {
+							// Neither "." nor "[" --> Syntax error
+							return "";
+						}
+					}
+				}
+			}
+			// END KGU#923 2021-02-03
 		}
 		if (typeEntry != null) {
 			// START KGU#388 2017-07-12: Enh. #423
@@ -3210,14 +3271,49 @@ public abstract class Element {
 		}
 		// END KGU#354 2017-05-22
 		// 2. If none of the approaches above succeeded check for a numeric literal
+		// START KGU#920 2021-02-03: Issue #920 Inifinity introduced as new literal
+		if (typeSpec.isEmpty() && (expr.equals("Infinity") || expr.equals("-Infinity") || expr.equals("\u221E"))) {
+			typeSpec = "double";
+		}
+		// END KGU#920 2021-02-03
 		if (typeSpec.isEmpty()) {
-			try {
-				Double.parseDouble(expr);
-				typeSpec = "double";
-				Integer.parseInt(expr);
-				typeSpec = "int";
+			// START KGU#923 2021-02-04: Issue #923 We may at least analyse constant expressions
+			//try {
+			//	Double.parseDouble(expr);
+			//	typeSpec = "double";
+			//	Integer.parseInt(expr);
+			//	typeSpec = "int";
+			//}
+			//catch (NumberFormatException ex) {}
+			StringList tokens = Syntax.splitLexically(expr, true);
+			tokens.removeAll(" ");
+			tokens.removeAll("+");
+			tokens.removeAll("-");
+			tokens.removeAll("*");
+			tokens.removeAll("/");
+			tokens.removeAll("%");
+			for (int i = 0; i < tokens.count(); i++) {
+				String token = tokens.get(i);
+				String subType = null;
+				try {
+					Double.parseDouble(token);
+					subType = "double";
+					Integer.parseInt(token);
+					subType = "int";
+				}
+				catch (NumberFormatException ex) {}
+				if (subType == null) {
+					typeSpec = "";
+					break;
+				}
+				if (typeSpec.isEmpty()) {
+					typeSpec = subType;
+				}
+				else if (typeSpec.equals("double") || subType.equals("double")) {
+					typeSpec = "double";
+				}
 			}
-			catch (NumberFormatException ex) {}
+			// END KGU#923 2021-02-04
 		}
 		// Check for boolean literals
 		if (typeSpec.isEmpty() && (expr.equals("true") || expr.equals("false"))) {
@@ -3516,6 +3612,10 @@ public abstract class Element {
 				specialSigns.add("<=");
 				specialSigns.add(">=");
 				// END KGU#872 2020-10-17
+				// START KGU#920 2021-02-03: Issue #920 Infinity now also literal
+				specialSigns.add("Infinity");
+				specialSigns.add("\u221E");
+				// END KGU#920 2021-02-03
 				// START KGU#883 2020-11-01: Enh. #881 bit operators and Boolean literal were missing
 				specialSigns.add("false");
 				specialSigns.add("true");

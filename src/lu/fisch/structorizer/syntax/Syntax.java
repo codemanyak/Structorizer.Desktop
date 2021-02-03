@@ -100,6 +100,9 @@ public class Syntax {
 			"|",
 			"~",
 			// END KGU#790 2020-10-31
+			// START KGU#920 2021-02-03: Enh. #920 We allow ∞ as synonym for Infinity
+			"\u221E",
+			// END KGU#920 2021-02-03
 			// START KGU#331 2017-01-13: Enh. #333 Precaution against unicode comparison operators
 			"\u2260",
 			"\u2264",
@@ -507,7 +510,7 @@ public class Syntax {
 					{
 						parts.set(i,"<<");
 						parts.delete(i+1);
-					}					
+					}
 					// END KGU#92 2015-12-01
 				}
 				else if (thisPart.equals(">"))
@@ -522,7 +525,7 @@ public class Syntax {
 					{
 						parts.set(i,">>");
 						parts.delete(i+1);
-					}					
+					}
 					// END KGU#92 2015-12-01
 				}
 				// START KGU#24 2014-10-18: Logical two-character operators should be detected, too ...
@@ -831,7 +834,7 @@ public class Syntax {
 	 * <li>Assignment:		"<-"</li>
 	 * <li>Comparison*:		"==", "<", ">", "<=", ">=", "!="</li>
 	 * <li>Logic*:			"&&", "||", "!", "^"</li>
-	 * <li>Arithmetics*:		"div" and usual Java operators (e. g. "mod" -> "%")</li>
+	 * <li>Arithmetics*:	"div", "&infin;", and usual Java operators (e. g. "mod" -> "%")</li>
 	 * </ul>
 	 * @param _tokens - a tokenised line of an Element's text (in practically unknown syntax)
 	 * @param _assignmentOnly - if true then only assignment operator will be unified
@@ -856,8 +859,11 @@ public class Syntax {
 			count += _tokens.replaceAllCi("not", "!");
 			count += _tokens.replaceAllCi("xor", "^");
 			// START KGU#843 2020-04-11: Bugfix #847 Inconsistency in handling operators (we don't count this, though)
-			_tokens.replaceAllCi("DIV", "div");
+			count += _tokens.replaceAllCi("DIV", "div");
 			// END KGU#843 2020-04-11
+			// START KGU#920 2021-02-03: Issue #920 Handle Infinity literal
+			count += _tokens.replaceAll("\u221E", "Infinity");
+			// END KGU#920 2021-02-03
 		}
 		return count;
 	}

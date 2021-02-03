@@ -47,6 +47,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig     2020-04-03      Enh. #828: Configuration for group export
  *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *      Kay Gürtzig     2020-10-19      Bugfix #877: Division by zero exception on batch export (Alternative)
+ *      Kay Gürtzig     2021-02-03      Issue #920: Transformation for "Infinity" literal
  *
  ******************************************************************************************************
  *
@@ -203,6 +204,9 @@ public class TexGenerator extends Generator {
 	@Override
 	protected String transformTokens(StringList tokens)
 	{
+		// START KGU#920 2021-02-03: Issue #920 Handle Infinity literal
+		tokens.replaceAll("Infinity", "\\infty");
+		// END KGU#920 2021-02-03
 		tokens.replaceAll("{", "\\{");
 		tokens.replaceAll("}", "\\}");
 		tokens.replaceAll("%", "\\)\\pKey{mod}\\(");
