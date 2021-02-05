@@ -166,6 +166,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2021-02-01      Bugfix #923: Analyser did not consider FOR loop variable types on record check
  *      Kay Gürtzig     2021-02-03      Bugfix #924: Record component names falsely detected as uninitialized variables
  *                                      Issue #920: `Infinity' introduced as literal
+ *      Kay Gürtzig     2021-02-04      Bugfix #925: Type entry production for const parameters mended
  *      
  ******************************************************************************************************
  *
@@ -3100,7 +3101,7 @@ public class Root extends Element {
             	collectParameters(varNames, argTypes, null);
             	for (int i = 0; i < varNames.count(); i++) {
             		String type = argTypes.get(i); 
-            		if (type != null && (type.trim() + " ").startsWith("const")) {
+            		if (type != null && (type.trim() + " ").startsWith("const ")) {
             			this.constants.put(varNames.get(i), null);
             		}
             	}
@@ -3368,7 +3369,10 @@ public class Root extends Element {
 		ArrayList<Param> parameters = getParams();
 		String typeSpec = null;
 		for (Param par: parameters) {
-			if ((typeSpec = par.getType()) != null) {
+			// START KGU#925 2021-02-04: Bugfix #925 - can't need prefixes like "const" here
+			//if ((typeSpec = par.getType()) != null) {
+			if ((typeSpec = par.getType(true)) != null) {
+			// END KGU#925 2021-02-04
 				this.addToTypeMap(typeMap, par.getName(), typeSpec, 0, true, true);
 			}
 		}
@@ -5606,8 +5610,8 @@ public class Root extends Element {
     }
 
     /**
-     *  Extracts parameter names and types from the parenthesis content of the Root text
-     *  and adds them synchronously to {@code paramNames} and {@code paramTypes} (if not null).
+     * Extracts parameter names and types from the parenthesis content of the Root text
+     * and adds them synchronously to {@code paramNames} and {@code paramTypes} (if not null).
      * @param paramNames - {@link StringList} to be expanded by the found parameter names
      * @param paramTypes - {@link StringList} to be expanded by the found parameter types, or null
      * @param paramDefaults - {@link StringList} to be expanded by possible default literals, or null
@@ -5791,6 +5795,11 @@ public class Root extends Element {
     {
         structorizerKeywords.clear();
         structorizerKeywords.add("global");
+        // START KGU#920 2021-02-04: Enh. #920 Infinity is now a literal
+        structorizerKeywords.add("Infinity");
+        structorizerKeywords.add("true");
+        structorizerKeywords.add("false");
+        // END KGU#920 2021-02-04
         for (String keyword: Syntax.getAllProperties()) {
             structorizerKeywords.add(keyword);
         }
