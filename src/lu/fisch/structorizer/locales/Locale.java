@@ -96,38 +96,37 @@ public class Locale {
             logger.info("Loading now locale: "+_langfile);        
 
             // read the file from the compiled application into a string
-            String input = new String();
+            StringList lines = new StringList();
             try 
             {
-            	// START KGU#244 2016-09-06: Allow temporary unregistered locales from arbitrary files
+                // START KGU#244 2016-09-06: Allow temporary unregistered locales from arbitrary files
                 //BufferedReader in = new BufferedReader(new InputStreamReader(this.getClass().getResourceAsStream("/lu/fisch/structorizer/locales/"+_langfile), "UTF-8"));
-            	File file = new File(_langfile);
-            	InputStreamReader isr = null;
-            	if (file.isAbsolute() && file.canRead())
-            	{
-            		isr = new InputStreamReader(new FileInputStream(file), "UTF-8");
-            	}
-            	else
-            	{
-            		isr = new InputStreamReader(this.getClass().getResourceAsStream("/lu/fisch/structorizer/locales/"+_langfile), "UTF-8");
-            	}
-            	BufferedReader in = new BufferedReader(isr);
+                File file = new File(_langfile);
+                InputStreamReader isr = null;
+                if (file.isAbsolute() && file.canRead())
+                {
+                    isr = new InputStreamReader(new FileInputStream(file), "UTF-8");
+                }
+                else
+                {
+                    isr = new InputStreamReader(this.getClass().getResourceAsStream("/lu/fisch/structorizer/locales/"+_langfile), "UTF-8");
+                }
+                BufferedReader in = new BufferedReader(isr);
                 // END KGU#244 2016-09-06
                 String str;
                 while ((str = in.readLine()) != null) 
                 {
-                    input+=str+"\n";
+                    lines.add(str);
                 }
                 in.close();
             } 
             catch (IOException e) 
             {
-                JOptionPane.showMessageDialog(null,  _langfile+": Error while loading language file\n"+e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(null,
+                        _langfile + ": Error while loading language file\n" + e.getMessage(),
+                        "Error",
+                        JOptionPane.ERROR_MESSAGE);
             }
-
-            // convert the data to a stringlist
-            StringList lines = new StringList();
-            lines.setText(input); 
 
             parseStringList(lines);
         }
@@ -159,12 +158,12 @@ public class Locale {
         
         // go ahead and parse the input
         StringList section = null;
-        for(int i=0; i<lines.count(); i++)
+        for (int i = 0; i < lines.count(); i++)
         {
             String line = lines.get(i).trim();
             
             // we found a section
-            if(line.startsWith(startOfSection)) 
+            if (line.startsWith(startOfSection)) 
             {
                 section = new StringList();
                 // get the name
@@ -175,12 +174,12 @@ public class Locale {
             // no special case
             else 
             {
-                if(section!=null)
+                if (section!=null)
                 {
                     // add the content
                     section.add(line);
                 }
-                else if(!line.trim().isEmpty())
+                else if (!line.trim().isEmpty())
                 {
                     JOptionPane.showMessageDialog(null, filename+": Found a sub-section ("+line+") before a section!", "Error", JOptionPane.ERROR_MESSAGE);
                 }
@@ -188,13 +187,19 @@ public class Locale {
         }
     }
     
-    public ArrayList<String> getKeys(String sectionName)
+    /**
+     * Extracts the message keys (i.e. the parts left of the equality
+     * sign) from the lines of the locale text of the specified section.
+     * @param sectionName - name of the interesting section of the locale
+     * @return an ArrayList of the message keys
+     */
+    public ArrayList<String> getKeyList(String sectionName)
     {
         ArrayList<String> keys = new ArrayList<String>();
         
         StringList section = sections.get(sectionName);
         
-        if(section==null)
+        if (section == null)
         {
             return new ArrayList<String>();
         }
@@ -202,7 +207,7 @@ public class Locale {
         for (int i = 0; i < section.count(); i++) {
             String line = section.get(i);
             StringList parts = StringList.explodeFirstOnly(line.trim(),"=");
-            if(line.trim().contains("=") && parts.get(0).contains(".") && !parts.get(0).startsWith("//"))
+            if (line.trim().contains("=") && parts.get(0).contains(".") && !parts.get(0).startsWith("//"))
             {
                 keys.add(parts.get(0));
             }
@@ -215,7 +220,7 @@ public class Locale {
         String[] sectionNames = getSectionNames();
         for (int i = 0; i < sectionNames.length; i++) {
             String sectionName = sectionNames[i];
-            if(getKeys(sectionName).contains(keyName)) return true;
+            if (getKeyList(sectionName).contains(keyName)) return true;
         }
         return false;
     }
@@ -284,7 +289,7 @@ public class Locale {
         for (int i = 0; i < section.count(); i++) {
             String line = section.get(i);
             StringList parts = StringList.explodeFirstOnly(line.trim(),"=");
-            if(line.trim().contains("=") && 
+            if (line.trim().contains("=") && 
                     parts.get(0).contains(".") && 
                     !parts.get(0).startsWith("//") &&
                     parts.get(0).equals(key)
@@ -315,9 +320,12 @@ public class Locale {
     /**
      * Retrieves the string value for the given {@code key} in section {@code sectionName}.
      * If there is no such key or the value isn't specified then an empty string will be
-     * returned.
+     * returned.<br/>
+     * <b>Note:</b> Possible conditions and index placeholders will <b>not</b> be resolved,
+     * i.e. they are interpreted as constant parts of the key here, e.g.
+     * {@code "InputBox.title[getInsertionType():insert]"}, not just {@code "InputBox.title"}.
      * @param sectionName - name of the interesting section
-     * @param key - the key sequence
+     * @param key - the key sequence (with all conditional adapters, as is)
      * @return a string associated to the given key or ""
      */
     public String getValue(String sectionName, String key)
@@ -339,8 +347,8 @@ public class Locale {
         //        return parts.get(1);
         //    }
         //}
-    	String value = getValueIfPresent(sectionName, key);
-    	if (value != null) return value;
+        String value = getValueIfPresent(sectionName, key);
+        if (value != null) return value;
         // END KGU#231 2016-08-08
         return "";
     }

@@ -131,6 +131,7 @@
  *      Kay Gürtzig         2020-12-12  Enh. #704: New top-level section "DiagramController"
  *      Kay Gürtzig         2021-01-23  Enh. #714: InputBox.chkShowFinally added
  *      Kay Gürtzig         2021-01-25  Enh. #915: New class InputBoxCase added
+ *      Kay Gürtzig         2021-02-07  Enh. #915: New messages and tooltips for InputBoxCase
  *
  ******************************************************************************************************
  *
@@ -212,8 +213,8 @@ Menu.menuEditRedo.text=Wiederholen
 Menu.menuEditCut.text=Ausschneiden
 Menu.menuEditCopy.text=Kopieren
 Menu.menuEditPaste.text=Einfügen
-Menu.menuEditSummonSub.text=Unterprogramm bearbeiten ...
-Menu.menuEditSummonSub.tooltip=Aufgerufenes Unterprogramm zur Bearbeitung heranziehen.
+Menu.menuEditSummonSub.text=@o bearbeiten ...
+Menu.menuEditSummonSub.tooltip=Aufgerufenes @o oder einbezogenes Diagram zur Bearbeitung heranziehen.
 Menu.menuEditFindReplace.text=Suchen/Ersetzen ...
 Menu.menuEditUpgradeTurtle.text=Reelle Turtle-Befehle
 Menu.menuEditUpgradeTurtle.tooltip=Ersetzt ganzzahlbasierte Turtle-Befehle in den ausgewählten Elementen durch reellwertige.
@@ -457,8 +458,13 @@ Menu.lblInvolveSubtree.text=Rekursiv auf Unterstrukturen anwenden
 Menu.lblPreserveContinuators.text=Bestehende Zeilensprünge beibehalten
 Menu.msgVetoClose.text=Structorizer ist dabei, sich zu beenden. Einspruch?
 Menu.msgSetAsPreferredGenerator.text=Sie haben die letzten %2 Male %1-Code exportiert.\nMöchten Sie %1 jetzt im Dateimenü als die bevorzugte Exportsprache setzen?
-Menu.msgChooseSubroutine.text=Bitte zu bearbeitendes Unterprogramm auswählen:
-Menu.msgCreateSubroutine.text=Neues Unterdiagramm «%» erstellen?
+Menu.msgChooseSubroutine.text=Bitte zu bearbeitendes @o-Diagramm auswählen:
+Menu.msgCreateSubroutine.text=Neues @o-Diagramm «%» erstellen?
+Menu.msgEditSubroutine.text=@o bearbeiten ...
+Menu.msgEditIncludable.text=@p bearbeiten ...
+Menu.msgChooseIncludable.text=Bitte zu bearbeitendes @p-Diagramm auswählen:
+Menu.msgCreateIncludable.text=Neues @p-Diagramm «%» erstellen?
+Menu.msgCyclicInclusion.text=Zyklischer Bezug entfernt - keine weiteren einbezogenen Diagramme!
 Menu.ttlMouseScrollUnit.text=Mausrad-Scroll-Einheit
 Menu.msgSelectPreferences.text=Zu exportierende Einstellungen (Kategorien)
 Menu.msgAllPreferences.text=Alle Einstellungen
@@ -470,6 +476,7 @@ Menu.prefsArranger.text=Arranger
 Menu.msgErrorSettingLaF.text=Problem beim Wechsel von Aussehen & Bedienung zu %1: %2
 Menu.msgRootCloned.text=Diagramm «%1» wurde geklont.\n\nSie arbeiten jetzt mit einer unabhängigen Kopie:\n%2
 Menu.msgAnalyserHint_3_30_14.text=Neue Symbole in manchen Elementen\nmachen jetzt darauf aufmerksam,\ndass Analyser-Warnungen\nfür diese Elemente vorliegen.\n\nSie können die Anzeige abschalten über:\n%
+Menu.msgVersionHint_3_30_15.text=Dieser neu entworfene Editor für @c-Elemente\nist optional.\nEr kann den Zusammenhang zwischen\nFall-Listen und den zugehörigen Zweigen\nbeim Umordnen bewahren.\n\nWenn Sie den traditionellen Elementeditor\nbevorzugen, dann können Sie das Häkchen bei\n"%1"\nin den %2 entfernen.
 // Table column headers for DiagramControllerAliases
 Menu.msgTabHdrSignature.text=Routinensignatur
 Menu.msgTabHdrAlias.text=Alias (Ersatzname)
@@ -557,6 +564,7 @@ Menu.hint26.3.text=Jetzt können Sie z.B. Ihr Diagramm in eine Programmiersprach
 Menu.hint26.4.text=Jetzt können Sie z.B. Ihr Diagramm als Grafikdatei exportieren → Menu "%1 ► %2 ► %3"
 Menu.error27.text=Einige Auswahlwerte (z.B. «%») scheinen keine Ganzzahlkonstanten zu sein.
 Menu.error28.text=Einige Werte (%) kommen mehrfach in den Auswahllisten vor!
+Menu.error29.text=Der Auswahlwert «%» ist von strukturiertem Typ und somit ungeeignet für @c!
 Menu.errorLineReference.text= (Zeile %)
 
 -----[ AnalyserPreferences ]-----
@@ -592,7 +600,8 @@ AnalyserPreferences.checkboxes.25.text=Empfehlungen für erste Programm-Anweisun
 AnalyserPreferences.checkboxes.26.text=Kurzer "Hallo Welt"-Kurs
 AnalyserPreferences.checkboxes.27.text=Prüfen, dass Fallauswahl-Werte Ganzzahlkonstanten sind.
 AnalyserPreferences.checkboxes.28.text=Prüfen, dass keine Fallauswahl-Überschneidungen vorkommen.
-AnalyserPreferences.chkDrawWarningSign.text=Zeichne Warndreieck in betroffenen Elementen
+AnalyserPreferences.checkboxes.29.text=Prüfen, dass der @c-Auswahlausdruck keinem strukturierten Typ angehört.
+AnalyserPreferences.lblDrawWarningSign.text=Zeichne Warndreieck in betroffenen Elementen
 AnalyserPreferences.okButton.text=OK
 
 
@@ -703,7 +712,7 @@ Editor.popupTransmute.text=Umwandeln
 Editor.popupOutsource.text=Auslagern
 Editor.popupOutsource.tooltip=Ausgewählte Elementfolge in neues @o auslagern.
 Editor.popupEditSub.text=Unterprogramm bearbeiten ...
-Editor.popupEditSub.tooltip=Aufgerufenes Unterprogramm zur Bearbeitung heranziehen.
+Editor.popupEditSub.tooltip=Aufgerufenes @o oder einbezogenes Diagram zur Bearbeitung heranziehen.
 // Collapsing
 Editor.popupCollapse.text=Reduzieren
 Editor.popupExpand.text=Erweitern
@@ -818,10 +827,14 @@ InputBoxCase.title[getInsertionType():insert]=Neue @c hinzufügen ...
 InputBoxCase.title[getInsertionType():update]=@c bearbeiten ...
 InputBoxCase.lblDiscriminator.text=Auswahlausdruck:
 InputBoxCase.lblSelectors.text=Fallkonstanten:
-InputBoxCase.btnAddLine.tooltip=Zeile für neuen Fall hinzufügen (kommagetrennte Liste der Auswahlkonstanten dafür eintragen!)
-InputBoxCase.btnDelLine.tooltip=Ausgewählte Fall-Zeile entfernen (zusammen mit dem ggf. zugehörigen Zweig!)
-InputBoxCase.btnUpLine.tooltip=Ausgewählte Fall-Zeile höher schieben
-InputBoxCase.btnDnLine.tooltip=Ausgewählte Fall-Zeile tiefer schieben.
+InputBoxCase.btnAddRow.tooltip=Zeile für neuen Fall hinzufügen (mehrere Auswahlkonstanten für denselben Fall mit Komma trennen!)
+InputBoxCase.btnDelRows.tooltip=Ausgewählte Fall-Zeile entfernen (ggf. zusammen mit dem zugehörigen Zweig!)
+InputBoxCase.btnUpRow.tooltip=Ausgewählte Fall-Zeile höher schieben
+InputBoxCase.btnDnRow.tooltip=Ausgewählte Fall-Zeile tiefer schieben
+InputBoxCase.btnMergeRows.tooltip=Ausgewählte Zeilen zusammenführen (nicht wählbar bei verschiedenen nicht-leeren Zweigen)
+InputBoxCase.btnSplitRow.tooltip=Fallkonstanten der gewählten Zeile auf eigene Zeilen aufteilen
+InputBoxCase.btnEnumAssist.tooltip=Fallzeilen für alle noch nicht vorkommenden Enumeratorwerte erzeugen und überflüssige Zeilen enfernen (außer bei nichtleeren Zweigen)
+InputBoxCase.btnCheckRows.tooltip=Konsistenz überprüfen und festgestellte Probleme anzeigen
 InputBoxCase.chkMoveBranches.text=Zweige mitbewegen
 InputBoxCase.chkMoveBranches.tooltip=Falls aktiviert (empfohlen!), wird die Beziehung bestehender Zweige zu verschobenen Fallzeilen aufrecht erhalten.
 InputBoxCase.chkDefaultBranch.text=Sonst-Zweig:
@@ -838,6 +851,14 @@ InputBoxCase.chkDisabled.text=Ausführung und Export unterbunden
 InputBoxCase.chkBreakpoint.text=Haltepunkt
 InputBoxCase.lblBreakTriggerText.text=Halt vor %. Ausführung
 InputBoxCase.msgSelectorMustNotBeEmpty.text=Eine Auswahlliste darf nicht leer sein!
+InputBoxCase.msgRedundantRows.text=Überflüssige Zeilen (kaum mögliche Werte):
+InputBoxCase.msgMissingValues.text=Fehlende Enumeratorwerte (und kein Default):
+InputBoxCase.msgConflictsDetected.text=Mehrfach vorkommende Fallkonstanten (Konflikte):
+InputBoxCase.msgOrphanedBranches.text=Nicht zugeordnete Zweige (Verlust beim Übernehmen!):
+InputBoxCase.msgDubiousSelectors.text=Fallkonstanten ohne bestimmbaren Wert:
+InputBoxCase.msgStructuredDiscriminator.text=Ungeeigneter Auswahlausdruck (strukturierter Typ)!
+InputBoxCase.msgNoProblems.text=Keine offensichtlichen Fehler festgestellt.
+InputBoxCase.msgRows.text=Zeilen
 
 -----[ AttributeInspector ]-----
 AttributeInspector.title=Diagrammeigenschaften
@@ -1488,6 +1509,7 @@ Control.msgConstantRecordComponent.text=Eine Verbundkomponente «%» kann nicht 
 Control.msgTypeMismatch.text=Werttyp «%1» ist nicht kompatibel mit dem Typ «%2» der Variablen/Komponente «%3»!
 Control.msgBadValueList.text=<%> kann nicht als Wertliste interpretiert werden.
 Control.msgBadValueListDetails.text=Details: %
+Control.msgInvalidArrayAccess.text=Unerwarteter Array-Zugriff bei «%1» (%2)!
 Control.msgIndexOutOfBounds.text=Index «%1» (%2) überschreitet Indexbereich für Array «%3»!
 Control.msgInitializerAsArgument.text=Ein Array-Initialisierer kann nicht direkt als Argument an eine eingebaute Funktion übergeben werden.\nWeisen Sie das Array vorher einer Variablen zu und übergeben Sie diese.
 Control.msgIllegalEmptyLine.text=Illegale leere Zeile in einem @j!

@@ -122,6 +122,9 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2021-01-10      Enh. #910: New method isImmutable(), synchronisation in writeOut...
  *      Kay Gürtzig     2021-01-22      Bugfix KGU#914 in splitExpressionList(StringList,...)
  *      Kay Gürtzig     2021-01-25      Enh. #915: New Structures preference "useInputBoxCase"
+ *      Kay Gürtzig     2021-02-01/03   Bugfix #923: Method identifyExprType had ignored qualified names
+ *      Kay Gürtzig     2021-02-03      Issue #920: Highlighting and tokenizing support for "Infinity" and '∞'
+ *      Kay Gürtzig     2021-02-04      Enh. #905, #926: Improved drawing of Analyser flags and backlink support
  *
  ******************************************************************************************************
  *
@@ -286,10 +289,10 @@ public abstract class Element {
 	// START KGU#791 2020-01-20: Enh. #801 - support for offline help
 	public static final String E_HELP_FILE = "structorizer_user_guide.pdf";
 	/** Estimated size of the User Guide PDF file (to be adapted when User Guide significantly grows) */
-	public static final long E_HELP_FILE_SIZE = 10000000;
+	public static final long E_HELP_FILE_SIZE = 10700000;
 	public static final String E_DOWNLOAD_PAGE = "https://www.fisch.lu/Php/download.php";
 	// END KGU#791 2020-01-20
-	public static final String E_VERSION = "3.30-15";
+	public static final String E_VERSION = "3.30-16";
 	public static final String E_THANKS =
 	"Developed and maintained by\n"+
 	" - Robert Fisch <robert.fisch@education.lu>\n"+
@@ -637,6 +640,9 @@ public abstract class Element {
 			"&",
 			"~",
 			// END KGU#790 2020-11-01
+			// START KGU#920 2021-02-03: Enh. #920 We allow ∞ as synonym for Infinity
+			"\u221E",
+			// END KGU#920 2021-02-03
 			// START KGU#331 2017-01-13: Enh. #333 Precaution against unicode comparison operators
 			"\u2260",
 			"\u2264",
@@ -982,7 +988,7 @@ public abstract class Element {
 	public boolean isImmutable()
 	{
 		Root myRoot = getRoot(this);
-		return myRoot.isDiagramControllerRepresentative();
+		return myRoot.isRepresentingDiagramController();
 	}
 	// END KGU#911 2021-01-19
 
@@ -2342,35 +2348,77 @@ public abstract class Element {
 	 */
 	protected void drawWarningSignOnError(Canvas _canvas, Rect _rect) {
 		if (E_ANALYSER && E_ANALYSER_MARKER && _canvas.isSetFlag(CANVAS_FLAGNO_ERROR_CHECK)) {
-			Root myRoot = getRoot(this);
-			if (myRoot != null && myRoot.errors != null && !myRoot.errors.isEmpty()) {
-				for (DetectedError error: myRoot.errors) {
-					if (this == error.getElement()) {
-						Color oldCol = _canvas.getColor();
-						if (error.isWarning()) {
-							_canvas.setColor(Color.RED);
+			// START KGU#906 2021-02-04: Bugfix for #905 - consider collapsed case
+//			Root myRoot = getRoot(this);
+//			if (myRoot != null && myRoot.errors != null && !myRoot.errors.isEmpty()) {
+//				for (DetectedError error: myRoot.errors) {
+//					if (this == error.getElement()) {
+//						Color oldCol = _canvas.getColor();
+//						if (error.isWarning()) {
+//							_canvas.setColor(Color.RED);
+//						}
+//						else {
+//							_canvas.setColor(Color.BLUE);
+//						}
+//						int height = (int)Math.round(E_PADDING * Math.sin(Math.PI/3) / 2);
+//						int yBase = _rect.top + E_PADDING/4 + height;
+//						int[] xCoords = new int[] {
+//								_rect.left + E_PADDING/4,		// left base corner
+//								_rect.left + 3 * E_PADDING/4,	// right base corner
+//								_rect.left + E_PADDING/2		// top corner
+//						};
+//						int[] yCoords = new int[] {
+//								yBase,					// left base corner
+//								yBase,					// right base corner
+//								_rect.top + E_PADDING/4	// top corner
+//						};
+//						_canvas.fillPoly(new Polygon(xCoords, yCoords, xCoords.length));
+//						_canvas.setColor(oldCol);
+//						break;
+//					}
+//				}
+//			}
+			HashMap<Element, Vector<DetectedError>> errorMap = this.getRelatedErrors(false);
+			{
+				// There should be at most a single entry with a single error object
+				for (Vector<DetectedError> errList: errorMap.values()) {
+					DetectedError error = errList.firstElement();
+					Color oldCol = _canvas.getColor();
+					if (error.isWarning()) {
+						_canvas.setColor(Color.RED);
+					}
+					else {
+						_canvas.setColor(Color.BLUE);
+					}
+					int height = (int)Math.round(E_PADDING * Math.sin(Math.PI/3) / 2);
+					int xBase = _rect.left + E_PADDING/4;
+					int yBase = _rect.top + E_PADDING/4 + height;
+					if (this.isCollapsed(true)) {
+						// Put it below or aside the icon
+						int iconHeight = this.getIcon().getIconHeight();
+						if (yBase + iconHeight < _rect.bottom) {
+							yBase += iconHeight;
 						}
 						else {
-							_canvas.setColor(Color.BLUE);
+							xBase += this.getIcon().getIconWidth();
 						}
-						int height = (int)Math.round(E_PADDING * Math.sin(Math.PI/3) / 2);
-						int yBase = _rect.top + E_PADDING/4 + height;
-						int[] xCoords = new int[] {
-								_rect.left + E_PADDING/4,		// left base corner
-								_rect.left + 3 * E_PADDING/4,	// right base corner
-								_rect.left + E_PADDING/2		// top corner
-						};
-						int[] yCoords = new int[] {
-								yBase,					// left base corner
-								yBase,					// right base corner
-								_rect.top + E_PADDING/4	// top corner
-						};
-						_canvas.fillPoly(new Polygon(xCoords, yCoords, xCoords.length));
-						_canvas.setColor(oldCol);
-						break;
 					}
+					int[] xCoords = new int[] {
+							xBase,		// left base corner
+							xBase + E_PADDING/2,	// right base corner
+							xBase + E_PADDING/4		// top corner
+					};
+					int[] yCoords = new int[] {
+							yBase,			// left base corner
+							yBase,			// right base corner
+							yBase - height	// top corner
+					};
+					_canvas.fillPoly(new Polygon(xCoords, yCoords, xCoords.length));
+					_canvas.setColor(oldCol);
+					break;
 				}
 			}
+			// END KGU#906 2021-02-04
 		}
 	}
 	// END KGU#906 2021-01-02
@@ -3398,6 +3446,65 @@ public abstract class Element {
 		TypeMapEntry typeEntry = null;
 		if (typeMap != null) {
 			typeEntry = typeMap.get(expr);
+			// START KGU#923 2021-02-03: Bugfix #923 complex access paths were ignored
+			if (typeEntry == null && (expr.contains(".") || expr.contains("["))) {
+				StringList tokens = Element.splitLexically(expr, true);
+				tokens.removeAll(" ");
+				String token0 = tokens.get(0);
+				if (Function.testIdentifier(token0, false, null)
+						&& (typeEntry = typeMap.get(token0)) != null) {
+					// Well, that is a start.
+					typeSpec = typeEntry.getCanonicalType(true, false);
+					int nTokens = tokens.count();
+					int pos = 1;
+					while (!typeSpec.isEmpty() && (pos < nTokens)) {
+						if (tokens.get(pos).equals(".")) {
+							// Record component - or not
+							if (typeEntry == null || !typeEntry.isRecord()
+									|| pos + 1 >= nTokens
+									|| !Function.testIdentifier(token0 = tokens.get(pos+1), false, null)) {
+								// Something wrong here
+								return "";
+							}
+							if ((typeEntry = typeEntry.getComponentInfo(true).get(token0)) == null) {
+								return "";
+							}
+							typeSpec = typeEntry.getCanonicalType(true, false);
+							pos += 2;
+						}
+						else if (tokens.get(pos).equals("[")) {
+							StringList indexExprs = Element.splitExpressionList(tokens.subSequence(pos+1, nTokens), ",", true);
+							for (int i = 0; i < indexExprs.count()-1; i++) {
+								if (!typeSpec.startsWith("@")) {
+									return "";
+								}
+								typeSpec = typeSpec.substring(1);
+							}
+							// typeSpec should not be the name of a (record) type
+							if ((typeEntry = typeMap.get(":" + typeSpec)) != null) {
+								typeSpec = typeEntry.getCanonicalType(true, false);
+							}
+							tokens.remove(pos, nTokens);
+							tokens.add(Element.splitLexically(indexExprs.get(indexExprs.count()-1), true));
+							nTokens = tokens.count();
+							if (nTokens > pos && tokens.get(pos).equals("]")) {
+								// Syntax correct, drop "]", prepare next cycle
+								tokens.remove(pos);
+								nTokens--;
+							}
+							else {
+								// either "]" was missing or nonsense is following
+								return "";
+							}
+						}
+						else {
+							// Neither "." nor "[" --> Syntax error
+							return "";
+						}
+					}
+				}
+			}
+			// END KGU#923 2021-02-03
 		}
 		if (typeEntry != null) {
 			// START KGU#388 2017-07-12: Enh. #423
@@ -3436,14 +3543,49 @@ public abstract class Element {
 		}
 		// END KGU#354 2017-05-22
 		// 2. If none of the approaches above succeeded check for a numeric literal
+		// START KGU#920 2021-02-03: Issue #920 Inifinity introduced as new literal
+		if (typeSpec.isEmpty() && (expr.equals("Infinity") || expr.equals("-Infinity") || expr.equals("\u221E"))) {
+			typeSpec = "double";
+		}
+		// END KGU#920 2021-02-03
 		if (typeSpec.isEmpty()) {
-			try {
-				Double.parseDouble(expr);
-				typeSpec = "double";
-				Integer.parseInt(expr);
-				typeSpec = "int";
+			// START KGU#923 2021-02-04: Issue #923 We may at least analyse constant expressions
+			//try {
+			//	Double.parseDouble(expr);
+			//	typeSpec = "double";
+			//	Integer.parseInt(expr);
+			//	typeSpec = "int";
+			//}
+			//catch (NumberFormatException ex) {}
+			StringList tokens = Element.splitLexically(expr, true);
+			tokens.removeAll(" ");
+			tokens.removeAll("+");
+			tokens.removeAll("-");
+			tokens.removeAll("*");
+			tokens.removeAll("/");
+			tokens.removeAll("%");
+			for (int i = 0; i < tokens.count(); i++) {
+				String token = tokens.get(i);
+				String subType = null;
+				try {
+					Double.parseDouble(token);
+					subType = "double";
+					Integer.parseInt(token);
+					subType = "int";
+				}
+				catch (NumberFormatException ex) {}
+				if (subType == null) {
+					typeSpec = "";
+					break;
+				}
+				if (typeSpec.isEmpty()) {
+					typeSpec = subType;
+				}
+				else if (typeSpec.equals("double") || subType.equals("double")) {
+					typeSpec = "double";
+				}
 			}
-			catch (NumberFormatException ex) {}
+			// END KGU#923 2021-02-04
 		}
 		// Check for boolean literals
 		if (typeSpec.isEmpty() && (expr.equalsIgnoreCase("true") || expr.equalsIgnoreCase("false"))) {
@@ -3751,6 +3893,10 @@ public abstract class Element {
 				//specialSigns.add("/=");
 				//specialSigns.add("%=");
 				// END KGU#913 2021-01-21
+				// START KGU#920 2021-02-03: Issue #920 Infinity now also literal
+				specialSigns.add("Infinity");
+				specialSigns.add("\u221E");
+				// END KGU#920 2021-02-03
 				// START KGU#883 2020-11-01: Enh. #881 bit operators and Boolean literal were missing
 				specialSigns.add("false");
 				specialSigns.add("true");
@@ -4135,10 +4281,10 @@ public abstract class Element {
 	
     /**
      * Detect whether the element is currently collapsed (or to be shown as collapsed by other reasons)
-     * @param _orHidden - if some additional element-specific hiding criterion is to be considered, too  
+     * @param _orHidingOthers - if some additional element-specific hiding criterion is to be considered, too  
      * @return true if element is to be shown in collapsed shape
      */
-    public boolean isCollapsed(boolean _orHidden) {
+    public boolean isCollapsed(boolean _orHidingOthers) {
         return collapsed;
     }
 
@@ -4261,6 +4407,9 @@ public abstract class Element {
         	// START KGU#843 2020-04-11: Bugfix #847 Inconsistency in handling operators (we don't count this, though)
         	_tokens.replaceAllCi("DIV", "div");
         	// END KGU#843 2020-04-11
+        	// START KGU#920 2021-02-03: Issue #920 Handle Infinity literal
+        	_tokens.replaceAll("\u221E", "Infinity");
+        	// END KGU#920 2021-02-03
         }
         return count;
     }
@@ -4797,5 +4946,84 @@ public abstract class Element {
 			this.rect0 = new Rect(rect0.left, rect0.top, rect0.bottom, rect0.right);
 		}
 	}
+	
+	// START KGU#906/KGU#926 2021-02-04: Enh. #905, #926 consider eclipsed substructure
+	/**
+	 * Retrieves all (or just the first) {@link DetectedError} objects related to this
+	 * element or some substructure element (in case this element is collapsed)
+	 * @param getAll - if not {@code true} then only the result will only contain the
+	 * first related {@link DetectedError} found (allowing an efficient existence check)
+	 * @return a map from element to lists of related {@link DetectedError} objects,
+	 *  may be empty
+	 */
+	public LinkedHashMap<Element, Vector<DetectedError>> getRelatedErrors(boolean getAll)
+	{
+		LinkedHashMap<Element, Vector<DetectedError>> errorMap = 
+				new LinkedHashMap<Element, Vector<DetectedError>>();
+		addRelatedErrors(getAll, errorMap);
+		return errorMap;
+	}
+	
+	/**
+	 * Internal helper for {@link #getRelatedErrors(boolean)}
+	 * @param getAll - if not {@code true} then only the result will only contain the
+	 * first related {@link DetectedError} found (allowing an efficient existence check)
+	 * @param errorMap - a map from element to lists of related {@link DetectedError} objects,
+	 *  may be empty
+	 */
+	protected final void addRelatedErrors(boolean getAll, LinkedHashMap<Element, Vector<DetectedError>> errorMap)
+	{
+		if (E_ANALYSER) {
+			Root myRoot = getRoot(this);
+			if (myRoot != null && myRoot.errors != null && !myRoot.errors.isEmpty()) {
+				boolean descend = this.isCollapsed(false);
+				// Now collect the information from the substructure if necessary
+				final class ErrorFinder implements IElementVisitor {
+					
+//					private Root root;
+//					public LinkedHashMap<Element, Vector<DetectedError>> errorMap;
+//					boolean descend;
+//					boolean oneIsEnough;
+//
+//					public ErrorFinder(Root _root, LinkedHashMap<Element, Vector<DetectedError>> _errorMap,
+//							boolean _descend, boolean _getAll)
+//					{
+//						root = _root;
+//						errorMap = _errorMap;
+//						descend = _descend;
+//						oneIsEnough = !_getAll;
+//					}
+					
+					@Override
+					public boolean visitPreOrder(Element _ele) {
+						for (DetectedError error: myRoot.errors) {
+							if (_ele == error.getElement()) {
+								if (!errorMap.containsKey(_ele)) {
+									errorMap.put(_ele, new Vector<DetectedError>());
+								}
+								errorMap.get(_ele).add(error);
+								if (!getAll) {
+									return false;
+								}
+							}
+						}
+						return descend;
+					}
+
+					@Override
+					public boolean visitPostOrder(Element _ele) {
+						return true;
+					}
+
+				}
+				ErrorFinder finder = new ErrorFinder();
+//				ErrorFinder finder = new ErrorFinder(myRoot, errorMap, descend, getAll);
+				traverse(finder);
+			}
+		}
+		
+	}
+	
+	// END KGU#906/KGU#926 2021-02-04
 	
 }
