@@ -269,6 +269,9 @@ public class StringList {
 			testSource = _source.toLowerCase();
 			testBy = testBy.toLowerCase();
 		}
+		if (_source == null) {
+			System.out.println("Here we go!");
+		}
 		while (!_source.isEmpty())
 		{
 			int pos = testSource.indexOf(testBy);

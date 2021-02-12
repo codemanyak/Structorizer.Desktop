@@ -33,6 +33,7 @@ package lu.fisch.structorizer.parsers;
  *      Author          Date            Description
  *      ------          ----            -----------
  *      Kay Gürtzig     2021-01-20      First Issue for #913
+ *      Kay Gürtzig     2021-02-12      Processing of FOR loops revised.
  *
  ******************************************************************************************************
  *
@@ -78,6 +79,11 @@ public class JStructParser extends DefaultHandler {
 	private static Schema nsdSchema = null;
 	
 	private static final String[] ACCESS = new String[] {"public", "protected", "private", "static"};
+	// Type names typically found in the first zone of a for loop header
+	private static final StringList AUTO_INCR = StringList.explode("+,+", ",");
+	private static final StringList AUTO_DECR = StringList.explode("-,-", ",");
+	private static final StringList AUTO_ADD = StringList.explode("+,=", ",");
+	private static final StringList AUTO_SUBT = StringList.explode("-,=", ",");
 	
 	private ArchivePool archive = null;
 	private String filePath = "";
@@ -413,7 +419,7 @@ public class JStructParser extends DefaultHandler {
 		else if (qualifiedName.equals("for"))
 		{
 			// create element
-			For ele = new For(StringList.getNew("???"));
+			Element ele = new For(StringList.getNew("???"));
 			
 			// read attributes
 			if (attributes.getIndex("code") != -1) {
@@ -434,40 +440,71 @@ public class JStructParser extends DefaultHandler {
 			 * or
 			 * for (Object x: coll)
 			 */
-			ele.style = For.ForLoopStyle.FREETEXT;
-			StringList tokens = Element.splitLexically(ele.getText().getLongString(), true);
+			((For)ele).style = For.ForLoopStyle.FREETEXT;
+			String text = ele.getText().getLongString();
+			StringList tokens = Element.splitLexically(text, true);
 			tokens.removeAll(" ");
 			if (tokens.count() >= 5 && tokens.get(0).equals("for")
 					&& tokens.get(1).equals("(") && tokens.get(tokens.count()-1).equals(")")) {
 				StringList exprs = Element.splitExpressionList(tokens.subSequence(2, tokens.count()), ";", true);
 				if (exprs.count() == 4) {
+					// Seems to be a counter-controlled loop
+					String loopVar = null;
+					String startVal = null;
+					String endVal = null;
+					int stepConst = 1;
+					boolean allSet = true;
 					// Parse the initialisation
 					tokens = Element.splitLexically(exprs.get(0), true);
+					tokens.removeAll(" ");
 					int posOpr = tokens.indexOf(asgnOpr);
 					if (posOpr > 0) {
 						// Get the variable
 						StringList varTokens = tokens.subSequence(0, posOpr).trim();
-						// Try to cut off the type
+						// Try to cut off the type (we might of course insert a declaration)
 						if (Function.testIdentifier(varTokens.get(varTokens.count()-1), false, null)) {
 							varTokens.remove(0, varTokens.count()-1);
 						}
-						ele.setCounterVar(varTokens.concatenate(null));
+						loopVar = varTokens.concatenate(null);
+						((For)ele).setCounterVar(loopVar);	// Won't help
 						// Get the start value
-						ele.setStartValue(tokens.concatenate(null, posOpr+1));
+						startVal = tokens.concatenate(null, posOpr+1);
+						((For)ele).setStartValue(startVal);	// Won't help
+					}
+					else {
+						allSet = false;
 					}
 					// Try to extract the step value
 					tokens = Element.splitLexically(exprs.get(2), true);
-					if ((posOpr = tokens.indexOf("++")) >= 0) {
-						ele.setStepConst(1);
+					tokens.removeAll(" ");
+					if ((posOpr = tokens.indexOf("++")) >= 0 
+							|| (posOpr = tokens.indexOf(AUTO_INCR, 0, true)+1) > 0) {
+						stepConst = 1;
+						((For)ele).setStepConst(1);
 					}
-					else if ((posOpr = tokens.indexOf("--")) >= 0) {
-						ele.setStepConst(-1);
+					else if ((posOpr = tokens.indexOf("--")) >= 0
+							|| (posOpr = tokens.indexOf(AUTO_DECR, 0, true)+1) > 0) {
+						stepConst = -1;
+						((For)ele).setStepConst(-1);
 					}
-					if ((posOpr = tokens.indexOf("+=")) >= 0) {
-						ele.setStepConst(tokens.concatenate(null, posOpr+1));
+					else if ((posOpr = tokens.indexOf("+=")) >= 0
+							|| (posOpr = tokens.indexOf(AUTO_ADD, 0, true)+1) > 0) {
+						String stepString = tokens.concatenate(null, posOpr+1);
+						allSet = ((For)ele).setStepConst(stepString) && allSet;
+						if (allSet) {
+							stepConst = Integer.parseInt(stepString);
+						}
 					}
-					else if ((posOpr = tokens.indexOf("-=")) >= 0) {
-						ele.setStepConst("-" + tokens.concatenate(null, posOpr+1));
+					else if ((posOpr = tokens.indexOf("-=")) >= 0
+							|| (posOpr = tokens.indexOf(AUTO_SUBT, 0, true)+1) > 0) {
+						String stepString = "-" + tokens.concatenate(null, posOpr+1);
+						allSet = ((For)ele).setStepConst(stepString) && allSet;
+						if (allSet) {
+							stepConst = Integer.parseInt(stepString);
+						}
+					}
+					else {
+						allSet = false;
 					}
 					// Try to get the end value from the condition
 					tokens = Element.splitLexically(exprs.get(1), true);
@@ -479,42 +516,68 @@ public class JStructParser extends DefaultHandler {
 							|| (posOpr = tokens.indexOf("!=")) >= 0
 							|| convertSyntax && (posOpr = tokens.indexOf("=")) >= 0
 							|| convertSyntax && (posOpr = tokens.indexOf("<>")) >= 0) {
-						// FIXME: Too rough
+						// FIXME: Too rough, could be a combined condition
 						String opr = tokens.get(posOpr);
-						String endVal = tokens.concatenate(null, posOpr+1);
-						int step = ele.getStepConst();
+						endVal = tokens.concatenate(null, posOpr+1);
+						int step = ((For)ele).getStepConst();
 						if (opr.equals("<") || (opr.equals("!=") || opr.equals("<>")) && step > 0) {
 							endVal = "(" + endVal + ") - 1";
 						}
-						else if ((opr.equals(">") || opr.equals("!=") || opr.equals("<>")) && ele.getStepConst() < 0) {
+						else if ((opr.equals(">") || opr.equals("!=") || opr.equals("<>")) && step < 0) {
 							endVal = "(" + endVal + ") + 1";
 						}
-						ele.setEndValue(endVal);
+						((For)ele).setEndValue(endVal);	// Won't help
+					}
+					else {
+						allSet = false;
+					}
+					if (convertSyntax) {
+						StringList comment = ele.getComment();
+						comment.add(text);
+						if (allSet) {
+							ele = new For(loopVar, startVal, endVal, stepConst);
+						}
+						else {
+							// Better produce a While loop
+							Instruction instr = new Instruction(exprs.get(0));
+							instr.setColor(ele.getColor());
+							lastQ.addElement(instr);
+							ele = new While(exprs.get(1));
+							ele.setColor(instr.getColor());
+							instr = new Instruction(exprs.get(2));
+							instr.setColor(ele.getColor());
+							// This will have to be placed at the end in endElement()
+							((While)ele).q.addElement(instr);
+						}
 					}
 				}
 				else {
 					exprs = Element.splitExpressionList(tokens.subSequence(2, tokens.count()), ":", true);
-					if (exprs.count() == 3) {
+					if (exprs.count() == 3 && exprs.get(2).equals(")")) {
 						// Try to get the variable
 						String var = exprs.get(0);
 						if (convertSyntax && var.contains(" ")) {
 							// Try to cut off the type
 							StringList varTokens = Element.splitLexically(var, true);
+							varTokens.removeAll(" ");
 							if (Function.testIdentifier(varTokens.get(varTokens.count()-1), false, null)) {
 								var = varTokens.get(varTokens.count()-1);
 							}
 						}
-						ele.setCounterVar(var);
+						((For)ele).setCounterVar(var);
 						//tokens = Element.splitLexically(exprs.get(0), true);
 						// Try to get the collection
-						ele.setValueList(exprs.get(1));
+						((For)ele).setValueList(exprs.get(1));
+						((For)ele).style = For.ForLoopStyle.TRAVERSAL;
+					}
+					else {
+						ele.setColor(Color.RED);
 					}
 				}
 			}
 			
-			
 			// set children
-			ele.q.setColor(ele.getColor());
+			((ILoop)ele).getBody().setColor(ele.getColor());
 			
 			// place stack
 			lastE = ele;
@@ -707,7 +770,8 @@ public class JStructParser extends DefaultHandler {
 		else if (qualifiedName.equals("qFor"))
 		{
 			// handle stacks
-			lastQ = ((For) lastE).q;
+			// Caution: lastE might be a replacing While element!
+			lastQ = ((ILoop) lastE).getBody();
 			// START KGU 2106-12-21: Bugfix #317
 			if (attributes.getIndex("color") != -1 && !attributes.getValue("color").equals("")) {
 				lastQ.setColor(Color.decode("0x"+attributes.getValue("color")));
@@ -768,6 +832,155 @@ public class JStructParser extends DefaultHandler {
 //		System.out.println("pStack:\t" + pStack.size());
 //		System.out.println("cStack:\t" + cStack.size() + "\n");
 	}
+
+//	// START KGU#913 2021-02-12: Enh. #913 FOR loops may not remain as they are
+//	/**
+//	 * More specific version of {@link #convertJava2Struct(Element)} for
+//	 * {@link For} elements. Tries to make sense of Java-specific FOR loop
+//	 * syntax.<br/>
+//	 * Only the text syntax of the given {@link For} loop {@code _for}
+//	 * if specified by {@link #convertSyntax}, which is set according to
+//	 * import preference "impConvertJStruct".
+//	 * @param _for - the imported {@link For}
+//	 * @return the element (or some replacement for it (e.g. a {@link Subqueue})
+//	 */
+//	private Element convertJava2Struct(For _for) {
+//		Element ele = _for;
+//		if (convertSyntax) {
+//			String text = _for.getUnbrokenText().getLongString();
+//			StringList tokens = Element.splitLexically(text, true);
+//			tokens.removeAll(" ");
+//			if (tokens.count() < 5 || !tokens.get(0).equals("for")
+//					|| !tokens.get(1).equals("(")
+//					|| !tokens.get(tokens.count()-1).equals(")")) {
+//				// Something is wrong here
+//				_for.setColor(Color.RED);
+//				return _for;
+//			}
+//			// Let's see whether it is a count-controlled loop
+//			StringList exprs = Element.splitExpressionList(
+//					tokens.subSequence(2, tokens.count()), ";", true);
+//			if (exprs.count() == 4 && exprs.get(3).equals(")")) {
+//				// It should be a counting loop, so try the best
+//				boolean ok = true;
+//				//newText.add(CodeParser.getKeywordOrDefault("preFor", "for"));
+//				// Check the first zone (initialisation)
+//				tokens = Element.splitLexically(exprs.get(0), true);
+//				tokens.replaceAll("=", "<-");
+//				if (tokens.count() >= 3) {
+//					String[] parts = new String[] {null, null, null};
+//					if (INTEGRAL_TYPES.contains(tokens.get(0))) {
+//						tokens.remove(0);
+//					}
+//					if (tokens.get(1).equals("<-")
+//							&& Function.testIdentifier(tokens.get(0), false, null)) {
+//						parts[0] = tokens.get(0);
+//						parts[1] = tokens.concatenate(null, 2);
+//					}
+//					else {
+//						ok = false;
+//					}
+//					// Check the third zone (increment)
+//					int step = 1;
+//					tokens = Element.splitLexically(exprs.get(2), true);
+//					if (tokens.count() == 3) {
+//						int posIncr = tokens.indexOf(AUTO_INCR, 0, true);
+//						int posDecr = tokens.indexOf(AUTO_DECR, 0, true);
+//						if ((posIncr == 0 || posDecr == 0) && tokens.get(2).equals(parts[0])
+//								|| (posIncr == 1 || posDecr == 1) && tokens.get(0).equals(parts[0])) {
+//							step = posDecr >= 0 ? -1 : 1;
+//						}
+//					}
+//					else if (tokens.count() == 4 && tokens.get(0).equals(parts[0])) {
+//						int posIncr = tokens.indexOf(AUTO_ADD, 0, true);
+//						int posDecr = tokens.indexOf(AUTO_SUBT, 0, true);
+//						if (posIncr == 1 || posDecr == 1) {
+//							try {
+//								step = - Integer.parseInt(tokens.get(3));
+//								if (posDecr == 1) {
+//									step = -1;
+//								}
+//							}
+//							catch (NumberFormatException exc) {
+//								ok = false;
+//							}
+//						}
+//					}
+//					else {
+//						ok = false;
+//					}
+//					// Check the second zone (condition)
+//					tokens = Element.splitLexically(exprs.get(1), true);
+//					if (tokens.count() >= 3 && tokens.get(0).equals(parts[0])
+//							&& COMP_OPRS.contains(tokens.get(1))) {
+//						String endVal = tokens.concatenate(null, 2);
+//						if (tokens.get(1).equals("<")
+//								|| tokens.get(1).equals("!=") && step > 0) {
+//							parts[2] = "(" + endVal + ") - 1";
+//						}
+//						else if (tokens.get(1).equals(">")
+//								|| tokens.get(1).equals("!=") && step < 0) {
+//							parts[2] = "(" + endVal + ") + 1";
+//						}
+//						else if (!tokens.get(1).equals("==")) {
+//							parts[2] = endVal;
+//						}
+//						else {
+//							ok = false;
+//						}
+//					}
+//					if (ok) {
+//						StringList comment = _for.getComment();
+//						ele = new For(parts[0], parts[1], parts[2], step);
+//						ele.setComment(comment);
+//					}
+//				}
+//				if (!ok) {
+//					// Form a while loop.
+//					Subqueue sq = new Subqueue();
+//					While whil = new While(exprs.get(1));
+//					sq.addElement(convertJava2Struct(new Instruction(exprs.get(0))));
+//					sq.addElement(whil);
+//					whil.q.addElement(convertJava2Struct(new Instruction(exprs.get(2))));
+//					ele = sq;
+//				}
+//			}
+//			else {
+//				// Apparently a collection-controlled loop
+//				exprs = Element.splitExpressionList(
+//						tokens.subSequence(2, tokens.count()), ":", true);
+//				if (exprs.count() == 3) {
+//					Subqueue sq = null;
+//					StringList newText = new StringList();
+//					newText.add(CodeParser.getKeyword("preForIn"));
+//					tokens = Element.splitLexically(exprs.get(0), true);
+//					if (tokens.count() > 1) {
+//						// Seems to be a declaration
+//						sq = new Subqueue();
+//						// Transform the declaration, somehow for now
+//						sq.addElement(new Instruction(
+//								"var " + tokens.get(tokens.count()-1)
+//								+ ": " + tokens.concatenate(null, 0, tokens.count()-1)));
+//					}
+//					if (!tokens.isEmpty()) {
+//						newText.add(tokens.get(tokens.count()-1));
+//					}
+//					else {
+//						newText.add("dummy" + Integer.toHexString(_for.hashCode()));
+//					}
+//					newText.add(CodeParser.getKeyword("postForIn"));
+//					newText.add(exprs.get(1));
+//					_for.setText(newText.concatenate(null));
+//					if (sq != null) {
+//						sq.addElement(_for);
+//						ele = sq;
+//					}
+//				}
+//			}
+//		}
+//		return ele;
+//	}
+//	// END KGU#913 2021-02-12
 	
 	/**
 	 * Converts the syntax of the text of element {@code ele} from Java to
@@ -827,9 +1040,21 @@ public class JStructParser extends DefaultHandler {
 			tryStack.pop();			
 		}
 		// -- QUEUES ---
+		else if (qualifiedName.equals("qFor")) {
+			// Check if the parent is a substituting While
+			if (lastQ.parent instanceof While) {
+				// The put the first instruction (the step!) to the end
+				if (lastQ.getSize() > 0) {
+					Element stepInstr = lastQ.getElement(0);
+					lastQ.removeElement(0);
+					lastQ.addElement(stepInstr);
+				}
+			}
+			qStack.pop();
+			lastQ = qStack.peek();
+		}
 		else if(qualifiedName.equals("qCase") ||
 				qualifiedName.equals("qPara") ||
-				qualifiedName.equals("qFor") ||
 				qualifiedName.equals("qForever") ||
 				qualifiedName.equals("qWhile") ||
 				qualifiedName.equals("qRepeat") ||
