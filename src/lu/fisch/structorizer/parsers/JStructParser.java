@@ -307,10 +307,20 @@ public class JStructParser extends DefaultHandler {
 			
 			convertJava2Struct(ele);
 			
-			if (((Instruction)ele).isProcedureCall()
-					|| ((Instruction)ele).isFunctionCall()) {
+			boolean containsCalls = false;
+			StringList text = ele.getText();
+			for (int i = 0; i < text.count(); i++) {
+				String line = text.get(i);
+				if (Instruction.isProcedureCall(line)
+						|| Instruction.isFunctionCall(line)) {
+					containsCalls = true;
+					break;
+				}
+			}
+			if (containsCalls) {
 				callCandidates.push((Instruction)ele);
 			}
+			// Apparently jumps are always separate
 			else if (((Instruction)ele).isJump()) {
 				Jump jump = new Jump(ele.getText());
 				jump.setComment(ele.getComment());
@@ -1068,16 +1078,47 @@ public class JStructParser extends DefaultHandler {
 		// START KGU#913 2021-02-13: Enh. #913 Check for disguised calls
 		while (!callCandidates.isEmpty()) {
 			Instruction cand = callCandidates.pop();
-			Function called = cand.getCalledRoutine();
-			if (!archive.findRoutinesBySignature(called.getName(),
-					called.paramCount(), null).isEmpty()) {
-				Subqueue parent = (Subqueue)cand.parent;
-				int ix = parent.getIndexOf(cand);
-				Call call = new Call(cand.getText());
-				call.setComment(cand.getComment());
-				call.setColor(cand.getColor());
+			Subqueue parent = (Subqueue)cand.parent;
+			int ix = parent.getIndexOf(cand);
+			StringList text = cand.getText();
+			for (int i = text.count()-1; i >= 0; i--) {
+				String line = text.get(i);
+				if (Instruction.isFunctionCall(line) ||
+						Instruction.isProcedureCall(line)) {
+					Function called = cand.getCalledRoutine(i);
+					if (!archive.findRoutinesBySignature(called.getName(),
+							called.paramCount(), null).isEmpty()) {
+						Call call = new Call(line);
+						call.setColor(cand.getColor());
+						if (i == 0) {
+							/*
+							 * If this is the first line then this
+							 * call will replace the remainder of
+							 * cand. So transfer the comment
+							 */
+							call.setComment(cand.getComment());
+						}
+						/* Get the subsequent lines - these must be
+						 * inserted as new partial instruction to
+						 * preserve original execution order
+						 */
+						if (i+1 < text.count()) {
+							Instruction part = new Instruction(
+									text.subSequence(i+1, text.count()));
+							part.setColor(cand.getColor());
+							parent.insertElementAt(part, ix + 1);
+						}
+						parent.insertElementAt(call, ix + 1);
+						text.remove(i, text.count());
+					}
+				}
+			}
+			/* All lines gone? Then remove the element (the comment
+			 * will already have been transferred to the first emerging
+			 * Call).
+			 */
+			if (text.isEmpty()) {
 				parent.removeElement(ix);
-				parent.insertElementAt(call, ix);
 			}
 		}
 		// END KGU#913 2021-02-13
