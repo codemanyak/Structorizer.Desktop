@@ -223,6 +223,7 @@ package lu.fisch.structorizer.gui;
  *      Kay Gürtzig     2021-01-27      Enh. #917: editSubNSD() (#689) now also applies to referred Includables
  *      Kay Gürtzig     2021-01-30      Bugfix #921: recursive type retrieval for outsizing, handling of enum types
  *      Kay Gürtzig     2021-02-04      Enh. #926: Element selection now scrolls to the related Analyser warnings
+ *      Kay Gürtzig     2021-02-13      Enh. #913: JStruct adapter correction in openNSD()
  *
  ******************************************************************************************************
  *
@@ -2332,6 +2333,9 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		Cursor origCursor = getCursor();
 		setCursor(new Cursor(Cursor.WAIT_CURSOR));
 		// END KGU#901 2021-01-22
+		// START KGU#913 2021-02-13: Enh. #913 JStruct files must not be referenced
+		boolean assignFilename = true;
+		// END KGU#913 2021-02-13
 		try
 		{
 			File f = new File(_filename);
@@ -2353,10 +2357,14 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 					root = parser.parse(f);
 				}
 				catch (NSDParser.NSDParserException ex) {
+					// START KGU#913 2021-01-20: Enh. #913
 					// For JStruct files we have a solution
 					if (ex.getDetectedFileType() == NSDParser.NSDFileType.JSTRUCT) {
 						JStructParser jStrParser = new JStructParser();
 						ArchivePool jClassPool = jStrParser.parse(new File(_filename));
+						// START KGU#913 2021-02-13: Enh. #913 JStruct files must not be referenced
+						assignFilename = false;;
+						// END KGU#913 2021-02-13
 						Set<Root> roots = jClassPool.getAllRoots();
 						if (!roots.isEmpty()) {
 							for (Root rt: roots) {
@@ -2375,15 +2383,23 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 					else {
 						throw ex;
 					}
+					// END KGU#913 2021-01-20
 				}
 				// END KGU#363 2017-05-21
 				//root.highlightVars = hil;
 				if (Element.E_VARHIGHLIGHT) {
 					root.retrieveVarNames();	// Initialise the variable table, otherwise the highlighting won't work
 				}
-				root.filename = _filename;
-				currentDirectory = new File(root.filename);
-				addRecentFile(root.filename);
+				// START KGU#913 2021-02-13: Enh. #913
+				//root.filename = _filename;
+				//currentDirectory = new File(root.filename);
+				//addRecentFile(root.filename);
+				currentDirectory = new File(_filename).getParentFile();
+				if (assignFilename) {
+					root.filename = _filename;
+				}
+				addRecentFile(_filename);
+				// END KGU#913 2021-02-13
 				
 				// START KGU#183 2016-04-23: Issue #169
 				selected = root;

@@ -55,6 +55,7 @@ package lu.fisch.structorizer.parsers;
  *      Kay Gürtzig     2018.07.17      Bugfix #562: Attribute "origin" must be set (overwritten) in any case
  *      Kay Gürtzig     2018.09.11      Refines #372: More sensible attributes for Roots from an arrz file.
  *      Kay Gürtzig     2019-03-17      Enh. #56: Import of new Try element implemented
+ *      Kay Gürtzig     2021-01-20      Enh. #913: Detection and signalling of JStruct files
  *
  ******************************************************************************************************
  *
@@ -86,6 +87,7 @@ import lu.fisch.structorizer.io.Ini;
 
 public class NSDParser extends DefaultHandler {
 	
+	// START KGU#913 2021-01-20: Enh. #913
 	/** Classifies detected deviant NSD file types */
 	public static enum NSDFileType {UNKNOWN, JSTRUCT};
 	
@@ -117,6 +119,7 @@ public class NSDParser extends DefaultHandler {
 		}
 	}
 	private boolean isJStructFile = false;
+	// END KGU#913 2021-01-20
 	
 	// START KGU#484 2018-03-21: Issue #463
 	public static final Logger logger = Logger.getLogger(NSDParser.class.getName());
