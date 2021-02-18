@@ -112,6 +112,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig     2020-04-25      Bugfix #863/1: Duplicate routine export to PapDesigner and StrukTex
  *      Kay Gürtzig     2020-04-28      Bugfix #828: Unreferenced subroutines were missing on group export with 1 main
  *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
+ *      Kay Gürtzig     2021-02-13      Bugfix #937: Endless loop precaution in topological sorting
  *
  ******************************************************************************************************
  *
@@ -4114,7 +4115,10 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 			{
 				SubTopoSortEntry entry = _dependencyMap.get(sub);
 				// If this routine refers to no other one, then enlist it
-				if (entry.nReferingTo == minRefCount)
+				// START KGU#936 2021-02-13: Bugfix #937 Could induce an endless loop
+				//if (entry.nReferingTo == minRefCount)
+				if (entry.nReferingTo <= minRefCount)
+				// END KGU#936 2021-02-13
 				{
 					roots.add(sub);
 				}
