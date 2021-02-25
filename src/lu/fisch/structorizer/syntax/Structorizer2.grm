@@ -1,7 +1,7 @@
-﻿"Name"    = 'StructorizerExpr'
-"Version" = '0.1'
-"Author"  = 'Dmitry Gazko, Kay Gürtzig'
-"About"   = 'LALR(1) Structorizer expression grammar, derived from Java grammar based on partial conversion of Sun Java 1.0-2.0 specification'
+"Name"    = 'StructorizerExpr'
+"Version" = '0.2'
+"Author"  = 'Kay Gürtzig'
+"About"   = 'LALR(1) Structorizer expression grammar, derived from Dmitry Gazko''s partial Java 1.0-2.0 grammar'
 
 ! -------------------------------------------------
 ! Character Sets
@@ -120,8 +120,8 @@ OctalIntegerLiteral = '0'{OctalCharSet}+{LongTypeSuffix}?
          |  <Primary> '.' Identifier '(' ')'
 
 <ArrayAccess> 
-        ::= <Name> '[' <Expression> ']'
-         |  <Primary> '[' <Expression> ']'
+        ::= <Name> '[' <ExpressionList> ']'
+         |  <Primary> '[' <ExpressionList> ']'
 
 <PostfixExpression>
         ::= <Primary>
@@ -152,7 +152,7 @@ OctalIntegerLiteral = '0'{OctalCharSet}+{LongTypeSuffix}?
         ::= <PostfixExpression>
          |  '~' <UnaryExpression>
          |  '!' <UnaryExpression>
-         |  no <UnaryExpression>
+         |  not <UnaryExpression>
 
 <MultiplicativeExpression>
         ::= <UnaryExpression>
@@ -210,7 +210,7 @@ OctalIntegerLiteral = '0'{OctalCharSet}+{LongTypeSuffix}?
 <ConditionalOrExpression>
         ::= <ConditionalAndExpression>
          |  <ConditionalOrExpression> '||' <ConditionalAndExpression>
-         |  <ConditionalAndExpression> or <InclusiveOrExpression>
+         |  <ConditionalOrExpression> or <ConditionalAndExpression>
 
 <ConditionalExpression> 
         ::= <ConditionalOrExpression>

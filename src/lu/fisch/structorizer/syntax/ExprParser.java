@@ -33,10 +33,10 @@ package lu.fisch.structorizer.syntax;
  *
  *      Author          Date            Description
  *      ------          ----            -----------
- *      Kay Gürtzig     2017.03.02      First Issue for Iden GOLDEngine
- *      Kay Gürtzig     2017.03.11      Parameter annotations and some comments corrected, indentation unified
- *      Kay Gürtzig     2018.03.26      Imports revised
- *      Kay Gürtzig     2018.06.30      Enh. #553: hooks for possible thread cancellation inserted.
+ *      Kay Gürtzig     2017-03-02      First Issue for Iden GOLDEngine
+ *      Kay Gürtzig     2017-03-11      Parameter annotations and some comments corrected, indentation unified
+ *      Kay Gürtzig     2018-03-26      Imports revised
+ *      Kay Gürtzig     2018-06-30      Enh. #553: hooks for possible thread cancellation inserted.
  *
  ******************************************************************************************************
  *
@@ -45,6 +45,7 @@ package lu.fisch.structorizer.syntax;
  *      Author          Date            Description
  *      ------          ----            -----------
  *      Kay Gürtzig     2018.10.23      First Issue (generated with GOLDprog.exe)
+ *      Kay Gürtzig     2021-02-25      Grammar table updated/corrected
  *
  ******************************************************************************************************
  *
@@ -193,7 +194,7 @@ public class ExprParser /*extends CodeParser*/
 		final int SYM_IDENTIFIER                           = 45;  // Identifier
 		final int SYM_INDIRECTCHARLITERAL                  = 46;  // IndirectCharLiteral
 		final int SYM_MOD                                  = 47;  // mod
-		final int SYM_NO                                   = 48;  // no
+		final int SYM_NOT                                  = 48;  // not
 		final int SYM_NULLLITERAL                          = 49;  // NullLiteral
 		final int SYM_OCTALESCAPECHARLITERAL               = 50;  // OctalEscapeCharLiteral
 		final int SYM_OCTALINTEGERLITERAL                  = 51;  // OctalIntegerLiteral
@@ -288,8 +289,8 @@ public class ExprParser /*extends CodeParser*/
 		final int PROD_METHODINVOCATION_LPAREN_RPAREN2                            = 38;  // <MethodInvocation> ::= <Name> '(' ')'
 		final int PROD_METHODINVOCATION_DOT_IDENTIFIER_LPAREN_RPAREN              = 39;  // <MethodInvocation> ::= <Primary> '.' Identifier '(' <ExpressionList> ')'
 		final int PROD_METHODINVOCATION_DOT_IDENTIFIER_LPAREN_RPAREN2             = 40;  // <MethodInvocation> ::= <Primary> '.' Identifier '(' ')'
-		final int PROD_ARRAYACCESS_LBRACKET_RBRACKET                              = 41;  // <ArrayAccess> ::= <Name> '[' <Expression> ']'
-		final int PROD_ARRAYACCESS_LBRACKET_RBRACKET2                             = 42;  // <ArrayAccess> ::= <Primary> '[' <Expression> ']'
+		final int PROD_ARRAYACCESS_LBRACKET_RBRACKET                              = 41;  // <ArrayAccess> ::= <Name> '[' <ExpressionList> ']'
+		final int PROD_ARRAYACCESS_LBRACKET_RBRACKET2                             = 42;  // <ArrayAccess> ::= <Primary> '[' <ExpressionList> ']'
 		final int PROD_POSTFIXEXPRESSION                                          = 43;  // <PostfixExpression> ::= <Primary>
 		final int PROD_POSTFIXEXPRESSION2                                         = 44;  // <PostfixExpression> ::= <Name>
 		final int PROD_POSTFIXEXPRESSION3                                         = 45;  // <PostfixExpression> ::= <PostIncrementExpression>
@@ -306,7 +307,7 @@ public class ExprParser /*extends CodeParser*/
 		final int PROD_UNARYEXPRESSIONNOTPLUSMINUS                                = 56;  // <UnaryExpressionNotPlusMinus> ::= <PostfixExpression>
 		final int PROD_UNARYEXPRESSIONNOTPLUSMINUS_TILDE                          = 57;  // <UnaryExpressionNotPlusMinus> ::= '~' <UnaryExpression>
 		final int PROD_UNARYEXPRESSIONNOTPLUSMINUS_EXCLAM                         = 58;  // <UnaryExpressionNotPlusMinus> ::= '!' <UnaryExpression>
-		final int PROD_UNARYEXPRESSIONNOTPLUSMINUS_NO                             = 59;  // <UnaryExpressionNotPlusMinus> ::= no <UnaryExpression>
+		final int PROD_UNARYEXPRESSIONNOTPLUSMINUS_NOT                            = 59;  // <UnaryExpressionNotPlusMinus> ::= not <UnaryExpression>
 		final int PROD_MULTIPLICATIVEEXPRESSION                                   = 60;  // <MultiplicativeExpression> ::= <UnaryExpression>
 		final int PROD_MULTIPLICATIVEEXPRESSION_TIMES                             = 61;  // <MultiplicativeExpression> ::= <MultiplicativeExpression> '*' <UnaryExpression>
 		final int PROD_MULTIPLICATIVEEXPRESSION_DIV                               = 62;  // <MultiplicativeExpression> ::= <MultiplicativeExpression> '/' <UnaryExpression>
@@ -343,7 +344,7 @@ public class ExprParser /*extends CodeParser*/
 		final int PROD_CONDITIONALANDEXPRESSION_AND                               = 93;  // <ConditionalAndExpression> ::= <ConditionalAndExpression> and <InclusiveOrExpression>
 		final int PROD_CONDITIONALOREXPRESSION                                    = 94;  // <ConditionalOrExpression> ::= <ConditionalAndExpression>
 		final int PROD_CONDITIONALOREXPRESSION_PIPEPIPE                           = 95;  // <ConditionalOrExpression> ::= <ConditionalOrExpression> '||' <ConditionalAndExpression>
-		final int PROD_CONDITIONALOREXPRESSION_OR                                 = 96;  // <ConditionalOrExpression> ::= <ConditionalAndExpression> or <InclusiveOrExpression>
+		final int PROD_CONDITIONALOREXPRESSION_OR                                 = 96;  // <ConditionalOrExpression> ::= <ConditionalOrExpression> or <ConditionalAndExpression>
 		final int PROD_CONDITIONALEXPRESSION                                      = 97;  // <ConditionalExpression> ::= <ConditionalOrExpression>
 		final int PROD_CONDITIONALEXPRESSION_QUESTION_COLON                       = 98;  // <ConditionalExpression> ::= <ConditionalOrExpression> '?' <Expression> ':' <ConditionalExpression>
 		final int PROD_ASSIGNMENTEXPRESSION                                       = 99;  // <AssignmentExpression> ::= <ConditionalExpression>
