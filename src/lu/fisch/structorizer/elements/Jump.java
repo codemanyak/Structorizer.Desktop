@@ -246,7 +246,7 @@ public class Jump extends Instruction {
 	protected void addFullText(StringList _lines, boolean _instructionsOnly)
 	{
 		// In a jump instruction no variables ought to be introduced - so we ignore this text on _instructionsOnly
-		if (!this.isDisabled() && !_instructionsOnly)
+		if (!this.isDisabled(false) && !_instructionsOnly)
 		{
 			// START KGU#413 2017-06-09: Enh. #416: Cope with user-inserted line breaks
 			//_lines.add(this.getText());
@@ -482,6 +482,17 @@ public class Jump extends Instruction {
 		return disabled;
 	}
 	// END KGU 2017-10-21
+
+	// START KGU#408 2021-02-26: Enh. #410 - modified Call behaviour forced to change functionality
+	/**
+	 * @return {@code false} since a Jump can never be declaratory.
+	 * @see #isMereDeclaration(String) 
+	 */
+	public boolean isMereDeclaratory()
+	{
+		return false;
+	}
+	// END KGU#408 2021-02-26
 
 	// START KGU#790 2021-01-17: Enh. #800
 	@Override

@@ -101,6 +101,8 @@ package lu.fisch.structorizer.parsers;
  *                                      Issue #851/4 Provisional implementation of SORT statement import
  *                                      Issue #851/5 Simple solution for PERFORM ... THRU ... call spans
  *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
+ *      Kay Gürtzig     2021-03-02      Bugfix #851/3: Float literals were torn apart by bugfix #485, index range
+ *                                      violation with fix file format fixed (caused by the same flawed workaround).
  *
  ******************************************************************************************************
  *
@@ -2008,7 +2010,7 @@ public class COBOLParser extends CodeParser
 //		final int PROD__ENVIRONMENT_DIVISION                                                 =  192;  // <_environment_division> ::= <_environment_header> <_configuration_section> <_input_output_section>
 //		final int PROD__ENVIRONMENT_HEADER                                                   =  193;  // <_environment_header> ::=
 //		final int PROD__ENVIRONMENT_HEADER_ENVIRONMENT_DIVISION_TOK_DOT                      =  194;  // <_environment_header> ::= ENVIRONMENT DIVISION 'TOK_DOT'
-//		final int PROD__CONFIGURATION_SECTION                                                =  195;  // <_configuration_section> ::= <_configuration_header> <_source_object_computer_paragraphs> <_special_names_paragraph> <_special_names_sentence_list> <_repository_paragraph>
+//		final int PROD__CONFIGURATION_SECTION                                                =  195;  // <_configuration_section> ::= <_configuration_header> <_source_object_computer_paragraphs> <_repository_paragraph> <_special_names_paragraph> <_special_names_sentence_list>
 //		final int PROD__CONFIGURATION_HEADER                                                 =  196;  // <_configuration_header> ::=
 //		final int PROD__CONFIGURATION_HEADER_CONFIGURATION_SECTION_TOK_DOT                   =  197;  // <_configuration_header> ::= CONFIGURATION SECTION 'TOK_DOT'
 //		final int PROD__SOURCE_OBJECT_COMPUTER_PARAGRAPHS                                    =  198;  // <_source_object_computer_paragraphs> ::=
@@ -4149,6 +4151,13 @@ public class COBOLParser extends CodeParser
 	// line length for source if source format is VARIABLE
 	private static final int TEXTCOLUMN_VARIABLE = 500;
 
+	// START KGU#946 2021-03-01: Bugfix #851/3
+	private static final Matcher LEFT_DIGIT_SEQUENCE = Pattern.compile("^(.*?\\W)?[0-9]+$").matcher("");
+	private static final Matcher RIGHT_DIGIT_SEQUENCE = Pattern.compile("^[0-9]+([eE][+-]?[0-9]+)?(\\W.*)?$").matcher("");
+	/** The decimal point surrogate used in the grammar to fix DecimalLiteral and FloatLiteral */
+	private static final String DEC_PT_SURR = "\u25AA";
+	// END KGU#946 2021-03-01
+	
 	// START KGU#473 2017-12-04: Bugfix #485
 	/** Names of all known intrinsic functions to be prefixed with "FUNCTION" for the parser */
 	private static final String[] INTRINSIC_FUNCTION_NAMES = {
@@ -4280,7 +4289,7 @@ public class COBOLParser extends CodeParser
 		private HashSet<String> privilegedFunctions = new HashSet<String>();
 		private String pendingName = null;
 
-		public String process(String line)
+		public String process(String line, boolean decimComma)
 		{
 			boolean replacementsDone = false;
 //			StreamTokenizer tokenizer = new StreamTokenizer(new StringReader(line));
@@ -4311,7 +4320,7 @@ public class COBOLParser extends CodeParser
 			StringList literals = new StringList();
 			boolean separatorsRemoved = false;
 			int parenthLevel = 0;
-			int posDelim = -1;
+			int posDelim = -1;	// position of a starting quote
 			// START KGU#672 2019-03-04: Bugfix #631 commas must not be eliminated within pic clauses
 			boolean inPic = false;
 			// END KGU#672 2019-03-04
@@ -4340,8 +4349,23 @@ public class COBOLParser extends CodeParser
 					//else if (token.equals(";") || parenthLevel == 0 && token.equals(",")) {
 					else if (token.equals(";") || parenthLevel == 0 && !inPic && token.equals(",")) {
 					// END KGU#672 2019-03-04
-						token = " ";	// Multiple spaces will be removed later
+						// START KGU#946 2021-03-01: Bugfix #851/3 Check for float literals
+						//token = " ";	// Multiple spaces will be removed later
+						//separatorsRemoved = true;
+						if (token.equals(",") && decimComma &&
+								i > 0 && LEFT_DIGIT_SEQUENCE.reset(tokens0.get(i-1)).matches() &&
+								i+1 < tokens0.count() && RIGHT_DIGIT_SEQUENCE.reset(tokens0.get(i+1)).matches()) {
+							/* We must reconcatenate the literal, use a decimal point surrogate
+							 * to protect it against TOK_DOT splitting */
+							token = tokens0.get(i-1) + DEC_PT_SURR + tokens0.get(i+1);
+							tokens.remove(tokens.count()-1);
+							tokens0.set(i+1, "");
+						}
+						else {
+							token = " ";	// Multiple spaces will be removed later
+						}
 						separatorsRemoved = true;
+						// END KGU#946 2021--03-01
 					}
 					if (token != null) {
 						tokens.add(token);
@@ -4361,6 +4385,18 @@ public class COBOLParser extends CodeParser
 			// First reconcatenate the parts lest too many separating blanks should be inserted in the end
 			tokens = StringList.explodeWithDelimiter(tokens.concatenate(), ".");
 			// END KGU#613 2018-12-13
+			// START KGU#946 2021-03-01: Bugfix #851/3 We must reconcatenate float literals
+			int posDot = -1;
+			while (!decimComma && (posDot = tokens.indexOf(".", posDot + 1)) >= 0) {
+				if (posDot >= 1 && LEFT_DIGIT_SEQUENCE.reset(tokens.get(posDot-1)).matches()
+					&& posDot+1 < tokens.count() && RIGHT_DIGIT_SEQUENCE.reset(tokens.get(posDot+1)).matches()) {
+					// We must reconcatenate the literal, use a decimal point surrogate
+					tokens.set(posDot-1, tokens.get(posDot-1) + DEC_PT_SURR + tokens.get(posDot+1));
+					tokens.remove(posDot, posDot+2);
+					replacementsDone = true;
+				}
+			}
+			// END KGU#946 2021-03-01
 			tokens = StringList.explode(tokens, "\\s+");
 			// START KGU#613 2018-12-16: Issue #631 - Previous splittings may have left empty strings
 			//if (tokens.count() == 0 || tokens.get(0).startsWith("*") || state == State.RA_END) {
@@ -4663,6 +4699,9 @@ public class COBOLParser extends CodeParser
 			if (replacementsDone || separatorsRemoved || literals.count() > 0) {
 				int leftOffs = line.indexOf(line.trim());
 				line = line.substring(0, leftOffs) + tokens.concatenate(" ");
+				// START KGU#946 2021-03-02: Bugfx #851/3: Restore decimal points
+				line = line.replace(DEC_PT_SURR, ".");
+				// END KGU#946 2021-03-02
 				// Restore temporarily substituted string literals
 				if (literals.count() > 0) {
 					tokens = StringList.explodeWithDelimiter(line, "'§STRINGLITERAL§'", true);
@@ -4902,6 +4941,9 @@ public class COBOLParser extends CodeParser
 				char firstNonSpaceInLine = srcLineCode.trim().charAt(0);
 				// word continuation
 				if (firstNonSpaceInLine != '\'' && firstNonSpaceInLine != '"') {
+					if (posAndLength.pos <= 0 || posAndLength.pos-1 > srcCode.length()) {
+						System.err.println("Wrong index");
+					}
 					srcCode.insert(posAndLength.pos - 1, srcLineCode);
 					posAndLength.pos += srcLineCode.length();
 					return;
@@ -4980,7 +5022,16 @@ public class COBOLParser extends CodeParser
 		}
 		//srcCodeLastPos += 1;   // really needed for free-form reference-format?
 		// START KGU#473 2017-12-04: Bugfix #485
-		strLine = repAuto.process(strLine);
+		// START KGU#946 2021-03-02: Bugfix #851/3 Face a possible length change by repAuto
+		//strLine = repAuto.process(strLine, decimalComma);
+		int oldLength = strLine.length();
+		strLine = repAuto.process(strLine, decimalComma);
+		int newLength = strLine.length();
+		if (oldLength != newLength) {
+			posAndLength.pos += newLength - oldLength;
+			posAndLength.length += newLength - oldLength;
+		}
+		// END KGU#946 2021-03-02
 		// END KGU#473 2017-12-04
 		srcCode.append (strLine + "\n");
 	}
@@ -5256,7 +5307,7 @@ public class COBOLParser extends CodeParser
 					_ele.setText(text + " " + resultVar);
 				};
 				_ele.setColor(Color.WHITE);
-				_ele.disabled = false;
+				_ele.setDisabled(false);
 			}
 			return true;
 		}
@@ -5341,7 +5392,7 @@ public class COBOLParser extends CodeParser
 	// END KGU#402 2019-03-07
 
 	// START KGU#847 2020-04-20: Issue #851 Mechanism to ensure sensible declarations for generated variables
-	private static final String AUX_VAR_DECL_COMMENT = "Auxiliary variables introducd by Structorizer on parsing";
+	private static final String AUX_VAR_DECL_COMMENT = "Auxiliary variables introduced by Structorizer on parsing";
 
 	/**
 	 * Prepares a declaration for varable {@code _varName} and associates
@@ -5549,7 +5600,7 @@ public class COBOLParser extends CodeParser
 
 			// add to NSD
 			Call sec = new Call(name);
-			sec.disabled = true;
+			sec.setDisabled(true);
 			_parentNode.addElement(this.equipWithSourceComment(sec, _reduction));
 			sec.getComment().insert("Definition of section " + name, 0);
 
@@ -5569,7 +5620,7 @@ public class COBOLParser extends CodeParser
 
 			// add to NSD
 			Call par = new Call(name);
-			par.disabled = true;
+			par.setDisabled(true);
 			_parentNode.addElement(this.equipWithSourceComment(par, _reduction));
 			par.getComment().insert("Definition of paragraph " + name, 0);
 
@@ -5616,7 +5667,7 @@ public class COBOLParser extends CodeParser
 				String content = this.getContent_R(_reduction, "");
 				Instruction instr = new Instruction(content);
 				instr.setColor(Color.RED);
-				instr.disabled = true;
+				instr.setDisabled(true);
 				_parentNode.addElement(this.equipWithSourceComment(instr, _reduction));
 				instr.getComment().add("This statement cannot be converted into a sensible diagram element!");
 			}
@@ -5661,7 +5712,7 @@ public class COBOLParser extends CodeParser
 			if (!this.importAccept(_reduction, _parentNode)) {
 				Instruction dummy = new Instruction(this.getContent_R(_reduction, ""));
 				dummy.setColor(Color.RED);
-				dummy.disabled = true;
+				dummy.setDisabled(true);
 				_parentNode.addElement(this.equipWithSourceComment(dummy, _reduction));
 				dummy.getComment().add(StringList.explode("An import for this kind of ACCEPT instruction is not implemented:\n"
 						+ this.getOriginalText(_reduction, ""), "\n"));
@@ -5861,7 +5912,7 @@ public class COBOLParser extends CodeParser
 				String content = this.getOriginalText(_reduction, "");
 				Instruction instr = new Instruction(content);
 				instr.setColor(Color.RED);
-				instr.disabled = true;
+				instr.setDisabled(true);
 				_parentNode.addElement(this.equipWithSourceComment(instr, _reduction));
 				instr.getComment().add("TODO: there is still no automatic conversion for this statement");
 			}
@@ -6104,7 +6155,7 @@ public class COBOLParser extends CodeParser
 		if (!built) {
 			String content = this.getContent_R(_reduction, "");
 			Instruction instr = new Instruction(content);
-			instr.disabled = true;
+			instr.setDisabled(true);
 			instr.setColor(Color.RED);
 			_parentNode.addElement(equipWithSourceComment(instr, _reduction));
 			instr.getComment().add("Import of INSPECT statements hasn't been implemented yet!");
@@ -7371,7 +7422,7 @@ public class COBOLParser extends CodeParser
 			_parentNode.insertElementAt(instr, pos);
 			Element statusEl = addStatusAssignment(_parentNode, fileDescr);
 			if (unsupportedMode) {
-				statusEl.disabled = true;
+				statusEl.setDisabled(true);
 			}
 			done = true;
 		} while (bodyRed != null);
@@ -7424,7 +7475,7 @@ public class COBOLParser extends CodeParser
 		else {
 			Instruction defective = new Instruction(this.getContent_R(_reduction, "", " "));
 			defective.setColor(Color.RED);
-			defective.disabled = true;
+			defective.setDisabled(true);
 			_parentNode.addElement(this.equipWithSourceComment(defective, _reduction));
 			defective.getComment().add("COBOL import still not implemented");
 		}
@@ -7465,7 +7516,7 @@ public class COBOLParser extends CodeParser
 		else {
 			Instruction defective = new Instruction(this.getContent_R(_reduction, "", " "));
 			defective.setColor(Color.RED);
-			defective.disabled = true;
+			defective.setDisabled(true);
 			_parentNode.addElement(this.equipWithSourceComment(defective, _reduction));
 			defective.getComment().add("COBOL import still not implemented");
 		}
@@ -7508,7 +7559,7 @@ public class COBOLParser extends CodeParser
 		else {
 			Instruction defective = new Instruction(this.getContent_R(_reduction, "", " "));
 			defective.setColor(Color.RED);
-			defective.disabled = true;
+			defective.setDisabled(true);
 			this.equipWithSourceComment(defective, _reduction);
 			defective.getComment().add("COBOL import still not implemented");
 			_parentNode.addElement(defective);
@@ -7570,7 +7621,7 @@ public class COBOLParser extends CodeParser
 		else {
 			Instruction defective = new Instruction(this.getContent_R(_reduction, "", " "));
 			defective.setColor(Color.RED);
-			defective.disabled = true;
+			defective.setDisabled(true);
 			this.equipWithSourceComment(defective, _reduction);
 			defective.getComment().add("COBOL import still not implemented");
 			_parentNode.addElement(defective);
@@ -7632,7 +7683,7 @@ public class COBOLParser extends CodeParser
 			}
 			if (color != null) {
 				jmp.setColor(color);
-				jmp.disabled = true;
+				jmp.setDisabled(true);
 			}
 			_parentNode.addElement(jmp);
 			// START KGU#464 201-12-04: Bugfix #475
@@ -7754,7 +7805,7 @@ public class COBOLParser extends CodeParser
 					else {
 						Instruction defective = new Instruction(this.getContent_R(_reduction, ""));
 						defective.setColor(Color.RED);
-						defective.disabled = true;
+						defective.setDisabled(true);
 						_parentNode.addElement(this.equipWithSourceComment(defective, _reduction));
 					}
 				}
@@ -9786,7 +9837,7 @@ public class COBOLParser extends CodeParser
 					Element doomedEl = null;
 					if (callIndex > 0 && (doomedEl = sq.getElement(callIndex-1)) instanceof Call) {
 						// Get rid of the dummy Call now
-						if (doomedEl.disabled && doomedEl.getText().getLongString().equalsIgnoreCase(sop.name)) {
+						if (doomedEl.isDisabled(true) && doomedEl.getText().getLongString().equalsIgnoreCase(sop.name)) {
 							replacingCall.setComment(doomedEl.getComment());
 							//System.out.println("=== Cleanup Call: " + sq.getElement(callIndex-1));
 							sq.removeElement(callIndex-1);
@@ -9833,7 +9884,7 @@ public class COBOLParser extends CodeParser
 						}
 						// END KGU#849 2020-04-20
 						client.setColor(colorMisc);	// No longer needs to be red
-						client.disabled = false;
+						client.setDisabled(false);
 					}
 					// At the original place we most likely won't need the Call anymore (not reachable).
 					if (!sq.isReachable(sop.startsAt, false)) {
@@ -9849,7 +9900,7 @@ public class COBOLParser extends CodeParser
 					Jump dummyJump = (Jump)firstElement;
 					// Cleanup if the content is just a dummy jump and it is preceded by a real jump and a dummy call
 					// both being un-reachable; then we will drop the two dummy elements now
-					if (startIndex > 0 && dummyJump.disabled && dummyJump.getText().getLongString().startsWith("(") && (dummyCall = sq.getElement(startIndex-1)) instanceof Call) {
+					if (startIndex > 0 && dummyJump.isDisabled(true) && dummyJump.getText().getLongString().startsWith("(") && (dummyCall = sq.getElement(startIndex-1)) instanceof Call) {
 						if (dummyCall.getText().getLongString().equalsIgnoreCase(sop.name)) {
 							if (!sq.isReachable(startIndex-1, false)) {
 								//System.out.println("=== Cleanup Jump: " + sq.getElement(ix));
@@ -9883,7 +9934,7 @@ public class COBOLParser extends CodeParser
 			else if (clients != null) {
 				for (Call client: clients) {
 					client.getComment().add("The called " + (sop.isSection ? "section" : "paragraph") + " seems to be empty, corrupt, or vanished.");
-					client.disabled = true;
+					client.setDisabled(true);
 				}
 			}
 			// END KGU#478 2017-12-10

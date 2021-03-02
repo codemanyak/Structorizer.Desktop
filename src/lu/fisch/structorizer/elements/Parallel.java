@@ -689,7 +689,7 @@ public class Parallel extends Element
 //		{
 //			_lines.add(this.getText());
 //		}
-    	if (qs!= null && !this.isDisabled())
+    	if (qs!= null && !this.isDisabled(false))
     	{
     		for (int i = 0; i < qs.size(); i++)
     		{
@@ -746,8 +746,9 @@ public class Parallel extends Element
 	 */
 	public boolean mayPassControl()
 	{
-		// A Case selection may only pass control if being disabled or containing only
-		// passable branches.
+		/* A Parallel section is only guaranteed to pass control if being disabled
+		 * or containing only passable branches.
+		 */
 		boolean mayPass = disabled;
 		if (!mayPass) {
 			mayPass = true;

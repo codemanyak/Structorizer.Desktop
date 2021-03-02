@@ -1344,6 +1344,16 @@ public class Mainform  extends LangFrame implements NSDController, IRoutinePoolL
 	 */
 	public void popupWelcomePane()
 	{
+		// START KGU#941 2021-02-24: Issue #944
+		String javaVersion = System.getProperty("java.version");
+		int javaMajor = 1;
+		if (javaVersion != null && javaVersion.indexOf(".") > 0) {
+			try {
+				javaMajor = Integer.parseInt(javaVersion.substring(0, javaVersion.indexOf(".")));
+			}
+			catch (NumberFormatException e) {}
+		}
+		// END KGU#941 2021-02-24
 		// START KGU#456 2017-11-06: Enh. #452
 		//if (!Ini.getInstance().getProperty("retrieveVersion", "false").equals("true")) {
 		if (this.isNew) {
@@ -1437,12 +1447,30 @@ public class Mainform  extends LangFrame implements NSDController, IRoutinePoolL
 			}
 		}
 		// END KGU#906 2021-01-18
+		// START KGU#941 2021-02-24: Issue #944: Temporary update hint
+		else if (javaMajor < 11
+				&& (this.suppressUpdateHint.isEmpty() || this.suppressUpdateHint.compareTo(Element.E_VERSION) < 0)
+				&& !System.getProperty("os.name").toLowerCase().startsWith("mac os x")) {
+			if (menu != null) {
+				String message = Menu.msgJavaUpgradeHint_3_30_18.getText();
+				if (Ini.getInstallDirectory().getAbsolutePath().endsWith("webstart")) {
+					message += Menu.msgJavaUpgradeHint_3_30_18a.getText();
+				}
+				JOptionPane.showMessageDialog(this,
+						message,
+						Element.E_VERSION,
+						JOptionPane.INFORMATION_MESSAGE,
+						IconLoader.getIconImage("078_java.png", 2.0));
+				this.suppressUpdateHint = Element.E_VERSION;
+			}
+		}
+		// END KGU#941 2021-02-24
 		else if (!Ini.getInstance().getProperty("retrieveVersion", "false").equals("true")) {
-			// END KGU#456 2017-11-06
+		// END KGU#456 2017-11-06
 			// START KGU#532 2018-06-25: In a webstart environment the message doesn't make sense
 			//if (!Element.E_VERSION.equals(this.suppressUpdateHint)) {
 			if (!isAutoUpdating && !Element.E_VERSION.equals(this.suppressUpdateHint)) {    	    		
-				// END KGU#532 2018-06-25
+			// END KGU#532 2018-06-25
 				int chosen = JOptionPane.showOptionDialog(this,
 						Menu.msgUpdateInfoHint.getText().replace("%1", this.menu.menuPreferences.getText()).replace("%2", this.menu.menuPreferencesNotifyUpdate.getText()),
 						Menu.lblHint.getText(),
@@ -1526,12 +1554,14 @@ public class Mainform  extends LangFrame implements NSDController, IRoutinePoolL
 	@Override
 	public void routinePoolChanged(IRoutinePool _source, int _flags) {
 		if (_source instanceof Arranger && this.editor != null) {
-			if ((_flags & IRoutinePoolListener.RPC_POOL_CHANGED) != 0) {
+			if ((_flags & (IRoutinePoolListener.RPC_POOL_CHANGED | IRoutinePoolListener.RPC_NAME_CHANGED)) != 0) {
 				// START KGU#626 2019-01-01: Enh. #657
 				//this.editor.updateArrangerIndex(Arranger.getSortedRoots());
 				this.editor.updateArrangerIndex(Arranger.getSortedGroups());
 				// END KGU#626 2019-01-01
-			} else if ((_flags & (IRoutinePoolListener.RPC_POSITIONS_CHANGED | IRoutinePoolListener.RPC_GROUP_COLOR_CHANGED)) != 0) {
+			} else if ((_flags & (IRoutinePoolListener.RPC_POSITIONS_CHANGED
+					| IRoutinePoolListener.RPC_STATUS_CHANGED
+					| IRoutinePoolListener.RPC_GROUP_COLOR_CHANGED)) != 0) {
 				this.editor.repaintArrangerIndex();
 			}
 			// START KGU#701 2019-03-30: Issue #718
