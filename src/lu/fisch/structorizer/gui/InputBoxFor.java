@@ -89,9 +89,9 @@ import javax.swing.UIManager;
 
 import lu.fisch.structorizer.elements.Element;
 import lu.fisch.structorizer.elements.For;
-import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.io.Ini;
 import lu.fisch.structorizer.locales.LangTextHolder;
+import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.StringList;
 
@@ -711,7 +711,7 @@ public class InputBoxFor extends InputBox implements ItemListener {
 			txtParserInfo.setText(msgMissingBrace1.getText());
 			// END KGU#247 2016-09-23
 		}
-		else if (Function.isFunction(forInValueList))
+		else if (Function.isFunction(forInValueList, false))
 		{
 			// START KGU#410 2017-07-01: Enh. #413 - for the split function we know that it returns an array
 			Function fct = new Function(forInValueList);

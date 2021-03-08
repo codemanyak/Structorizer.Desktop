@@ -18,7 +18,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package lu.fisch.structorizer.executor;
+package lu.fisch.structorizer.syntax;
 
 /******************************************************************************************************
  *
@@ -43,6 +43,7 @@ package lu.fisch.structorizer.executor;
  *      Kay Gürtzig     2020-11-01      Issue #800: Moved testIdentifier to Syntax and countChar to BString,
  *                                      indentation aligned
  *      Kay Gürtzig     2020-11-02      Issue #800: Completely revised, now using Syntax and Expression
+ *      Kay Gürtzig     2021-03-05      Bugfix #961: Method isFunction() extended (for method tests)
  *
  ******************************************************************************************************
  *
@@ -54,10 +55,10 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
 
-import lu.fisch.structorizer.syntax.Expression;
-import lu.fisch.structorizer.syntax.Syntax;
-import lu.fisch.structorizer.syntax.SyntaxException;
-import lu.fisch.structorizer.syntax.Type;
+//import lu.fisch.structorizer.syntax.Expression;
+//import lu.fisch.structorizer.syntax.Syntax;
+//import lu.fisch.structorizer.syntax.SyntaxException;
+//import lu.fisch.structorizer.syntax.Type;
 import lu.fisch.utils.StringList;
 
 /**
@@ -135,6 +136,15 @@ public class Function
 	private Expression expr = null;			// The parsed input string
 	// END KGU#790 2020-11-02
 
+	/**
+	 * Parses the expression held in string {@code exp} and tries to bild a
+	 * Function object from it. The resulting object can be asked if it
+	 * actually represents a valid function (or method) invocation.
+	 * @param exp - a linearised expression in Structorizer syntax as string
+	 * @see #Function(Expression)
+	 * @see #isFunction()
+	 * @see #isMethod()
+	 */
 	public Function(String exp)
 	{
 		this.str = exp.trim();
@@ -179,7 +189,7 @@ public class Function
 		try {
 			LinkedList<Expression> exprs = Expression.parse(tokens, null, (short)0);
 			if (exprs.size() == 1) {
-				if (isFunction(exprs.get(0))) {
+				if (isFunction(exprs.get(0), true)) {
 					expr = exprs.get(0);
 				}
 			}
@@ -199,7 +209,7 @@ public class Function
 	public Function(Expression expr)
 	{
 		this.str = expr.toString();
-		if (isFunction(expr)) {
+		if (isFunction(expr, true)) {
 			this.expr = expr;
 		}
 	}
@@ -257,12 +267,20 @@ public class Function
 	 * call syntax.
 	 * @param expr - an {@link Expression} to be checked for method
 	 * or function call syntax.
-	 * @return {@code true} if this is either a method or function call
-	 * @see #isFunction(String)
+	 * @param acceptQualifiers - whether a qualified name (i.e an explicit method call)
+	 *  is okay
+	 * * @return {@code true} if this is either a method or function call
+	 * @see #isFunction(String, boolean)
 	 */
-	public static boolean isFunction(Expression expr)
+	// START KGU#959 2021-03-05: Issue #961 We need a possibility to detect method calls
+	//public static boolean isFunction(Expression expr)
+	public static boolean isFunction(Expression expr, boolean acceptQualifiers)
+	// END KGU#959 2021-03-05
 	{
-		return expr.isFunctionCall() || expr.isMethodCall();
+		// START KGU#959 2021-03-05: Issue #961 We need a possibility to detect method calls
+		//return expr.isFunctionCall() || expr.isMethodCall();
+		return expr.isFunctionCall() || acceptQualifiers && expr.isMethodCall();
+		// END KGU#959 2021-03-05
 	}
 	// END KGU#790 2020-11-02
 
@@ -270,13 +288,18 @@ public class Function
 	// START KGU#332 2017-01-29: Enh. #335
 	/**
 	 * Tests whether the passed-in expression string {@code expr} may represent a
-	 * routine or method call, i.e., consists of an identifier or component access
+	 * routine (or method) call, i.e., consists of an identifier or component access
 	 * followed by a parenthesized comma-separated list of argument expressions.
 	 * @param expr - an expression as string
+	 * @param acceptQualifiers - whether a qualified name (i.e an explicit method call)
+	 *  is okay
 	 * @return {@code true} if the expression has got function or method call syntax
-	 * @see #isFunction(Expression)
+	 * @see #isFunction(Expression, boolean)
 	 */
-	public static boolean isFunction(String expr)
+	// START KGU#959 2021-03-05: Issue #961 We need a possibility to detect method calls
+	//public static boolean isFunction(String expr)
+	public static boolean isFunction(String expr, boolean acceptQualifiers)
+	// END KGU#959 2021-03-05
 	{
 		// START KGU#790 2020-11-02: Issue #800 Completely revised
 //		expr = expr.trim();
@@ -309,7 +332,9 @@ public class Function
 			exprs = Expression.parse(tokens, null, (short)0);
 		} catch (SyntaxException exc) {}
 		if (exprs != null && exprs.size() == 1) {
-			return isFunction(exprs.getFirst());
+			// START KGU#959 2021-03-05: Issue #961 We need a possibility to detect method calls
+			return isFunction(exprs.getFirst(), acceptQualifiers);
+			// END KGU#959 2021-03-05
 		}
 		return false;
 		// END KGU#790 2020-11-02

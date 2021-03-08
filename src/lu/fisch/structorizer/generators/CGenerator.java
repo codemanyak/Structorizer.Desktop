@@ -189,7 +189,7 @@ import java.util.logging.Level;
 import lu.fisch.utils.*;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.structorizer.elements.*;
-import lu.fisch.structorizer.executor.Function;
+import lu.fisch.structorizer.syntax.Function;
 
 public class CGenerator extends Generator {
 

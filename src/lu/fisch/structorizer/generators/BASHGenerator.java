@@ -196,8 +196,8 @@ import lu.fisch.structorizer.elements.Subqueue;
 import lu.fisch.structorizer.elements.TypeMapEntry;
 import lu.fisch.structorizer.elements.While;
 import lu.fisch.structorizer.executor.Executor;
-import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
+import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.StringList;
 
@@ -896,7 +896,7 @@ public class BASHGenerator extends Generator {
 	}
 	protected String transformExpression(String expr, boolean isAssigned, boolean asArgument)
 	{
-		if (Function.isFunction(expr)) {
+		if (Function.isFunction(expr, false)) {
 			// It cannot be a diagram call here, so it must be some built-in function
 			expr = this.transformExpression(new Function(expr));
 			if (isAssigned || asArgument) {

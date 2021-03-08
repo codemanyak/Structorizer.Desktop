@@ -206,12 +206,12 @@ import lu.fisch.structorizer.elements.TypeMapEntry;
 import lu.fisch.structorizer.elements.While;
 import lu.fisch.structorizer.executor.Control;
 import lu.fisch.structorizer.executor.Executor;
-import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.helpers.IPluginClass;
 import lu.fisch.structorizer.io.Ini;
 import lu.fisch.structorizer.io.LicFilter;
 import lu.fisch.structorizer.syntax.Expression;
 import lu.fisch.structorizer.syntax.Expression.Operator;
+import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.structorizer.syntax.Line;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.BString;
@@ -2342,7 +2342,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	{
 		String valueList = _for.getValueList();
 		StringList items = null;
-		boolean isComplexObject = Function.isFunction(valueList) || this.varNames.contains(valueList);
+		boolean isComplexObject = Function.isFunction(valueList, false) || this.varNames.contains(valueList);
 		if (valueList.startsWith("{") && valueList.endsWith("}"))
 		{
 			items = Element.splitExpressionList(valueList.substring(1, valueList.length()-1), ",");

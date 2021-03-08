@@ -250,9 +250,9 @@ import lu.fisch.structorizer.locales.LangTextHolder;
 import lu.fisch.structorizer.locales.Locales;
 import lu.fisch.structorizer.archivar.IRoutinePool;
 import lu.fisch.structorizer.arranger.Arranger;
-import lu.fisch.structorizer.executor.Function;
 //import lu.fisch.structorizer.generators.Generator;
 import lu.fisch.structorizer.gui.*;
+import lu.fisch.structorizer.syntax.Function;
 
 /**
  * This class represents the "root" of a diagram or the program/sub itself.
@@ -4237,7 +4237,7 @@ public class Root extends Element {
 	private void analyse_15(Call ele, Vector<DetectedError> _errors)
 	{
 		// START KGU#376 2017-04-11: Enh. #389 - new call type / undone 2017-07-01
-		if (!ele.isProcedureCall() && !ele.isFunctionCall())
+		if (!ele.isProcedureCall(false) && !ele.isFunctionCall(false))
 		//if (!ele.isProcedureCall() && !ele.isFunctionCall() && !ele.isImportCall())
 		// END KGU#376 2017-04-11
 		{

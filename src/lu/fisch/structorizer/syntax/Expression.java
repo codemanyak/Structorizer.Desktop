@@ -56,7 +56,6 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.NoSuchElementException;
 
-import lu.fisch.structorizer.executor.Function;
 import lu.fisch.utils.StringList;
 
 /**

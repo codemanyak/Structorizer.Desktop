@@ -128,6 +128,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2021-02-03      Issue #920: Highlighting and tokenizing support for "Infinity" and '∞'
  *      Kay Gürtzig     2021-02-04      Enh. #905, #926: Improved drawing of Analyser flags and backlink support
  *      Kay Gürtzig     2021-02-24      Enh. #410: "?" added as lexical delimiter and operator symbol
+ *      Kay Gürtzig     2021-03-03      Issue #954: Modified breakpoint behaviour
  *
  ******************************************************************************************************
  *
@@ -223,10 +224,10 @@ import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.structorizer.syntax.SyntaxException;
 import lu.fisch.structorizer.syntax.TypeRegistry;
 import lu.fisch.structorizer.executor.Executor;
-import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
 import lu.fisch.structorizer.io.*;
+import lu.fisch.structorizer.syntax.Function;
 
 import java.awt.Point;
 import java.awt.Polygon;
@@ -300,7 +301,7 @@ public abstract class Element {
 	public static final long E_HELP_FILE_SIZE = 10700000;
 	public static final String E_DOWNLOAD_PAGE = "https://www.fisch.lu/Php/download.php";
 	// END KGU#791 2020-01-20
-	public static final String E_VERSION = "3.31-01";
+	public static final String E_VERSION = "3.31-02";
 	public static final String E_THANKS =
 	"Developed and maintained by\n"+
 	" - Robert Fisch <robert.fisch@education.lu>\n"+
@@ -515,6 +516,11 @@ public abstract class Element {
 	/** Is the replacement of DiagramController aliases active? */
 	public static boolean E_APPLY_ALIASES = false;
 	// END KGU#480 2018-01-21
+	// START KGU#952 2021-03-03: Issue #954 - Allow temporarily to ignore all breakpoints
+	/** Controls the validity of existing breakpoints */
+	public static boolean E_BREAKPOINTS_ENABLED = true;
+	// END KGU#952 2021-03-03
+
 
 	// some colors
 	// START KGU#245 2018-02-07
@@ -2075,6 +2081,11 @@ public abstract class Element {
 	 */
 	public boolean triggersBreakNow()
 	{
+		// START KGU#952 2021-03-03: Issue #954 Breakpoints may be generally disabled
+		if (!E_BREAKPOINTS_ENABLED) {
+			return false;
+		}
+		// END KGU#952 2021-03-03
 		int trigger =  this.getBreakTriggerCount();
 		return this.breakpoint && (trigger == 0 || Element.E_COLLECTRUNTIMEDATA && trigger == this.getExecCount()+1);
 	}
@@ -3300,7 +3311,7 @@ public abstract class Element {
 			// END KGU#388 2017-07-12
 		}
 		// Otherwise check if it's a built-in function with unambiguous type
-		else if (Function.isFunction(expr)) {
+		else if (Function.isFunction(expr, false)) {
 			typeSpec = (new Function(expr).getResultType(""));
 		}
 		// START KGU#782 2019-12-02 For certain purposes, e.g. export of FOR-IN loops char detection may be essential

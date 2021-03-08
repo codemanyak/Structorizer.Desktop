@@ -112,7 +112,6 @@ import lu.fisch.structorizer.archivar.IRoutinePoolListener;
 import lu.fisch.structorizer.elements.Call;
 import lu.fisch.structorizer.elements.Element;
 import lu.fisch.structorizer.elements.Root;
-import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.gui.ColorButton;
 import lu.fisch.structorizer.gui.Diagram;
 import lu.fisch.structorizer.gui.GUIScaler;
@@ -124,6 +123,7 @@ import lu.fisch.structorizer.locales.LangEventListener;
 import lu.fisch.structorizer.locales.LangTextHolder;
 import lu.fisch.structorizer.locales.LangTree;
 import lu.fisch.structorizer.parsers.GENParser;
+import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.utils.StringList;
 
 /**

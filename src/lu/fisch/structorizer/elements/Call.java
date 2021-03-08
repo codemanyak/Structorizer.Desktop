@@ -106,9 +106,9 @@ import lu.fisch.graphics.*;
 import lu.fisch.utils.*;
 import lu.fisch.structorizer.archivar.IRoutinePool;
 import lu.fisch.structorizer.arranger.Arranger;
-import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
+import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.structorizer.syntax.Line;
 
 public class Call extends Instruction {
@@ -329,8 +329,8 @@ public class Call extends Instruction {
 	 * <li> {@code null} otherwise.</li>
 	 * <ul>
 	 * @return Function object or {@code null}.
-	 * @see #isFunctionCall()
-	 * @see #isProcedureCall()
+	 * @see #isFunctionCall(boolean)
+	 * @see #isProcedureCall(boolean)
 	 */
 	@Override
 	public Function getCalledRoutine()

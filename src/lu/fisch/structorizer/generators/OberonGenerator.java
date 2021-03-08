@@ -127,8 +127,8 @@ import java.util.regex.Matcher;
 import lu.fisch.utils.*;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.structorizer.elements.*;
-import lu.fisch.structorizer.executor.Function;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
+import lu.fisch.structorizer.syntax.Function;
 
 public class OberonGenerator extends Generator {
 	
@@ -1189,7 +1189,7 @@ public class OberonGenerator extends Generator {
 			String valueList = _for.getValueList();
 			// Fortunately, there is a predefined function LEN in Oberon that makes it possible
 			// to convert this in to a COUNTER loop. We just need a generic index variable
-			if (Function.isFunction(valueList))
+			if (Function.isFunction(valueList, false))
 			{
 				// For performance reasons, it wouldn't be so good an idea to call the function all the way again
 				this.insertDeclaration("VAR", arrayName + ": ARRAY OF " + itemType + ";", _indent.length());

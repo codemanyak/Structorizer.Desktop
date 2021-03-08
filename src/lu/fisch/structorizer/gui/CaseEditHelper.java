@@ -52,7 +52,7 @@ import bsh.Interpreter;
 import lu.fisch.structorizer.elements.Element;
 import lu.fisch.structorizer.elements.Root;
 import lu.fisch.structorizer.elements.TypeMapEntry;
-import lu.fisch.structorizer.executor.Function;
+import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.StringList;
 
@@ -147,7 +147,7 @@ public class CaseEditHelper {
 				catch (EvalError exc) {}
 			}
 		}
-		else if (Function.isFunction(expr)) {
+		else if (Function.isFunction(expr, false)) {
 			try {
 				// Might help - if not: there is a next try
 				value = interpreter.eval("Math." + expr + ";");

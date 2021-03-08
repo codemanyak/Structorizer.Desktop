@@ -379,6 +379,7 @@ import lu.fisch.structorizer.elements.*;
 import lu.fisch.structorizer.gui.Diagram;
 import lu.fisch.structorizer.gui.IconLoader;
 import lu.fisch.structorizer.gui.Menu;
+import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.structorizer.syntax.Syntax;
 //import lu.fisch.structorizer.syntax.ExprParser;
 import lu.fisch.utils.BString;

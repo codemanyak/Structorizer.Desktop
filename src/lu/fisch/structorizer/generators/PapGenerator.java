@@ -74,7 +74,7 @@ import lu.fisch.structorizer.elements.Root;
 import lu.fisch.structorizer.elements.Subqueue;
 import lu.fisch.structorizer.elements.Try;
 import lu.fisch.structorizer.elements.While;
-import lu.fisch.structorizer.executor.Function;
+import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.BString;
 import lu.fisch.utils.StringList;
