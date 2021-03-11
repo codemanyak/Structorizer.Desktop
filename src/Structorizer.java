@@ -119,10 +119,10 @@ import java.util.logging.Logger;
 import javax.swing.JOptionPane;
 import javax.swing.UIManager;
 
-//import com.formdev.flatlaf.FlatDarculaLaf;
-//import com.formdev.flatlaf.FlatDarkLaf;
-//import com.formdev.flatlaf.FlatIntelliJLaf;
-//import com.formdev.flatlaf.FlatLightLaf;
+import com.formdev.flatlaf.FlatDarculaLaf;
+import com.formdev.flatlaf.FlatDarkLaf;
+import com.formdev.flatlaf.FlatIntelliJLaf;
+import com.formdev.flatlaf.FlatLightLaf;
 
 //import lu.fisch.structorizer.application.ApplicationFactory;
 import lu.fisch.structorizer.archivar.Archivar;
@@ -361,11 +361,11 @@ public class Structorizer
 		System.setProperty("sun.java2d.noddraw", "true");
 		// END KGU#521 2018-06-12
 
-		// START KGU#966 2021-03-10: Issue #966 Additional L&F (experimental)
-//		FlatLightLaf.installLafInfo();
-//		FlatDarkLaf.installLafInfo();
-//		FlatDarculaLaf.installLafInfo();
-//		FlatIntelliJLaf.installLafInfo();
+		// START KGU#966 2021-03-10: Issue #966 Additional L&Fs (experimental)
+		FlatLightLaf.installLafInfo();
+		FlatIntelliJLaf.installLafInfo();
+		FlatDarkLaf.installLafInfo();
+		FlatDarculaLaf.installLafInfo();
 		// END KGU#966 2021-03-10
 		
 		// try to load the system Look & Feel

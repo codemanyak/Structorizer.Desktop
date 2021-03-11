@@ -378,6 +378,9 @@ public abstract class Element {
 	"\n"+
 	"Command interpreter provided by\n"+
 	" - Pat Niemeyer <pat@pat.net>\n"+
+	"\n"+
+	"FlatLaf 1.0 provided by\n"+
+	" - FormDev GmbH <https://www.formdev.com/flatlaf>\n"+
 	"";
 	public final static String E_CHANGELOG = "";
 
