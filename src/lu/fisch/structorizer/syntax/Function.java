@@ -44,6 +44,7 @@ package lu.fisch.structorizer.syntax;
  *                                      indentation aligned
  *      Kay Gürtzig     2020-11-02      Issue #800: Completely revised, now using Syntax and Expression
  *      Kay Gürtzig     2021-03-05      Bugfix #961: Method isFunction() extended (for method tests)
+ *      Kay Gürtzig     2021-06-06      sgn function added to knownResultTypes
  *
  ******************************************************************************************************
  *
@@ -75,6 +76,7 @@ public class Function
 		//knownResultTypes.put("abs#1", "numeric");
 		//knownResultTypes.put("max#2", "numeric");
 		//knownResultTypes.put("min#2", "numeric");
+		knownResultTypes.put("sgn#1", "int");
 		knownResultTypes.put("round#1", "int");
 		knownResultTypes.put("ceil#1", "double");
 		knownResultTypes.put("floor#1", "double");

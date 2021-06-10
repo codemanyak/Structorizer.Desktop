@@ -478,8 +478,8 @@ Menu.msgErrorSettingLaF.text=Problem beim Wechsel von Aussehen & Bedienung zu %1
 Menu.msgRootCloned.text=Diagramm «%1» wurde geklont.\n\nSie arbeiten jetzt mit einer unabhängigen Kopie:\n%2
 Menu.msgAnalyserHint_3_30_14.text=Neue Symbole in manchen Elementen\nmachen jetzt darauf aufmerksam,\ndass Analyser-Warnungen\nfür diese Elemente vorliegen.\n\nSie können die Anzeige abschalten über:\n%
 Menu.msgVersionHint_3_30_15.text=Dieser neu entworfene Editor für @c-Elemente\nist optional.\nEr kann den Zusammenhang zwischen\nFall-Listen und den zugehörigen Zweigen\nbeim Umordnen bewahren.\n\nWenn Sie den traditionellen Elementeditor\nbevorzugen, dann können Sie das Häkchen bei\n"%1"\nin den %2 entfernen.
-Menu.msgJavaUpgradeHint_3_30_18.text=Die Structorizer-Entwickler haben vor, die Kombatibilität zu Java 8\ngegen Mitte 2021 aufzugeben und die Code-Basis zu erneuern, wodurch wenigstens\neine Java-11-VM vorausgesetzt wird.\nStructorizer läuft bereits jetzt auch auf Java 11+, but zukünftige Versionen\nwerden nicht länger auf veralteten Java-Umgebungen < 11 ausführbar sein. Dabei\nspielt es keine Rolle, ob Oracle Java oder ein OpenJDK verwendet wird.
-Menu.msgJavaUpgradeHint_3_30_18a.text=\nBeachte, dass die Untertützung von Java WebStart offiziell mit Java endete,\nes gibt aber äquivalente Alternativen wie Open Webstart (https://openwebstart.com),\nfalls du an der JNLP-Verteilung von Structorizer festhalten magst.
+Menu.msgJavaUpgradeHint_3_30_18.text=Die Structorizer-Entwickler haben vor, die Kombatibilität zu Java 8\ngegen Mitte 2021 aufzugeben und die Code-Basis zu erneuern, wodurch wenigstens\neine Java-11-VM vorausgesetzt wird.\nStructorizer läuft bereits jetzt auch auf Java 11+, aber zukünftige Versionen\nwerden nicht länger auf veralteten Java-Umgebungen < 11 ausführbar sein. Dabei\nspielt es keine Rolle, ob Oracle Java oder ein OpenJDK verwendet wird.
+Menu.msgJavaUpgradeHint_3_30_18a.text=\nBeachte, dass die Unterstützung von Java WebStart offiziell mit Java endete,\nes gibt aber äquivalente Alternativen wie Open Webstart (https://openwebstart.com),\nfalls du an der JNLP-Verteilung von Structorizer festhalten magst.
 // Table column headers for DiagramControllerAliases
 Menu.msgTabHdrSignature.text=Routinensignatur
 Menu.msgTabHdrAlias.text=Alias (Ersatzname)
@@ -1097,7 +1097,6 @@ ExportOptionDialoge.noConversionCheckBox.text=Keine Umwandlung der Elementinhalt
 ExportOptionDialoge.noConversionCheckBox.tooltip=Aktivieren Sie diese Option, wenn Ihre Struktogrammtexte bereits in der Zielsprache formuliert sind.
 ExportOptionDialoge.commentsCheckBox.text=Anweisungen als Kommentare exportieren.
 ExportOptionDialoge.bracesCheckBox.text=Öffnende Blockklammern ans Ende der Zeile (C/C++/Java etc.).
-ExportOptionDialoge.lineNumbersCheckBox.text=Zeilennummern mitgenerieren (BASIC).
 ExportOptionDialoge.chkExportSubroutines.text=Aufgerufene Unterprogramme mit exportieren.
 ExportOptionDialoge.chkExportLicenseInfo.text=Autorenschafts- and Lizenzattribute exportieren.
 ExportOptionDialoge.lbPrefGenerator.text=Bevorzugte Code-Export-Sprache:
@@ -1199,6 +1198,15 @@ PluginOptionDialog.optionComponents.use_WINAPI_defines.text[getPluginKey():C99Pa
 PluginOptionDialog.optionComponents.use_WINAPI_defines.tooltip[getPluginKey():C99Parser]=Aktivieren, falls die Quelldatei viele Bezüge auf Typnamen oder bloße Kennzeichnungen der WINAPI enthält (wie z.B. "WINAPI").
 PluginOptionDialog.optionComponents.use_MinGw_defines.text[getPluginKey():C99Parser]=Namen und Typen von MinGw benutzt
 PluginOptionDialog.optionComponents.use_MinGw_defines.tooltip[getPluginKey():C99Parser]=Aktivieren, falls die Quelldatei viele Bezüge auf Typnamen oder bloße Kennzeichnungen von MinGw enthält.
+PluginOptionDialog.optionComponents.lineNumbering.text=Zeilennummern mitgenerieren.
+PluginOptionDialog.optionComponents.lineNumbering.tooltip[getPluginKey():BasGenerator]=Diese Option ändert zugleich die gesamte Syntax hin zu Vintage-BASIC.
+PluginOptionDialog.optionComponents.lineNumbering.tooltip[getPluginKey():COBOLGenerator]=Diese Option nummeriert die exportierten Code-Zeilen fortlaufend.
+PluginOptionDialog.optionLabels.numberingInterval.text=Intervall für Zeilennummerierung
+PluginOptionDialog.optionComponents.numberingInterval.tooltip=Sowiet durch Package unterstützt: 0 für aus, 1 für jede Zeile, n für jede n-te Zeile
+PluginOptionDialog.optionLabels.package.text=Zu verwendendes LaTeX-Package
+PluginOptionDialog.optionComponents.package.tooltip=Bitte bevorzugtes Algorithmen-Package auswählen
+PluginOptionDialog.optionComponents.appendSemicolon.text=Anweisungen mit Semikolon abschließen
+PluginOptionDialog.optionComponents.appendSemicolon.tooltip=Falls aktiviert, wird hinter jede Anweisung ein ';' angefügt.
 
 -----[ ElementNamePreferences ]-----
 ElementNamePreferences.title=Elementnamen einstellen
