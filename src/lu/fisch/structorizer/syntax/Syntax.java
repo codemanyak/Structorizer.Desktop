@@ -808,13 +808,16 @@ public class Syntax {
 
 	// START KGU#18/KGU#23 2015-10-24 intermediate transformation added and decomposed
 	/**
-	 * Converts the operator symbols accepted by Structorizer into Java operators:
-	 * - Assignment:		"<-"
-	 * - Comparison:		"==", "<", ">", "<=", ">=", "!="
-	 * - Logic:				"&&", "||", "!", "^"
-	 * - Arithmetics:		"div" and usual Java operators (e.g. "mod" -> "%")
+	 * Converts the operator symbols accepted by Structorizer into mostly Java operators:
+	 * <ul>
+	 * <li>Assignment:	"<-"</li>
+	 * <li>Comparison:	"==", "<", ">", "<=", ">=", "!="</li>
+	 * <li>Logic:		"&&", "||", "!", "^"</li>
+	 * <li>Arithmetics:	"div", "&infin;", and usual Java operators (e.g. "mod" -> "%")</li>
+	 * </ul>
 	 * @param _expression - an Element's text in practically unknown syntax
-	 * @return an equivalent of the _expression String with replaced operators
+	 * @return an equivalent of the {@code _expression} String with replaced operators
+	 * @see #unifyOperators(StringList, boolean)
 	 */
 	public static String unifyOperators(String _expression)
 	{
@@ -831,13 +834,14 @@ public class Syntax {
 	 * Converts the operator symbols accepted by Structorizer into intermediate operators
 	 * (mostly Java operators):
 	 * <ul>
-	 * <li>Assignment:		"<-"</li>
-	 * <li>Comparison*:		"==", "<", ">", "<=", ">=", "!="</li>
-	 * <li>Logic*:			"&&", "||", "!", "^"</li>
-	 * <li>Arithmetics*:	"div", "&infin;", and usual Java operators (e. g. "mod" -> "%")</li>
+	 * <li>Assignment:	"<-"</li>
+	 * <li>Comparison:	"==", "<", ">", "<=", ">=", "!="</li>
+	 * <li>Logic:		"&&", "||", "!", "^"</li>
+	 * <li>Arithmetics:	"div", "&infin;", and usual Java operators (e. g. "mod" -> "%")</li>
 	 * </ul>
-	 * @param _tokens - a tokenised line of an Element's text (in practically unknown syntax)
-	 * @param _assignmentOnly - if true then only assignment operator will be unified
+	 * @param _tokens - a tokenised line of an Element's text (in practically unknown syntax),
+	 * will be modified by the method
+	 * @param _assignmentOnly - if {@code true} then only assignment operators will be unified
 	 * @return total number of deletions / replacements
 	 */
 	public static int unifyOperators(StringList _tokens, boolean _assignmentOnly)
@@ -873,8 +877,8 @@ public class Syntax {
 	 * Removes redundant marker keywords (as configured in the Parser Preferences) from
 	 * the given token list {@code _tokens}.
 	 * @param _tokens - the lexically split text with already condensed keywords
-	 * @param _preMarkers
-	 * @param _postMarkers
+	 * @param _preMarkers - whether "Pre" markers are to be removed
+	 * @param _postMarkers - whether "Post" markers are to be removed
 	 */
 	public static void removeRedundantMarkers(StringList _tokens, boolean _preMarkers, boolean _postMarkers)
 	{
