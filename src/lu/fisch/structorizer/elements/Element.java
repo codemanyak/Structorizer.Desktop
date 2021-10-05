@@ -4128,13 +4128,15 @@ public abstract class Element {
     // (The obvious disadvantage is slightly reduced performance, of course)
     /**
      * Returns the serialised texts held within this element and its substructure.
-     * The argument _instructionsOnly controls whether mere expressions like logical conditions or
-     * even call statements are included. As a rule, no lines that may not potentially introduce new
-     * variables are added if true (which not only reduces time and space requirements but also avoids
-     * "false positives" in variable detection). 
-     * Uses addFullText() - so possibly better override that method if necessary.
-     * @param _instructionsOnly - if true then only the texts of Instruction elements are included
-     * @return the composed StringList
+     * The argument {@code _instructionsOnly} controls whether mere expressions like
+     * logical conditions or even call statements are included. As a rule, no lines
+     * that may not potentially introduce new variables are added if {@code true}
+     * (which not only reduces time and space requirements but also avoids "false positives"
+     * in variable detection).<br/>
+     * Uses {@link #addFullText(StringList, boolean)} - so possibly better override that method if
+     * necessary.
+     * @param _instructionsOnly - if {@code true} then only the texts of Instruction elements are included
+     * @return the composed {@link StringList}
      */
     public StringList getFullText(boolean _instructionsOnly)
     {
@@ -4166,29 +4168,28 @@ public abstract class Element {
      * Conventions of the intermediate language:<br/>
      * Operators (note the surrounding spaces - no double spaces will exist):
      * <ul>
-     * <li>Assignment:		" <- "
-     * <li>Comparison:		" = ", " < ", " > ", " <= ", " >= ", " <> "
-     * <li>Logic:				" && ", " || ", " §NOT§ ", " ^ "
-     * <li>Arithmetics:		usual Java operators without padding
-     * <li>Control key words:<br/>
-     * -	If, Case:		none (wiped off)<br/>
-     * -	While, Repeat:	none (wiped off)<br/>
-     * -	For:			unchanged<br/>
-     * -	Forever:		none (wiped off)</li>
+     * <li>Assignment:	" <- "
+     * <li>Comparison:	" = ", " < ", " > ", " <= ", " >= ", " <> "
+     * <li>Logic:		" && ", " || ", " §NOT§ ", " ^ "
+     * <li>Arithmetics:	usual Java operators without padding
+     * <li>Control key words:<ul>
+     *   <li>If, Case:		none (wiped off)</li>
+     *   <li>While, Repeat:	none (wiped off)</li>
+     *   <li>For:			unchanged</li>
+     *   <li>Forever:		none (wiped off)</li>
+     * </ul></li>
      * </ul>
-     * 
      * @return a padded intermediate language equivalent of the stored text
      */
-    
     public StringList getIntermediateText()
     {
-    	StringList interSl = new StringList();
-    	StringList lines = this.getUnbrokenText();
-    	for (int i = 0; i < lines.count(); i++)
-    	{
-    		interSl.add(transformIntermediate(lines.get(i)));
-    	}
-    	return interSl;
+        StringList interSl = new StringList();
+        StringList lines = this.getUnbrokenText();
+        for (int i = 0; i < lines.count(); i++)
+        {
+            interSl.add(transformIntermediate(lines.get(i)));
+        }
+        return interSl;
     }
     
     /**
@@ -4207,7 +4208,7 @@ public abstract class Element {
     }
     
     /**
-     * Creates a (hopefully) lossless representation of the _text String as a
+     * Creates a (hopefully) lossless representation of the {@code _text} String as a
      * tokens list of a common intermediate language (code generation phase 1).
      * This allows the language-specific Generator subclasses to concentrate
      * on the translation into their target language (code generation phase 2).
@@ -4216,13 +4217,14 @@ public abstract class Element {
      * <ul>
      * <li>Assignment:		"<-"</li>
      * <li>Comparison:		"=", "<", ">", "<=", ">=", "<>"</li>
-     * <li>Logic:				"&&", "||", "!", "^"</li>
+     * <li>Logic:			"&&", "||", "!", "^"</li>
      * <li>Arithmetics:		usual Java operators</li>
-     * <li>Control key words:<br/>
-     * -	If, Case:		none (wiped off)<br/>
-     * -	While, Repeat:	none (wiped off)<br/>
-     * -	For:			unchanged<br/>
-     * -	Forever:		none (wiped off)</li>
+     * <li>Control key words:<ul>
+     *   <li>If, Case:		none (wiped off)</li>
+     *   <li>While, Repeat:	none (wiped off)</li>
+     *   <li>For:			unchanged</li>
+     *   <li>Forever:		none (wiped off)</li>
+     * </ul></li>
      * </ul>
      * @param _text - a line of the Structorizer element
      * //@return a padded intermediate language equivalent of the stored text
@@ -4313,6 +4315,7 @@ public abstract class Element {
     // END KGU#162 2016-03-31
     
     // START KGU#152 2016-03-02: Better self-description of Elements
+    @Override
     public String toString()
     {
     	return getClass().getSimpleName() + '@' + Integer.toHexString(hashCode()) +
@@ -4322,41 +4325,41 @@ public abstract class Element {
     			// END KGU#261 2017-01-19
     }
     // END KGU#152 2016-03-02
-    
+
 	// START KGU#258 2016-09-26: Enh. #253
-    /**
-     * Returns a fixed array of names of parser preferences being relevant for
-     * the current type of Element (e.g. in case of refactoring)
-     * @return Arrays of key strings for Syntax.keywordMap
-     */
-    protected abstract String[] getRelevantParserKeys();
-    
-    /**
-     * Looks up the associated token sequence in _splitOldKeywords for any of the parser preference names
-     * provided by getRelevantParserKeys(). If there is such a token sequence then it will be
-     * replaced throughout my text by the associated current parser preference for the respective name
-     * @param _oldKeywords - a map of tokenized former non-empty parser preference keywords to be replaced
-     * @param _ignoreCase - whether case is to be ignored on comparison.
-     */
-    public void refactorKeywords(HashMap<String, StringList> _splitOldKeywords, boolean _ignoreCase)
-    {
-    	String[] relevantKeys = getRelevantParserKeys();
-    	if (relevantKeys != null && !_splitOldKeywords.isEmpty())
-    	{
-    		StringList result = new StringList();
-    		for (int i = 0; i < this.text.count(); i++)
-    		{
-    			result.add(refactorLine(text.get(i), _splitOldKeywords, relevantKeys, _ignoreCase));
-    		}
-    		this.text = result;
-    	}
+	/**
+	 * Returns a fixed array of names of parser preferences being relevant for
+	 * the current type of Element (e.g. in case of refactoring)
+	 * @return Arrays of key strings for Syntax.keywordMap
+	 */
+	protected abstract String[] getRelevantParserKeys();
+
+	/**
+	 * Looks up the associated token sequence in _splitOldKeywords for any of the parser preference names
+	 * provided by getRelevantParserKeys(). If there is such a token sequence then it will be
+	 * replaced throughout my text by the associated current parser preference for the respective name
+	 * @param _oldKeywords - a map of tokenized former non-empty parser preference keywords to be replaced
+	 * @param _ignoreCase - whether case is to be ignored on comparison.
+	 */
+	public void refactorKeywords(HashMap<String, StringList> _splitOldKeywords, boolean _ignoreCase)
+	{
+		String[] relevantKeys = getRelevantParserKeys();
+		if (relevantKeys != null && !_splitOldKeywords.isEmpty())
+		{
+			StringList result = new StringList();
+			for (int i = 0; i < this.text.count(); i++)
+			{
+				result.add(refactorLine(text.get(i), _splitOldKeywords, relevantKeys, _ignoreCase));
+			}
+			this.text = result;
+		}
 	}
 	
 	/**
-     * Looks up the associated token sequence in _splitOldKeys for any of the parser
-     * preference names provided by _prefNames. If there is such a token sequence
-     * then it will be replaced throughout {@code _line} by the associated current
-     * parser preference for the respective name.
+	 * Looks up the associated token sequence in _splitOldKeys for any of the parser
+	 * preference names provided by _prefNames. If there is such a token sequence
+	 * then it will be replaced throughout {@code _line} by the associated current
+	 * parser preference for the respective name.
 	 * @param _line - line of element text
 	 * @param _splitOldKeys - a map of tokenized former non-empty parser preference keywords to be replaced
 	 * @param _prefNames - Array of parser preference names being relevant for this kind of element

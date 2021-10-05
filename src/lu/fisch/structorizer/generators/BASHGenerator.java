@@ -95,6 +95,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig         2020-03-27/29   Enh. #828: Modifications tpo supporet group export
  *      Kay Gürtzig         2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *      Kay Gürtzig         2021-02-03      Issue #920: Transformation for "Infinity" literal
+ *      Kay Gürtzig         2021-10-03      Issue #990: Precautions against wrong result type associations
  *
  ******************************************************************************************************
  *
@@ -1760,6 +1761,9 @@ public class BASHGenerator extends Generator {
 		this.returns = false;
 		// END KGU#828 2020-03-18
 		boolean alwaysReturns = mapJumps(_root.children);
+		// START KGU#990 2021-10-03: Bugfix #990
+		_root.returnsValue = this.returns;
+		// END KGU#990 2021-10-03
 		boolean isSubroutine = _root.isSubroutine();
 		// END KGU#803 2020-02-16
 		// START KGU#705 2019-09-23: Enh. #738
