@@ -86,7 +86,11 @@ import lu.fisch.structorizer.gui.IconLoader;
 import lu.fisch.structorizer.syntax.Line;
 import lu.fisch.utils.*;
 
-
+/**
+ * This Structorizer class represents a multi-way Case selection in a diagram.
+ * 
+ * @author Bob Fisch
+ */
 public class Case extends Element implements IFork
 {
 	

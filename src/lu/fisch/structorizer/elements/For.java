@@ -70,6 +70,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2021-01-22      Result value for setStepConst(String) introduced
  *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *      Kay Gürtzig     2021-02-01      Bugfix #923: Type retrieval for value lists was too weak
+ *      Kay Gürtzig     2021-10-09      Bugfix #997: Inconsistent blank handling between forms and text
  *
  ******************************************************************************************************
  *
@@ -93,7 +94,12 @@ import lu.fisch.structorizer.syntax.Line;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.*;
 
-
+/**
+ * This Structorizer class represents either a counter-controlled or a collection-
+ * controlled For loop in a diagram.
+ * 
+ * @author Bob Fisch
+ */
 public class For extends Element implements ILoop {
 
 	// START KGU#61 2016-03-20: Enh. #84/#135
@@ -1012,17 +1018,23 @@ public class For extends Element implements ILoop {
 		{
 			asgnmtOpr = " := ";
 		}
-		String forClause = Syntax.getKeyword("preFor").trim() + " " +
-				_counter + asgnmtOpr + _start + " " +
-				Syntax.getKeyword("postFor").trim() + " " + _end;
+		String forClause = Syntax.getKeyword("preFor").trim() + " "
+				// START KGU#998 2021-10-09: Bugfix #997 redundant spaces tended to spoil comparison
+				//+ _counter + asgnmtOpr + _start + " "
+				//+ CodeParser.getKeyword("postFor").trim() + " " + _end;
+				+ _counter.trim() + asgnmtOpr + _start.trim() + " "
+				+ Syntax.getKeyword("postFor").trim() + " " + _end.trim();
+				// END KGU#998 2021-10-09
 		if (_step != 1 || _forceStep)
 		{
-			forClause = forClause + " " + Syntax.getKeyword("stepFor").trim() + " " +
-					Integer.toString(_step);
+			forClause = forClause + " " + Syntax.getKeyword("stepFor").trim() + " "
+					+ Integer.toString(_step);
 		}
+		// START KGU#998 2021-10-09: Bugfix #997 This compromised expressions like length("a   b  c")
 		// Now get rid of multiple blanks
-		forClause = forClause.replace("  ", " ");
-		forClause = forClause.replace("  ", " ");
+		//forClause = forClause.replace("  ", " ");
+		//forClause = forClause.replace("  ", " ");
+		// END KGU#998 2021-10-09
 		return forClause;
 	}
 	
@@ -1072,12 +1084,13 @@ public class For extends Element implements ILoop {
 	
 	/**
 	 * Classifies the loop style based only on the congruence of the stored
-	 * text with the generated textes of the styles COUNTER and TRAVERSAL
-	 * (the latter being the code for FOR-IN loops).
-	 * You might also consider testing this.style (which just returns a cached
-	 * earlier classification) and this.isForInLoop(), which first checks the
-	 * cached classification and if this is FREETEXT also calls this method
-	 * in order to find out whether this complies with FOR-IN syntax.
+	 * text with the generated texts of the styles COUNTER and TRAVERSAL
+	 * (the latter being the code for FOR-IN loops).<br/>
+	 * You might also consider testing this.{@link #style} (which just returns
+	 * a cached earlier classification) and this.isForInLoop(), which first
+	 * checks the cached classification and if this is FREETEXT also calls
+	 * this method in order to find out whether this complies with FOR-IN
+	 * syntax.<br/>
 	 * Note that assignment operator differences will be tolerated.
 	 * @return One of the style codes COUNTER, TRAVERSAL, and FREETEXT
 	 */

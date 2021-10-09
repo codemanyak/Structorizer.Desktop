@@ -61,7 +61,9 @@ import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.StringList;
 
 /**
- * Elemment class representing a try / catch / finally construct after a proposal by Bob Fisch (#56)
+ * Structorizer class representing a try / catch / finally construct (after a proposal
+ * by Bob Fisch (#56)).
+ * 
  * @author Kay Gürtzig
  */
 public class Try extends Element {
