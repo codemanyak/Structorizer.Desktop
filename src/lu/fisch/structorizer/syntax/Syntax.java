@@ -172,7 +172,7 @@ public class Syntax {
 	private static HashMap<String, StringList> splitKeywords = new HashMap<String, StringList>();
 	// END KGU 2016-03-29
 	
-	// START KGU#884 2021-10-25: Issue #800
+	// START KGU 2021-10-25: More efficient implementation of ex Element.cutOutRedundantMarkers()
 	private static final String[] DECORATOR_KEYS = {
 			"preAlt", "preCase", "preWhile", "preRepeat",
 			"postAlt", "postCase", "postWhile", "postRepeat"
@@ -180,7 +180,7 @@ public class Syntax {
 	/** Holds the split redundant keywords (i.e. the mere "decorators") by growing length */
 	// Use lazy initialisation
 	private static ArrayList<StringList> splitDecorators = null;
-	// END KGU#884 2021-10-25
+	// END KGU 2021-10-25
 
 	// START KGU#466 2019-08-02: Issue #733 - Support selective preference export
 	public static String[] getPreferenceKeys()
@@ -227,9 +227,9 @@ public class Syntax {
 			ini.load();
 
 			splitKeywords.clear();
-			// START KGU#884 2021-10-25: Issue #800
+			// START KGU#790 2021-10-25: Issue #800
 			splitDecorators = null;
-			// END KGU#884 2021-10-25
+			// END KGU#790 2021-10-25
 			for (String key: keywordMap.keySet())
 			{
 				String propertyName = "Parser" + Character.toUpperCase(key.charAt(0)) + key.substring(1);
@@ -391,14 +391,14 @@ public class Syntax {
 		if (keywordMap.containsKey(_key)) {
 			keywordMap.put(_key, _keyword);
 			splitKeywords.put(_key, splitLexically(_keyword, false));
-			// START KGU#884 2021-10-25: Issue #800
+			// START KGU#790 2021-10-25: Issue #800
 			splitDecorators = null;
-			// END KGU#884 2021-10-25
+			// END KGU#790 2021-10-25
 		}
 	}
 	// END KGU#288 2016-11-06
 	
-	// START KGU#162/KGU#884 2016-03-31/2021-10-25: Enh. #144,#800 - undispensible part of transformIntermediate
+	// START KGU#162 2016-03-31/2021-10-25: Enh. #144 - undispensible part of transformIntermediate
 	/**
 	 * Removes redundant decorator keywords from the passed-in token list.
 	 * (Undispensible part of {@link Element#transformIntermediate(String)}.)

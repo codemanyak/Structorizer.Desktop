@@ -4273,10 +4273,10 @@ public abstract class Element {
         StringList tokens = Syntax.splitLexically(interm, true);
         
         // START KGU#165 2016-03-26: Now keyword search with/without case
-        // START KGU#884 2021-10-25: Delegated to Syntax
+        // START KGU#790 2021-10-25: Delegated to Syntax
         //cutOutRedundantMarkers(tokens);
         Syntax.removeDecorators(tokens);
-        // END KGU#884 2021-10-25
+        // END KGU#790 2021-10-25
         // END KGU#165 2016-03-26
         
         Syntax.unifyOperators(tokens, false);
@@ -4288,7 +4288,7 @@ public abstract class Element {
     // END KGU#18/KGU#23 2015-10-24
     
     // START KGU#162 2016-03-31: Enh. #144 - undispensible part of transformIntermediate
-    // START KGU#884 2021-10-25: Issue #800 replaced by Syntax.removeDecorators(StringList)
+    // START KGU#790 2021-10-25: Issue #800 replaced by Syntax.removeDecorators(StringList)
     //public static void cutOutRedundantMarkers(StringList _tokens)
     //{
     //    // Collect redundant placemarkers to be deleted from the text
@@ -4322,7 +4322,7 @@ public abstract class Element {
     //    	}
     //    }
     //}
-    // END KGU#884 2021-10-25
+    // END KGU#790 2021-10-25
     // END KGU#162 2016-03-31
     
     // START KGU#152 2016-03-02: Better self-description of Elements
