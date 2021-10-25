@@ -20,13 +20,11 @@
 package lu.fisch.structorizer.syntax;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import lu.fisch.structorizer.elements.Element;
-import lu.fisch.structorizer.elements.Instruction;
 import lu.fisch.structorizer.syntax.Declaration.DeclarationRule;
 import lu.fisch.structorizer.syntax.Expression.NodeType;
 import lu.fisch.structorizer.syntax.Expression.Operator;

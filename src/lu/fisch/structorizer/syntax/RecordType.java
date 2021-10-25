@@ -99,7 +99,7 @@ public class RecordType extends Type {
 	 * @throws SyntaxException 
 	 */
 	public RecordType(String name, LinkedHashMap<String, Type> components) throws SyntaxException {
-		super(name, null);
+		super(name);
 		this.compTypes = components;
 	}
 	

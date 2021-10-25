@@ -37,6 +37,12 @@ package lu.fisch.structorizer.syntax;
  ******************************************************************************************************
  *
  *      Comment:
+ *      This class is the attempt to formalise and parse different kinds of declaration,
+ *      which of course share some common parts):
+ *      a) Routine parameter lists (start symbol <par_list>);
+ *      b) Record component lists (start symbol <rec_group_list>);
+ *      c) variables and constants (start symbol <cdecl_list>);
+ *      b) enumerator lists (start symbol <enum_list>).
  *      BNF
  *      <par_list>        ::= <par_group_list> | <par_decl_list>
  *      <par_group_list>  ::= <par_group> | <par_group> ';' <par_group_list>

@@ -68,12 +68,11 @@ public class EnumType extends Type {
 	 * Items without explicitly given value are generically coded (by incrementing
 	 * the value assigned to the previous element.
 	 * @param name - type name
-	 * @param modifiers - possible specification of the underlying integral type
 	 * @param items - a sequential map of names to value descriptions or null.
 	 * @throws SyntaxException if the name does not fit to identifier syntax
 	 */
-	public EnumType(String name, StringList modifiers, LinkedHashMap<String, String> items) throws SyntaxException {
-		super(name, modifiers);
+	public EnumType(String name, LinkedHashMap<String, String> items) throws SyntaxException {
+		super(name);
 		this.items.putAll(items);
 	}
 
@@ -86,7 +85,7 @@ public class EnumType extends Type {
 	 * @throws SyntaxException if the name does not fit to identifier syntax
 	 */
 	public EnumType(String name, StringList modifiers, StringList itemNames) throws SyntaxException {
-		super(name, modifiers);
+		super(name);
 		for (int i = 0; i < itemNames.count(); i++) {
 			this.items.put(itemNames.get(i), null);
 		}

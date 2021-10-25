@@ -23,6 +23,9 @@ package lu.fisch.structorizer.syntax;
 import java.util.HashMap;
 import java.util.regex.Pattern;
 
+import lu.fisch.structorizer.elements.Element;
+import lu.fisch.utils.StringList;
+
 /******************************************************************************************************
  *
  *      Author:         Kay Gürtzig
@@ -49,33 +52,54 @@ import java.util.regex.Pattern;
  *
  */
 public class TypeRegistry {
+	
+	public static final class TypeRegEntry {
+		public Type type;
+		public Element defined = null;
+		public int lineNo = -1;
+		
+		public TypeRegEntry(Type type) {
+			this.type = type;
+		}
+		
+		public TypeRegEntry(Type type, Element el, int line)
+		{
+			this.type = type;
+			this.defined = el;
+			if (el != null) {
+				this.lineNo = line;
+			}
+		}
+	};
 
 	private static final Pattern BIN_PATTERN = Pattern.compile("0b[01]+");
 	private static final Pattern OCT_PATTERN = Pattern.compile("0[0-7]+");
 	private static final Pattern HEX_PATTERN = Pattern.compile("0x[0-9A-Fa-f]+");
 
 	@SuppressWarnings("serial")
-	private static final HashMap<String, Type> globalMap = new HashMap<String, Type>() {{
+	private static final HashMap<String, TypeRegEntry> globalMap = new HashMap<String, TypeRegEntry>() {{
 		try {
-			put(":dummy", Type.getDummyType());
-			put(":boolean", new PrimitiveType("boolean", Boolean.valueOf(false)));
-			put(":byte", new PrimitiveType("byte", Byte.valueOf((byte)0)));
-			put(":short", new PrimitiveType("short", Short.valueOf((short)0)));
-			put(":int", new PrimitiveType("int", Integer.valueOf((int)0)));
-			put(":long", new PrimitiveType("long", Long.valueOf((long)0)));
-			put(":ushort", new PrimitiveType("ushort", Short.valueOf((short)0)));
-			put(":uint", new PrimitiveType("uint", Integer.valueOf((int)0)));
-			put(":ulong", new PrimitiveType("ulong", Long.valueOf((long)0)));
-			put(":float", new PrimitiveType("float", Float.valueOf((float)0.0)));
-			put(":double", new PrimitiveType("double", Double.valueOf((double)0.0)));
-			put(":char", new PrimitiveType("char", Character.valueOf('\0')));
-			put(":string", new PrimitiveType("string", new String()));
+			StringList modifiers = StringList.getNew("unsigned");
+			put(":dummy", new TypeRegEntry(Type.getDummyType()));
+			put(":boolean", new TypeRegEntry(new PrimitiveType("boolean", Boolean.valueOf(false))));
+			put(":byte", new TypeRegEntry(new PrimitiveType("byte", Byte.valueOf((byte)0))));
+			put(":short", new TypeRegEntry(new PrimitiveType("short", Short.valueOf((short)0))));
+			put(":int", new TypeRegEntry(new PrimitiveType("int", Integer.valueOf((int)0))));
+			put(":long", new TypeRegEntry(new PrimitiveType("long", Long.valueOf((long)0))));
+			put(":ubyte", new TypeRegEntry(new PrimitiveType("ubyte", modifiers, Byte.valueOf((byte)0))));
+			put(":ushort", new TypeRegEntry(new PrimitiveType("ushort", modifiers, Short.valueOf((short)0))));
+			put(":uint", new TypeRegEntry(new PrimitiveType("uint", modifiers, Integer.valueOf((int)0))));
+			put(":ulong", new TypeRegEntry(new PrimitiveType("ulong", modifiers, Long.valueOf((long)0))));
+			put(":float", new TypeRegEntry(new PrimitiveType("float", Float.valueOf((float)0.0))));
+			put(":double", new TypeRegEntry(new PrimitiveType("double", Double.valueOf((double)0.0))));
+			put(":char", new TypeRegEntry(new PrimitiveType("char", Character.valueOf('\0'))));
+			put(":string", new TypeRegEntry(new PrimitiveType("string", new String())));
 		}
 		catch (Exception exc)
 		{}
 	}};
 	
-	private HashMap<String, Type> typeMap = null;
+	private HashMap<String, TypeRegEntry> typeMap = null;
 	
 	/**
 	 * Used for static access to global register, lazy initialisation. The global
@@ -92,7 +116,7 @@ public class TypeRegistry {
 		if (globalInstance == null) {
 			getGlobalInstance();
 		}
-		typeMap = new HashMap<String, Type>();
+		typeMap = new HashMap<String, TypeRegEntry>();
 		typeMap.putAll(globalMap);
 	}
 	
@@ -114,11 +138,21 @@ public class TypeRegistry {
 		return this.getClass().getSimpleName() + this.typeMap.toString();
 	}
 	
+	/**
+	 * Retrieves the global standard type associated to the given type name
+	 * @param name - type name
+	 * @return the associated global {@link Type} instance or {@code null}
+	 */
 	public static Type getStandardType(String name)
 	{
 		return getGlobalInstance().getType(name);
 	}
 	
+	/**
+	 * Retrieves the matching Type Registry entry for the given literal
+	 * @param literal - a literal from an element text
+	 * @return either the corresponding {@code Type} instance of {@code null}
+	 */
 	public static Type getStandardTypeFor(String literal)
 	{
 		Type stdType = Type.getDummyType();
@@ -166,10 +200,16 @@ public class TypeRegistry {
 	 * If it hadn't been registered here then returns {@code null}.
 	 * @param typeName - must be an identifier
 	 * @return the {@link Type} or {@code null}
+	 * @see #getTypeFor(String)
+	 * @see #getTypeEntryFor(String)
 	 */
 	public Type getType(String typeName)
 	{
-		return this.typeMap.get(":" + typeName);
+		TypeRegEntry entry = this.typeMap.get(":" + typeName);
+		if (entry != null) {
+			return entry.type;
+		}
+		return null;
 	}
 
 	/**
@@ -179,6 +219,24 @@ public class TypeRegistry {
 	 * @return the {@link Type} or {@code null}
 	 */
 	public Type getTypeFor(String varName)
+	{
+		TypeRegEntry entry = this.typeMap.get(varName);
+		if (entry != null) {
+			return entry.type;
+		}
+		return null;
+	}
+	
+	/**
+	 * Retrieves the {@link TypeRegEntry} for the given variable name {@code varName}.
+	 * If it hadn't been registered here then returns {@code null}. Otherwise the
+	 * returned entry will contain the information about a possible declaring element
+	 * line.
+	 * @param varName - must be an identifier
+	 * @return the {@link TypeRegEntry} or {@code null}
+	 * @see #getTypeFor(String)
+	 */
+	public TypeRegEntry getTypeEntryFor(String varName)
 	{
 		return this.typeMap.get(varName);
 	}
@@ -195,17 +253,43 @@ public class TypeRegistry {
 	 * @return {@code null} if the registration failed, {@code type} if the
 	 * registration worked without overriding another entry, otherwise the
 	 * overwritten previous {@link Type} entry.
+	 * @see #putType(Type, Element, int, boolean)
 	 */
 	public Type putType(Type type, boolean force)
 	{
+		return putType(type, null, -1, force);
+	}
+	/**
+	 * Registers the given {@link Type} {@code type} being defined in line
+	 * {@code defLine} of Element {@code definingEl} under its name unless it
+	 * is anonymous or there is already an entry with the same name. Both
+	 * restrictions can be overridden with {@code force = true}.
+	 * Standard types may not be overridden in any case.
+	 * @param type - the {@link Type} to be registered
+	 * @param definingEl - the Element where the type is defined or {@code null}
+	 * @param defLine - number of the defining text line or -1
+	 * @param force - whether it is even to be put if it is an anonymous type
+	 * or would override an existing entry (which is dangerous as references to
+	 * the type might get inconsistent).
+	 * @return {@code null} if the registration failed, {@code type} if the
+	 * registration worked without overriding another entry, otherwise the
+	 * overwritten previous {@link Type} entry.
+	 */
+	public Type putType(Type type, Element definingEl, int defLine, boolean force)
+	{
 		// TODO: Check for equivalent type
+		// TODO: Don't override an explicitly defined type, either
 		Type result = null;
-		if (getStandardType(type.getName()) == null &&
-				(force || !type.isAnonymous() && !typeMap.containsKey(":" + type.getName()))) {
-			result = typeMap.put(":" + type.getName(), type);
+		String name = type.getName();
+		if (getStandardType(name) == null &&
+				(force || !type.isAnonymous() && !typeMap.containsKey(":" + name))) {
+			TypeRegEntry oldEntry = typeMap.put(":" + name, new TypeRegEntry(type, definingEl, defLine));
 			type.registry = this;
-			if (result == null) {
+			if (oldEntry == null) {
 				result = type;
+			}
+			else {
+				result = oldEntry.type;
 			}
 		}
 		return result;
@@ -228,15 +312,22 @@ public class TypeRegistry {
 	 */
 	public Type putTypeFor(String varName, Type type, boolean force)
 	{
+		return putTypeFor(varName, type, null, -1, force);
+	}
+	public Type putTypeFor(String varName, Type type, Element declaringEl, int declLine, boolean force)
+	{
 		Type result = null;
 		Type prevType = null;
 		if (force || !typeMap.containsKey(varName)
 				&& ((prevType = getType(type.getName())) == null || prevType == type)) {
 			// TODO: Check for equivalent type
-			result = typeMap.put(varName, type);
+			TypeRegEntry entry = typeMap.put(varName, new TypeRegEntry(type, declaringEl, declLine));
 			type.registry = this;
-			if (result == null) {
+			if (entry == null) {
 				result = type;
+			}
+			else {
+				result = entry.type;
 			}
 			// Ensure the type is registered as well
 			putType(type, false);

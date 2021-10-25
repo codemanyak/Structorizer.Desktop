@@ -1,7 +1,5 @@
 package lu.fisch.structorizer.syntax;
 
-import lu.fisch.utils.StringList;
-
 /******************************************************************************************************
  *
  *      Author:         Kay Gürtzig
@@ -17,6 +15,7 @@ import lu.fisch.utils.StringList;
  *      Kay Gürtzig     2019-12-19      First Issue (#800)
  *      Kay Gürtzig     2020-11-01      Name check inserted
  *      Kay Gürtzig     2020-11-06      Uplink to a TypeRegistry added
+ *      Kay Gürtzig     2021-10-17      Field modifiers removed
  *
  ******************************************************************************************************
  *
@@ -27,8 +26,8 @@ import lu.fisch.utils.StringList;
 
 /**
  * Base class for data type description in Structorizer. Can be used as mere
- * type name reference (while an owning {@link TypeRegistry} is not available
- * (t be replaced by a specified Type subclass object as soon as possible).
+ * type name reference (while an owning {@link TypeRegistry} is not available,
+ * to be replaced by a specified Type subclass object as soon as possible).
  * @author Kay Gürtzig
  */
 public class Type {
@@ -51,8 +50,6 @@ public class Type {
 	/**
 	 * {@code null} or a list of modifiers (each of which ought to be an identifier)
 	 */
-	// FIXME: Do we really need this (it does not make much sense as does not contribute to the key)
-	protected StringList modifiers = null;
 	
 	/**
 	 * Link to the owning {@link TypeRegistry}
@@ -63,7 +60,6 @@ public class Type {
 	private Type()
 	{
 		this.name = "???";
-		this.modifiers = new StringList();
 	}
 
 	/**
@@ -79,57 +75,6 @@ public class Type {
 			throw new SyntaxException("Type name must be an Ascii identifier", 0);
 		}
 		this.name = name.trim();
-	}
-	
-	/**
-	 * Extracts name and modifiers from the given type specification tokens
-	 * {@code specTokens}. Assumed cases:<br/>
-	 * <ul>
-	 * <li>[mod1 mod2 ...] name</li>
-	 * </ul>
-	 * @param specTokens blank-free token list
-	 * @throws SyntaxException if the name does not fit to identifier syntax
-	 */
-	@Deprecated
-	public Type(StringList specTokens) throws SyntaxException {
-		// TODO: somewhat rough, we ought to check for non-identifiers
-		int length = specTokens.count();
-		if (length >= 1) {
-			this.name = specTokens.get(length-1);
-			if (!Syntax.isIdentifier(this.name, true, null)) {
-				throw new SyntaxException("Type name must be an Ascii identifier", 0);
-			}
-			this.modifiers = specTokens.subSequence(0, length-1);
-		}
-	}
-
-	/**
-	 * Constructs the type from the given {@code name} and {@code modifiers}
-	 * list (which will be reduced, i.e. blanks and empty parts will be removed).
-	 * The modifiers must not be essential for the type (e.g. "unsigned") in a way
-	 * that there several possible types with same name only distinguished by the
-	 * modifiers.
-	 * @param name - type name, must be an Ascii identifier
-	 * @param modifiers - list of modifiers or null
-	 * @throws SyntaxException if {@code name} does not fit to identifier syntax
-	 */
-	protected Type(String name, StringList modifiers) throws SyntaxException {
-		if (name == null) {
-			name = "%" + nextId++;	// Create an anonymous name
-		}
-		else if (!Syntax.isIdentifier(name, true, null)) {
-			throw new SyntaxException("Type name must be an Ascii identifier", 0);
-		}
-		this.name = name.trim();
-		if (modifiers != null) {
-			modifiers = new StringList(modifiers);
-			modifiers.removeAll(" ");
-			modifiers.removeAll("");
-			for (int i = 0; i < modifiers.count(); i++) {
-				modifiers.set(i, modifiers.get(i).trim());
-			}
-		}
-		this.modifiers = modifiers;
 	}
 	
 	/**
@@ -192,12 +137,7 @@ public class Type {
 	 */
 	protected String toStringWithName(String altName, boolean deep)
 	{
-		StringList mods = this.modifiers;
-		if (mods == null) {
-			mods = new StringList();
-		}
-		mods.add(altName != null ? altName : this.name);
-		return mods.getLongString();
+		return altName != null ? altName : this.name;
 	}
 	
 	/**

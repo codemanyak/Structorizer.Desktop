@@ -19,6 +19,8 @@
  */
 package lu.fisch.structorizer.syntax;
 
+import java.util.ArrayList;
+
 /******************************************************************************************************
  *
  *      Author:         Kay Gürtzig
@@ -32,6 +34,7 @@ package lu.fisch.structorizer.syntax;
  *      Author          Date            Description
  *      ------          ----            -----------
  *      Kay Gürtzig     2019-12-20      First Issue
+ *      Kay Gürtzig     2021-10-17      getDimensions() modified (both signature and algorithm)
  *
  ******************************************************************************************************
  *
@@ -90,7 +93,7 @@ public class ArrayType extends Type {
 	 * @throws SyntaxException if the name does not fit to identifier syntax
 	 */
 	public ArrayType(String name, Type elementType, int size) throws SyntaxException {
-		super(name, null);
+		super(name);
 		elType = elementType;
 		if (size > 0) {
 			this.size = size;
@@ -98,14 +101,16 @@ public class ArrayType extends Type {
 	}
 
 	/**
-	 * 
-	 * @param name
-	 * @param elementType
-	 * @param indexRange
+	 * Constructs an array type for the given {@code name} over elements of data
+	 * type {@code elementType} with given index range {@code indexRange}.
+	 * @param name - the type name (must fit to strict Ascii identifier syntax)
+	 * @param elementType - data type of the elements (or {@code null} if unspecified)
+	 * @param indexRange - a pair of lower and upper index bounds where bowth values
+	 * are meant to be included. 
 	 * @throws SyntaxException if the name does not fit to identifier syntax
 	 */
 	public ArrayType(String name, Type elementType, int[] indexRange) throws SyntaxException {
-		super(name, null);
+		super(name);
 		elType = elementType;
 		if (indexRange != null) {
 			offset = indexRange[0];
@@ -126,7 +131,7 @@ public class ArrayType extends Type {
 	 * and the element type specification, the index start offset and the number of elements
 	 * in parentheses, e.g.:<br/>
 	 * {@code @id(elType,0,100)}
-	 * @param altName - an alternative name to be used instead of {@link #getName()}
+	 * @param altName - an alternative name to be used instead of {@link #getName()},
 	 * if {@code null} then the internal identifier will be used.
 	 * @param deep - whether possible substructure is to be fully described (otherwise
 	 * embedded types will just be represented by their names (if the are named).
@@ -151,7 +156,7 @@ public class ArrayType extends Type {
 	}
 	
 	/**
-	 * @return the data type of the array elements (if known), {@code null} otherwise.
+	 * @return the data type of the array elements (if known, {@code null} otherwise).
 	 */
 	public Type getElementType()
 	{
@@ -159,15 +164,19 @@ public class ArrayType extends Type {
 	}
 	
 	/**
-	 * @return the number of dimensions (= array nesting level), minimum is 1.
+	 * @return the list of array sizes and index range offsets in direct nesting
+	 * succession, i.e. as far as the element type is an array type itself. 
 	 */
-	public int getDimensions()
+	public ArrayList<int[]> getDimensions()
 	{
-		int nDims = 1;
-		if (this.elType instanceof ArrayType) {
-			nDims += ((ArrayType) this.elType).getDimensions();
+		ArrayList<int[]> dimensions = new ArrayList<int[]>();
+		dimensions.add(new int[] {this.size, this.offset});
+		Type elemT = this.elType;
+		while (elemT instanceof ArrayType) {
+			dimensions.add(new int[] {((ArrayType)elemT).size, ((ArrayType)elemT).offset});
+			elemT = ((ArrayType)elemT).elType;
 		}
-		return nDims;
+		return dimensions;
 	}
 	
 }
