@@ -20,8 +20,6 @@
 
 package lu.fisch.structorizer.syntax;
 
-import java.util.ArrayList;
-
 /******************************************************************************************************
  *
  *      Author:         Kay Gürtzig
@@ -36,6 +34,7 @@ import java.util.ArrayList;
  *      ------          ----            -----------
  *      Kay Gürtzig     2020-08-12      First Issue
  *      Kay Gürtzig     2020-11-01      Further methods from Element and Function moved hitherto
+ *      Kay Gürtzig     2021-10-25      Method removeDecorators now replaces Element.cutOutRedundantMarkers
  *
  ******************************************************************************************************
  *
@@ -44,6 +43,7 @@ import java.util.ArrayList;
  *
  ******************************************************************************************************///
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -140,6 +140,7 @@ public class Syntax {
 
 	// START KGU#288 2016-11-06: Issue #279: Access limited to private, compensated by new methods
 	//public static final HashMap<String, String> keywordMap = new LinkedHashMap<String, String>();
+	/** Maps formal keyword keys like "preAlt" to the actually configured keywords (as strings) */
 	private static final HashMap<String, String> keywordMap = new LinkedHashMap<String, String>();
 	// END KGU#288 2016-11-06
 	static {
@@ -167,8 +168,19 @@ public class Syntax {
 	}
 
 	// START KGU 2016-03-29: For keyword detection improvement
+	/** Like {@link #keywordMap} but holding the tokenized keywords (lazy initialisation) */
 	private static HashMap<String, StringList> splitKeywords = new HashMap<String, StringList>();
 	// END KGU 2016-03-29
+	
+	// START KGU#884 2021-10-25: Issue #800
+	private static final String[] DECORATOR_KEYS = {
+			"preAlt", "preCase", "preWhile", "preRepeat",
+			"postAlt", "postCase", "postWhile", "postRepeat"
+			};
+	/** Holds the split redundant keywords (i.e. the mere "decorators") by growing length */
+	// Use lazy initialisation
+	private static ArrayList<StringList> splitDecorators = null;
+	// END KGU#884 2021-10-25
 
 	// START KGU#466 2019-08-02: Issue #733 - Support selective preference export
 	public static String[] getPreferenceKeys()
@@ -185,6 +197,9 @@ public class Syntax {
 	 */
 	public static void loadFromINI()
 	{
+		/* Define some defaults for all mandatory keywords and some decorators
+		 * before loading the configured keyword set from the Ini file
+		 */
 		final HashMap<String, String> defaultKeys = new HashMap<String, String>();
 		// START KGU 2017-01-06: Issue #327: Defaults changed to English
 		defaultKeys.put("ParserPreFor", "for");
@@ -212,6 +227,9 @@ public class Syntax {
 			ini.load();
 
 			splitKeywords.clear();
+			// START KGU#884 2021-10-25: Issue #800
+			splitDecorators = null;
+			// END KGU#884 2021-10-25
 			for (String key: keywordMap.keySet())
 			{
 				String propertyName = "Parser" + Character.toUpperCase(key.charAt(0)) + key.substring(1);
@@ -373,9 +391,54 @@ public class Syntax {
 		if (keywordMap.containsKey(_key)) {
 			keywordMap.put(_key, _keyword);
 			splitKeywords.put(_key, splitLexically(_keyword, false));
+			// START KGU#884 2021-10-25: Issue #800
+			splitDecorators = null;
+			// END KGU#884 2021-10-25
 		}
 	}
 	// END KGU#288 2016-11-06
+	
+	// START KGU#162/KGU#884 2016-03-31/2021-10-25: Enh. #144,#800 - undispensible part of transformIntermediate
+	/**
+	 * Removes redundant decorator keywords from the passed-in token list.
+	 * (Undispensible part of {@link Element#transformIntermediate(String)}.)
+	 * @param _tokens - the token list to be cleansed.
+	 */
+	public static void removeDecorators(StringList _tokens)
+	{
+		// Collect redundant placemarkers to be deleted from the text
+		if (splitDecorators == null) {
+			// We must first establish the sorted decorator list
+			StringList keys = new StringList();
+			StringList decorators = new StringList();
+			for (String key: DECORATOR_KEYS) {
+				int ix = decorators.addByLength(getKeyword(key));
+				if (ix >= 0) {
+					keys.insert(key, ix);
+				}
+			}
+			splitDecorators = new ArrayList<StringList>();
+			for (int ix = 0; ix < keys.count(); ix++) {
+				splitDecorators.add(Syntax.getSplitKeyword(keys.get(ix)));
+			}
+		}
+
+		for (int i = 0; i < splitDecorators.size(); i++)
+		{
+			StringList markerTokens = splitDecorators.get(i);
+			int markerLen = markerTokens.count();
+			int pos = -1;
+			while ((pos = _tokens.indexOf(markerTokens, 0, !Syntax.ignoreCase)) >= 0)
+			{
+				for (int j = 0; j < markerLen; j++)
+				{
+					_tokens.delete(pos);
+				}
+			}
+		}
+	}
+	// END KGU#162 2016-03-31
+
 	
 	// START KGU#790 2020-11-01: Moved hitherto from Function.testIdentifier() and renamed
 	/**
@@ -873,39 +936,39 @@ public class Syntax {
 	}
 	// END KGU#92 2015-12-01
 
-	/**
-	 * Removes redundant marker keywords (as configured in the Parser Preferences) from
-	 * the given token list {@code _tokens}.
-	 * @param _tokens - the lexically split text with already condensed keywords
-	 * @param _preMarkers - whether "Pre" markers are to be removed
-	 * @param _postMarkers - whether "Post" markers are to be removed
-	 */
-	public static void removeRedundantMarkers(StringList _tokens, boolean _preMarkers, boolean _postMarkers)
-	{
-		// Collect redundant placemarkers to be deleted from the text
-		StringList redundantMarkers = new StringList();
-		if (_preMarkers) {
-			redundantMarkers.addByLength(Syntax.getKeyword("preAlt"));
-			redundantMarkers.addByLength(Syntax.getKeyword("preCase"));
-			redundantMarkers.addByLength(Syntax.getKeyword("preWhile"));
-			redundantMarkers.addByLength(Syntax.getKeyword("preRepeat"));
-		}
-		if (_postMarkers) {
-			redundantMarkers.addByLength(Syntax.getKeyword("postAlt"));
-			redundantMarkers.addByLength(Syntax.getKeyword("postCase"));
-			redundantMarkers.addByLength(Syntax.getKeyword("postWhile"));
-			redundantMarkers.addByLength(Syntax.getKeyword("postRepeat"));
-		}
-
-		for (int i = 0; i < redundantMarkers.count(); i++)
-		{
-			String marker = redundantMarkers.get(i);
-			if (!marker.trim().isEmpty())
-			{
-				_tokens.removeAll(marker, !Syntax.ignoreCase);
-			}
-		}
-	}
+//	/**
+//	 * Removes redundant marker keywords (as configured in the Parser Preferences) from
+//	 * the given token list {@code _tokens}.
+//	 * @param _tokens - the lexically split text with already condensed keywords
+//	 * @param _preMarkers - whether "Pre" markers are to be removed
+//	 * @param _postMarkers - whether "Post" markers are to be removed
+//	 */
+//	public static void removeRedundantMarkers(StringList _tokens, boolean _preMarkers, boolean _postMarkers)
+//	{
+//		// Collect redundant placemarkers to be deleted from the text
+//		StringList redundantMarkers = new StringList();
+//		if (_preMarkers) {
+//			redundantMarkers.addByLength(Syntax.getKeyword("preAlt"));
+//			redundantMarkers.addByLength(Syntax.getKeyword("preCase"));
+//			redundantMarkers.addByLength(Syntax.getKeyword("preWhile"));
+//			redundantMarkers.addByLength(Syntax.getKeyword("preRepeat"));
+//		}
+//		if (_postMarkers) {
+//			redundantMarkers.addByLength(Syntax.getKeyword("postAlt"));
+//			redundantMarkers.addByLength(Syntax.getKeyword("postCase"));
+//			redundantMarkers.addByLength(Syntax.getKeyword("postWhile"));
+//			redundantMarkers.addByLength(Syntax.getKeyword("postRepeat"));
+//		}
+//
+//		for (int i = 0; i < redundantMarkers.count(); i++)
+//		{
+//			String marker = redundantMarkers.get(i);
+//			if (!marker.trim().isEmpty())
+//			{
+//				_tokens.removeAll(marker, !Syntax.ignoreCase);
+//			}
+//		}
+//	}
 
 // This was just an obsolete draft
 //	/**

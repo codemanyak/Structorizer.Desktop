@@ -130,6 +130,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2021-02-24      Enh. #410: "?" added as lexical delimiter and operator symbol
  *      Kay Gürtzig     2021-03-03      Issue #954: Modified breakpoint behaviour
  *      Kay Gürtzig     2021-06-10      Enh. #926, #979: New method getAnalyserMarkerBounds() to support tooltip
+ *      Kay Gürtzig     2021-10-25      Issue #800: cutOutRedundantMarkers substituted by Syntax.removeDecorators()
  *
  ******************************************************************************************************
  *
@@ -4272,7 +4273,10 @@ public abstract class Element {
         StringList tokens = Syntax.splitLexically(interm, true);
         
         // START KGU#165 2016-03-26: Now keyword search with/without case
-        cutOutRedundantMarkers(tokens);
+        // START KGU#884 2021-10-25: Delegated to Syntax
+        //cutOutRedundantMarkers(tokens);
+        Syntax.removeDecorators(tokens);
+        // END KGU#884 2021-10-25
         // END KGU#165 2016-03-26
         
         Syntax.unifyOperators(tokens, false);
@@ -4284,38 +4288,41 @@ public abstract class Element {
     // END KGU#18/KGU#23 2015-10-24
     
     // START KGU#162 2016-03-31: Enh. #144 - undispensible part of transformIntermediate
-    public static void cutOutRedundantMarkers(StringList _tokens)
-    {
-    	// Collect redundant placemarkers to be deleted from the text
-        StringList redundantMarkers = new StringList();
-        redundantMarkers.addByLength(Syntax.getKeyword("preAlt"));
-        redundantMarkers.addByLength(Syntax.getKeyword("preCase"));
-        redundantMarkers.addByLength(Syntax.getKeyword("preWhile"));
-        redundantMarkers.addByLength(Syntax.getKeyword("preRepeat"));
-
-        redundantMarkers.addByLength(Syntax.getKeyword("postAlt"));
-        redundantMarkers.addByLength(Syntax.getKeyword("postCase"));
-        redundantMarkers.addByLength(Syntax.getKeyword("postWhile"));
-        redundantMarkers.addByLength(Syntax.getKeyword("postRepeat"));
-        
-        for (int i = 0; i < redundantMarkers.count(); i++)
-        {
-        	String marker = redundantMarkers.get(i);
-        	if (marker != null && !marker.trim().isEmpty())
-        	{
-        		StringList markerTokens = Syntax.splitLexically(marker, false);
-        		int markerLen = markerTokens.count();
-        		int pos = -1;
-        		while ((pos = _tokens.indexOf(markerTokens, 0, !Syntax.ignoreCase)) >= 0)
-        		{
-        			for (int j = 0; j < markerLen; j++)
-        			{
-        				_tokens.delete(pos);
-        			}
-        		}
-        	}
-        }
-    }
+    // START KGU#884 2021-10-25: Issue #800 replaced by Syntax.removeDecorators(StringList)
+    //public static void cutOutRedundantMarkers(StringList _tokens)
+    //{
+    //    // Collect redundant placemarkers to be deleted from the text
+    //    // FIXME: Find a more efficient way to do this
+    //    StringList redundantMarkers = new StringList();
+    //    redundantMarkers.addByLength(Syntax.getKeyword("preAlt"));
+    //    redundantMarkers.addByLength(Syntax.getKeyword("preCase"));
+    //    redundantMarkers.addByLength(Syntax.getKeyword("preWhile"));
+    //    redundantMarkers.addByLength(Syntax.getKeyword("preRepeat"));
+    //
+    //    redundantMarkers.addByLength(Syntax.getKeyword("postAlt"));
+    //    redundantMarkers.addByLength(Syntax.getKeyword("postCase"));
+    //    redundantMarkers.addByLength(Syntax.getKeyword("postWhile"));
+    //    redundantMarkers.addByLength(Syntax.getKeyword("postRepeat"));
+    //    
+    //    for (int i = 0; i < redundantMarkers.count(); i++)
+    //    {
+    //    	String marker = redundantMarkers.get(i);
+    //    	if (marker != null && !marker.trim().isEmpty())
+    //    	{
+    //    		StringList markerTokens = Syntax.splitLexically(marker, false);
+    //    		int markerLen = markerTokens.count();
+    //    		int pos = -1;
+    //    		while ((pos = _tokens.indexOf(markerTokens, 0, !Syntax.ignoreCase)) >= 0)
+    //    		{
+    //    			for (int j = 0; j < markerLen; j++)
+    //    			{
+    //    				_tokens.delete(pos);
+    //    			}
+    //    		}
+    //    	}
+    //    }
+    //}
+    // END KGU#884 2021-10-25
     // END KGU#162 2016-03-31
     
     // START KGU#152 2016-03-02: Better self-description of Elements

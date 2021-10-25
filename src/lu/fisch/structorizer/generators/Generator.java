@@ -1808,7 +1808,10 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		{
 			// Suppress all syntax changes, just split to tokens.
 			tokens = Syntax.splitLexically(_input, true);
-			Element.cutOutRedundantMarkers(tokens);
+			// START KGU#884 2021-10-25: Issue #800
+			//Element.cutOutRedundantMarkers(tokens);
+			Syntax.removeDecorators(tokens);
+			// END KGU#884 2021-10-25
 		}
 		else
 		{

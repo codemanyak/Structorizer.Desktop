@@ -57,6 +57,7 @@ package lu.fisch.utils;
  *      Kay Gürtzig     2020-10-31      Javadoc revised and complemented, setCommaText() with additional argument
  *      A. Simonetta    2021-03-25      Issue #967: New method replaceIfContains
  *      Kay Gürtzig     2021-04-09      Renamed method replaceIfContains to replaceInElements
+ *      Kay Gürtzig     2021-10-25      Results added for add(String), addOrdered(String), and addByLength()
  *
  ******************************************************************************************************
  *
@@ -396,6 +397,13 @@ public class StringList {
 	/**
 	 * Appends the given String {@code _string} at end.
 	 * @param _string - a string
+	 * 
+	 * @see #add(StringList)
+	 * @see #addOrdered(String)
+	 * @see #addByLength(String)
+	 * @see #addIfNew(String)
+	 * @see #addOrderedIfNew(String)
+	 * @see #addByLengthIfNew(String)
 	 */
 	public void add(String _string) {
 		strings.add(_string);
@@ -409,53 +417,74 @@ public class StringList {
 	 * been member then another copy of the string will be inserted.
 	 *
 	 * @param _string
+	 * @return - the index of the insertion
+	 * 
 	 * @see #add(String)
 	 * @see #addOrderedIfNew(String)
-	 * @see #addIfNew(String)
 	 * @see #addByLength(String)
 	 */
-	public void addOrdered(String _string)
+	// START KGU#884 2021-10-25: Issue #800 result type and semantics changed
+	//public void addOrdered(String _string)
+	//{
+	//	addOrdered(_string, false);
+	//}
+	public int addOrdered(String _string)
+	// END KGU#884 2021-10-25
 	{
-		addOrdered(_string, false);
+		return addOrdered(_string, false);
 	}
 	
-	private boolean addOrdered(String _string, boolean _onlyIfNew)
+	// START KGU#884 2021-10-25: Issue #800 result type and semantics changed
+	//private boolean addOrdered(String _string, boolean _onlyIfNew)
+	private int addOrdered(String _string, boolean _onlyIfNew)
+	// END KGU#884 2021-10-25
 	{
-		for (int i=0; i < strings.size(); i++)
+		for (int i = 0; i < strings.size(); i++)
 		{
 			int comp = (strings.get(i)).compareTo(_string);
 			if (comp == 0 && _onlyIfNew) {
-				return false;
+				// START KGU#884 2021-10-25: Issue #800
+				//return false;
+				return -1;
+				// END KGU#884 2021-10-25
 			}
 			else if (comp >= 0) {
 				strings.insertElementAt(_string, i);
-				return true;
+				// START KGU#884 2021-10-25: Issue #800
+				//return true;
+				return i;
+				// END KGU#884 2021-10-25
 			}
 		}
 
 		add(_string);
-		return true;
+		// START KGU#884 2021-10-25: Issue #800
+		//return true;
+		return strings.size() - 1;
+		// END KGU#884 2021-10-25
 	}
 
 	/**
 	 * Inserts {@code _string} such that the elements be ordered by decreasing length
 	 * (longest ones first!). If {@code _string} is {@code null} or empty then it will
-	 * not be added at all. Elements of same length occur in order of insertion.<br/>
+	 * <b>not</b> be added at all. Elements of same length occur in order of insertion.<br/>
 	 * (Only works if the already contained elements represent the order described
 	 * above.)<br/>
 	 * Multiple String values may occur i.e. if you add a string that has already
 	 * been member then another copy of the string will be inserted.
 	 *
 	 * @param _string - the string to be inserted
+	 * @return the index of the insertion (or -1 if no insertion was done)
 	 *
 	 * @see #add(String)
-	 * @see #addIfNew(String)
 	 * @see #addOrdered(String)
-	 * @see #addOrderedIfNew(String)
 	 * @see #addByLengthIfNew(String)
 	 */
-	public void addByLength(String _string) {
-		boolean inserted = false;
+	// START KGU#884 2021-10-25: Issue #800 result added
+	//public void addByLength(String _string) {
+	//	boolean inserted = false;
+	public int addByLength(String _string){
+	// END KGU#884 2021-10-25
 		// START KGU 2020-10-30: More safety...
 		//if (!_string.equals(""))
 		if (_string != null && !_string.equals(""))
@@ -465,16 +494,26 @@ public class StringList {
 				// FIXME: Shouldn't strings of the same length be ordered lexicographically?
 				if ((strings.get(i)).length() < _string.length()) {
 					strings.insertElementAt(_string, i);
-					inserted = true;
-					break;
+					// START KGU#884 2021-10-25
+					//inserted = true;
+					//break;
+					return i;
+					// END KGU#884 2021-10-25
 				}
 			}
 
-			if (!inserted)
-			{
-				add(_string);
-			}
+			// START KGU#884 2021-10-25: Issue #800
+			//if (!inserted)
+			//{
+			//	add(_string);
+			//}
+			add(_string);
+			return strings.size()-1;
+			// END KGU#884 2021-10-25
 		}
+		// START KGU#884 2021-10-25: Issue #800
+		return -1;
+		// END KGU#884 2021-10-25
 	}
 
 	/**
@@ -484,9 +523,8 @@ public class StringList {
 	 * @return {@code true} if the string was new
 	 *
 	 * @see #add(String)
-	 * @see #addOrdered(String)
+	 * @see #addIfNew(StringList)
 	 * @see #addOrderedIfNew(String)
-	 * @see #addByLength(String)
 	 * @see #addByLengthIfNew(String)
 	 */
 	public boolean addIfNew(String _string) {
@@ -506,14 +544,15 @@ public class StringList {
 	 * @param _string - The string to be added
 	 * @return {@code true} if the string was new
 	 *
-	 * @see #add(String)
 	 * @see #addIfNew(String)
 	 * @see #addOrdered(String)
-	 * @see #addByLength(String)
 	 * @see #addByLengthIfNew(String)
 	 */
 	public boolean addOrderedIfNew(String _string) {
-		return addOrdered(_string, true);
+		// START KGU#884 2021-10-25: Issue #800 Modified semantics
+		//return addOrdered(_string, true);
+		return addOrdered(_string, true) >= 0;
+		// END KGU#884 2021-10-25
 	}
 
 	/**
@@ -526,9 +565,7 @@ public class StringList {
 	 * @param _string the string to be inserted
 	 * @return {@code true} if the string was new
 	 *
-	 * @see #add(String)
 	 * @see #addIfNew(String)
-	 * @see #addOrdered(String)
 	 * @see #addOrderedIfNew(String)
 	 * @see #addByLength(String)
 	 */
@@ -565,7 +602,7 @@ public class StringList {
 	 * contained in this StringList.
 	 *
 	 * @param _string - The string to be added
-	 * @return {@code true} if some of the strings of {@code _stringList} was added
+	 * @return {@code true} if some of the strings of {@code _stringList} were added
 	 *
 	 * @see #add(String)
 	 * @see #addIfNew(String)

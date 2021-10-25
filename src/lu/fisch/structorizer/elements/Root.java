@@ -5283,7 +5283,10 @@ public class Root extends Element {
 		StringList unbrText = _ele.getUnbrokenText();
 		for (int i = 0; i < unbrText.count(); i++) {
 			StringList tokens = Syntax.splitLexically(unbrText.get(i), true);
-			Element.cutOutRedundantMarkers(tokens);
+			// START KGU#884 2021-10-25: Issue #800
+			//Element.cutOutRedundantMarkers(tokens);
+			Syntax.removeDecorators(tokens);
+			// END KGU#884 2021-10-25
 			analyse_24_tokens(_ele, _errors, _types, tokens);
 		}
 	}

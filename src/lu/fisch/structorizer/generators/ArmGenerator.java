@@ -532,7 +532,10 @@ public class ArmGenerator extends Generator {
         // We are currently not supporting complex expressions
         //variable = variable.replace(")", "").replace("(", "").replace("!", "").replace(" ", "");
         StringList tokens = Syntax.splitLexically(variable, true);
-        Element.cutOutRedundantMarkers(tokens);
+        // START KGU#884 2021-10-25: Issue #800
+        //Element.cutOutRedundantMarkers(tokens);
+        Syntax.removeDecorators(tokens);
+        // END KGU#884 2021-10-25
         tokens.removeAll("(");
         tokens.removeAll(")");
         //tokens.removeAll("!");	// ???
@@ -1379,7 +1382,10 @@ public class ArmGenerator extends Generator {
         String condition = _ele.getUnbrokenText().getLongString().trim();
 
         StringList tokens = Syntax.splitLexically(condition, true);
-        Element.cutOutRedundantMarkers(tokens);
+        // START KGU#884 2021-10-25: Issue #800
+        //Element.cutOutRedundantMarkers(tokens);
+        Syntax.removeDecorators(tokens);
+        // END KGU#884 2021-10-25
         tokens.removeAll(" ");
         Syntax.unifyOperators(tokens, false);
         condition = tokens.concatenate(null);
