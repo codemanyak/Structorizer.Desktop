@@ -283,7 +283,7 @@ public class StringList {
 //
 //		return sl;
 		// TODO: performance should be measured and compared between these two solutions!
-		// The following is the (optimized) alternative solution copied from BString  
+		// The following is the (optimized) alternative solution copied from BString
 		StringList sl = new StringList();
 		int lenBy = _by.length();
 		String testSource = _source;
@@ -1445,23 +1445,23 @@ public class StringList {
 	 */
 	public int removeAll(String _string)
 	// START KGU#375 2017-04-04: For regularity, new method to remove case-independently
-	//    {
-	//    	int nRemoved = 0;
-	//    	int i = 0;
-	//    	while (i < count())
-	//    	{
-	//    		if (strings.get(i).equals(_string))
-	//    		{
-	//    			strings.removeElementAt(i);
-	//    			nRemoved++;
-	//    		}
-	//    		else
-	//    		{
-	//        		i++;    			
-	//    		}
-	//    	}
-	//    	return nRemoved;
-	//    }
+	//{
+	//	int nRemoved = 0;
+	//	int i = 0;
+	//	while (i < count())
+	//	{
+	//		if (strings.get(i).equals(_string))
+	//		{
+	//			strings.removeElementAt(i);
+	//			nRemoved++;
+	//		}
+	//		else
+	//		{
+	//			i++;
+	//		}
+	//	}
+	//	return nRemoved;
+	//}
 	{
 		return removeAll(_string, true);
 	}
@@ -1529,21 +1529,21 @@ public class StringList {
 	 */
 	public int replaceAll(String _stringOld, String _stringNew) {
 		// START KGU#129 2016-01-08: Delegated to common submethod
-//    	int nReplaced = 0;
-//    	int i = 0;
-//    	while (i < count())
-//    	{
-//    		if (strings.get(i).equals(_stringOld))
-//    		{
-//    			strings.setElementAt(_stringNew, i);
-//    			nReplaced++;
-//    		}
-//    		else
-//    		{
-//    			i++;
-//    		}
-//    	}
-//    	return nReplaced;
+//		int nReplaced = 0;
+//		int i = 0;
+//		while (i < count())
+//		{
+//			if (strings.get(i).equals(_stringOld))
+//			{
+//				strings.setElementAt(_stringNew, i);
+//				nReplaced++;
+//			}
+//			else
+//			{
+//				i++;
+//			}
+//		}
+//		return nReplaced;
 		return replaceAllBetween(_stringOld, _stringNew, true, 0, count());
 		// END KGU#129 2016-01-08
 	}
