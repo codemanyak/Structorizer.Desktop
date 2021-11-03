@@ -1,7 +1,56 @@
-"Name"    = 'StructorizerExpr'
-"Version" = '0.2'
+﻿! -----------------------------------------------------------------------
+! Structorizer line grammar
+! -----------------------------------------------------------------------
+!
+! This grammar is a simplified LALR(1) grammar approach for GOLDParser
+! to parse element lines of Nassi-Shneiderman diagrams in Structorizer
+! (http://structorizer.fisch.lu).
+! Recent versions of Structorizer used to do some eclectic unsystematic
+! parsing without a formalized grammar and often in different ways,
+! depending on the respective purpose, which predictably led to several
+! inconsistencies and was a reliable source of many bugs and inefficient
+! operation.
+! So this approach is meant to provide Structorizer elements with syntax
+! trees of their contents that may serve as a dependable fundament of all
+! content-related tasks like syntax highlighting, analysis, execution,
+! and code generation.
+! To avoid several intersection grammars for the diferent kinds of
+! expected Element text content, some Element-type-specific "keywords"
+! will be inserted as line prefix before sending the text to the parser,
+! serving to unambiguously fork the parsing from start (as if there were
+! different start symbols in the grammar).
+! As there is no possibility of some dynamic symbol table feedback during
+! parsing, the rules are usually too generous in all conflict-prone cases.
+! For instance, in a condition it does not make sense combine results of
+! integer bit operations by Boolean operators like "and" and "or",
+! though formally the grammar allows this (actually in order to establish
+! the usual operator precedence of C / Java).
+! This will require some subsequent semantic check. Illegal combinations
+! will have to be detected afterwards, based on the obtained syntax tree,
+! To get the input code into a syntax tree at all had priority here.
+! For parts of the underlying Java expression syntax, the following
+! source was used (a partial Java 1.0-2.0 grammar for GOLDparser by
+! Dmitri Gazko):
+! http://www.goldparser.org/grammars/files/Java-Dmitry-Gazko.zip
+!
+! -----------------------------------------------------------------------
+! Version history:                                       
+! Version   Date        Author          Description
+! V 0.1     2021-02-16  Kay Gürtzig     Created (i.e. derived from the D.
+!                                       Gazkos Java 2.0 grammar) and tested
+!                                       with GOLDBuilder 5.2.0
+! V 0.2     2021-02-25  Kay Gürtzig     Reduced to the mere expression rules,
+!                                       adapted to Sructorizer-specific
+!                                       extensions and restrictions
+! V 0.3     2021-11-03  Kay Gürtzig     Extended to Structorizer lines, i.e.
+!                                       instructions, declarations, loop
+!                                       etc.
+! -----------------------------------------------------------------------
+
+"Name"    = 'StructorizerLine'
+"Version" = '0.3'
 "Author"  = 'Kay Gürtzig'
-"About"   = 'LALR(1) Structorizer expression grammar, derived from Dmitry Gazko''s partial Java 1.0-2.0 grammar'
+"About"   = 'LALR(1) grammar for Structorizer element lines'
 
 ! -------------------------------------------------
 ! Character Sets
@@ -40,13 +89,71 @@ StartWithNoZeroDecimalIntegerLiteral = {NoZeroDigit}{Digit}*{LongTypeSuffix}?
 StartWithZeroDecimalIntegerLiteral = '0'{LongTypeSuffix}?
 HexIntegerLiteral = '0'('x'|'X'){HexDigit}+{LongTypeSuffix}?
 OctalIntegerLiteral = '0'{OctalCharSet}+{LongTypeSuffix}?
+TypeKey = [Tt][Yy][Pp][Ee]
+VarKey = [Vv][Aa][Rr]
+DimKey = [Dd][Ii][Mm]
+AsKey = [Aa][Ss]
+ConstKey = [Cc][Oo][Nn][Ss][Tt]
+AndOpr = [Aa][Nn][Dd]
+OrOpr = [Oo][Rr]
+DivOpr = [Dd][Ii][Vv]
+ModOpr = [Mm][Oo][Dd]
+ShlOpr = [Ss][Hh][Ll]
+ShrOpr = [Ss][Hh][Rr]
+ArrayKey = [Aa][Rr][Rr][Aa][Yy]
+OfKey = [Oo][Ff]
+RecordKey = 'record' | 'struct'
+
+! Discriminating keys (prefixes) for the types of Element line
+CondKey = '§COND§'
+InputKey = '§INPUT§'
+OutputKey = '§OUTPUT§'
+ForKey = '§FOR§'
+ToKey = '§TO§'
+StepKey = '§STEP§'
+ForInKey = '§FOREACH§'
+InKey = '§IN§'
+ReturnKey = '§RETURN§'
+LeaveKey = '§LEAVE§'
+ExitKey = '§EXIT§'
+ThrowKey = '§THROW§'
+CatchKey = '§CATCH§'
+CallKey = '§CALL§'
+CaseKey = '§CASE§'
+SelectorKey = '§SELECT§'
 
 "Case Sensitive" = 'True'
-"Start Symbol"   = <Expression>
+"Start Symbol"   = <ElementLine>
 
 ! ===================================================================
 ! Rules
 ! ===================================================================
+
+! -------------------------------------------------------------------
+! Line types
+! -------------------------------------------------------------------
+
+<ElementLine>
+        ::= <Assignment>
+         |  <VarInitialisation>
+         |  <InputInstruction>
+         |  <OutputInstruction>
+         |  <VarDeclaration>
+         |  <ConstDefinition>
+         |  <TypeDefinition>
+         |  <Condition>
+         |  <ForHeader>
+         |  <ForInHeader>
+         |  <Jump>
+         |  <Call>
+         |  <CatchClause>
+         |  <CaseDiscriminator>
+         |  <CaseSelectors>
+         !|  <RoutineHeader>    ! Too ambiguous - will be parsed in the traditional way 
+
+! -------------------------------------------------------------------
+! Expressions
+! -------------------------------------------------------------------
 
 <CharacterLiteral> 
         ::= IndirectCharLiteral
@@ -91,17 +198,23 @@ OctalIntegerLiteral = '0'{OctalCharSet}+{LongTypeSuffix}?
 
 <RecordInitializer>
         ::= Identifier '{' <ComponentInitializers> '}'
-         | Identifier '{' '}'
+         |  Identifier '{' '}'
 
-<ExpressionList> ::= <Expression>
-                        | <ExpressionList> ',' <Expression>
+<ExpressionList>
+        ::= <Expression>
+         |  <ExpressionList> ',' <Expression>
 
-<ComponentInitializers> ::= <ComponentInitializer>
-                        | <ComponentInitializers> ',' <ComponentInitializer>
+<ComponentInitializers>
+        ::= <ComponentInitializerList>
+         |  <ExpressionList>
+         |  <ExpressionList> ',' <ComponentInitializerList>
+                         
+<ComponentInitializerList>
+        ::= <ComponentInitializerList> ',' <ComponentInitializer>
+         |  <ComponentInitializer>
 
 <ComponentInitializer> 
         ::= Identifier ':' <Expression>
-         |  <Expression>
 
 <Primary> 
         ::= <Literal>
@@ -113,9 +226,12 @@ OctalIntegerLiteral = '0'{OctalCharSet}+{LongTypeSuffix}?
 <FieldAccess> 
         ::= <Primary> '.' Identifier
 
-<MethodInvocation>
+<RoutineInvocation>
         ::= <Name> '(' <ExpressionList> ')'
          |  <Name> '(' ')'
+
+<MethodInvocation>
+        ::= <RoutineInvocation>
          |  <Primary> '.' Identifier '(' <ExpressionList> ')'
          |  <Primary> '.' Identifier '(' ')'
 
@@ -158,8 +274,8 @@ OctalIntegerLiteral = '0'{OctalCharSet}+{LongTypeSuffix}?
         ::= <UnaryExpression>
          |  <MultiplicativeExpression> '*' <UnaryExpression>
          |  <MultiplicativeExpression> '/' <UnaryExpression>
-         |  <MultiplicativeExpression> div <UnaryExpression>
-         |  <MultiplicativeExpression> mod <UnaryExpression>
+         |  <MultiplicativeExpression> DivOpr <UnaryExpression>
+         |  <MultiplicativeExpression> ModOpr <UnaryExpression>
          |  <MultiplicativeExpression> '%' <UnaryExpression>
 
 <AdditiveExpression>
@@ -172,8 +288,8 @@ OctalIntegerLiteral = '0'{OctalCharSet}+{LongTypeSuffix}?
          |  <ShiftExpression> '<<' <AdditiveExpression>
          |  <ShiftExpression> '>>' <AdditiveExpression>
          |  <ShiftExpression> '>>>' <AdditiveExpression>
-         |  <ShiftExpression> shl <AdditiveExpression>
-         |  <ShiftExpression> shr <AdditiveExpression>
+         |  <ShiftExpression> ShlOpr <AdditiveExpression>
+         |  <ShiftExpression> ShrOpr <AdditiveExpression>
 
 <RelationalExpression>
         ::= <ShiftExpression>
@@ -205,12 +321,12 @@ OctalIntegerLiteral = '0'{OctalCharSet}+{LongTypeSuffix}?
 <ConditionalAndExpression>
         ::= <InclusiveOrExpression>
          |  <ConditionalAndExpression> '&&' <InclusiveOrExpression>
-         |  <ConditionalAndExpression> and <InclusiveOrExpression>
+         |  <ConditionalAndExpression> AndOpr <InclusiveOrExpression>
 
 <ConditionalOrExpression>
         ::= <ConditionalAndExpression>
          |  <ConditionalOrExpression> '||' <ConditionalAndExpression>
-         |  <ConditionalOrExpression> or <ConditionalAndExpression>
+         |  <ConditionalOrExpression> OrOpr <ConditionalAndExpression>
 
 <ConditionalExpression> 
         ::= <ConditionalOrExpression>
@@ -220,17 +336,28 @@ OctalIntegerLiteral = '0'{OctalCharSet}+{LongTypeSuffix}?
         ::= <ConditionalExpression>
 !         |  <Assignment>
 
-!<Assignment>
-!        ::= <LeftHandSide> <AssignmentOperator> <AssignmentExpression>
+<Expression>
+        ::= <AssignmentExpression>
+          | <ArrayInitializer>
+          | <RecordInitializer>
 
-!<LeftHandSide> 
-!        ::= <Name>
-!         |  <FieldAccess>
-!         |  <ArrayAccess>
+!<ConstantExpression> ::= <Expression>
 
-!<AssignmentOperator> 
-!         ::= '<-'
-!          | ':='
+! -------------------------------------------------------------------
+! Instructions
+! -------------------------------------------------------------------
+
+<Assignment>
+        ::= <LeftHandSide> <AssignmentOperator> <Expression>
+
+<LeftHandSide> 
+        ::= <Name>
+         |  <FieldAccess>
+         |  <ArrayAccess>
+
+<AssignmentOperator> 
+         ::= '<-'
+          |  ':='
 !        ::= '='
 !         |  '*='
 !         |  '/='
@@ -244,9 +371,152 @@ OctalIntegerLiteral = '0'{OctalCharSet}+{LongTypeSuffix}?
 !         |  '^='
 !         |  '|='
 
-<Expression> ::= <AssignmentExpression>
-              | <ArrayInitializer>
-              | <RecordInitializer>
+<VarInitialisation>
+        ::= <VarDeclaration> <AssignmentOperator> <Expression>
+         |  <TypeDescription> <ArrayDecl> <AssignmentOperator> <Expression>
+         
+<ArrayDecl>
+        ::= Identifier <DimensionList>
+         
+<DimensionList>
+        ::= <DimensionList> <Dimension>
+         |
+         
+<Dimension>
+        ::= '[' <ShiftExpression> ']'
 
-!<ConstantExpression> ::= <Expression>
+<InputInstruction>
+        ::= InputKey
+         |  InputKey <Prompt> <TargetList>
+         
+<TargetList>
+        ::= <LeftHandSide>
+         |  <TargetList> ',' <LeftHandSide>
+         
+<Prompt>
+        ::= StringLiteral
+         |  StringLiteral ','
+         |
+         
+<OutputInstruction>
+        ::= OutputKey
+         |  OutputKey <ExpressionList>
 
+<VarDeclaration>
+        ::= VarKey Identifier ':' <TypeDescription>
+         |  DimKey Identifier AsKey <TypeDescription>
+         
+<ConstDefinition>
+        ::= ConstKey Identifier <AssignmentOperator> <Expression>
+         |  ConstKey Identifier ':' <TypeDescription> <AssignmentOperator> <Expression>
+         |  ConstKey Identifier AsKey <TypeDescription> <AssignmentOperator> <Expression>
+
+<TypeDefinition>
+        ::= TypeKey Identifier '=' <TypeConstruction>
+         
+<TypeConstruction>
+        ::= <TypeDescription>
+         |  RecordKey '{' <ComponentList> '}'
+         |  'enum' '{' <EnumList> '}'
+
+<TypeDescription>
+        ::= Identifier <Dims>
+         |  <ArrayOf> <TypeDescription>
+         
+<Dims>  ::= <Dims> '[]'
+         |
+         
+<ArrayOf>
+        ::= ArrayKey OfKey
+         |  ArrayKey '[' <RangeList> ']' OfKey
+         
+<RangeList>
+        ::= <Range>
+         |  <RangeList> ',' <Range>
+         
+<Range> ::= <ShiftExpression>
+         |  <IntegerLiteral> '..' <IntegerLiteral>
+         
+<ComponentList>
+        ::= <ComponentGroup>
+         |  <ComponentList> ';' <ComponentGroup>
+         
+<ComponentGroup>
+        ::= <IdList> AsKey <TypeDescription>
+         |  <IdList> ':' <TypeDescription>
+         
+<IdList>
+        ::= Identifier
+         |  <IdList> ',' Identifier
+
+<EnumList>
+        ::= <EnumDef>
+         |  <EnumList> ',' <EnumDef> 
+         
+<EnumDef>
+        ::= Identifier
+         |  Identifier '=' <ShiftExpression>    ! The expression should be more restricted
+         
+! -------------------------------------------------------------------
+! Alternatives and loops
+! -------------------------------------------------------------------
+
+<Condition>
+        ::= CondKey <ConditionalOrExpression>
+         
+! -------------------------------------------------------------------
+! FOR loops
+! -------------------------------------------------------------------
+
+<ForHeader>
+        ::= ForKey Identifier <AssignmentOperator> <Expression> ToKey <Expression> <StepClause>
+         
+<StepClause>
+        ::= StepKey <DecimalIntegerLiteral>
+         |  StepKey '-' <DecimalIntegerLiteral>
+         |  StepKey '+' <DecimalIntegerLiteral>
+         |
+         
+<ForInHeader>
+        ::= ForInKey Identifier InKey <ValueList>
+         
+<ValueList>
+        ::= <ArrayInitializer>
+         |  <Primary>
+         !|  <ExpressonList>    ! We shouldn't support loose lists any longer
+
+! -------------------------------------------------------------------
+! JUMPs
+! -------------------------------------------------------------------
+
+<Jump>  ::= ReturnKey
+         |  ReturnKey <Expression>
+         |  ExitKey
+         |  ExitKey <Expression>
+         |  LeaveKey
+         |  LeaveKey <DecimalIntegerLiteral>
+         |  ThrowKey <Expression>
+         
+! -------------------------------------------------------------------
+! CALLs
+! -------------------------------------------------------------------
+
+<Call>  ::= CallKey <RoutineInvocation>
+         |  CallKey <LeftHandSide> <AssignmentOperator> <RoutineInvocation>
+         
+! -------------------------------------------------------------------
+! TRY blocks
+! -------------------------------------------------------------------
+
+<CatchClause>
+        ::= CatchKey Identifier
+         |  CatchKey Identifier ':' <TypeDescription>
+         |  CatchKey Identifier AsKey <TypeDescription>
+         |  CatchKey <TypeDescription> Identifier
+         
+<CaseDiscriminator>
+        ::= CaseKey <AssignmentExpression>
+         
+<CaseSelectors>
+        ::= SelectorKey <ExpressionList>    ! Should be a constant expression list
+         
