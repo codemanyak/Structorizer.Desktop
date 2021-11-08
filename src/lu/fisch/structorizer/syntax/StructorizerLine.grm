@@ -45,10 +45,13 @@
 ! V 0.3     2021-11-03  Kay Gürtzig     Extended to Structorizer lines, i.e.
 !                                       instructions, declarations, loop
 !                                       etc.
+! V 0.4     2021-11-08  KayGürtzig      <AssignmentExpression> eliminated,
+!                                       side-effect expressions (auto-increment/
+!                                       auto-decrement) disabled.
 ! -----------------------------------------------------------------------
 
 "Name"    = 'StructorizerLine'
-"Version" = '0.3'
+"Version" = '0.4'
 "Author"  = 'Kay Gürtzig'
 "About"   = 'LALR(1) grammar for Structorizer element lines'
 
@@ -62,6 +65,7 @@
 {IdAlphaNumeric} = {Alphanumeric} + [_$]
 {HexDigit} = {Digit} + [abcdefABCDEF]
 {OctalCharSet} = [01234567]
+{BinaryCharSet} = [01]
 {NoZeroDigit} = [123456789]
 {LongTypeSuffix} =[lL]
 {FloatTypeSuffix} =[dfDF]
@@ -89,11 +93,13 @@ StartWithNoZeroDecimalIntegerLiteral = {NoZeroDigit}{Digit}*{LongTypeSuffix}?
 StartWithZeroDecimalIntegerLiteral = '0'{LongTypeSuffix}?
 HexIntegerLiteral = '0'('x'|'X'){HexDigit}+{LongTypeSuffix}?
 OctalIntegerLiteral = '0'{OctalCharSet}+{LongTypeSuffix}?
+BinaryIntegerLiteral = '0'('b'|'B'){BinaryCharSet}+{LongTypeSuffix}?
 TypeKey = [Tt][Yy][Pp][Ee]
 VarKey = [Vv][Aa][Rr]
 DimKey = [Dd][Ii][Mm]
 AsKey = [Aa][Ss]
 ConstKey = [Cc][Oo][Nn][Ss][Tt]
+NotOpr = [Nn][On][Tt]
 AndOpr = [Aa][Nn][Dd]
 OrOpr = [Oo][Rr]
 DivOpr = [Dd][Ii][Vv]
@@ -173,6 +179,7 @@ SelectorKey = '§SELECT§'
         ::= <DecimalIntegerLiteral>
          |  HexIntegerLiteral  
          |  OctalIntegerLiteral
+         |  BinaryIntegerLiteral
 
 
 <Literal> 
@@ -242,33 +249,33 @@ SelectorKey = '§SELECT§'
 <PostfixExpression>
         ::= <Primary>
          |  <Name>
-         |  <PostIncrementExpression>
-         |  <PostDecrementExpression>
+!         |  <PostIncrementExpression>
+!         |  <PostDecrementExpression>
 
-<PostIncrementExpression>
-        ::= <PostfixExpression> '++'
+!<PostIncrementExpression>
+!        ::= <PostfixExpression> '++'
 
-<PostDecrementExpression>
-        ::= <PostfixExpression> '--'
+!<PostDecrementExpression>
+!        ::= <PostfixExpression> '--'
 
 <UnaryExpression>
-        ::= <PreIncrementExpression>
-         |  <PreDecrementExpression>
-         |  '+' <UnaryExpression>
+        ::= '+' <UnaryExpression>
          |  '-' <UnaryExpression>
+!         |  <PreIncrementExpression>
+!         |  <PreDecrementExpression>
          |  <UnaryExpressionNotPlusMinus>
 
-<PreIncrementExpression> 
-        ::= '++' <UnaryExpression>
+!<PreIncrementExpression> 
+!        ::= '++' <UnaryExpression>
 
-<PreDecrementExpression>
-        ::= '--' <UnaryExpression>
+!<PreDecrementExpression>
+!        ::= '--' <UnaryExpression>
 
 <UnaryExpressionNotPlusMinus> 
         ::= <PostfixExpression>
          |  '~' <UnaryExpression>
          |  '!' <UnaryExpression>
-         |  not <UnaryExpression>
+         |  NotOpr <UnaryExpression>
 
 <MultiplicativeExpression>
         ::= <UnaryExpression>
@@ -332,12 +339,8 @@ SelectorKey = '§SELECT§'
         ::= <ConditionalOrExpression>
          |  <ConditionalOrExpression> '?' <Expression> ':' <ConditionalExpression>
 
-<AssignmentExpression> 
-        ::= <ConditionalExpression>
-!         |  <Assignment>
-
 <Expression>
-        ::= <AssignmentExpression>
+        ::= <ConditionalExpression>
           | <ArrayInitializer>
           | <RecordInitializer>
 
@@ -349,6 +352,11 @@ SelectorKey = '§SELECT§'
 
 <Assignment>
         ::= <LeftHandSide> <AssignmentOperator> <Expression>
+! KGU 2021-11-07: The following four variants might be allowed some day
+!        |  <LeftHandSide> '++'
+!        |  <LeftHandSide> '--'
+!        |  '++' <LeftHandSide>
+!        |  '--' <LeftHandSide>
 
 <LeftHandSide> 
         ::= <Name>
@@ -358,7 +366,7 @@ SelectorKey = '§SELECT§'
 <AssignmentOperator> 
          ::= '<-'
           |  ':='
-!        ::= '='
+! KGU 2021-11-07: The following combination operators might be allowed some day
 !         |  '*='
 !         |  '/='
 !         |  '%='
@@ -419,10 +427,12 @@ SelectorKey = '§SELECT§'
          |  RecordKey '{' <ComponentList> '}'
          |  'enum' '{' <EnumList> '}'
 
+! If we allowed arbitray modifiers (like "unsigned") here then the gramar would be ambiguous
+! Only in case of a fixed set of known and reserved modifiers we could do something here
 <TypeDescription>
         ::= Identifier <Dims>
          |  <ArrayOf> <TypeDescription>
-         
+
 <Dims>  ::= <Dims> '[]'
          |
          
@@ -462,7 +472,7 @@ SelectorKey = '§SELECT§'
 ! -------------------------------------------------------------------
 
 <Condition>
-        ::= CondKey <ConditionalOrExpression>
+        ::= CondKey <ConditionalExpression>
          
 ! -------------------------------------------------------------------
 ! FOR loops
@@ -478,12 +488,12 @@ SelectorKey = '§SELECT§'
          |
          
 <ForInHeader>
-        ::= ForInKey Identifier InKey <ValueList>
+        ::= ForInKey Identifier InKey <ExpressionList>
          
-<ValueList>
-        ::= <ArrayInitializer>
-         |  <Primary>
-         !|  <ExpressonList>    ! We shouldn't support loose lists any longer
+!<ValueList>
+!        ::= <ArrayInitializer>
+!         |  <Primary>
+!         !|  <ExpressonList>    ! We shouldn't support loose lists any longer
 
 ! -------------------------------------------------------------------
 ! JUMPs
@@ -515,7 +525,7 @@ SelectorKey = '§SELECT§'
          |  CatchKey <TypeDescription> Identifier
          
 <CaseDiscriminator>
-        ::= CaseKey <AssignmentExpression>
+        ::= CaseKey <ConditionalExpression>
          
 <CaseSelectors>
         ::= SelectorKey <ExpressionList>    ! Should be a constant expression list

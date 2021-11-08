@@ -19,8 +19,6 @@
  */
 package lu.fisch.structorizer.syntax;
 
-import java.util.Arrays;
-
 /******************************************************************************************************
  *
  *      Author:         Kay Gürtzig
@@ -41,6 +39,7 @@ import java.util.Arrays;
  *      Kay Gürtzig     2020-11-03      toString() delegated to (the less performant but more more versatile)
  *                                      appendToTokenList() method family,
  *                                      embedded Operator class extended with a translation option to function/method
+ *      Kay Gürtzig     2021-11-08      Support for ternary conditional operator (? :) added
  *
  ******************************************************************************************************
  *
@@ -50,6 +49,8 @@ import java.util.Arrays;
  *        and from token list. Type inference approaches are planned.
  *
  ******************************************************************************************************///
+
+import java.util.Arrays;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -67,11 +68,10 @@ import lu.fisch.utils.StringList;
  * <table>
  * <tr><th>Type</th><th>String</th><th>Children</th></tr>
  * <tr><td>LITERAL</td><td>the literal</td><td>(empty)</td></tr>
- * <tr><td>VARIABLE</td><td>variable id</td><td>(empty)</td></tr>
+ * <tr><td>IDENTIFIER</td><td>variable or component id</td><td>(empty)</td></tr>
  * <tr><td>OPERATOR</td><td>operator symbol</td><td>operands</td></tr>
- * <tr><td>INDEX</td><td>""</td><td>array, index expressions</td></tr>
  * <tr><td>FUNCTION</td><td>function id</td><td>arguments</td></tr>
- * <tr><td>QUALIFIER</td><td>comp id</td><td>record</td></tr>
+ * <tr><td>METHOD</td><td>method id</td><td>object, arguments</td></tr>
  * <tr><td>ARRAY_INITIALIZATION</td><td>type id (if any)</td><td>elements</td></tr>
  * <tr><td>RECORD_INITIALIZATION</td><td>type id</td><td>components</td></tr>
  * <tr><td>COMPONENT</td><td>[comp id]</td><td>comp value</td></tr>
@@ -149,6 +149,8 @@ public class Expression {
 	 * Export operator specification for expression mapping. Operator names from the
 	 * key set of map {@link Expression#OPERATOR_PRECEDENCE} may be mapped to objects
 	 * of this class in order to specify a translation for {@link Expression} trees.
+	 * In addition, a mapping for "?,:" (specifying the ternary conditional operator
+	 * {@code ... ? ... : ...}) may or should be provided.
 	 * @author Kay Gürtzig
 	 */
 	public static final class Operator {
@@ -280,6 +282,7 @@ public class Expression {
 		put("&1", new Operator("@1", 11));	// address (C)
 		//put("[]", new Operator("[]", 12));	// Does not change anything
 		//put(".", new Operator(".", 12));	// Does not change anything
+		put("?,!", new Operator("ifthenelse"));
 	}};
 	
 	/** COMPONENT means the colon separating a component name and a component value in a record initializer,<br/>
@@ -292,8 +295,12 @@ public class Expression {
 		IDENTIFIER,
 		/** an operator (its symbol), parent of operand expressions, data type usually inferred */
 		OPERATOR,
+		/** the ternary conditional operator as of C "... ? ... : ..." */
+		TERNARY,
 		/** function call (its identifier), parent of argument expressions, data type declared */
 		FUNCTION,
+		/** method call (its name), parent of object and argument expressions, data type declared */
+		METHOD,
 		/** an array initializer, parent of element expressions, data type determined by elements */
 		ARRAY_INITIALIZER,
 		/** a record initializer (record type name), parent of {@link #COMPONENT}s */
@@ -346,6 +353,21 @@ public class Expression {
 		text = "";
 	}
 	
+	/**
+	 * Counts the nodes contained in the hierarchy. To obtain the number of tokens
+	 * consider {@link #appendToTokenList(StringList)} and to apply method count()
+	 * to the result.
+	 * @return the number of nodes on traversing
+	 */
+	public int getLength()
+	{
+		int length = 1;
+		for (Expression child: children) {
+			length += child.getLength();
+		}
+		return length;
+	}
+	
 	/* (non-Javadoc)
 	 * @see java.lang.Object#toString()
 	 */
@@ -357,10 +379,12 @@ public class Expression {
 	 * Returns this expression as linearized string in Structorizer-compatible
 	 * syntax, assuming that this expression is embedded as operand of an operator
 	 * with precedence level {@code parentPrec}.
+	 * 
 	 * @param parentPrec - the assumed parent operator precedence
 	 * @param _alternOprs - alternative operator specifications (differing symbol
 	 * or precedence).
 	 * @return the composed expression string
+	 * 
 	 * @see #OPERATOR_PRECEDENCE
 	 * @see #appendToTokenList(StringList)
 	 * @see #appendToTokenList(StringList, HashMap)
@@ -368,117 +392,6 @@ public class Expression {
 	 */
 	private String toString(int parentPrec, HashMap<String, Operator> _alternOprs)
 	{
-		// Now delegated to appendToTokenList, which is less efficient but more versatile
-//		StringBuilder sb = new StringBuilder();
-//		String sepa = "";	// separator
-//		Iterator<Expression> iter = null;
-//		switch (type) {
-//		case LITERAL:
-//		case VARIABLE:
-//			sb.append(text);
-//			break;
-//		case OPERATOR: {
-//			// May be unary or binary
-//			Operator opr = null;
-//			if (_alternOprs != null) {
-//				opr = _alternOprs.get(text);
-//			}
-//			int myPrec = OPERATOR_PRECEDENCE.get(text);
-//			String symbol = text;
-//			if (opr != null) {
-//				myPrec = opr.precedence;
-//				symbol = opr.symbol;
-//			}
-//			if (children.size() <= 1 && !symbol.startsWith("1")) {
-//				// Unary prefix operator
-//				if (symbol.endsWith("1")) {
-//					sb.append(symbol.substring(0, symbol.length()-1));
-//				}
-//				else if (children.isEmpty() || !text.equals("[]")) {
-//					sb.append(symbol);
-//				}
-//				// Insert a gap if the operator is an identifier (word)
-//				if (Syntax.isIdentifier(symbol, false, null)) {
-//					sb.append(" ");
-//				}
-//			}
-//			// Without pointers, there is no need to put parentheses if parent is . or []
-//			else if (myPrec < parentPrec && !(myPrec < 11 && parentPrec == 12)) {
-//				sepa = "(";
-//			}
-//			iter = children.iterator();
-//			while (iter.hasNext()) {
-//				sb.append(sepa + iter.next().toString(myPrec, _alternOprs));
-//				if (text.equals("[]")) {
-//					sepa = sepa.isEmpty() ? symbol.substring(0, 1) : ", ";	// usually '['
-//				}
-//				else if (!text.equals(".")) {
-//					sepa = " " + symbol + " ";
-//				}
-//				else {
-//					sepa = symbol;
-//				}
-//			}
-//			if (text.equals("[]") && !children.isEmpty()) {
-//				sb.append(symbol.substring(1));	// usually ']'
-//			}
-//			if ((children.size() > 1 || symbol.startsWith("1"))
-//					&& myPrec < parentPrec && !(myPrec < 11 && parentPrec == 12)) {
-//				sb.append(')');
-//			}
-//			if ((children.size() <= 1) && symbol.startsWith("1")) {
-//				sb.append(symbol.substring(1));
-//			}
-//			break;
-//		}
-////		case INDEX:	// obsolete
-////			// First child expresses the array
-////			sb.append(children.getFirst().toString(OPERATOR_PRECEDENCE.get("[]")) + "[");
-////			iter = children.listIterator(1);
-////			while (iter.hasNext()) {
-////				sb.append(sepa + iter.next().toString());
-////				sepa = ", ";
-////			}
-////			sb.append(']');
-////			break;
-//		case RECORD_INITIALIZER:
-//			sb.append(text);
-//		case ARRAY_INITIALIZER:
-//			sb.append('{');
-//			iter = children.iterator();
-//			while (iter.hasNext()) {
-//				sb.append(sepa + iter.next().toString());
-//				sepa = ", ";
-//			}
-//			sb.append('}');
-//			break;
-//		case COMPONENT:
-//			sb.append(text + ": ");
-//			if (!children.isEmpty()) {
-//				sb.append(children.getFirst().toString());
-//			}
-//			break;
-//		case FUNCTION:
-//			sb.append(text + "(");
-//			iter = children.iterator();
-//			while (iter.hasNext()) {
-//				sb.append(sepa + iter.next().toString());
-//				sepa = ", ";
-//			}
-//			sb.append(')');
-//			break;
-////		case QUALIFIER:	// obsolete
-////			sb.append(children.getFirst().toString(OPERATOR_PRECEDENCE.get(".")));
-////			sb.append("." + text);
-////			break;
-//		case PARENTH:
-//			sb.append(text);
-//			sb.append(children.size());	// This element counts aggregated expressions by adding null entries
-//			break;
-//		default:
-//			break;		
-//		}
-//		return sb.toString();
 		StringList tokens = new StringList();
 		appendToTokenList(tokens, (byte)parentPrec, _alternOprs);
 		return tokens.concatenate(null);
@@ -486,10 +399,12 @@ public class Expression {
 	
 	/**
 	 * Given an operator symbol mapping to alternative operator symbols and preferences,
-	 * returns a translated linear expression string
+	 * returns a translated linear expression string.
+	 * 
 	 * @param _operatorSpecs - maps operator symbols from the key set of {@link #OPERATOR_PRECEDENCE}
 	 * to pairs of target operator symbol, and preference.
 	 * @return the linearized expression
+	 * 
 	 * @see #toString()
 	 * @see #OPERATOR_PRECEDENCE
 	 * @see #verboseOperators
@@ -502,7 +417,9 @@ public class Expression {
 	/**
 	 * Append this expression tree in tokenized form to the given token list {@code tokens}.
 	 * Uses standard operator precedence table {@link #OPERATOR_PRECEDENCE}.
+	 * 
 	 * @param tokens - a non-null {@link #toString(int)} to append my tokens to.
+	 * 
 	 * @see #appendToTokenList(StringList, HashMap)
 	 */
 	public void appendToTokenList(StringList tokens)
@@ -517,15 +434,17 @@ public class Expression {
 	 * ranks, which has an impact where parentheses must be placed. This way, an
 	 * equivalent translation to target languages may be addressed. A given empty map will
 	 * force parentheses around any non-atomic sub-expression.
+	 * 
 	 * @param tokens - a non-null {@link StringList} to append my tokens to.
 	 * @param alternOprs - a customized operator precedence map (if empty, then composed
 	 * operand expressions will be parenthesized).
+	 * 
 	 * @see #appendToTokenList(StringList)
 	 * @see #appendToTokenList(StringList, byte, HashMap)
 	 */
-	public void appendToTokenList(StringList tokens, HashMap<String, Operator> precMap)
+	public void appendToTokenList(StringList tokens, HashMap<String, Operator> alternOprs)
 	{
-		appendToTokenList(tokens, (byte)-1, precMap);
+		appendToTokenList(tokens, (byte)-1, alternOprs);
 	}
 	/**
 	 * Append this expression tree in tokenized form (with beautifying blanks around operator
@@ -535,11 +454,13 @@ public class Expression {
 	 * ranks, which has an impact where parentheses must be placed. This way, an
 	 * equivalent translation to target languages may be addressed. A given empty map will
 	 * force parentheses around any non-atomic sub-expression.
+	 * 
 	 * @param tokens - a non-null {@link StringList} to append my tokens to.
 	 * @param parentPrec - the operator precedence of the operator this expression forms an
 	 * operand for. -1 means there is no parent operator.
 	 * @param alternOprs - a customized operator precedence map (if empty, then composed
 	 * operand expressions will be parenthesized).
+	 * 
 	 * @see #appendToTokenList(StringList)
 	 */
 	private void appendToTokenList(StringList tokens, byte parentPrec, HashMap<String, Operator> alternOprs)
@@ -558,7 +479,7 @@ public class Expression {
 			boolean noPrec = false;	// put all expressions in parentheses?
 			if (alternOprs != null) {
 				opr = alternOprs.get(text);
-				noPrec =  alternOprs.isEmpty();
+				noPrec = alternOprs.isEmpty();
 			}
 			Byte myPrec = OPERATOR_PRECEDENCE.get(text);
 			String symbol = text;
@@ -662,6 +583,84 @@ public class Expression {
 			}
 			break;
 		}
+		case TERNARY:
+		{
+			int parenThresh = 5;	// Standard parenthesis threshold for children
+			Operator opr = null;
+			byte[] order = null;
+			if (alternOprs != null) {
+				if (alternOprs.isEmpty()) {
+					// Any non-atomic children will be parenthesised anyway
+					parenThresh = Integer.MAX_VALUE;
+				}
+				else {
+					opr = alternOprs.get(text);
+					if (opr != null) {
+						order = opr.argumentOrder;
+					}
+				}
+			}
+			if (children.isEmpty()) {
+				// Premature state
+				tokens.add(text);
+			}
+			else if (order == null) {
+				String[] symbols = text.split(",");
+				// We will always put this in braces
+				tokens.add("(");
+				int ix = 0;
+				for (Expression child: children) {
+					boolean paren = child.type != NodeType.TERNARY && child.getLength() > parenThresh;
+					if (paren) {
+						tokens.add("(");
+					}
+					child.appendToTokenList(tokens, parentPrec, alternOprs);
+					if (paren) {
+						tokens.add(")");
+					}
+					if (ix < symbols.length) {
+						tokens.add(" ");
+						tokens.add(symbols[ix++]);
+						tokens.add(" ");
+					}
+				}
+				tokens.add(")");
+			}
+			else if (order.length == 0 || order[0] == 0) {
+				tokens.add(opr.symbol);
+				tokens.add("(");
+				if (order.length == 0) {
+					order = new byte[] {0, 1, 2};
+				}
+				for (int i = 0; i < Math.min(order.length, children.size()); i++) {
+					if (i > 0) {
+						tokens.add(",");
+						tokens.add(" ");
+					}
+					if (order[i] < children.size()) {
+						children.get(order[i]).appendToTokenList(tokens, parentPrec, alternOprs);
+					}
+				}
+				tokens.add(")");
+			}
+			else { // as method?
+				// FIXME: This makes little sense and is rather unlikely. Thus weak precautions.
+				children.get(order[0]).appendToTokenList(tokens, parentPrec, alternOprs);
+				tokens.add(".");
+				tokens.add(opr.symbol);
+				tokens.add("(");
+				for (int i = 1; i < Math.min(order.length, children.size()); i++) {
+					if (i > 1) {
+						tokens.add(",");
+					}
+					if (order[i] < children.size()) {
+						children.get(order[i]).appendToTokenList(tokens, parentPrec, alternOprs);
+					}
+				}
+				tokens.add(")");
+			}
+			break;
+		}
 		case RECORD_INITIALIZER:
 			tokens.add(text);	// The record type name
 		case ARRAY_INITIALIZER:
@@ -691,6 +690,24 @@ public class Expression {
 			}
 			tokens.add(")");
 			break;
+		case METHOD: {
+			// append the target object
+			children.getFirst().appendToTokenList(tokens, alternOprs);
+			tokens.add(".");
+			tokens.add(text);
+			tokens.add("(");
+			int ix = 0;
+			for (Expression child: children) {
+				if (ix > 0) {	// First child was the target object, skip it here
+					for (int i = 0; i < sepa.length; i++) tokens.add(sepa[i]);
+					child.appendToTokenList(tokens, alternOprs);
+					sepa = new String[]{",", " "};
+				}
+				ix++;
+			}
+			tokens.add(")");
+			break;
+		}
 		case PARENTH:
 			// Only relevant during parsing (i.e. for debugging purposes)
 			tokens.add(text);
@@ -746,13 +763,19 @@ public class Expression {
 	 * Recursively tries to infer the data type of this expression (bottom up).
 	 * Relies on types already associated to sub-expressions (to renew all,
 	 * consider calling {@link #clearDataTypes(boolean)} before).
-	 * If {@code _typeMap} is given then new identified types and type associations
-	 * will be cached both at the expression substructure and in the {@code _typeMap}.
+	 * If {@code _typeMap} is given and {@code _cacheTypes} is {@code true} then new
+	 * identified types and type associations will be cached both at the expression
+	 * substructure and in the {@code _typeMap}.
+	 * 
 	 * @param _typeMap - a {@link TypeRegistry} to be used for variable type retrieval
 	 * and putting new type associations, or {@code null}.
-	 * @param _cacheTypes
+	 * @param _cacheTypes - Whether the inferred type is to be cached at this Expression
+	 * object (may accelerate repeated retrieval but also implies a risk of sticky obsolete
+	 * information.
 	 * @return The top type if identified. May be an anonymous (or temporarily composed)
 	 * type, in particular if {@code _typeMap} is not given for retrieval of variable types
+	 * 
+	 * @see #clearDataTypes(boolean)
 	 */
 	public Type inferType(TypeRegistry _typeMap, boolean _cacheTypes)
 	{
@@ -823,6 +846,9 @@ public class Expression {
 					}
 				}
 			}
+			break;
+		case METHOD:
+			// TODO How could we find out the result type of a method call?
 			break;
 		case LITERAL:
 			dType = TypeRegistry.getStandardTypeFor(text);
@@ -937,6 +963,14 @@ public class Expression {
 				}
 			}
 			break;
+		case TERNARY:
+			/* This is meant to be the well-known ...?...:... construct,
+			 * the type equals the one of the central and last operand.
+			 */
+			for (int i = 1; dType == null && i < children.size(); i++) {
+				dType = children.get(i).inferType(_typeMap, _cacheTypes);
+			}
+			break;
 		case RECORD_INITIALIZER:
 			if (_typeMap != null) {
 				dType = _typeMap.getType(text);
@@ -959,6 +993,7 @@ public class Expression {
 					// FIXME Auto-generated catch block
 					exc.printStackTrace();
 				}
+				isSafe = false;
 				_cacheTypes = false;
 			}
 			break;
@@ -976,7 +1011,7 @@ public class Expression {
 				dataType = dType;
 				isDataTypeSafe = !dType.isAnonymous();
 			}
-			if (_typeMap != null) {
+			if (_typeMap != null && _cacheTypes) {
 				dataType = dType;
 				isDataTypeSafe = isSafe && !dType.isAnonymous();
 				// FIXME really force?
@@ -991,6 +1026,9 @@ public class Expression {
 	 * Wipes off all data type associations to give way for an updating
 	 * type inference. If {@code onlyUnsafe} is true then safe data type
 	 * associations (as for literals) will remain.
+	 * 
+	 * @param onlyUnsafe - whether types marked as safe are to be preserved.
+	 * 
 	 * @see #inferType(TypeRegistry, boolean)
 	 * @see #copy(boolean)
 	 */
@@ -1010,7 +1048,9 @@ public class Expression {
 	 * @param withTypes - whether already attached data type info is to be
 	 * copied as well, no matter whether safe or not. (This way, the expression
 	 * copy can be transferred to another {@link TypeRegistry} context.)
+	 * 
 	 * @return the copy of this
+	 * 
 	 * @see #inferType(TypeRegistry, boolean)
 	 * @see #clearDataTypes(boolean)
 	 */
@@ -1028,6 +1068,7 @@ public class Expression {
 	 * Parses a token list into a list of Expression trees. The resulting Expression
 	 * list will usually contain a single element. Raises an exception in case of
 	 * syntactical errors.
+	 * 
 	 * @param tokens - a {@link StringList} containing the tokenized (and not necessarily
 	 * unified) expression text, will be consumed on parsing until a first token that
 	 * does not fit well. Spaces will be eliminated (if still present).
@@ -1039,7 +1080,9 @@ public class Expression {
 	 * @param tokenNo - the number of preceding tokens of he line not contained in
 	 * {@code tokens}, i.e. the overall index of the first token within {@code tokens}
 	 * @return the syntax tree or null.
+	 * 
 	 * @throws ExpressionException
+	 * 
 	 * @see {@link #parseList(StringList, String, String, StringList)}
 	 */
 	public static LinkedList<Expression> parse(StringList tokens, StringList stopTokens, short tokenNo) throws SyntaxException
@@ -1052,28 +1095,42 @@ public class Expression {
 		short position = 0;
 		boolean stopped = false;	// Flag for a detected stopToken
 		short nestingLevel = 0;	// bracket nesting - used to check expression listing
+		short condLevel = 0;	// conditional nesting (for ternary operators)
 		boolean wasOpd = false;	// true if the previous token was an operand
 		boolean signPos = true;	// true if a following '+' or '-' must be a sign
 		//while (!unifiedTokens.isEmpty() && (stopTokens == null || !stopTokens.contains(unifiedTokens.get(0)) || !stack.isEmpty())) {
 		while (!tokens.isEmpty() && !stopped) {
 			String token = tokens.get(0);
-			if (OPERATOR_PRECEDENCE.containsKey(token.toLowerCase()) || token.equals("[")) {
+			if (OPERATOR_PRECEDENCE.containsKey(token.toLowerCase())
+					|| token.equals("[") || token.equals("?")) {
 				// Must be an operator
 				if (token.equals("[")) {
 					token = "[]";
 				}
-				int prec = OPERATOR_PRECEDENCE.get(token.toLowerCase());
+				int prec = 1;
+				if (!token.equals("?")) {
+					prec = OPERATOR_PRECEDENCE.get(token.toLowerCase());
+				}
 				// Check for overloaded unary operator (also consider C deref and address operators)
 				boolean mayBeSign = signPos && (token.equals("+") || token.equals("-") || token.equals("*") || token.equals("&"));
 				while ((expr = stack.peekLast()) != null
-						&& expr.type == NodeType.OPERATOR
+						&& (expr.type == NodeType.OPERATOR
 						&& !mayBeSign
 						&& !NEGATION_OPERATORS.contains(token, false)	// is left-associative
-						&& prec <= OPERATOR_PRECEDENCE.get(expr.text.toLowerCase())) {
+						&& prec <= OPERATOR_PRECEDENCE.get(expr.text.toLowerCase())
+						|| expr.type == NodeType.TERNARY
+						&& "?,:".equals(expr.text)
+						&& prec <= 1)) {
 					try {
-						expr.children.addFirst(output.removeLast());	// second operand
-						if (!NEGATION_OPERATORS.contains(expr.text, false) && !expr.text.endsWith("1")) {
-							expr.children.addFirst(output.removeLast());	// first operand
+						if (expr.type == NodeType.TERNARY) {
+							expr.children.addLast(output.removeLast());	// third operand
+						}
+						else {
+							expr.children.addFirst(output.removeLast());	// second operand
+							if (!NEGATION_OPERATORS.contains(expr.text, false)
+									&& !expr.text.endsWith("1") && expr.type != NodeType.TERNARY) {
+								expr.children.addFirst(output.removeLast());	// first operand
+							}
 						}
 					}
 					catch (NoSuchElementException ex) {
@@ -1087,16 +1144,27 @@ public class Expression {
 						throw new SyntaxException("An operator '.' must be followed by an identifier!", tokenNo + position);
 					}
 				}
-				expr = new Expression(NodeType.OPERATOR, mayBeSign ? token+"1" : token, (short)(tokenNo + position));
-				stack.addLast(expr);
-				if (token.equals("[]")) {
-					expr = new Expression(NodeType.PARENTH, "[", (short)(tokenNo + position));
-					expr.children.addLast(null);		// one operand is the array
-					if (tokens.count() > 2 && !tokens.get(1).equals("]")) {
-						expr.children.addLast(null);	// expect at least one index
+				else if (token.equals("?")) {
+					if (tokens.count() < 4 || !tokens.contains(":")) {
+						throw new SyntaxException("An operator '?' must be followed by an ':'!", tokenNo + position);
 					}
+					expr = new Expression(NodeType.TERNARY, "?", (short)(tokenNo + position));
 					stack.addLast(expr);
-					nestingLevel++;
+					condLevel++;
+					// FIXME: Will we have to snatch the last output operand already?
+				}
+				else {
+					expr = new Expression(NodeType.OPERATOR, mayBeSign ? token+"1" : token, (short)(tokenNo + position));
+					stack.addLast(expr);
+					if (token.equals("[]")) {
+						expr = new Expression(NodeType.PARENTH, "[", (short)(tokenNo + position));
+						expr.children.addLast(null);		// one operand is the array
+						if (tokens.count() > 2 && !tokens.get(1).equals("]")) {
+							expr.children.addLast(null);	// expect at least one index
+						}
+						stack.addLast(expr);
+						nestingLevel++;
+					}
 				}
 				signPos = !token.equals(".");
 				wasOpd = false;
@@ -1115,7 +1183,23 @@ public class Expression {
 				}
 				else if ("(".equals(nextToken)) {
 					// Function name
-					expr = new Expression(NodeType.FUNCTION, token, (short)(tokenNo + position));
+					Expression top = null;
+					if (!stack.isEmpty()) {
+						top = stack.peekLast();
+					}
+					if (top != null && top.type == NodeType.OPERATOR && ".".equals(top.text)) {
+						try {
+							expr = new Expression(NodeType.METHOD, token, (short)(tokenNo + position));
+							expr.children.addFirst(output.removeLast());	// target object
+							stack.removeLast();
+						}
+						catch (NoSuchElementException ex) {
+							throw new SyntaxException("Too few operands for operator «" + expr.text + "».", expr.tokenPos, ex, 0);
+						}
+					}
+					else {
+						expr = new Expression(NodeType.FUNCTION, token, (short)(tokenNo + position));
+					}
 					stack.addLast(expr);
 					wasOpd = false;
 				}
@@ -1285,7 +1369,7 @@ public class Expression {
 				expr = stack.peekLast();
 				// Care for non-arithmetic brackets (argument list, index list, initializer)
 				if (expr != null) {
-					if (opening.equals("(") && expr.type == NodeType.FUNCTION
+					if (opening.equals("(") && (expr.type == NodeType.FUNCTION || expr.type == NodeType.METHOD)
 							|| opening.equals("{") && (expr.type == NodeType.ARRAY_INITIALIZER || expr.type == NodeType.RECORD_INITIALIZER)
 							|| opening.equals("[") && expr.text.equals("[]")) {
 						for (int i = 0; i < nItems; i++) {
@@ -1303,6 +1387,44 @@ public class Expression {
 				signPos = false;
 				wasOpd = true;
 			}
+			else if (token.equals(":") && condLevel > 0) {
+				// Seems to be the ternary conditional operator
+				String opening = "?";
+				boolean condFound = false;
+				do {
+					expr = stack.peekLast();
+					if (expr == null || expr.type == NodeType.PARENTH) {
+						throw new SyntaxException("'" + token + "' without preceding '" + opening + "'", tokenNo + position);
+					}
+					if (expr.type == NodeType.TERNARY) {
+						if (expr.text.equals(opening)) {
+							condFound = true;
+						}
+						else if (!composeExpression(expr, output)) {
+							// Inconsistent preceding ternary expression
+							throw new SyntaxException("'" + token + "' without preceding '" + opening + "'", tokenNo + position);
+						}
+					}
+					else {
+						composeExpression(expr, output);
+					}
+					stack.removeLast();
+				} while (!condFound);
+				expr.text += "," + token;
+				condLevel--;
+				for (int i = 0; i < 2; i++) {
+					try {
+						expr.children.addFirst(output.removeLast());
+					}
+					catch (NoSuchElementException ex) {
+						throw new SyntaxException("Lost first two operands for " + expr.text, expr.tokenPos, ex, 0);
+					}
+				}
+				// Re-push it
+				stack.addLast(expr);
+				signPos = true;
+				wasOpd = false;
+			}
 			else if (stopTokens != null && stopTokens.contains(token)) {
 				stopped = true;
 			}
@@ -1315,7 +1437,7 @@ public class Expression {
 			}
 		} // while (!tokens.isEmpty() && !stopped)
 		
-		// Now resolve the remaining operator stack content as far a possible
+		// Now resolve the remaining operator stack content as far as possible
 		while (!stack.isEmpty()) {
 			expr = stack.removeLast();
 			if (expr.type == NodeType.PARENTH) {
@@ -1330,9 +1452,17 @@ public class Expression {
 					nOpds = 2;
 				}
 			}
+			else if (expr.type == NodeType.TERNARY) {
+				// If we had three operands then expr wouldn't lie on the stack anymore
+				// So fetch the remaining ones of the first two operands
+				nOpds = 2 - nOpds;
+			}
 			try {
 				for (int i = 0; i < nOpds; i++) {
 					expr.children.addFirst(output.removeLast());
+				}
+				if (expr.type == NodeType.TERNARY && expr.children.size() < 3) {
+					expr.children.addLast(output.removeLast());
 				}
 			}
 			catch (NoSuchElementException ex) {
@@ -1343,14 +1473,16 @@ public class Expression {
 		return output;
 	}
 
-	/**}
+	/**
 	 * Given the incomplete expression node {@code expr}, which is supposed to be
 	 * an operator or a record component initialiser, completes the expression by
 	 * consuming elements from the operand stack {@code operands} and pushes the
-	 * composed expression node to the {@code operands} stack.
+	 * composed expression node back to the {@code operands} stack.
+	 * 
 	 * @param expr - the incomplete expression node
 	 * @param operands - stack of operands
 	 * @return {@code true} if a composition was possible, {@code false} otherwise
+	 * 
 	 * @throws SyntaxException if {@code expr} is of an inappropriate type or if
 	 * {@code operands} does not contain enough elements to accomplish {@code expr}
 	 */
@@ -1373,6 +1505,21 @@ public class Expression {
 			}
 			catch (NoSuchElementException ex) {
 				throw new SyntaxException("Missing value for record component «" + expr.text + "»", 0, ex, 0);
+			}
+		}
+		else if (expr.type == NodeType.TERNARY) {
+			for (int i = expr.children.size(); i < 3; i++) {
+				try {
+					if (i < 2) {
+						expr.children.addFirst(operands.removeLast());
+					}
+					else {
+						expr.children.addLast(operands.removeLast());
+					}
+				}
+				catch (NoSuchElementException ex) {
+					throw new SyntaxException(String.format("Missing %d. value for record component «%s»", i+1, expr.text), 0, ex, 0);
+				}
 			}
 		}
 		else {
@@ -1467,6 +1614,7 @@ public class Expression {
 			case RECORD_INITIALIZER:
 			case COMPONENT:
 			case FUNCTION:
+			case METHOD:
 				if (isLeftSide) {
 					// Non of these may occur directly on the left-hand side
 					complete = false;

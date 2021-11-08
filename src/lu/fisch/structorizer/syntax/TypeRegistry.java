@@ -30,7 +30,7 @@ import lu.fisch.utils.StringList;
  *
  *      Author:         Kay Gürtzig
  *
- *      Description:    Class TypeRegister, a global and several local type registers
+ *      Description:    Class TypeRegistry, register for type definitions and associations
  *
  ******************************************************************************************************
  *
@@ -48,8 +48,9 @@ import lu.fisch.utils.StringList;
  ******************************************************************************************************///
 
 /**
- * @author kay
- *
+ * A look-up table for type definitions and associations, consists of a global and several local type
+ * registers
+ * @author Kay Gürtzig
  */
 public class TypeRegistry {
 	

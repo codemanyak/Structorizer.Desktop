@@ -72,7 +72,7 @@ public class Line {
 		// FIXME Since class Declaration, possibly a distinction between LT_CONST_DEF and LT_VAR_DECL is no longer needed
 		/** Line could not be parsed, 0 expr. */
 		LT_RAW,
-		/** Assignment without declaration (function call, too?), 1 expr. */
+		/** Assignment without declaration (function call, too?), 2 expr */
 		LT_ASSIGNMENT,
 		/** Input instruction, >= 0 expr. (1st = prompt string) */
 		LT_INPUT,
@@ -80,12 +80,12 @@ public class Line {
 		LT_OUTPUT,
 		/** Condition of an Alternative or loop, 1 expr */
 		LT_CONDITION,
-		/** For loop head, 3 expr. (1st = assignment, 3rd = literal) */
+		/** For loop head, 4 expr. (1st = name, 3rd = int literal) */
 		LT_FOR_LOOP,
-		/** Foreach loop head, 2 expr. (1st = name, 2nd = array/string) */
+		/** Foreach loop head, 2 expr. (1st = name, 2nd = name/array/string/expression list) */
 		LT_FOREACH_LOOP,
-		/** Procedure call, 1 expr. */
-		LT_PROC_CALL,
+		/** Procedure or function call, 1 or 2 expr. */
+		LT_ROUTINE_CALL,
 		/** Return instruction, 0..1 expr. */
 		LT_RETURN,
 		/** Leave instruction, 0..1 expr. */
@@ -120,7 +120,7 @@ public class Line {
 	public static final int LT_CONDITION_MASK    = 1 << LineType.LT_CONDITION.ordinal();
 	public static final int LT_FOR_LOOP_MASK     = 1 << LineType.LT_FOR_LOOP.ordinal();
 	public static final int LT_FOREACH_LOOP_MASK = 1 << LineType.LT_FOREACH_LOOP.ordinal();
-	public static final int LT_PROC_CALL_MASK    = 1 << LineType.LT_PROC_CALL.ordinal();
+	public static final int LT_PROC_CALL_MASK    = 1 << LineType.LT_ROUTINE_CALL.ordinal();
 	public static final int LT_LEAVE_MASK        = 1 << LineType.LT_LEAVE.ordinal();
 	public static final int LT_RETURN_MASK       = 1 << LineType.LT_RETURN.ordinal();
 	public static final int LT_EXIT_MASK         = 1 << LineType.LT_EXIT.ordinal();
@@ -135,6 +135,10 @@ public class Line {
 	public static final int LT_VAR_INIT_MASK     = 1 << LineType.LT_VAR_INIT.ordinal();
 	public static final int LT_ROUTINE_MASK      = 1 << LineType.LT_ROUTINE.ordinal();
 	
+	/**
+	 * Maps internal prefix keys and some actual keywords like "var", "dim", "const",
+	 * "type" to corresponding {@link LineType}s
+	 */
 	private static final HashMap<String, LineType> lineStartsToTypes = new HashMap<String, LineType>();
 	static {
 		lineStartsToTypes.put("input", LineType.LT_INPUT);
@@ -225,7 +229,7 @@ public class Line {
 		case LT_CATCH:
 		case LT_CONDITION:
 		case LT_EXIT:
-		case LT_PROC_CALL:
+		case LT_ROUTINE_CALL:
 		case LT_THROW:
 		case LT_INPUT:
 		case LT_CONST_DEF:
@@ -272,7 +276,7 @@ public class Line {
 		case LT_LEAVE:
 		case LT_THROW:
 		case LT_RETURN:
-		case LT_PROC_CALL:
+		case LT_ROUTINE_CALL:
 		case LT_VAR_DECL:
 			count = 1;
 			break;
@@ -480,7 +484,7 @@ public class Line {
 		case LT_CONDITION:
 		case LT_EXIT:
 		case LT_THROW:
-		case LT_PROC_CALL:
+		case LT_ROUTINE_CALL:
 			// We expect exactly one expression and no further keywords in general
 			{
 				List<Expression> parsed = Expression.parse(_tokens, null, (short)0);
@@ -778,7 +782,7 @@ public class Line {
 		case LT_RETURN:
 		case LT_THROW:
 		case LT_OUTPUT:
-		case LT_PROC_CALL:
+		case LT_ROUTINE_CALL:
 			for (Expression expr: expressions) {
 				okay = expr.gatherVariables(assignedVars, usedVars, false) && okay;
 			}
@@ -898,10 +902,15 @@ public class Line {
 			put("-1", new Operator("-1", 11));	// sign
 			put("*1", new Operator("1^", 11));	// pointer deref (Pascal)
 			put("&1", new Operator("@1", 11));	// address (Pascal)
+			put("?,:", new Operator("ifthenelse"));
 		}};
 		
 		String[] exprTests = new String[] {
 				// "good" expressions
+				"c <- 57 > 3 ? 12 : -5",
+				"c + 5 * 3 == 8 ? (423 * 7) : 128 + 9",
+				"(c + 5 * 3 == 8) ? (57 > 3 ? 12 : -5) : 128 + 9",
+				"(c + 5 * 3 == 8) ? 57 > 3 ? 12 : -5 : 128 + 9",
 				"a <- 7 * (15 - sin(1.3))",
 				"a <- 7 * (15 - sin(b))",
 				"a[i+1] <- { 16, \"doof\", 45+9, b}",
@@ -963,11 +972,17 @@ public class Line {
 		
 		TypeRegistry types = new TypeRegistry();
 		
+		long timeTotal = 0L;
+		long maxTime = -1L;
+		long minTime = -1L;
+		int nTests = 0;
 		for (String test: exprTests) {
 			try {
-				StringList tokens = Syntax.splitLexically(test, true);
 				System.out.println("===== " + test + " =====");
+				long startTime = System.currentTimeMillis();
+				StringList tokens = Syntax.splitLexically(test, true);
 				List<Expression> exprs = Expression.parse(tokens, /*sepas/**/ /**/null/**/, (short)0);
+				long endTime = System.currentTimeMillis();
 				int i = 1;
 				for (Expression expr: exprs) {
 					StringList vars1 = new StringList();
@@ -989,10 +1004,27 @@ public class Line {
 					}
 					i++;
 				}
+				long timeDiff = endTime - startTime;
+				System.out.println(timeDiff);
+				timeTotal += (timeDiff);
+				if (nTests == 0) {
+					maxTime = timeDiff;
+					minTime = timeDiff;
+				}
+				else if (timeDiff > maxTime) {
+					maxTime = timeDiff;
+				}
+				else if (timeDiff < minTime) {
+					minTime = timeDiff;
+				}
+				nTests++;
 			} catch (SyntaxException exc) {
 				System.err.println(exc.getMessage() + " at " + exc.getPosition());
 			}
 		}
+		System.out.println("---------------------------------------------------------------------------------------");
+		System.out.println("sum = " + timeTotal + ", ave = " + (timeTotal *1.0 / nTests) + ", min = " + minTime + ", max = " + maxTime);
+		System.out.println("---------------------------------------------------------------------------------------");
 		
 		for (String line: lineTests) {
 			System.out.println("===== " + line + " =====");
@@ -1010,10 +1042,12 @@ public class Line {
 		}
 		
 		for (String test: negationTests) {
-			StringList tokens = Syntax.splitLexically(test, true);
 			System.out.println("===== " + test + " =====");
+			long startTime = System.currentTimeMillis();
+			StringList tokens = Syntax.splitLexically(test, true);
 			try {
 				List<Expression> exprs = Expression.parse(tokens, null, (short)0);
+				long endTime = System.currentTimeMillis();
 				Expression cond = exprs.get(0);
 				System.out.println(cond.toString());
 				Type exprType = cond.inferType(types, false);
@@ -1033,10 +1067,27 @@ public class Line {
 				else {
 					System.out.println("No type retrieved");
 				}
+				long timeDiff = endTime - startTime;
+				System.out.println(timeDiff);
+				timeTotal += (timeDiff);
+				if (nTests == 0) {
+					maxTime = timeDiff;
+					minTime = timeDiff;
+				}
+				else if (timeDiff > maxTime) {
+					maxTime = timeDiff;
+				}
+				else if (timeDiff < minTime) {
+					minTime = timeDiff;
+				}
+				nTests++;
 			} catch (SyntaxException exc) {
 				System.err.println(exc.getMessage() + " at " + exc.getPosition());
 			}
 		}
+		System.out.println("---------------------------------------------------------------------------------------");
+		System.out.println("sum = " + timeTotal + ", ave = " + (timeTotal *1.0 / nTests) + ", min = " + minTime + ", max = " + maxTime);
+		System.out.println("---------------------------------------------------------------------------------------");
 		
 		System.out.println(types);
 	}
