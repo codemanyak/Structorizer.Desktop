@@ -3075,10 +3075,7 @@ public class Root extends Element {
     				while ((pos = tokens.indexOf(keyTokens, pos + 1, !Syntax.ignoreCase)) >= 0)
     				{
     					tokens.set(pos, keywords[kw]);
-    					for (int j=1; j < keyLength; j++)
-    					{
-    						tokens.delete(pos+1);
-    					}
+    					tokens.remove(pos + 1, pos + keyLength);
     				}
     			}
     		}
