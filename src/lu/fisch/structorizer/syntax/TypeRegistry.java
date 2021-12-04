@@ -39,6 +39,10 @@ import lu.fisch.utils.StringList;
  *      Author          Date            Description
  *      ------          ----            -----------
  *      Kay Gürtzig     2020-11-01      First Issue (for #800)
+ *      Kay Gürtzig     2021-11-24      Method putType(String, Type, Element, int, boolean) added to allow
+ *                                      synonym registrations. Synonym type definitions will be of little
+ *                                      use, though as variables are not associated to type names but to
+ *                                      types. So the synonym will practically be bridged.
  *
  ******************************************************************************************************
  *
@@ -266,15 +270,18 @@ public class TypeRegistry {
 	 * is anonymous or there is already an entry with the same name. Both
 	 * restrictions can be overridden with {@code force = true}.
 	 * Standard types may not be overridden in any case.
+	 * 
 	 * @param type - the {@link Type} to be registered
-	 * @param definingEl - the Element where the type is defined or {@code null}
-	 * @param defLine - number of the defining text line or -1
+	 * @param definingEl - the Element where the type is defined, or {@code null}
+	 * @param defLine - number of the defining text line, or -1
 	 * @param force - whether it is even to be put if it is an anonymous type
 	 * or would override an existing entry (which is dangerous as references to
 	 * the type might get inconsistent).
 	 * @return {@code null} if the registration failed, {@code type} if the
 	 * registration worked without overriding another entry, otherwise the
 	 * overwritten previous {@link Type} entry.
+	 * 
+	 * @see #putType(String, Type, Element, int, boolean)
 	 */
 	public Type putType(Type type, Element definingEl, int defLine, boolean force)
 	{
@@ -291,6 +298,58 @@ public class TypeRegistry {
 			}
 			else {
 				result = oldEntry.type;
+			}
+		}
+		return result;
+	}
+	/**
+	 * Registers the given {@link Type} {@code type} being defined in line
+	 * {@code defLine} of Element {@code definingEl} under the passed name
+	 * {@code typeId} name unless it is anonymous or there is already an 
+	 * entry with the same name.<br/>
+	 * Both restrictions can be overridden with {@code force = true}.
+	 * Standard types may not be overridden in any case.
+	 * 
+	 * @param typeId - the (synonym) type name under which {@code type} is to be
+	 * additionally registered
+	 * @param type - the {@link Type} to be registered
+	 * @param definingEl - the Element where the type is defined or {@code null}
+	 * @param defLine - number of the defining text line or -1
+	 * @param force - whether it is even to be put if it is an anonymous type
+	 * or would override an existing entry (which is dangerous as references to
+	 * the type might get inconsistent).
+	 * @return {@code null} if the registration failed, {@code type} if the
+	 * registration worked without overriding another entry, otherwise the
+	 * overwritten previous {@link Type} entry.
+	 * @throws SyntaxException if the creation of a redirection type is illegal
+	 * (e.g. because of a 
+	 * 
+	 * @see #putType(Type, Element, int, boolean)
+	 */
+	public Type putType(String typeId, Type type, Element definingEl, int defLine, boolean force) throws SyntaxException
+	{
+		// TODO: Check for equivalent type
+		// TODO: Don't override an explicitly defined type, either
+		String name = type.getName();
+		if (type instanceof RedirType && (typeId == null || typeId.equals(name))) {
+			// The caller seems to have prepared a redirection type already
+			return putType(type, definingEl, defLine, force);
+		}
+		Type result = null;
+		if (getStandardType(typeId) == null &&
+				(force || !type.isAnonymous() && !typeMap.containsKey(":" + typeId))) {
+			Type oldType = getType(type.getName());
+			Type refType = type;
+			if (oldType == null) {
+				refType = new RedirType(typeId, type);
+				typeMap.put(":" + typeId, new TypeRegEntry(refType, definingEl, defLine));
+				refType.registry = this;
+			}
+			if (oldType == null) {
+				result = refType;
+			}
+			else {
+				result = oldType;
 			}
 		}
 		return result;

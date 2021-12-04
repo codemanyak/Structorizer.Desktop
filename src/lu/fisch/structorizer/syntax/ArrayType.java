@@ -25,7 +25,7 @@ import java.util.ArrayList;
  *
  *      Author:         Kay Gürtzig
  *
- *      Description:    Type class for arrays
+ *      Description:    Data type representing class for array types
  *
  ******************************************************************************************************
  *
@@ -35,6 +35,7 @@ import java.util.ArrayList;
  *      ------          ----            -----------
  *      Kay Gürtzig     2019-12-20      First Issue
  *      Kay Gürtzig     2021-10-17      getDimensions() modified (both signature and algorithm)
+ *      Kay Gürtzig     2021-11-24      Field rangeExprs and method getRangeExpressions() added
  *
  ******************************************************************************************************
  *
@@ -54,10 +55,10 @@ import java.util.ArrayList;
  */
 public class ArrayType extends Type {
 
-	// FIXME It may be sensible to replace this with a type name (for registry consistency)
 	private Type elType = null;
-	int size = 0;	// 0 means unknown or flexible
-	int offset = 0;	// By default, indexing starts at 0
+	private int size = 0;	// 0 means unknown or flexible, -1 means to be dynamically calculated via expression
+	private int offset = 0;	// By default, indexing starts at 0
+	private Expression[] rangeExprs = null;	// holds the [offset and] size expressions if not literals
 	
 //	/**
 //	 * Extracts name, element type, and index range from the given type
@@ -103,10 +104,13 @@ public class ArrayType extends Type {
 	/**
 	 * Constructs an array type for the given {@code name} over elements of data
 	 * type {@code elementType} with given index range {@code indexRange}.
-	 * @param name - the type name (must fit to strict Ascii identifier syntax)
+	 * 
+	 * @param name - the type name (must fit to strict Ascii identifier syntax), or
+	 *  {@code null} (for an anonymous type)
 	 * @param elementType - data type of the elements (or {@code null} if unspecified)
-	 * @param indexRange - a pair of lower and upper index bounds where bowth values
-	 * are meant to be included. 
+	 * @param indexRange - a pair of lower and upper index bounds where both values
+	 * are meant to be included.
+	 * 
 	 * @throws SyntaxException if the name does not fit to identifier syntax
 	 */
 	public ArrayType(String name, Type elementType, int[] indexRange) throws SyntaxException {
@@ -116,6 +120,27 @@ public class ArrayType extends Type {
 			offset = indexRange[0];
 			size = indexRange[1] - offset + 1;
 		}
+	}
+
+	/**
+	 * Constructs an array type for the given {@code name} over elements of data
+	 * type {@code elementType} with given index range expressions {@code rangeExprs}.
+	 * 
+	 * @param name - the type name (must fit to strict Ascii identifier syntax) or
+	 *  {@code null} (for an anonymous type)
+	 * @param elementType - data type of the elements (or {@code null} if unspecified)
+	 * @param rangeExpressions - an array of one or two {@link Expression}s, in case
+	 * of one expression it describes the computation of the element number (array size),
+	 * in case of two expressions, {@code rangeExpressions[0]} denotes the lower index
+	 * bound, {@code rangeExpressions[1]} the upper index bound.
+	 * 
+	 * @throws SyntaxException if the name does not fit to identifier syntax
+	 */
+	public ArrayType(String name, Type elementType, Expression[] rangeExpressions) throws SyntaxException {
+		super(name);
+		elType = elementType;
+		size = -1;	// Mark the association of expressions
+		rangeExprs = rangeExpressions;
 	}
 
 	@Override
@@ -128,13 +153,14 @@ public class ArrayType extends Type {
 	 * Returns a string expressing the type structure either in a shallow way
 	 * ({@code deep = false}) or in a completely recursive way ({@code deep = true}).
 	 * The result will start with symbol {@code @}, followed by the identifier (if named)
-	 * and the element type specification, the index start offset and the number of elements
-	 * in parentheses, e.g.:<br/>
+	 * and, in parentheses, the element type specification, the index start offset
+	 * and the number of elements (if specified exactly, otherwise 0), e.g.:<br/>
 	 * {@code @id(elType,0,100)}
+	 * 
 	 * @param altName - an alternative name to be used instead of {@link #getName()},
 	 * if {@code null} then the internal identifier will be used.
 	 * @param deep - whether possible substructure is to be fully described (otherwise
-	 * embedded types will just be represented by their names (if the are named).
+	 * embedded types will just be represented by their names (if they are named).
 	 * @return the composed string
 	 */
 	@Override
@@ -165,7 +191,9 @@ public class ArrayType extends Type {
 	
 	/**
 	 * @return the list of array sizes and index range offsets in direct nesting
-	 * succession, i.e. as far as the element type is an array type itself. 
+	 * succession, i.e. as far as the element type is an array type itself.
+	 * 
+	 * @see #getRangeExpressions(int)
 	 */
 	public ArrayList<int[]> getDimensions()
 	{
@@ -179,4 +207,50 @@ public class ArrayType extends Type {
 		return dimensions;
 	}
 	
+	/**
+	 * Retrieves the {@link Expressions} describing either the size of the
+	 * nested array type at level {@code _depth} (where 0 denotes this type)
+	 * if the index offset is 0 or of the index start offset (lower index bound)
+	 * and of the upper index bound if the index offset is not 0.
+	 * If the size was not specified at all or if there are no {@code _depth}
+	 * subsequent array dimensions in this type then returns {@code null}.
+	 * 
+	 * @param _depth - the dimension level (0 is outer etc.)
+	 * @return an array of one or two {@link Expression} objects (representing
+	 * syntax trees), or {@code null}
+	 * 
+	 * @see #getDimensions()
+	 */
+	public Expression[] getRangeExpressions(int _depth)
+	{
+		Type elemT = this.elType;
+		while (elemT instanceof ArrayType && _depth >= 0) {
+			ArrayType elemType = (ArrayType)elemT;
+			if (_depth == 0) {
+				if (elemType.size == -1) {
+					return elemType.rangeExprs;
+				}
+				else if (elemType.size == 0) {
+					return null;
+				}
+				else if (elemType.offset == 0) {
+					return new Expression[] {
+							new Expression(Expression.NodeType.LITERAL,
+									Integer.toString(elemType.size), (short)0)
+					};
+				}
+				else {
+					return new Expression[] {
+							new Expression(Expression.NodeType.LITERAL,
+									Integer.toString(elemType.offset), (short)0),
+							new Expression(Expression.NodeType.LITERAL,
+									Integer.toString(elemType.size -1), (short)1)
+					};
+				}
+			}
+			elemT = elemType.elType;
+			_depth--;
+		}
+		return null;
+	}
 }

@@ -177,6 +177,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2021-10-05      Enh. #992: New Analyser check 30 against bracket faults
  *      Kay Gürtzig     2021-10-07      Bugfix #995: False Analyser accusations about insecure initialization status
  *      Kay Gürtzig     2021-11-12/14   Enh. #967 New plugin-specific Analyser syntax checks
+ *      Kay Gürtzig     2021-12-04      Issue #800: Grammar-based Analyser syntax check added
  *      
  ******************************************************************************************************
  *
@@ -248,6 +249,7 @@ import java.util.EmptyStackException;
 import lu.fisch.graphics.*;
 import lu.fisch.utils.*;
 import lu.fisch.structorizer.syntax.Line;
+import lu.fisch.structorizer.syntax.LineParser;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.structorizer.syntax.TypeRegistry;
 import lu.fisch.structorizer.helpers.GENPlugin;
@@ -778,7 +780,8 @@ public class Root extends Element {
 		true,	false,	true,	true,	true,	// 11 .. 15
 		true,	true,	true,	true,	true,	// 16 .. 20
 		true,	true,	true,	true,	false,	// 21 .. 25
-		false,	true,	true,	true,	true	// 26 .. 30
+		false,	true,	true,	true,	true,	// 26 .. 30
+		false									// 31
 		// Add another element for every new check...
 		// and DON'T FORGET to append its description to
 		// AnalyserPreferences.checkCaptions
@@ -3567,418 +3570,417 @@ public class Root extends Element {
 	}
 	// END BFI 2015-12-10
 	
-    // START KGU 2016-03-25: JLabel replaced by new class LangTextHolder
-    //private String errorMsg(JLabel _label, String _rep)
-    private String errorMsg(LangTextHolder _label, String _subst)
-    // END KGU 2016-03-25
-    {
-            String res = _label.getText();
-            res = res.replace("%", _subst);
-            return res;
-    }
-    
-    // START KGU#239 2016-08-12: New opportunity to insert more than one information
-    private String errorMsg(LangTextHolder _label, String[] _substs)
-    {
-        String msg = _label.getText();
-        for (int i = 0; i < _substs.length; i++)
-        {
-        	msg = msg.replace("%"+(i+1), _substs[i]);
-        }
-        return msg;
-    	
-    }
-    // END KGU#239 2016-08-12
+	// START KGU 2016-03-25: JLabel replaced by new class LangTextHolder
+	//private String errorMsg(JLabel _label, String _rep)
+	private String errorMsg(LangTextHolder _label, String _subst)
+	// END KGU 2016-03-25
+	{
+		String res = _label.getText();
+		res = res.replace("%", _subst);
+		return res;
+	}
 
-    // START KGU#78 2015-11-25: We additionally supervise return mechanisms
-    //private void analyse(Subqueue _node, Vector _errors, StringList _vars, StringList _uncertainVars)
-    /**
-     * Analyses the subtree, which _node is local root of
-     * @param _node - subtree root
-     * @param _errors - the collected errors (may be enhanced by the call)
-     * @param _vars - names of variables being set within the subtree
-     * @param _uncertainVars - names of variables being set in some branch of the subtree 
-     * @param _constants - constants defined hitherto
-     * @param _resultFlags - a boolean array: {usesReturn?, usesResult?, usesProcName?}
-     * @param _types - the type definitions and declarations encountered so far
-     */
-    private void analyse(Subqueue _node, Vector<DetectedError> _errors, StringList _vars, StringList _uncertainVars, HashMap<String, String> _constants, boolean[] _resultFlags, HashMap<String, TypeMapEntry> _types)
-    {
-    	for (int i = 0; i < _node.getSize(); i++)
-    	{
-    		Element ele = _node.getElement(i);
-    		// START KGU#277 2016-10-13: Enh. #270 - disabled elements are to be handled as if they wouldn't exist
-    		if (ele.isDisabled(true)) continue;
-    		// END KGU#277 2016-10-13
-    		String eleClassName = ele.getClass().getSimpleName();
-    		
-    		// get all set variables from actual instruction (just this level, no substructre)
-    		StringList myVars = getVarNames(ele);
+	// START KGU#239 2016-08-12: New opportunity to insert more than one information
+	private String errorMsg(LangTextHolder _label, String[] _substs)
+	{
+		String msg = _label.getText();
+		for (int i = 0; i < _substs.length; i++)
+		{
+			msg = msg.replace("%"+(i+1), _substs[i]);
+		}
+		return msg;
 
-    		// START KGU#1012 2021-11-14: Enh. #967
-    		if (pluginSyntaxCheckers != null && !eleClassName.equals("Root") && !eleClassName.equals("Parallel")) {
-    			for (Map.Entry<String, GeneratorSyntaxChecker> chkEntry: pluginSyntaxCheckers.entrySet()) {
-    				if (pluginChecks.get(chkEntry.getKey()) == true) {
-    					GeneratorSyntaxChecker checker = chkEntry.getValue();
-    					StringList lines = ele.getUnbrokenText();
-    					GENPlugin.SyntaxCheck.Source testType = 
-    							GENPlugin.SyntaxCheck.Source.valueOf(chkEntry.getKey().split(":")[1]);
-    					switch (testType) {
-    					case STRING:
-    						for (int l = 0; l < lines.count(); l++) {
-    							String line = lines.get(l);
-    							String error = checker.checkSyntax(line, ele, l);
-    							if (error != null) {
-    								// FIXME: Fetch the plugin-configured message
-    								addError(_errors, new DetectedError(error.replace("error.syntax", "ARM syntax violation"), ele), -2);
-    							}
-    						}
-    						break;
-    					case TREE:
-    						// FIXME not implemented yet: iterate over parsed lines
-    						break;
-    					}
-    				}
-    			}
-    		}
-    		// END KGU#1012 2021-11-14
-    		
-    		// CHECK: assignment in condition (#8)
-    		if (eleClassName.equals("While")
-    				|| eleClassName.equals("Repeat")
-    				|| eleClassName.equals("Alternative"))
-    		{
-    			analyse_8(ele, _errors);
-    		}
-    		
-    		// CHECK  #5: non-uppercase var
-    		// CHECK  #7: correct identifiers
-    		// CHECK #13: Competitive return mechanisms
-    		analyse_5_7_13(ele, _errors, myVars, _resultFlags);
-    		
-    		// START KGU#239/KGU#327 2016-08-12: Enh. #231 / # 329
-    		// CHECK #18: Variable names only differing in case
-    		// CHECK #19: Possible name collisions with reserved words
-    		// CHECK #21: Mistakable variable names I, l, O
-    		analyse_18_19_21(ele, _errors, _vars, _uncertainVars, myVars);
-    		// END KGU#239/KGU#327 2016-08-12
+	}
+	// END KGU#239 2016-08-12
 
-    		// CHECK #10: wrong multi-line instruction
-    		// CHECK #11: wrong assignment (comparison operator in assignment)
-    		// CHECK #22: constant depending on non-constants or constant redefinition
-    		// CHECK #24: type definitions
-    		if (eleClassName.equals("Instruction"))
-    		{
-    			analyse_10_11(ele, _errors);
-    			// START KGU#375 2017-04-04: Enh. #388
-    			// START KGU#388 2017-09-16: Enh. #423 record analysis
-    			//analyse_22((Instruction)ele, _errors, _vars, _uncertainVars, _constants);
-    			analyse_22_24((Instruction)ele, _errors, _vars, _uncertainVars, _constants, _types);
-    			// END KGU#388 2017-09-16
-    			// END KGU#375 2017-04-04
-    		}
+	// START KGU#78 2015-11-25: We additionally supervise return mechanisms
+	//private void analyse(Subqueue _node, Vector _errors, StringList _vars, StringList _uncertainVars)
+	/**
+	 * Analyses the subtree, which _node is local root of
+	 * @param _node - subtree root
+	 * @param _errors - the collected errors (may be enhanced by the call)
+	 * @param _vars - names of variables being set within the subtree
+	 * @param _uncertainVars - names of variables being set in some branch of the subtree 
+	 * @param _constants - constants defined hitherto
+	 * @param _resultFlags - a boolean array: {usesReturn?, usesResult?, usesProcName?}
+	 * @param _types - the type definitions and declarations encountered so far
+	 */
+	private void analyse(Subqueue _node, Vector<DetectedError> _errors, StringList _vars, StringList _uncertainVars, HashMap<String, String> _constants, boolean[] _resultFlags, HashMap<String, TypeMapEntry> _types)
+	{
+		for (int i = 0; i < _node.getSize(); i++)
+		{
+			Element ele = _node.getElement(i);
+			// START KGU#277 2016-10-13: Enh. #270 - disabled elements are to be handled as if they wouldn't exist
+			if (ele.isDisabled(true)) continue;
+			// END KGU#277 2016-10-13
+			String eleClassName = ele.getClass().getSimpleName();
 
-    		// START KGU#992 2021-10-05: Enh. #992
-    		// CHECK #30: Bracket balancing
-    		analyse_30(ele, _errors);
-    		// END KGU#992 2021-10-05
+			// get all set variables from actual instruction (just this level, no substructre)
+			StringList myVars = getVarNames(ele);
 
-    		// CHECK: non-initialised var (except REPEAT)  (#3)
-    		// START KGU#375 2017-04-05: Enh. #388 linewise analysis for Instruction elements
-//    		StringList myUsed = getUsedVarNames(ele, true, true);
-//    		if (!eleClassName.equals("Repeat"))
-//    		{
-//    			// FIXME: linewise test for Instruction elements needed
-//    			analyse_3(ele, _errors, _vars, _uncertainVars, myUsed);
-//    		}
-    		StringList myUsed = new StringList();
-    		if (eleClassName.equals("Instruction"))
-    		{
-    			@SuppressWarnings("unchecked")
-    			HashMap<String, String> constantDefs = (HashMap<String, String>)_constants.clone();
-    			String[] keywords = Syntax.getAllProperties();
-    			StringList initVars = new StringList(_vars);
-    			// START KGU#423 2017-09-13: Enh. #416 - cope with user-defined line breaks
-    			//for (int j = 0; j < ele.getText().count(); j++) {
-    			StringList unbrokenText = ele.getUnbrokenText();
-    			for (int j = 0; j < unbrokenText.count(); j++) {
-    			// END KGU#423 2017-09-13
-    				String line = unbrokenText.get(j);
-    				// START KGU#388 2017-09-13: Enh. #423
-    				if (!Instruction.isTypeDefinition(line, _types)) {
-    				// END KGU#388 2017-09-13
-    					myUsed = getUsedVarNames(line, keywords);
-    					// START KGU#985 2021-10-07: Bugfix #995 - Pass line number, respect "healing"
-    					//analyse_3(ele, _errors, initVars, _uncertainVars, myUsed, -1);
-    					//initVars.add(this.getVarNames(StringList.getNew(line), constantDefs));
-    					analyse_3(ele, _errors, initVars, _uncertainVars, myUsed, j);
-    					StringList asgdVars = this.getVarNames(StringList.getNew(line), constantDefs);
-    					initVars.add(asgdVars);
-    					for (int k = 0; k < asgdVars.count(); k++) {
-    						_uncertainVars.removeAll(asgdVars.get(k));
-    					}
-    					// END KGU#985 2021-10-07
-    				// START KGU#388 2017-09-13: Enh. #423
-    				}
-    				// END KGU#388 2017-09-13
-    			}
-    		}
-    		else {
-    			myUsed = getUsedVarNames(ele, true, true);
-    			if (!eleClassName.equals("Repeat"))
-    			{
-    				analyse_3(ele, _errors, _vars, _uncertainVars, myUsed, -1);
-    			}
-    		}
-    		// END KGU#375 2017-04-05
+			// START KGU#790 2021-12-04: Issue #800 Grammar-based check
+			if (check(31) && !eleClassName.equals("Parallel")) {
+				analyse_31(ele, _errors);
+			}
+			// END KGU#790 2021-12-04
 
-    		/*////// AHHHHHHHH ////////
-                            getUsedVarNames should also parse for new variable names,
-                            because any element that uses a variable that has never been
-                            assigned, this variable will not be known and thus not
-                            detected at all!
-                            KGU#163 2016-03-25: Solved
-    		 */
-    		/*
-    		if(_node.getElement(i).getClass().getSimpleName().equals("Instruction"))
-    		{
-    			System.out.println("----------------------------");
-    			System.out.println(((Element) _node.getElement(i)).getText());
-    			System.out.println("----------------------------");
-    			System.out.println("Vars : "+myVars);
-    			System.out.println("Init : "+_vars);
-    			System.out.println("Used : "+myUsed);
-    			//System.out.println("----------------------------");
-    		}
-    		/**/
+			// START KGU#1012 2021-11-14: Enh. #967
+			if (pluginSyntaxCheckers != null && !eleClassName.equals("Root") && !eleClassName.equals("Parallel")) {
+				for (Map.Entry<String, GeneratorSyntaxChecker> chkEntry: pluginSyntaxCheckers.entrySet()) {
+					if (pluginChecks.get(chkEntry.getKey()) == true) {
+						GeneratorSyntaxChecker checker = chkEntry.getValue();
+						StringList lines = ele.getUnbrokenText();
+						GENPlugin.SyntaxCheck.Source testType = 
+								GENPlugin.SyntaxCheck.Source.valueOf(chkEntry.getKey().split(":")[1]);
+						switch (testType) {
+						case STRING:
+							for (int l = 0; l < lines.count(); l++) {
+								String line = lines.get(l);
+								String error = checker.checkSyntax(line, ele, l);
+								if (error != null) {
+									// FIXME: Fetch the plugin-configured message
+									addError(_errors, new DetectedError(error.replace("error.syntax", "ARM syntax violation"), ele), -2);
+								}
+							}
+							break;
+						case TREE:
+							// FIXME not implemented yet: iterate over parsed lines
+							break;
+						}
+					}
+				}
+			}
+			// END KGU#1012 2021-11-14
 
-    		// START KGU#2/KGU#78 2015-11-25: New checks for Call and Jump elements
-    		// CHECK: Correct syntax of Call elements (#15) New!
-    		if (ele instanceof Call)
-    		{
-    			analyse_15((Call)ele, _errors);
-    		}
-    		// CHECK: Correct usage of Jump, including return (#16) New!
-    		// + CHECK #13: Competitive return mechanisms
-    		else if (ele instanceof Jump)
-    		{
-    			analyse_13_16_jump((Jump)ele, _errors, myVars, _resultFlags);
-    		}
-    		else if (ele instanceof Instruction)	// May also be a subclass (except Call and Jump)!
-    		{
-    		// END KGU#78 2015-11-25
+			// CHECK: assignment in condition (#8)
+			if (eleClassName.equals("While")
+					|| eleClassName.equals("Repeat")
+					|| eleClassName.equals("Alternative"))
+			{
+				analyse_8(ele, _errors);
+			}
+
+			// CHECK  #5: non-uppercase var
+			// CHECK  #7: correct identifiers
+			// CHECK #13: Competitive return mechanisms
+			analyse_5_7_13(ele, _errors, myVars, _resultFlags);
+
+			// START KGU#239/KGU#327 2016-08-12: Enh. #231 / # 329
+			// CHECK #18: Variable names only differing in case
+			// CHECK #19: Possible name collisions with reserved words
+			// CHECK #21: Mistakable variable names I, l, O
+			analyse_18_19_21(ele, _errors, _vars, _uncertainVars, myVars);
+			// END KGU#239/KGU#327 2016-08-12
+
+			// CHECK #10: wrong multi-line instruction
+			// CHECK #11: wrong assignment (comparison operator in assignment)
+			// CHECK #22: constant depending on non-constants or constant redefinition
+			// CHECK #24: type definitions
+			if (eleClassName.equals("Instruction"))
+			{
+				analyse_10_11(ele, _errors);
+				// START KGU#375 2017-04-04: Enh. #388
+				// START KGU#388 2017-09-16: Enh. #423 record analysis
+				//analyse_22((Instruction)ele, _errors, _vars, _uncertainVars, _constants);
+				analyse_22_24((Instruction)ele, _errors, _vars, _uncertainVars, _constants, _types);
+				// END KGU#388 2017-09-16
+				// END KGU#375 2017-04-04
+			}
+
+			// START KGU#992 2021-10-05: Enh. #992
+			// CHECK #30: Bracket balancing
+			analyse_30(ele, _errors);
+			// END KGU#992 2021-10-05
+
+			// CHECK: non-initialised var (except REPEAT)  (#3)
+			// START KGU#375 2017-04-05: Enh. #388 linewise analysis for Instruction elements
+//			StringList myUsed = getUsedVarNames(ele, true, true);
+//			if (!eleClassName.equals("Repeat"))
+//			{
+//				// FIXME: linewise test for Instruction elements needed
+//				analyse_3(ele, _errors, _vars, _uncertainVars, myUsed);
+//			}
+			StringList myUsed = new StringList();
+			if (eleClassName.equals("Instruction"))
+			{
+				@SuppressWarnings("unchecked")
+				HashMap<String, String> constantDefs = (HashMap<String, String>)_constants.clone();
+				String[] keywords = Syntax.getAllProperties();
+				StringList initVars = new StringList(_vars);
+				// START KGU#423 2017-09-13: Enh. #416 - cope with user-defined line breaks
+				//for (int j = 0; j < ele.getText().count(); j++) {
+				StringList unbrokenText = ele.getUnbrokenText();
+				for (int j = 0; j < unbrokenText.count(); j++) {
+				// END KGU#423 2017-09-13
+					String line = unbrokenText.get(j);
+					// START KGU#388 2017-09-13: Enh. #423
+					if (!Instruction.isTypeDefinition(line, _types)) {
+					// END KGU#388 2017-09-13
+						myUsed = getUsedVarNames(line, keywords);
+						// START KGU#985 2021-10-07: Bugfix #995 - Pass line number, respect "healing"
+						//analyse_3(ele, _errors, initVars, _uncertainVars, myUsed, -1);
+						//initVars.add(this.getVarNames(StringList.getNew(line), constantDefs));
+						analyse_3(ele, _errors, initVars, _uncertainVars, myUsed, j);
+						StringList asgdVars = this.getVarNames(StringList.getNew(line), constantDefs);
+						initVars.add(asgdVars);
+						for (int k = 0; k < asgdVars.count(); k++) {
+							_uncertainVars.removeAll(asgdVars.get(k));
+						}
+						// END KGU#985 2021-10-07
+					// START KGU#388 2017-09-13: Enh. #423
+					}
+					// END KGU#388 2017-09-13
+				}
+			}
+			else {
+				myUsed = getUsedVarNames(ele, true, true);
+				if (!eleClassName.equals("Repeat"))
+				{
+					analyse_3(ele, _errors, _vars, _uncertainVars, myUsed, -1);
+				}
+			}
+			// END KGU#375 2017-04-05
+
+			/*
+			if(_node.getElement(i).getClass().getSimpleName().equals("Instruction"))
+			{
+				System.out.println("----------------------------");
+				System.out.println(((Element) _node.getElement(i)).getText());
+				System.out.println("----------------------------");
+				System.out.println("Vars : "+myVars);
+				System.out.println("Init : "+_vars);
+				System.out.println("Used : "+myUsed);
+				//System.out.println("----------------------------");
+			}
+			/**/
+
+			// START KGU#2/KGU#78 2015-11-25: New checks for Call and Jump elements
+			// CHECK: Correct syntax of Call elements (#15) New!
+			if (ele instanceof Call)
+			{
+				analyse_15((Call)ele, _errors);
+			}
+			// CHECK: Correct usage of Jump, including return (#16) New!
+			// + CHECK #13: Competitive return mechanisms
+			else if (ele instanceof Jump)
+			{
+				analyse_13_16_jump((Jump)ele, _errors, myVars, _resultFlags);
+			}
+			else if (ele instanceof Instruction)	// May also be a subclass (except Call and Jump)!
+			{
+			// END KGU#78 2015-11-25
 				analyse_13_16_instr((Instruction)ele, _errors, i == _node.getSize()-1, myVars, _resultFlags);
-    		// START KGU#78 2015-11-25
-    		}
-    		// END KGU#78 2015-11-25
+			// START KGU#78 2015-11-25
+			}
+			// END KGU#78 2015-11-25
 
-    		// add detected vars to initialised vars
-//    		// START KGU#376 2017-04-11: Enh. #389 - withdrawn 2017-04-20
-    		_vars.addIfNew(myVars);
-//    		if (!(ele instanceof Call && ((Call)ele).isImportCall())) {
-//    			_vars.addIfNew(myVars);
-//    		}
-//    		// END KGU#376 2017-04-20
+			// add detected vars to initialised vars
+//			// START KGU#376 2017-04-11: Enh. #389 - withdrawn 2017-04-20
+			_vars.addIfNew(myVars);
+//			if (!(ele instanceof Call && ((Call)ele).isImportCall())) {
+//				_vars.addIfNew(myVars);
+//			}
+//			// END KGU#376 2017-04-20
 
-    		// CHECK: endless loop (#2)
-    		if (eleClassName.equals("While")
-    				|| eleClassName.equals("Repeat"))
-    		{
-    			analyse_2(ele, _errors);
-    		}
+			// CHECK: endless loop (#2)
+			if (eleClassName.equals("While")
+					|| eleClassName.equals("Repeat"))
+			{
+				analyse_2(ele, _errors);
+			}
 
-    		// CHECK: loop var modified (#1) and loop parameter consistency (#14 new!)
-    		if (eleClassName.equals("For"))
-    		{
-    			// START KGU#923 2021-02-01: Bugfix #923 FOR loops introduce variables!
-    			if (ele instanceof For) {
-    				ele.updateTypeMap(_types);
-    			}
-    			// END KGU#923 2021-02-01
-    			analyse_1_2_14((For)ele, _errors);
-    		}
+			// CHECK: loop var modified (#1) and loop parameter consistency (#14 new!)
+			if (eleClassName.equals("For"))
+			{
+				// START KGU#923 2021-02-01: Bugfix #923 FOR loops introduce variables!
+				if (ele instanceof For) {
+					ele.updateTypeMap(_types);
+				}
+				// END KGU#923 2021-02-01
+				analyse_1_2_14((For)ele, _errors);
+			}
 
-    		// CHECK: if with empty T-block (#4)
-    		if (eleClassName.equals("Alternative"))
-    		{
-    			if(((Alternative)ele).qTrue.getSize()==0)
-    			{
-    				//error  = new DetectedError("You are not allowed to use an IF-statement with an empty TRUE-block!",(Element) _node.getElement(i));
-    				addError(_errors, new DetectedError(errorMsg(Menu.error04,""), ele), 4);
-    			}
-    		}
-    		
-    		// CHECK: Inconsistency risk due to concurrent variable access by parallel threads (#17) New!
-    		if (eleClassName.equals("Parallel"))
-    		{
-    			analyse_17((Parallel) ele, _errors);
-    		}
-    		// START KGU#514 2018-04-03: Bugfix #528 (for Instructions, it has already been done above)
-    		else if (check(24) && !eleClassName.equals("Instruction")) {
-    			analyse_24(ele, _errors, _types);
-    		}
-    		// END KGU#514 2018-04-03
+			// CHECK: if with empty T-block (#4)
+			if (eleClassName.equals("Alternative"))
+			{
+				if(((Alternative)ele).qTrue.getSize()==0)
+				{
+					//error  = new DetectedError("You are not allowed to use an IF-statement with an empty TRUE-block!",(Element) _node.getElement(i));
+					addError(_errors, new DetectedError(errorMsg(Menu.error04,""), ele), 4);
+				}
+			}
+
+			// CHECK: Inconsistency risk due to concurrent variable access by parallel threads (#17) New!
+			if (eleClassName.equals("Parallel"))
+			{
+				analyse_17((Parallel) ele, _errors);
+			}
+			// START KGU#514 2018-04-03: Bugfix #528 (for Instructions, it has already been done above)
+			else if (check(24) && !eleClassName.equals("Instruction")) {
+				analyse_24(ele, _errors, _types);
+			}
+			// END KGU#514 2018-04-03
 
 
-    		// continue analysis for subelements
-    		if (ele instanceof ILoop)
-    		{
-    			analyse(((ILoop) ele).getBody(), _errors, _vars, _uncertainVars, _constants, _resultFlags, _types);
-    		
-    			if (ele instanceof Repeat)
-    			{
-    				analyse_3(ele, _errors, _vars, _uncertainVars, myUsed, -1);
-    			}
-    		}
-    		else if (eleClassName.equals("Parallel"))
-    		{
-    			StringList initialVars = new StringList(_vars);
-    			Iterator<Subqueue> iter = ((Parallel)ele).qs.iterator();
-    			while (iter.hasNext())
-    			{
-    				// For the thread, propagate only variables known before the parallel section
-    				StringList threadVars = new StringList(initialVars);
-    				analyse(iter.next(), _errors, threadVars, _uncertainVars, _constants, _resultFlags, _types);
-    				// Any variable introduced by one of the threads will be known after all threads have terminated
-    				_vars.addIfNew(threadVars);
-    			}
-    		}
-    		else if(eleClassName.equals("Alternative"))
-    		{
-    			StringList tVars = new StringList(_vars);
-    			StringList fVars = new StringList(_vars);
+			// continue analysis for subelements
+			if (ele instanceof ILoop)
+			{
+				analyse(((ILoop) ele).getBody(), _errors, _vars, _uncertainVars, _constants, _resultFlags, _types);
 
-    			analyse(((Alternative)ele).qTrue, _errors, tVars, _uncertainVars, _constants, _resultFlags, _types);
-    			analyse(((Alternative)ele).qFalse, _errors, fVars, _uncertainVars, _constants, _resultFlags, _types);
+				if (ele instanceof Repeat)
+				{
+					analyse_3(ele, _errors, _vars, _uncertainVars, myUsed, -1);
+				}
+			}
+			else if (eleClassName.equals("Parallel"))
+			{
+				StringList initialVars = new StringList(_vars);
+				Iterator<Subqueue> iter = ((Parallel)ele).qs.iterator();
+				while (iter.hasNext())
+				{
+					// For the thread, propagate only variables known before the parallel section
+					StringList threadVars = new StringList(initialVars);
+					analyse(iter.next(), _errors, threadVars, _uncertainVars, _constants, _resultFlags, _types);
+					// Any variable introduced by one of the threads will be known after all threads have terminated
+					_vars.addIfNew(threadVars);
+				}
+			}
+			else if(eleClassName.equals("Alternative"))
+			{
+				StringList tVars = new StringList(_vars);
+				StringList fVars = new StringList(_vars);
 
-    			for(int v = 0; v < tVars.count(); v++)
-    			{
-    				String varName = tVars.get(v);
-    				if (fVars.contains(varName)) { _vars.addIfNew(varName); }
-    				else if (!_vars.contains(varName)) { _uncertainVars.add(varName); }
-    			}
-    			for(int v = 0; v < fVars.count(); v++)
-    			{
-    				String varName = fVars.get(v);
-    				if (!_vars.contains(varName)) { _uncertainVars.addIfNew(varName); }
-    			}
+				analyse(((Alternative)ele).qTrue, _errors, tVars, _uncertainVars, _constants, _resultFlags, _types);
+				analyse(((Alternative)ele).qFalse, _errors, fVars, _uncertainVars, _constants, _resultFlags, _types);
 
-    			// if a variable is not being initialised on both of the lists,
-    			// it could be considered as not always being initialised
-    			//
-    			// => use a second list with variable that "may not have been initialised"
-    		}
-    		else if(eleClassName.equals("Case"))
-    		{
-    			Case caseEle = ((Case) ele);
+				for(int v = 0; v < tVars.count(); v++)
+				{
+					String varName = tVars.get(v);
+					if (fVars.contains(varName)) { _vars.addIfNew(varName); }
+					else if (!_vars.contains(varName)) { _uncertainVars.add(varName); }
+				}
+				for(int v = 0; v < fVars.count(); v++)
+				{
+					String varName = fVars.get(v);
+					if (!_vars.contains(varName)) { _uncertainVars.addIfNew(varName); }
+				}
+
+				// if a variable is not being initialised on both of the lists,
+				// it could be considered as not always being initialised
+				//
+				// => use a second list with variable that "may not have been initialised"
+			}
+			else if(eleClassName.equals("Case"))
+			{
+				Case caseEle = ((Case) ele);
 				int si = caseEle.qs.size();	// Number of branches
-    			StringList initialVars = new StringList(_vars);
-    			// START KGU#758 2019-11-08: Enh. #770
-    			analyse_27_28(caseEle, _errors);
-    			// END KGU#758 2019-11-08
-    			// START KGU#928 2021-02-08: Enh. #928 - discriminator type check added
-    			analyse_29(caseEle, _errors, _types);
-    			// END KGU#928 2021-02-08
-    			    			 
-    			// This Hashtable will contain strings composed of as many '1' characters as
-    			// branches initialise the respective new variable - so in the end we can see
-    			// which variables aren't always initialised.
-    			Hashtable<String, String> myInitVars = new Hashtable<String, String>();
-    			for (int j=0; j < si; j++)
-    			{
-    				StringList caseVars = new StringList(initialVars);
-    				analyse((Subqueue) caseEle.qs.get(j),_errors, caseVars, _uncertainVars, _constants, _resultFlags, _types);
-    				for(int v = 0; v < caseVars.count(); v++)
-    				{
-    					String varName = caseVars.get(v);
-    					if(myInitVars.containsKey(varName))
-    					{
-    						myInitVars.put(varName, myInitVars.get(varName) + "1");
-    					}
-    					else
-    					{
-    						myInitVars.put(varName, "1");
-    					}
-    				}
-    				//_vars.addIfNew(caseVars);
-    			}
-    			//System.out.println(myInitVars);
-    			// walk trough the hash table and check
-    			Enumeration<String> keys = myInitVars.keys();
-    			// adapt size if no "default"
-    			if ( caseEle.getText().get(caseEle.getText().count()-1).equals("%") )
-    			{
-    				si--;
-    			}
-    			//System.out.println("SI = "+si+" = "+c.text.get(c.text.count()-1));
-    			while ( keys.hasMoreElements() )
-    			{
-    				String key = keys.nextElement();
-    				String value = myInitVars.get(key);
+				StringList initialVars = new StringList(_vars);
+				// START KGU#758 2019-11-08: Enh. #770
+				analyse_27_28(caseEle, _errors);
+				// END KGU#758 2019-11-08
+				// START KGU#928 2021-02-08: Enh. #928 - discriminator type check added
+				analyse_29(caseEle, _errors, _types);
+				// END KGU#928 2021-02-08
 
-    				if(value.length()==si)
-    				{
-    					_vars.addIfNew(key);
-    				}
-    				else
-    				{
-    					if(!_vars.contains(key))
-    					{
-    						_uncertainVars.addIfNew(key);
-    					}
-    				}
-    			}
-    			// look at the comment for the IF-structure
-    		}
-    		// START KGU#812 2020-02-21: Bugfix #825 forgotten to descend recursively
-    		else if (eleClassName.equals("Try")) {
-    			StringList tVars = new StringList(_vars);
-    			StringList cVars = new StringList(_vars);
-    			StringList fVars = new StringList(_vars);
+				// This Hashtable will contain strings composed of as many '1' characters as
+				// branches initialise the respective new variable - so in the end we can see
+				// which variables aren't always initialised.
+				Hashtable<String, String> myInitVars = new Hashtable<String, String>();
+				for (int j=0; j < si; j++)
+				{
+					StringList caseVars = new StringList(initialVars);
+					analyse((Subqueue) caseEle.qs.get(j),_errors, caseVars, _uncertainVars, _constants, _resultFlags, _types);
+					for(int v = 0; v < caseVars.count(); v++)
+					{
+						String varName = caseVars.get(v);
+						if(myInitVars.containsKey(varName))
+						{
+							myInitVars.put(varName, myInitVars.get(varName) + "1");
+						}
+						else
+						{
+							myInitVars.put(varName, "1");
+						}
+					}
+					//_vars.addIfNew(caseVars);
+				}
+				//System.out.println(myInitVars);
+				// walk trough the hash table and check
+				Enumeration<String> keys = myInitVars.keys();
+				// adapt size if no "default"
+				if ( caseEle.getText().get(caseEle.getText().count()-1).equals("%") )
+				{
+					si--;
+				}
+				//System.out.println("SI = "+si+" = "+c.text.get(c.text.count()-1));
+				while ( keys.hasMoreElements() )
+				{
+					String key = keys.nextElement();
+					String value = myInitVars.get(key);
 
-    			cVars.addIfNew(((Try)ele).getText().trim());
-    			
-    			analyse(((Try)ele).qTry, _errors, tVars, _uncertainVars, _constants, _resultFlags, _types);
-    			analyse(((Try)ele).qCatch, _errors, cVars, _uncertainVars, _constants, _resultFlags, _types);
+					if(value.length()==si)
+					{
+						_vars.addIfNew(key);
+					}
+					else
+					{
+						if(!_vars.contains(key))
+						{
+							_uncertainVars.addIfNew(key);
+						}
+					}
+				}
+				// look at the comment for the IF-structure
+			}
+			// START KGU#812 2020-02-21: Bugfix #825 forgotten to descend recursively
+			else if (eleClassName.equals("Try")) {
+				StringList tVars = new StringList(_vars);
+				StringList cVars = new StringList(_vars);
+				StringList fVars = new StringList(_vars);
 
-    			for(int v = 0; v < tVars.count(); v++)
-    			{
-    				String varName = tVars.get(v);
-    				if (!_vars.contains(varName)) { _uncertainVars.add(varName); }
-    			}
-    			for(int v = 0; v < cVars.count(); v++)
-    			{
-    				String varName = cVars.get(v);
-    				if (!_vars.contains(varName)) { _uncertainVars.add(varName); }
-    			}
-    			
-    			analyse(((Try)ele).qFinally, _errors, fVars, _uncertainVars, _constants, _resultFlags, _types);
+				cVars.addIfNew(((Try)ele).getText().trim());
 
-    			for(int v = 0; v < fVars.count(); v++)
-    			{
-    				String varName = fVars.get(v);
-    				_vars.addIfNew(varName);
-    			}
+				analyse(((Try)ele).qTry, _errors, tVars, _uncertainVars, _constants, _resultFlags, _types);
+				analyse(((Try)ele).qCatch, _errors, cVars, _uncertainVars, _constants, _resultFlags, _types);
 
-    		}
-    		// END KGU#812 2020-02-21
-    		// START KGU#376 2017-04-11: Enh. #389 - revised 2017-04-20 - disabled 2017-07-01
-    		//else if ((ele instanceof Call && ((Call)ele).isImportCall())) {
-    		//	analyse_23((Call)ele, _errors, _vars, _uncertainVars, _constants);
-    		//}
-    		// END KGU#376 2017-04-11
-    		
-    	} // for(int i=0; i < _node.size(); i++)...
-    }
-    
-    // START KGU 2016-03-24: Decomposed analyser methods
-    
-    /**
-     * CHECK  #1: loop var modified<br/>
-     * CHECK #14: loop parameter consistency
-     * @param ele - For element to be analysed
-     * @param _errors - global list of errors
-     */
+				for(int v = 0; v < tVars.count(); v++)
+				{
+					String varName = tVars.get(v);
+					if (!_vars.contains(varName)) { _uncertainVars.add(varName); }
+				}
+				for(int v = 0; v < cVars.count(); v++)
+				{
+					String varName = cVars.get(v);
+					if (!_vars.contains(varName)) { _uncertainVars.add(varName); }
+				}
+
+				analyse(((Try)ele).qFinally, _errors, fVars, _uncertainVars, _constants, _resultFlags, _types);
+
+				for(int v = 0; v < fVars.count(); v++)
+				{
+					String varName = fVars.get(v);
+					_vars.addIfNew(varName);
+				}
+
+			}
+			// END KGU#812 2020-02-21
+			// START KGU#376 2017-04-11: Enh. #389 - revised 2017-04-20 - disabled 2017-07-01
+			//else if ((ele instanceof Call && ((Call)ele).isImportCall())) {
+			//	analyse_23((Call)ele, _errors, _vars, _uncertainVars, _constants);
+			//}
+			// END KGU#376 2017-04-11
+
+		} // for(int i=0; i < _node.size(); i++)...
+	}
+
+	// START KGU 2016-03-24: Decomposed analyser methods
+
+	/**
+	 * CHECK  #1: loop var modified<br/>
+	 * CHECK #14: loop parameter consistency
+	 * @param ele - For element to be analysed
+	 * @param _errors - global list of errors
+	 */
 	private void analyse_1_2_14(For ele, Vector<DetectedError> _errors)
 	{
 		// get assigned variables from inside the FOR-loop
@@ -5471,7 +5473,24 @@ public class Root extends Element {
 		}
 	}
 	// END KGU#992 2021-10-05
-	
+
+	/**
+	 * CHECK 31: General grammar-based line syntax check
+	 * @param ele - element to be checked
+	 * @param _errors - global errior list
+	 */
+	private void analyse_31(Element _ele, Vector<DetectedError> _errors) {
+		StringList lines = _ele.getUnbrokenText();
+		LineParser parser = LineParser.getInstance();
+		for (int i = 0; i < lines.count(); i++) {
+			String line = parser.preprocessLine(lines.get(i), _ele, i, true);
+			String error = parser.check(line);
+			if (error != null) {
+				addError(_errors, new DetectedError(errorMsg(Menu.error31, new String[] {Integer.toString(i+1), error.replace("error.syntax", "")}), _ele), 31);
+			}
+		}
+	}
+
 	// START KGU#456 2017-11-06: Enh. #452
 	/**
 	 * Reports the active guide and performs the specified checks and steps

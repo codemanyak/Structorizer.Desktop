@@ -70,7 +70,8 @@ public class PrimitiveType extends Type {
 		if (prototype == null) {
 			prototype = 0;	// Integer as default
 		}
-		System.out.println(prototype.getClass().getTypeName());
+		// FIXME: Remove the debug print
+		//System.out.println(prototype.getClass().getTypeName());
 		proto = prototype;
 	}
 

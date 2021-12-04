@@ -19,6 +19,8 @@
  */
 package lu.fisch.structorizer.syntax;
 
+import java.util.ArrayList;
+
 /******************************************************************************************************
  *
  *      Author:         Kay Gürtzig
@@ -57,6 +59,8 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.NoSuchElementException;
 
+import bsh.EvalError;
+import bsh.Interpreter;
 import lu.fisch.utils.StringList;
 
 /**
@@ -309,8 +313,6 @@ public class Expression {
 		COMPONENT,
 		/** temporary type (during parsing): parentheses, brackets or braces, parent of expressions */
 		PARENTH,
-		/** a variable initialisation or a list of variables, data type is declared (safe) */
-		DECLARATION,
 		/** a routine header (its name), parent of parameter {@link #DECLARATION}s, data type is declared for result */
 		ROUTINE};
 	public NodeType type;
@@ -1673,6 +1675,124 @@ public class Expression {
 			}
 		}
 		return complete;
+	}
+
+	/**
+	 * Tries to evaluate this if it is a constant expression
+	 * 
+	 * @param _constants - a look-up table mapping constant names to literal strings
+	 *        (may be {@code null}, in which case named constants will not be evaluable)
+	 * @param _interpr - optionally an interpreter in order to evaluate operators,
+	 *        or {@code null}
+	 * @return either the evaluated constant result or {@code null}
+	 */
+	public Object evaluateConstantExpr(HashMap<String, String> _constants, Interpreter _interpr) {
+		Object result = null;
+		String content = text;
+		switch (type) {
+		case OPERATOR:
+		case TERNARY:
+		{
+			ArrayList<Object> operands = new ArrayList<Object>();
+			for (Expression expr: children) {
+				Object opd = expr.evaluateConstantExpr(_constants, _interpr);
+				if (opd == null) {
+					return null;
+				}
+				operands.add(opd);
+			}
+			if (_interpr != null) {
+				StringBuilder sb = new StringBuilder();
+				int opdCnt = 0;
+				String[] opr = Syntax.unifyOperators(text).replace("<-", "=").split(",");
+				if (operands.size() >= 2) {
+					sb.append(operands.get(opdCnt++).toString());
+					sb.append(" ");
+				}
+				if (operands.size() <= 1) {
+					if (opr[0].endsWith("1")) {
+						opr[0] = opr[0].substring(0, opr[0].length() - 1);
+					}
+				}
+				sb.append(opr[0]);
+				if (operands.size() > 1) {
+					sb.append(" ");
+				}
+				sb.append(operands.get(opdCnt++));
+				if (type == NodeType.TERNARY && operands.size() > 2) {
+					sb.append(" ");
+					sb.append(opr[1]);
+					sb.append(" ");
+					sb.append(operands.get(opdCnt));
+				}
+				try {
+					// FIXME too optimistic - we may have to replace operators
+					result = _interpr.eval(sb.toString());
+				} catch (EvalError exc) {}
+			}
+			// TODO what could we do ourselves on a low level? BigDecimal arithmetics?
+		}
+		break;
+		case IDENTIFIER:
+			if (_constants == null || !_constants.containsKey(content)) {
+				return null;
+			}
+			content = _constants.get(content);
+			if (content.startsWith(":") && content.contains("€")) {
+				content = content.substring(content.indexOf('€') + 1);
+			}
+		case LITERAL:
+			if (_interpr != null) {
+				try {
+					result = _interpr.eval(content);
+				} catch (EvalError exc) {}
+			}
+			else if (content.startsWith("\"") && content.endsWith("\"")
+					|| content.startsWith("'") && content.endsWith("'") && text.length() != 3) {
+				// FIXME this is too simple, of course, see Executor
+				result = content.substring(1, content.length()-1);
+			}
+			else if (content.startsWith("'") && content.endsWith("'")) {
+				result = text.charAt(1);
+			}
+			else if (content.equalsIgnoreCase("infinity") || content.equals("∞")) {
+				result = Double.POSITIVE_INFINITY;
+			}
+			else if (content.equalsIgnoreCase("-infinity") || content.equals("-∞")) {
+				result = Double.NEGATIVE_INFINITY;
+			}
+			else if (content.equals("true")) {
+				result = true;
+			}
+			else if (content.equals("false")) {
+				result = false;
+			}
+			else {
+				try {
+					result = Double.parseDouble(content);
+					if (content.startsWith("0x") || content.startsWith("0X")) {
+						result = Integer.parseInt(content.substring(2), 16);
+					}
+					else if (content.startsWith("0b") || content.startsWith("0B")) {
+						result = Integer.parseInt(content.substring(2), 2);
+					}
+					else if (content.startsWith("0")) {
+						result = Integer.parseInt(content, 8);
+					}
+					result = Integer.parseInt(content);
+				}
+				catch (NumberFormatException ex) {}
+			}
+			// TODO
+			break;
+		case FUNCTION:
+		case METHOD:
+			// TODO
+			break;
+		default:
+			break;
+		}
+		return result;
 	}
 
 }

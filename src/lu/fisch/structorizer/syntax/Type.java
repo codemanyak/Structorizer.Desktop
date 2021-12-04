@@ -16,6 +16,7 @@ package lu.fisch.structorizer.syntax;
  *      Kay Gürtzig     2020-11-01      Name check inserted
  *      Kay Gürtzig     2020-11-06      Uplink to a TypeRegistry added
  *      Kay Gürtzig     2021-10-17      Field modifiers removed
+ *      Kay Gürtzig     2021-11-28      Method getType() added
  *
  ******************************************************************************************************
  *
@@ -64,7 +65,9 @@ public class Type {
 
 	/**
 	 * Constructs the type from the given {@code name}.
-	 * @param name - type name, must be an Ascii identifier
+	 * 
+	 * @param name - type name, must be an Ascii identifier or {@code null} (for an
+	 * anonymous type)
 	 * @throws SyntaxException if {@code name} does not fit to identifier syntax
 	 */
 	public Type(String name) throws SyntaxException {
@@ -141,10 +144,19 @@ public class Type {
 	}
 	
 	/**
+	 * @return this type.
+	 */
+	protected Type getType()
+	{
+		return this;
+	}
+	
+	/**
 	 * Convenience method for internal retrieval of referenced types within
 	 * the same {@link TypeRegistry}.
-	 * @param name
-	 * @return the type corresponding to the given  or {@code null}
+	 * 
+	 * @param typeName - name of the referred type
+	 * @return the type corresponding to the given {@code typeName} or {@code null}
 	 */
 	protected Type getType(String typeName)
 	{
@@ -206,6 +218,7 @@ public class Type {
 	 * and have the same name. In case of anonymous types, the comparison
 	 * of the top-level name will be suppressed.<br/>
 	 * (The comparison is simply done via the textual representation.)
+	 * 
 	 * @param another - the type to compare with
 	 * @return {@code true} if both types are structurally equivalent.
 	 */
@@ -218,7 +231,7 @@ public class Type {
 		String str2 = another.toString(true);
 		boolean equiv = str1.equals(str2);
 		if (!equiv) {
-			// In case of anonymous types compare with equalised nmes
+			// In case of anonymous types compare with equalised names
 			if (isAnonymous()) {
 					str1 = toStringWithName(another.getName(), true);
 			}

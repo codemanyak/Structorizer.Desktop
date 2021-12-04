@@ -430,10 +430,7 @@ public class Syntax {
 			int pos = -1;
 			while ((pos = _tokens.indexOf(markerTokens, 0, !Syntax.ignoreCase)) >= 0)
 			{
-				for (int j = 0; j < markerLen; j++)
-				{
-					_tokens.delete(pos);
-				}
+				_tokens.remove(pos, pos + markerLen);
 			}
 		}
 	}

@@ -69,10 +69,9 @@ public class Line {
 	 * @author Kay Gürtzig
 	 */
 	public static enum LineType {
-		// FIXME Since class Declaration, possibly a distinction between LT_CONST_DEF and LT_VAR_DECL is no longer needed
-		/** Line could not be parsed, 0 expr. */
+		/** Line could not be parsed, 0 expr. [, 1 error message?] */
 		LT_RAW,
-		/** Assignment without declaration (function call, too?), 2 expr */
+		/** Assignment without declaration (function call, too?), 1 expr */
 		LT_ASSIGNMENT,
 		/** Input instruction, >= 0 expr. (1st = prompt string) */
 		LT_INPUT,
@@ -84,7 +83,7 @@ public class Line {
 		LT_FOR_LOOP,
 		/** Foreach loop head, 2 expr. (1st = name, 2nd = name/array/string/expression list) */
 		LT_FOREACH_LOOP,
-		/** Procedure or function call, 1 or 2 expr. */
+		/** Procedure or function call, 1 expr. (= assignment or proc call) */
 		LT_ROUTINE_CALL,
 		/** Return instruction, 0..1 expr. */
 		LT_RETURN,
@@ -102,13 +101,13 @@ public class Line {
 		LT_DEFAULT,
 		/** Catch clause (TRY block), 1 expr. */
 		LT_CATCH,
-		/** Type definition, 1 expr. (= type name) + type */
+		/** Type definition, 1 expr. (= type id) + type */
 		LT_TYPE_DEF,
-		/** Constant definition, 1 Declaration */
+		/** Constant definition, 1 expr. + type */
 		LT_CONST_DEF,
-		/** Variable declaration, 1 Declaration {@code <rec_group>} */
+		/** Variable declaration, 1..n expr. (= var ids) + type */
 		LT_VAR_DECL,
-		/** Variable initialisation, 1 Declaration {@code <decl>} + 1 expr. */
+		/** Variable initialisation, 1 expr. (assignment) + type */
 		LT_VAR_INIT,
 		/** Routine header, 1 Routine (name + n Declarations + type/null) */
 		LT_ROUTINE
@@ -153,19 +152,27 @@ public class Line {
 		lineStartsToTypes.put("preReturn", LineType.LT_RETURN);
 		lineStartsToTypes.put("preExit", LineType.LT_EXIT);
 		lineStartsToTypes.put("preThrow", LineType.LT_THROW);
-		lineStartsToTypes.put("var", LineType.LT_VAR_DECL);
-		lineStartsToTypes.put("dim", LineType.LT_VAR_DECL);
+		lineStartsToTypes.put("var", LineType.LT_VAR_DECL);	// FIXME could also be LT_VAR_INIT
+		lineStartsToTypes.put("dim", LineType.LT_VAR_DECL);	// FIXME could also be LT_VAR_INIT
 		lineStartsToTypes.put("const", LineType.LT_CONST_DEF);
 		lineStartsToTypes.put("type", LineType.LT_TYPE_DEF);
 	}
 	
 	private LineType type;
 	private Expression[] expressions;
+	private Type dataType = null;
 	
 	public Line(LineType _type, Expression[] _expressions)
 	{
 		type = _type;
 		expressions = _expressions;
+	}
+	
+	public Line(LineType _type, Expression[] _expressions, Type _dataType)
+	{
+		type = _type;
+		expressions = _expressions;
+		dataType = _dataType;
 	}
 	
 	/**
@@ -213,6 +220,27 @@ public class Line {
 	}
 	
 	/**
+	 * Yields teh associated data type.
+	 * @param _explicitOnly - st this {@code true} if you are only interested in an
+	 * explicitly assigned type here (e.g. from a type definition or variable declaration),
+	 * otherwise the attached expressions will be asked for their data type.
+	 * @return the explicitly associated data type (e.g. in case of a type definition
+	 * or variable declaration)
+	 */
+	public Type getDataType(boolean _explicitOnly)
+	{
+		Type dType = dataType;
+		if (dType == null && !_explicitOnly && expressions != null) {
+			for (Expression expr: expressions) {
+				if ((dType = expr.dataType) != null) {
+					return dType;
+				}
+			}
+		}
+		return dType;
+	}
+	
+	/**
 	 * @param _type - the {@link LineType} the query is for
 	 * @return the minimum number of required expressions for this type.
 	 * @see #getMaxExprCount(LineType)
@@ -226,6 +254,7 @@ public class Line {
 		switch (_type) {
 		case LT_ASSIGNMENT:
 		case LT_CASE:
+		case LT_SELECTOR:
 		case LT_CATCH:
 		case LT_CONDITION:
 		case LT_EXIT:
@@ -237,6 +266,8 @@ public class Line {
 			count = 1;
 			break;
 		case LT_FOR_LOOP:
+			count = 3;
+			break;
 		case LT_FOREACH_LOOP:
 			count = 2;
 			break;
@@ -277,7 +308,7 @@ public class Line {
 		case LT_THROW:
 		case LT_RETURN:
 		case LT_ROUTINE_CALL:
-		case LT_VAR_DECL:
+		case LT_VAR_INIT:
 			count = 1;
 			break;
 		case LT_ROUTINE:
@@ -285,11 +316,13 @@ public class Line {
 			count = 2;
 			break;
 		case LT_FOR_LOOP:
-			count = 3;
+			count = 4;
 			break;
 		case LT_INPUT:
 		case LT_OUTPUT:
+		case LT_SELECTOR:
 		case LT_FOREACH_LOOP:
+		case LT_VAR_DECL:
 		case LT_RAW:
 			count = Integer.MAX_VALUE;
 			break;
@@ -304,17 +337,22 @@ public class Line {
 	
 	/**
 	 * Tries to parse the given (unbroken) {@code textLine} into a Line structure
+	 * 
 	 * @param tokens - the tokenized text line (without operator unification!)
 	 * @param expectedTypes - a bitmap marking the expected line types (may depend on the
 	 * Element type). Controls the validity.
 	 * @param typeMap - a {@link TypeRegistry} for data type retrieval or creation, may be
 	 * {@code null}
 	 * @return a Line object or {@code null} (e.g. in case of an empty line)
+	 * 
 	 * @throws SyntaxException if there is a syntactic error in the text
+	 * 
 	 * @see #parse(String, LineType, TypeRegistry, StringList)
 	 */
 	public static Line parse(StringList tokens, int expectedTypes, TypeRegistry typeMap) throws SyntaxException
 	{
+		Type dType = null;
+		short tokenPos = 0;
 		// Check if the line starts with a command keyword
 		LineType lType = null;	// Detected line type
 		String token0 = null;	// Starting token
@@ -383,7 +421,7 @@ public class Line {
 					new String[] {lType.toString(), acceptedTypes.concatenate("|")},
 					0, null, 0);
 		}
-		else if (lType == null) {
+		if (lType == null) {
 			// Adopt the expected type if unique
 			for (LineType lt: LineType.values()) {
 				if ((expectedTypes & (1 << lt.ordinal())) != 0) {
@@ -396,8 +434,50 @@ public class Line {
 				}
 			}
 		}
-		// Identify the separators and extract the expressions
-		lType = extractExpressions(tokens, lType, exprs, typeMap);
+		StringList declTokens = new StringList(tokens);
+		switch (lType) {
+		case LT_VAR_INIT:
+		case LT_CONST_DEF:
+			tokens.removeAll(" ");	// Make sure the token number of the operator is correct
+			tokenPos = (short)tokens.indexOf("<-");
+			declTokens = declTokens.subSequence(0, tokenPos);
+			tokens.remove(0, tokenPos+1);
+		case LT_VAR_DECL: {
+			dType = Declaration.parse(declTokens, Declaration.DeclarationRule.VDECL, (short)0, typeMap, exprs);
+			if (tokenPos >= 0 && exprs.size() == 1) {
+				List<Expression> valueExprs = Expression.parse(tokens, null, (short)(tokenPos+1));
+				Expression asgnmt = new Expression(Expression.NodeType.OPERATOR, "<-", tokenPos);
+				asgnmt.children.add(exprs.get(0));
+				asgnmt.children.add(valueExprs.get(0));
+				exprs.clear();
+				exprs.add(asgnmt);
+			}
+			break;
+		}
+		case LT_TYPE_DEF:
+		{
+			/* TODO
+			 * These are the possible syntax variants to detect:
+			 * type <id> '=' <record>'{' <record_group_List> '}';
+			 * type <id> '=' enum '{' <enum_list> '}';
+			 * type <id> '=' <type>
+			 * where:
+			 * <colon> ::= ':' | as
+			 * <record> ::= record | struct
+			 */
+			int nTokens = tokens.count();
+			if (nTokens < 3
+					|| !Syntax.isIdentifier(tokens.get(0), false, null)
+					|| !tokens.get(1).equals("=")) {
+				throw new SyntaxException("Wrong type definition syntax: missing '='", 2);
+			}
+			dType = Declaration.parse(tokens, Declaration.DeclarationRule.TYPE_DEF, tokenPos, typeMap, exprs);
+		}
+			break;
+		default:
+			// Identify the separators and extract the expressions
+			lType = extractExpressions(tokens, lType, exprs, typeMap);
+		}
 		return new Line(lType, exprs.toArray(new Expression[exprs.size()]));
 	}
 
@@ -405,6 +485,7 @@ public class Line {
 	 * Extract the expressions from the unprefixed token list {@code _tokens} according
 	 * to the expected or detected line type {@code _type} and gather them in {@code _exprs}.
 	 * Consider the known variable names {@code _varNames} if given.
+	 * 
 	 * @param _tokens - The token list without an identified leading keyword (this should
 	 * reflect in the given {@code _type}). May still contain blanks and non-unified operators.
 	 * Any still contained keyword must already have been condensed into a single token.
@@ -413,6 +494,7 @@ public class Line {
 	 * @param _typeMap  - a {@link TypeRegistry} for data type retrieval or creation, may be
 	 * {@code null}
 	 * @return the eventual line type
+	 * 
 	 * @throws SyntaxException if there are syntactic errors
 	 */
 	private static LineType extractExpressions(StringList _tokens, LineType _type, 
@@ -447,7 +529,9 @@ public class Line {
 				assignmentFailed = true;
 			}
 			if (assignmentFailed) {
-				_exprs.add(Declaration.parse(_tokens, DeclarationRule.CDECL, (short)0, _typeMap));
+				// FIXME still relevant here?
+				ArrayList<Expression> ids = new ArrayList<Expression>();
+				Type varType = Declaration.parse(_tokens, DeclarationRule.CDECL, (short)0, _typeMap, ids);
 				parsed = Expression.parse(_tokens.subSequence(posAsgn+1, nTokens), null, (short)(posAsgn+1));
 				if (nTokens == 0 && parsed.size() == 1) {
 					_exprs.add(parsed.get(0));
@@ -463,13 +547,15 @@ public class Line {
 			// It might involve a type association ("typed constant" in Pascal)
 		{
 			int posAsgn = _tokens.indexOf("<-");
-			StringList left = _tokens.subSequence(0, posAsgn);
-			if (left.contains(":") | left.contains("as")) {
+			StringList left = _tokens.subSequence(0, posAsgn).trim();
+			if (left.contains(":") || left.contains("as", false) || left.count() > 1) {
 				// Same handling as in LT_VAR_INIT
 				StringList right = _tokens.subSequence(posAsgn+1, nTokens);
-				_exprs.add(Declaration.parse(left, DeclarationRule.VDECL, (short)1, _typeMap));
+				ArrayList<Expression> ids = new ArrayList<Expression>();
+				Type constType = Declaration.parse(left, DeclarationRule.VDECL, (short)1, _typeMap, ids);
 				List<Expression> parsed = Expression.parse(right, null, (short)(posAsgn + 2));
-				if (right.isEmpty() && parsed.size() == 1) {
+				if (ids.size() == 1 && right.isEmpty() && parsed.size() == 1) {
+					_exprs.add(ids.get(0));
 					_exprs.add(parsed.get(0));
 					break;
 				}
@@ -642,70 +728,6 @@ public class Line {
 			// Just extract all available expressions
 			_exprs.addAll(Expression.parse(_tokens, null, (short)1));
 			break;
-		case LT_TYPE_DEF:
-		{
-			/* TODO
-			 * These are the possible syntax variants to detect:
-			 * a) type <id> = <record>{ <id> {, <id>} <colon> <type>; {; <id> {, <id>} <colon> <type>} };
-			 * b) type <id> = <record>{ <type> <id> {, <id> {; <type> <id> {, <id>}} };
-			 * g) type <id> = enum{ <id> [ = <value> ] {, <id> [ = <value> ]} };
-			 * h) type <id> = <type>
-			 * where:
-			 * <colon> ::= ':' | as
-			 * <record> ::= record | struct
-			 * It would be great and sufficient simply to store
-			 * the defined type as Type object - but there is no such field that would
-			 * make any sense for other line types. So the wayout is Declaration object
-			 */
-			if (nTokens < 3
-					|| !Syntax.isIdentifier(_tokens.get(0), false, null)
-					|| !_tokens.get(1).equals("=")) {
-				throw new SyntaxException("Wrong type definition syntax: missing '='", 2);
-			}
-			Declaration.DeclarationRule rule = null;
-			String discr = _tokens.get(2);
-			if (nTokens > 4 && _tokens.get(3).equals("{") && _tokens.get(nTokens-1).equals("}")) {
-				if (discr.equals("record") || discr.equals("struct")) {
-					rule = DeclarationRule.REC_GROUP_LIST;
-				}
-				else if (discr.equals("enum")) {
-					rule = DeclarationRule.ENUM_LIST;
-				}
-				_exprs.add(Declaration.parse(_tokens.subSequence(4, nTokens-1), rule, (short)5, _typeMap));
-			}
-			else if (_tokens.count() == 3 && Syntax.isIdentifier(discr, false, null)) {
-				Expression alias = new Expression(NodeType.IDENTIFIER, discr, (short)4);
-				if (_typeMap != null) {
-					alias.dataType = _typeMap.getType(discr);
-				}
-				_exprs.add(alias);
-			}
-			
-		}
-			break;
-		case LT_VAR_DECL:
-		{
-			// TODO Otherwise we would like to fetch the variable name(s)
-			_exprs.add(Declaration.parse(_tokens, DeclarationRule.VDECL, (short)1, _typeMap));
-		}
-			break;
-		case LT_VAR_INIT:
-		{
-			// TODO We might want to extract the mere assignment part - if any
-			int posAsgn = _tokens.indexOf("<-");
-			if (posAsgn > 0) {
-				// Keyword "var" or "dim" should already have been cut off
-				StringList left = _tokens.subSequence(0, posAsgn);
-				_tokens.remove(0, posAsgn);	// The right part remains
-				//left.removeAll(" ");
-				_exprs.add(Declaration.parse(left, DeclarationRule.VDECL, (short)1, _typeMap));
-				List<Expression> parsed = Expression.parse(_tokens, null, (short)(posAsgn + 2));
-				if (parsed.size() == 1) {
-					_exprs.add(parsed.get(0));
-				}
-			}
-		}
-			break;
 		case LT_ROUTINE:
 			break;
 		default:
@@ -716,6 +738,7 @@ public class Line {
 
 	/**
 	 * Tries to parse the given (unbroken) {@code textLine} into a Line structure
+	 * 
 	 * @param textLine - the (unbroken) text line as string
 	 * @param expectedTypes - a bit pattern composed of LineType masks, e.g.
 	 *        {@code LT_ASSIGNMENT_MASK | LT_VAR_INIT_MASK} to specify the
@@ -763,6 +786,13 @@ public class Line {
 		return sb.toString();
 	}
 	
+	/**
+	 * Retrieves all
+	 * @param assignedVars
+	 * @param declaredVars
+	 * @param usedVars
+	 * @return
+	 */
 	public boolean gatherVariables(StringList assignedVars, StringList declaredVars, StringList usedVars)
 	{
 		boolean okay = true;

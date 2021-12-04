@@ -49,7 +49,7 @@ package lu.fisch.structorizer.parsers;
  *
  *      Author          Date            Description
  *      ------          ----            -----------
- *      Kay Gürtzig     2017-03-02      First Issue for Iden GOLDEngine
+ *      Kay Gürtzig     2017-03-02      First Issue for Iden GOLDEngine (though based on Hawkins' template)
  *      Kay Gürtzig     2017-03-11      Parameter annotations and some comments corrected, indentation unified
  *      Kay Gürtzig     2018-03-26      Imports revised
  *      Kay Gürtzig     2018-06-30      Enh. #553: hooks for possible thread cancellation inserted.
@@ -321,7 +321,7 @@ public class %Name%Parser extends CodeParser
 			default:
 				if (_reduction.size()>0)
 				{
-					for (int i=0; i<_reduction.size(); i++)
+					for (int i = 0; i < _reduction.size(); i++)
 					{
 						if (_reduction.get(i).getType() == SymbolType.NON_TERMINAL)
 						{

@@ -14,17 +14,18 @@
 ! trees of their contents that may serve as a dependable fundament of all
 ! content-related tasks like syntax highlighting, analysis, execution,
 ! and code generation.
-! To avoid several intersection grammars for the diferent kinds of
+! To avoid several intersecting grammars for the different kinds of
 ! expected Element text content, some Element-type-specific "keywords"
 ! will be inserted as line prefix before sending the text to the parser,
 ! serving to unambiguously fork the parsing from start (as if there were
 ! different start symbols in the grammar).
 ! As there is no possibility of some dynamic symbol table feedback during
 ! parsing, the rules are usually too generous in all conflict-prone cases.
-! For instance, in a condition it does not make sense combine results of
-! integer bit operations by Boolean operators like "and" and "or",
+! For instance, in a condition it does not make sense to combine results
+! of integer bit operations by Boolean operators like "and" and "or",
 ! though formally the grammar allows this (actually in order to establish
-! the usual operator precedence of C / Java).
+! the usual operator precedence of C / Java and because & and | may also
+! be applied to Boolean values as non shortcutting logical operators).
 ! This will require some subsequent semantic check. Illegal combinations
 ! will have to be detected afterwards, based on the obtained syntax tree,
 ! To get the input code into a syntax tree at all had priority here.
@@ -48,10 +49,18 @@
 ! V 0.4     2021-11-08  KayGürtzig      <AssignmentExpression> eliminated,
 !                                       side-effect expressions (auto-increment/
 !                                       auto-decrement) disabled.
+! V 0.5     2021-11-10  Kay Gürtzig     $ removed from identifier characters,
+!                                       BinaryIntegerLiteral added, NotOpr defined
+!                                       (did not solve the parsing error, though)
+! V 0.6     2021-11-20  Kay Gürtzig     unsigned modifier in <TypeDescription>
+!                                       and Indentifier lists in <VarDeclaration>
+!                                       allowed, Identifier syntax widened to
+!                                       {All Latin} instead of {Letter}
+! V 0.7     2021-12-04  Kay Gürtzig     <RoutineInvocation> added to <ElementLine>                
 ! -----------------------------------------------------------------------
 
 "Name"    = 'StructorizerLine'
-"Version" = '0.4'
+"Version" = '0.6'
 "Author"  = 'Kay Gürtzig'
 "About"   = 'LALR(1) grammar for Structorizer element lines'
 
@@ -61,8 +70,8 @@
 
 {String Char} = {Printable} - ["]
 {Quote} = ['']
-{IdLetter} = {Letter} + [_$]
-{IdAlphaNumeric} = {Alphanumeric} + [_$]
+{IdLetter} = {All Latin} + [_]
+{IdAlphaNumeric} = {IdLetter} + {Digit} + [_]
 {HexDigit} = {Digit} + [abcdefABCDEF]
 {OctalCharSet} = [01234567]
 {BinaryCharSet} = [01]
@@ -144,6 +153,7 @@ SelectorKey = '§SELECT§'
          |  <VarInitialisation>
          |  <InputInstruction>
          |  <OutputInstruction>
+         |  <RoutineInvocation>
          |  <VarDeclaration>
          |  <ConstDefinition>
          |  <TypeDefinition>
@@ -380,7 +390,7 @@ SelectorKey = '§SELECT§'
 !         |  '|='
 
 <VarInitialisation>
-        ::= <VarDeclaration> <AssignmentOperator> <Expression>
+        ::= <VarDeclaration1> <AssignmentOperator> <Expression>
          |  <TypeDescription> <ArrayDecl> <AssignmentOperator> <Expression>
          
 <ArrayDecl>
@@ -410,14 +420,19 @@ SelectorKey = '§SELECT§'
         ::= OutputKey
          |  OutputKey <ExpressionList>
 
-<VarDeclaration>
+<VarDeclaration1>
         ::= VarKey Identifier ':' <TypeDescription>
          |  DimKey Identifier AsKey <TypeDescription>
+         
+<VarDeclaration>
+        ::= VarKey <IdList> ':' <TypeDescription>
+         |  DimKey <IdList> AsKey <TypeDescription>
          
 <ConstDefinition>
         ::= ConstKey Identifier <AssignmentOperator> <Expression>
          |  ConstKey Identifier ':' <TypeDescription> <AssignmentOperator> <Expression>
          |  ConstKey Identifier AsKey <TypeDescription> <AssignmentOperator> <Expression>
+         |  ConstKey <TypeDescription> <ArrayDecl> <AssignmentOperator> <Expression>
 
 <TypeDefinition>
         ::= TypeKey Identifier '=' <TypeConstruction>
@@ -428,12 +443,14 @@ SelectorKey = '§SELECT§'
          |  'enum' '{' <EnumList> '}'
 
 ! If we allowed arbitray modifiers (like "unsigned") here then the gramar would be ambiguous
-! Only in case of a fixed set of known and reserved modifiers we could do something here
+! Only in case of a fixed set of known and reserved modifiers we can do something here
 <TypeDescription>
-        ::= Identifier <Dims>
+        ::= Identifier <DimsOpt>
+         |  'unsigned' Identifier <DimsOpt>
          |  <ArrayOf> <TypeDescription>
 
-<Dims>  ::= <Dims> '[]'
+<DimsOpt>
+        ::= <DimsOpt> '[]'
          |
          
 <ArrayOf>

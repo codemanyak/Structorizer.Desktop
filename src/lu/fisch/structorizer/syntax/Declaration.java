@@ -24,7 +24,8 @@ package lu.fisch.structorizer.syntax;
  *
  *      Author:         Kay Gürtzig
  *
- *      Description:    Class Declaration, a specific Expression subclass
+ *      Description:    Class Declaration, used to parse declarations into data types or to convert data
+ *                      type descriptions
  *
  ******************************************************************************************************
  *
@@ -33,6 +34,7 @@ package lu.fisch.structorizer.syntax;
  *      Author          Date            Description
  *      ------          ----            -----------
  *      Kay Gürtzig     2020-11-03      First Issue (for #800)
+ *      Kay Gürtzig     2021-11-21      Fundamentally revised
  *
  ******************************************************************************************************
  *
@@ -44,6 +46,7 @@ package lu.fisch.structorizer.syntax;
  *      c) variables and constants (start symbol <cdecl_list>);
  *      b) enumerator lists (start symbol <enum_list>).
  *      BNF
+ *      <type_def>        ::= <id> '=' ((<record> '{' <rec_group_list> '}') | (enum '{' <enum_list> '}') | <type>))
  *      <par_list>        ::= <par_group_list> | <par_decl_list>
  *      <par_group_list>  ::= <par_group> | <par_group> ';' <par_group_list>
  *      <par_group>       ::= [const] <rec_group> | [const] <cdecl> | [const] <def>
@@ -92,11 +95,16 @@ import lu.fisch.utils.StringList;
  * Brings an own parsing algorithm and translation support.
  * @author Kay Gürtzig
  */
-public class Declaration extends Expression {
+public class Declaration {
 	
 	/** Enumerator representing the respective grammar rule */
 	public static enum DeclarationRule {
 		// FIXME: Pointers should be considered in future
+		/** {@code <type_def>        ::= <id> '=' <record> }'{' {@code <rec_group_list>} '}'<br/>
+		 *  &nbsp;&nbsp;&nbsp;{@code  |  <id> '=' enum }'{' {@code <enum_list>} '}'<br/>
+		 *  &nbsp;&nbsp;&nbsp;{@code  |  <id> '=' <type>}
+		 */
+		TYPE_DEF,
 		/** {@code <par_list>        ::= <par_group_list> | <par_decl_list>} */
 		PAR_LIST,
 		/** {@code <par_group_list>  ::= <par_group> | <par_group> ';' <par_group_list>} */
@@ -134,6 +142,7 @@ public class Declaration extends Expression {
 	};
 
 	//private static final int PAR_LIST_MASK       = 1 << DeclarationRule.PAR_LIST.ordinal();
+	private static final int TYPE_DEF_MASK =       1 << DeclarationRule.TYPE_DEF.ordinal();
 	private static final int PAR_GROUP_LIST_MASK = 1 << DeclarationRule.PAR_GROUP_LIST.ordinal();
 	private static final int PAR_GROUP_MASK      = 1 << DeclarationRule.PAR_GROUP.ordinal();
 	private static final int REC_GROUP_LIST_MASK = 1 << DeclarationRule.REC_GROUP_LIST.ordinal();
@@ -166,9 +175,8 @@ public class Declaration extends Expression {
 	 * @param isConst
 	 * @param tokenPos
 	 */
-	public Declaration(DeclarationRule declRule, LinkedList<Expression> components, short tokenPos, boolean isConst)
+	public Declaration(DeclarationRule declRule, boolean isConst)
 	{
-		super(NodeType.DECLARATION, "", tokenPos, components);
 		rule = declRule;
 		isConstant = isConst;
 	}
@@ -183,9 +191,10 @@ public class Declaration extends Expression {
 
 	/**
 	 * Parses the given token list (maybe a declaration line or a zone within a
-	 * parameter declaration list and returns a Declaration syntax tree
-	 * according to the structure. Copes with all Structorizer declaration styles
-	 * (Pascal, BASIC, C, Java)
+	 * parameter declaration list or just the type description) and returns a
+	 * {@link Type} object representing the data type according to the structure.
+	 * Is to cope with all Structorizer declaration styles (Pascal, BASIC, C, Java).
+	 * 
 	 * @param tokens - the token list representing a declaration part of a line,
 	 *        expected to be condensed (i.e. <b>not containing white space</b>) 
 	 * @param expectedRule - a {@link DeclarationRule} specifying the accepted
@@ -195,12 +204,14 @@ public class Declaration extends Expression {
 	 * @param typeMap - a {@link TypeRegistry} for data type retrieval from names,
 	 *        might be enhanced by anonymous types in case we bump into an explicit
 	 *        array declaration.
+	 * @param declaredIds - used to gather the names (ids) of the declared variables
+	 *        as expression objects (in order to keep the token numbers)
 	 * @return a Declaration object if nothing goes wrong (otherwise an Exception
 	 *        ought to be expected)
 	 * @throws SyntaxException in case of syntactical errors
 	 */
-	public static Declaration parse(StringList tokens, DeclarationRule expectedRule,
-			short tokenNo, TypeRegistry typeMap) throws SyntaxException
+	public static Type parse(StringList tokens, DeclarationRule expectedRule,
+			short tokenNo, TypeRegistry typeMap, ArrayList<Expression> declaredIds) throws SyntaxException
 	{
 		/*
 		 * This is not a clean parsing algorithm but a rather pragmatic and heuristic
@@ -229,10 +240,11 @@ public class Declaration extends Expression {
 		ArrayList<StringList> listItems = new ArrayList<StringList>();
 		int posSemi = tokens.indexOf(";");
 		// At least two items - should be either PAR_GROUP_LIST or REC_GROUP_LIST
-		if (posSemi >= 0 && (acceptedRules &= (PAR_GROUP_LIST_MASK | REC_GROUP_LIST_MASK)) == 0) {
+		if (posSemi >= 0 && (acceptedRules &= (PAR_GROUP_LIST_MASK | REC_GROUP_LIST_MASK | TYPE_DEF_MASK)) == 0) {
 			throw new SyntaxException("Unexpected ';'", tokenNo + posSemi);
 		}
 		int posStart = 0;
+		// FIXME This does not work with type definition at all.
 		while (posSemi >= 0) {
 			listItems.add(tokens.subSequence(posStart, posSemi));
 			posSemi = tokens.indexOf(";", posStart = posSemi + 1);
@@ -246,14 +258,15 @@ public class Declaration extends Expression {
 			expectedRule = DeclarationRule.REC_GROUP;
 		}
 		if (listItems.size() > 1) {
+			// TODO
 			// Should be either PAR_GROUP_LIST or REC_GROUP_LIST now
 			// Parse each group
 			for (StringList listItem: listItems) {
-				declarations.add(Declaration.parse(listItem, expectedRule,
-						(short)(tokenNo + tokenPos), typeMap));
-				tokenPos += listItem.count() + 1; // list item length and semicolon
+//				declarations.add(Declaration.parse(listItem, expectedRule,
+//						(short)(tokenNo + tokenPos), typeMap));
+//				tokenPos += listItem.count() + 1; // list item length and semicolon
 			}
-			return new Declaration(thisRule, declarations, tokenNo, false);
+//			return new Declaration(thisRule, declarations, tokenNo, false);
 		}
 		// Obviously it is not a group list (but might be a group), so reduce the expectation
 		acceptedRules = 1 << expectedRule.ordinal();
@@ -298,9 +311,10 @@ public class Declaration extends Expression {
 					throw new SyntaxException("Unexpected '='",
 							tokenNo + posDef);
 				}
+				// TODO
 				// As there was a ':' or "as", the left-hand side must be a VDECL
-				declarations.add(Declaration.parse(tokens.subSequence(0, posDef),
-						DeclarationRule.VDECL, tokenNo, typeMap));
+//				declarations.add(Declaration.parse(tokens.subSequence(0, posDef),
+//						DeclarationRule.VDECL, tokenNo, typeMap));
 				// Parse the right-hand side (the default value, an expression)
 				LinkedList<Expression> exprs = 
 						Expression.parse(tokens.subSequence(posDef+1, tokens.count()), null, (short)(tokenNo + posDef+1));
@@ -309,7 +323,7 @@ public class Declaration extends Expression {
 					throw new SyntaxException("Defective default value expression", tokenNo + posDef + 1);
 				}
 				declarations.add(exprs.get(0));
-				return new Declaration(DeclarationRule.DEF, declarations, tokenNo, isConst);
+//				return new Declaration(DeclarationRule.DEF, declarations, tokenNo, isConst);
 			}
 			// No default value, hence a REC_GROUP
 			Type type = null;
@@ -325,17 +339,17 @@ public class Declaration extends Expression {
 				// FIXME we must parse the type right of posColon!
 				System.err.println("Type parsing not implemented in REC_GROUP!");
 			}
-			// pare the left-hand side (should be an identifier or an identifier list)
-			Declaration declared = Declaration.parse(tokens.subSequence(0, posColon),
-					DeclarationRule.ID_LIST, tokenNo, typeMap);
-			declared.dataType = type;
-			// the children should also be tagged
-			for (Expression id: declared.children) {
-				id.dataType = type;
-			}
-			declarations.add(declared);
-			// FIXME: Should we tag the REC_GROUP with the type as well?
-			return new Declaration(DeclarationRule.REC_GROUP, declarations, tokenNo, isConst);
+			// parse the left-hand side (should be an identifier or an identifier list)
+//			Declaration declared = Declaration.parse(tokens.subSequence(0, posColon),
+//					DeclarationRule.ID_LIST, tokenNo, typeMap);
+//			declared.dataType = type;
+//			// the children should also be tagged
+//			for (Expression id: declared.children) {
+//				id.dataType = type;
+//			}
+//			declarations.add(declared);
+//			// FIXME: Should we tag the REC_GROUP with the type as well?
+//			return new Declaration(DeclarationRule.REC_GROUP, declarations, tokenNo, isConst);
 		}
 		
 		// If there was neither a semicolon nor a <colon> separator then we can restrict the rule
@@ -367,35 +381,42 @@ public class Declaration extends Expression {
 			int posBrack2 = listItem0.lastIndexOf("]");
 			switch (expectedRule) {
 			case ENUM_LIST:
+				// TODO ?
 				for (StringList listItem: listItems) {
-					declarations.add(Declaration.parse(listItem,
-							DeclarationRule.ENUM_ITEM, (short)(tokenNo + tokenPos), typeMap));
-					tokenPos += listItem.count() + 1;	// length of listItem plus comma
+//					declarations.add(Declaration.parse(listItem,
+//							DeclarationRule.ENUM_ITEM, (short)(tokenNo + tokenPos), typeMap));
+//					tokenPos += listItem.count() + 1;	// length of listItem plus comma
 				}
-				return new Declaration(expectedRule, declarations, tokenNo, true);
+//				return new Declaration(expectedRule, declarations, tokenNo, true);
+				break;
 			case ID_LIST:
+				// TODO ?
 				for (StringList listItem: listItems) {
 					if (listItem.count() != 1 || !Syntax.isIdentifier(listItem.get(0), false, null)) {
 						throw new SyntaxException("Not a valid identifier", tokenNo + tokenPos);
 					}
-					declarations.add(new Expression(NodeType.IDENTIFIER, listItem.get(0),
-							(short)(tokenNo + tokenPos)));
+//					declarations.add(new Expression(NodeType.IDENTIFIER, listItem.get(0),
+//							(short)(tokenNo + tokenPos)));
 					tokenPos += listItem.count() + 1;	// length of listItem plus comma
 				}
-				return new Declaration(expectedRule, declarations, tokenNo, false);
+//				return new Declaration(expectedRule, declarations, tokenNo, false);
+				break;
 			case PAR_DECL_LIST:
+				// TODO ?
 				isConst = listItems.get(0).get(0).equals("const");
 				if (isConst) {
 					listItems.get(0).remove(0);
 					tokenPos++;
 				}
 				for (StringList listItem: listItems) {
-					declarations.add(Declaration.parse(listItem,
-							DeclarationRule.PAR_DECL, (short)(tokenNo + tokenPos), typeMap));
+//					declarations.add(Declaration.parse(listItem,
+//							DeclarationRule.PAR_DECL, (short)(tokenNo + tokenPos), typeMap));
 					tokenPos += listItem.count() + 1;	// length of listItem plus comma
 				}
-				return new Declaration(expectedRule, declarations, tokenNo, isConst);
+//				return new Declaration(expectedRule, declarations, tokenNo, isConst);
+				break;
 			case PAR_GROUP:
+				// TODO ?
 				isConst = listItems.get(0).get(0).equals("const");
 				if (isConst) {
 					listItems.get(0).remove(0);
@@ -405,6 +426,7 @@ public class Declaration extends Expression {
 				expectedRule = DeclarationRule.CDECL_LIST;
 				// We deliberately run into the next case here!
 			case CDECL_LIST:
+				// TODO ?
 				// Check whether there is a common type specification
 				if (listItem0.count() > 1 && (posBrack1 < 0 || posBrack2 == listItem0.count()-1)) {
 					// We must extract the type information from the first list item
@@ -427,33 +449,37 @@ public class Declaration extends Expression {
 							offset -= typeDescr.count();
 						}
 					}
-					Declaration decl = Declaration.parse(listItem,
-							DeclarationRule.CDECL, (short)(tokenNo + tokenPos + offset), typeMap);
-					decl.isConstant = isConst;
-					declarations.add(decl);
+//					Declaration decl = Declaration.parse(listItem,
+//							DeclarationRule.CDECL, (short)(tokenNo + tokenPos + offset), typeMap);
+//					decl.isConstant = isConst;
+//					declarations.add(decl);
 					tokenPos += offset + listItem.count() + 1;	// length of the orig. listItem plus comma
 				}
-				return new Declaration(expectedRule, declarations, tokenNo, isConst);
+//				return new Declaration(expectedRule, declarations, tokenNo, isConst);
+				break;
 			case CARRAY_LIST:
+				// TODO ?
 				for (StringList listItem: listItems) {
 					int posBrack = listItem.indexOf("[");
 					if (posBrack < 0 && listItem.count() == 1
 							&& Syntax.isIdentifier(listItem.get(0), false, null)) {
-						declarations.add(new Expression(NodeType.IDENTIFIER,
-								listItem.get(0), (short)(tokenNo + tokenPos)));
+//						declarations.add(new Expression(NodeType.IDENTIFIER,
+//								listItem.get(0), (short)(tokenNo + tokenPos)));
 					}
 					else {
 						// FIXME we can't know the type here, we just know that it is an array
 						// Shall we always assign the element type to a CARRAY declaration?
-						declarations.add(Declaration.parse(listItem,
-								DeclarationRule.CARRAY, (short)(tokenNo + tokenPos), typeMap));
+//						declarations.add(Declaration.parse(listItem,
+//								DeclarationRule.CARRAY, (short)(tokenNo + tokenPos), typeMap));
 					}
 					tokenPos += listItem.count() + 1;
 				}
-				return new Declaration(expectedRule, declarations, tokenNo, false);
+//				return new Declaration(expectedRule, declarations, tokenNo, false);
+				break;
 			default:
 				throw new SyntaxException("Unexpected ','", listItems.get(0).count());
 			}
+			return type;
 		}
 		
 		if (expectedRule == DeclarationRule.PAR_GROUP) {

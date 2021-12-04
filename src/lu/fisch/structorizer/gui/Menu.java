@@ -130,6 +130,7 @@ package lu.fisch.structorizer.gui;
  *      Kay Gürtzig     2021-03-03      Issue #954: Modified behaviour of "Clear all Breakpoints" button
  *      Kay Gürtzig     2021-04-15      Enh. #967: menu item menuDiagramARM as introduced by A. Simonetta disabled 
  *      Kay Gürtzig     2021-10-05      Enh. #992: Messages for new Analyser check 30 against bracket faults
+ *      Kay Gürtzig     2021-12-04      Enh. #800: Message for new grammar-based Analyser check 31
  *
  ******************************************************************************************************
  *
@@ -631,6 +632,9 @@ public class Menu extends LangMenuBar implements NSDController, LangEventListene
 	public static final LangTextHolder error30_2 = new LangTextHolder("There is at least one more closing '%1' than opening brackets in line %2!");
 	public static final LangTextHolder error30_3 = new LangTextHolder("There is a closing '%1' where '%3' is expected in line %2!");
 	// END KGU#992 2021-10-05
+	// START KGU#790 2021-12-04: Enh. #800 Grammar-based syntax check
+	public static final LangTextHolder error31 = new LangTextHolder("Unexpected token in line %1: %2");
+	// END KGU#790 2021-12-04
 	// START KGU#459 2017-11-14: Enh. #459
 	public static final LangTextHolder msgGuidedTours = new LangTextHolder("You activated guided tours.\n\nWatch out for recommendations\nor instructions\nin the bottom text pane\n(Analyser report list)."
 			+ "\nLittle blue or red triangles in\nthe elements will remind you.");

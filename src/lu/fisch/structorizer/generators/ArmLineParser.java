@@ -55,7 +55,6 @@ import lu.fisch.structorizer.elements.Jump;
 import lu.fisch.structorizer.elements.Root;
 import lu.fisch.structorizer.elements.Subqueue;
 import lu.fisch.structorizer.parsers.AuParser;
-import lu.fisch.structorizer.parsers.CodeParser;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.StringList;
 
@@ -383,9 +382,17 @@ public class ArmLineParser implements GeneratorSyntaxChecker
 
 	//----------------------------- Preprocessor -----------------------------
 	
+	/**
+	 * Pre-processes the given element line for the ARM line parser, i.e. replaces
+	 * configured keywords by grammar-defined ones, inserts classifying prefixes
+	 * where needed.
+	 * @param line - the (unbroken) element line to be parsed or checked
+	 * @param owner - the owning NSD element
+	 * @param lineNo - the line index
+	 * @return the pre-processed line as string
+	 */
 	private String preprocessLine(String line, Element owner, int lineNo)
 	{
-		Subqueue sq;
 		String className = owner.getClass().getSimpleName();
 		if (className.equals("Call")) {
 			line = "§CALL§ " + line;
@@ -406,16 +413,20 @@ public class ArmLineParser implements GeneratorSyntaxChecker
 				StringList tokens = Syntax.splitLexically(line, false);
 				String[] keys = {"preReturn", "preLeave", "preExit", "preThrow"};
 				for (String key: keys) {
-					String keyWord = Syntax.getKeyword(key);
 					// START KGU#1017 2021-11-17: Issue #1020 Consider case and non-tokens
+					//String keyWord = Syntax.getKeyword(key);
 					//if (line.startsWith(keyWord)) {
-					StringList splitKey = Syntax.splitLexically(keyWord, false);
+					//	line = "§" + key.substring(3).toUpperCase() + "§"
+					//			+ line.substring(keyWord.length());
+					//	break;
+					//}
+					StringList splitKey = Syntax.getSplitKeyword(key);
 					if (tokens.indexOf(splitKey, 0, !Syntax.ignoreCase) == 0) {
-					// END KGU#1017 2021-11-17
-						line = "§" + key.substring(3).toUpperCase() + "§"
-								+ line.substring(keyWord.length());
+						tokens.remove(1, splitKey.count());
+						tokens.set(0, "§" + key.substring(3).toUpperCase() + "§");
 						break;
 					}
+					// END KGU#1017 2021-11-17
 				}
 			}
 		}
@@ -436,8 +447,7 @@ public class ArmLineParser implements GeneratorSyntaxChecker
 					markers = new String[]{"§FOR§", "§TO§", "§STEP§"};
 				}
 				for (int i = 0; i < keys.length; i++) {
-					String keyWord = Syntax.getKeyword(keys[i]);
-					StringList splitKey = Syntax.splitLexically(keyWord, false);
+					StringList splitKey = Syntax.getSplitKeyword(keys[i]);
 					int posKey = tokens.indexOf(splitKey, 0, !Syntax.ignoreCase);
 					if (posKey >= 0) {
 						tokens.remove(posKey+1, posKey + splitKey.count());
@@ -445,28 +455,33 @@ public class ArmLineParser implements GeneratorSyntaxChecker
 					}
 				}
 			}
-			// START KGU#1017 2021-11-17: Issue #1020 Accept return lines in Instructions
-			else if (className.equals("Instruction") && Jump.isReturn(line)
-					&& lineNo == owner.getUnbrokenText().count()-1
-					&& owner.parent instanceof Subqueue
-					&& (sq = (Subqueue)owner.parent).getElement(sq.getSize()-1) == owner
-					&& sq.parent instanceof Root
-					&& ((Root)sq.parent).isSubroutine()) {
-				StringList splitKey = Syntax.splitLexically(Syntax.getKeyword("preReturn"), false);
-				tokens.remove(1, splitKey.count());
-				tokens.set(0, "§RETURN§");
-			}
-			// END KGU#1017 2021-11-17
-			else {
-				String[] keys = {"input", "output"};
-				for (String key: keys) {
-					StringList splitKey = Syntax.splitLexically(Syntax.getKeyword(key), false);
-					if (tokens.indexOf(splitKey, 0, !Syntax.ignoreCase) == 0) {
-						tokens.remove(1, splitKey.count());
-						tokens.set(0, "§" + key.toUpperCase() + "§");
-						break;
-					}
+			else if (className.equals("Instruction")) {
+				// START KGU#1017 2021-11-17: Issue #1020 Accept return lines in Instructions
+				Subqueue sq;	// Parent subqueue (needed for terminal return analysis)
+				if (Jump.isReturn(line)
+						&& lineNo == owner.getUnbrokenText().count()-1
+						&& owner.parent instanceof Subqueue
+						&& (sq = (Subqueue)owner.parent).getElement(sq.getSize()-1) == owner
+						&& sq.parent instanceof Root
+						&& ((Root)sq.parent).isSubroutine()) {
+					StringList splitKey = Syntax.splitLexically(Syntax.getKeyword("preReturn"), false);
+					tokens.remove(1, splitKey.count());
+					tokens.set(0, "§RETURN§");
 				}
+				else {
+				// END KGU#1017 2021-11-17
+					String[] keys = {"input", "output"};
+					for (String key: keys) {
+						StringList splitKey = Syntax.splitLexically(Syntax.getKeyword(key), false);
+						if (tokens.indexOf(splitKey, 0, !Syntax.ignoreCase) == 0) {
+							tokens.remove(1, splitKey.count());
+							tokens.set(0, "§" + key.toUpperCase() + "§");
+							break;
+						}
+					}
+				// START KGU#1017 2021-11-17: Issue #1020
+				}
+				// END KGU#1017 2021-11-17
 			}
 			line = tokens.concatenate();
 		}
