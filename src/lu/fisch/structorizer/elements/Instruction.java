@@ -754,7 +754,7 @@ public class Instruction extends Element {
 			// It is an input instruction
 			inputItems = new StringList();
 			tokens.remove(0, keyTokens.count());	// Remove the keyword
-			tokens.removeAll(" ");					// remove whitespace
+			tokens.removeBlanks();					// remove whitespace
 			// Identify the prompt if any
 			if (tokens.isEmpty()) {
 				inputItems.add(""); 
@@ -858,7 +858,7 @@ public class Instruction extends Element {
 				}
 			}
 			// END KGU#1009 2021-11-02
-			tokens.removeAll(" ");
+			tokens.removeBlanks();
 			// START KGU#388 2017-09-27: Enh. #423 there might be a qualified name
 			if (tokens.contains(".")) {
 				int i = 1;
@@ -969,7 +969,7 @@ public class Instruction extends Element {
 		// FIXME why would we allow to define multi-word type names?
 		String typename = tokens.concatenate("", 1, posDef).trim();
 		tokens = tokens.subSequence(posDef+1, tokens.count());
-		tokens.removeAll(" ");
+		tokens.removeBlanks();
 		String tag = tokens.get(0).toLowerCase();
 		return Syntax.isIdentifier(typename, false, null) &&
 				// START KGU#542 2019-11-17: Enh. #739 - also consider enumeration types
@@ -1180,13 +1180,12 @@ public class Instruction extends Element {
 	
 	public void updateTypeMapFromLine(HashMap<String, TypeMapEntry> typeMap, String line, int lineNo)
 	{
-		StringList tokens = Syntax.splitLexically(line, true);
+		StringList tokens = Syntax.splitLexically(line, true, true);
 		String varName = null;
 		String typeSpec = "";
 		boolean isAssigned = false;
 		boolean isDeclared = true;
 		Syntax.unifyOperators(tokens, true);
-		tokens.removeAll(" ");
 		if (tokens.isEmpty()) {
 			return;
 		}
@@ -1199,7 +1198,7 @@ public class Instruction extends Element {
 			typeSpec = tokens.concatenate(" ", posColon+1, (isAssigned ? posAsgnmt : tokens.count()));
 			// There may be one or more variable names between "var" and ':' if there is no assignment
 			StringList varTokens = tokens.subSequence(1, posColon);
-			varTokens.removeAll(" ");
+			//varTokens.removeAll(" ");	// tokens was already condensed
 			for (int i = 0; i < varTokens.count(); i++)
 			{
 				if (Syntax.isIdentifier(varTokens.get(i), false, null) && (i + 1 >= varTokens.count() || varTokens.get(i+1).equals(","))) {

@@ -290,7 +290,7 @@ public class PerlGenerator extends Generator {
 		// START KGU#388/KGU#542 2019-11-19: Enh. #423, #739 transferred the stuff from transform(String) hitherto
 		// Manipulate a condensed token list copy simultaneously (makes it easier to locate neighbouring tokens)
 		StringList denseTokens = new StringList(tokens);
-		denseTokens.removeAll(" ");	// Condense
+		denseTokens.removeBlanks();	// Condense
 		// Now transform all array and record initializers
 		// To go from right to left should ensure we advance from the innermost to the outermost brace
 		int posBraceL = tokens.lastIndexOf("{");
@@ -588,8 +588,7 @@ public class PerlGenerator extends Generator {
 
 				String text = null;
 				if (isAsgn) {
-					StringList tokens = Syntax.splitLexically(line, true);
-					tokens.removeAll(" ");
+					StringList tokens = Syntax.splitLexically(line, true, true);
 					Syntax.unifyOperators(tokens, true);
 					int posAsgn = tokens.indexOf("<-");
 					String var = Instruction.getAssignedVarname(tokens.subSequence(0, posAsgn), true);

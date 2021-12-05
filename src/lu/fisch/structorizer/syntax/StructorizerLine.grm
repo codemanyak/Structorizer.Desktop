@@ -56,13 +56,15 @@
 !                                       and Indentifier lists in <VarDeclaration>
 !                                       allowed, Identifier syntax widened to
 !                                       {All Latin} instead of {Letter}
-! V 0.7     2021-12-04  Kay Gürtzig     <RoutineInvocation> added to <ElementLine>,
+! V 0.7     2021-12-05  Kay Gürtzig     <RoutineInvocation> added to <ElementLine>,
 !                                       conflict among <VarDeclaration> and
-!                                       <VarInitialisation> resolved                
+!                                       <VarInitialisation> resolved, {String Char}
+!                                       now copes with {All Printable}, const
+!                                       declarations in CALLs enabled            
 ! -----------------------------------------------------------------------
 
 "Name"    = 'StructorizerLine'
-"Version" = '0.6'
+"Version" = '0.7'
 "Author"  = 'Kay Gürtzig'
 "About"   = 'LALR(1) grammar for Structorizer element lines'
 
@@ -70,7 +72,7 @@
 ! Character Sets
 ! -------------------------------------------------
 
-{String Char} = {Printable} - ["]
+{String Char} = {All Printable} - ["]
 {Quote} = ['']
 {IdLetter} = {All Latin} + [_]
 {IdAlphaNumeric} = {IdLetter} + {Digit} + [_]
@@ -539,6 +541,9 @@ SelectorKey = '§SELECT§'
 
 <Call>  ::= CallKey <RoutineInvocation>
          |  CallKey <LeftHandSide> <AssignmentOperator> <RoutineInvocation>
+         |  CallKey ConstKey Identifier <AssignmentOperator> <RoutineInvocation>
+         |  CallKey ConstKey Identifier ':' <TypeDescription> <AssignmentOperator> <RoutineInvocation>
+         |  CallKey ConstKey Identifier AsKey <TypeDescription> <AssignmentOperator> <RoutineInvocation>
          
 ! -------------------------------------------------------------------
 ! TRY blocks

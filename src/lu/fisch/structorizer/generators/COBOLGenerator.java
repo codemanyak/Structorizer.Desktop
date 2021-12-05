@@ -831,12 +831,11 @@ public class COBOLGenerator extends Generator {
 				if (line.isEmpty() || Instruction.isMereDeclaration(line)) {
 					continue;
 				}
-				StringList tokens = Syntax.splitLexically(line, true);
+				StringList tokens = Syntax.splitLexically(line, true, true);
 				Syntax.unifyOperators(tokens, false);
 				String transfLine = transform(line);
 				// Input and output should work via standard transformation...
 				if (Instruction.isAssignment(line)) {
-					tokens.removeAll(" ");
 					int posAsgn = tokens.indexOf("<-");
 					// FIXME Somehow we must find out what data type is transferred... -> #800
 					String varName = transform(Instruction.getAssignedVarname(tokens, false));
@@ -1151,8 +1150,7 @@ public class COBOLGenerator extends Generator {
 				boolean isFct = Call.isAssignment(line);
 				String target = null;
 				if (isFct) {
-					StringList tokens = Syntax.splitLexically(line, true);
-					tokens.removeAll(" ");
+					StringList tokens = Syntax.splitLexically(line, true, true);
 					target = transform(Call.getAssignedVarname(tokens, true));
 				}
 				if (routinePool != null) {

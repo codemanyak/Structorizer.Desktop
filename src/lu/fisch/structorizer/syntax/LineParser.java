@@ -76,6 +76,7 @@ import com.creativewidgetworks.goldparser.engine.enums.SymbolType;
 
 import lu.fisch.structorizer.elements.Element;
 import lu.fisch.structorizer.elements.For;
+import lu.fisch.structorizer.elements.Instruction;
 import lu.fisch.structorizer.elements.Root;
 import lu.fisch.structorizer.parsers.AuParser;
 import lu.fisch.utils.StringList;
@@ -515,12 +516,15 @@ public class LineParser /*extends CodeParser*/
 		final int PROD_JUMP_THROWKEY                                              = 184;  // <Jump> ::= ThrowKey <Expression>
 		final int PROD_CALL_CALLKEY                                               = 185;  // <Call> ::= CallKey <RoutineInvocation>
 		final int PROD_CALL_CALLKEY2                                              = 186;  // <Call> ::= CallKey <LeftHandSide> <AssignmentOperator> <RoutineInvocation>
-		final int PROD_CATCHCLAUSE_CATCHKEY_IDENTIFIER                            = 187;  // <CatchClause> ::= CatchKey Identifier
-		final int PROD_CATCHCLAUSE_CATCHKEY_IDENTIFIER_COLON                      = 188;  // <CatchClause> ::= CatchKey Identifier ':' <TypeDescription>
-		final int PROD_CATCHCLAUSE_CATCHKEY_IDENTIFIER_ASKEY                      = 189;  // <CatchClause> ::= CatchKey Identifier AsKey <TypeDescription>
-		final int PROD_CATCHCLAUSE_CATCHKEY_IDENTIFIER2                           = 190;  // <CatchClause> ::= CatchKey <TypeDescription> Identifier
-		final int PROD_CASEDISCRIMINATOR_CASEKEY                                  = 191;  // <CaseDiscriminator> ::= CaseKey <ConditionalExpression>
-		final int PROD_CASESELECTORS_SELECTORKEY                                  = 192;  // <CaseSelectors> ::= SelectorKey <ExpressionList>
+		final int PROD_CALL_CALLKEY_CONSTKEY_IDENTIFIER                           = 187;  // <Call> ::= CallKey ConstKey Identifier <AssignmentOperator> <RoutineInvocation>
+		final int PROD_CALL_CALLKEY_CONSTKEY_IDENTIFIER_COLON                     = 188;  // <Call> ::= CallKey ConstKey Identifier ':' <TypeDescription> <AssignmentOperator> <RoutineInvocation>
+		final int PROD_CALL_CALLKEY_CONSTKEY_IDENTIFIER_ASKEY                     = 189;  // <Call> ::= CallKey ConstKey Identifier AsKey <TypeDescription> <AssignmentOperator> <RoutineInvocation>
+		final int PROD_CATCHCLAUSE_CATCHKEY_IDENTIFIER                            = 190;  // <CatchClause> ::= CatchKey Identifier
+		final int PROD_CATCHCLAUSE_CATCHKEY_IDENTIFIER_COLON                      = 191;  // <CatchClause> ::= CatchKey Identifier ':' <TypeDescription>
+		final int PROD_CATCHCLAUSE_CATCHKEY_IDENTIFIER_ASKEY                      = 192;  // <CatchClause> ::= CatchKey Identifier AsKey <TypeDescription>
+		final int PROD_CATCHCLAUSE_CATCHKEY_IDENTIFIER2                           = 193;  // <CatchClause> ::= CatchKey <TypeDescription> Identifier
+		final int PROD_CASEDISCRIMINATOR_CASEKEY                                  = 194;  // <CaseDiscriminator> ::= CaseKey <ConditionalExpression>
+		final int PROD_CASESELECTORS_SELECTORKEY                                  = 195;  // <CaseSelectors> ::= SelectorKey <ExpressionList>
 	};
 	
 	/** Collection of expression list rule identifiers used in
@@ -612,6 +616,10 @@ public class LineParser /*extends CodeParser*/
 				}
 			}
 			else if (className.equals("Instruction")) {
+				// FIXME ugly workaround for type definitions: we suppress operator unification
+				if (Instruction.isTypeDefinition(_line)) {
+					_unifyOprs = false;
+				}
 				StringList splitKey = Syntax.getSplitKeyword("preReturn");
 				if (tokens.indexOf(splitKey, 0, !Syntax.ignoreCase) == 0) {
 					tokens.remove(1, splitKey.count());
@@ -633,7 +641,8 @@ public class LineParser /*extends CodeParser*/
 			Syntax.unifyOperators(tokens, false);
 		}
 		else {
-			tokens.replaceAllCi("not", "!");	// Grammar does not cope with "not" token
+			// Grammar does not cope with "not" tokens in front of identifiers
+			tokens.replaceAllCi("not", "!");
 		}
 		_line = tokens.concatenate();
 		return _line;
@@ -986,7 +995,33 @@ public class LineParser /*extends CodeParser*/
 							expressions.add(buildExpression(red.get(1), tokenPos, _types));
 						}
 						break;
-
+					case RuleConstants.PROD_CALL_CALLKEY_CONSTKEY_IDENTIFIER:
+						// <Call> ::= CallKey ConstKey Identifier <AssignmentOperator> <RoutineInvocation>
+					case RuleConstants.PROD_CALL_CALLKEY_CONSTKEY_IDENTIFIER_COLON:
+						// <Call> ::= CallKey ConstKey Identifier ':' <TypeDescription> <AssignmentOperator> <RoutineInvocation>
+					case RuleConstants.PROD_CALL_CALLKEY_CONSTKEY_IDENTIFIER_ASKEY:
+						// <Call> ::= CallKey ConstKey Identifier AsKey <TypeDescription> <AssignmentOperator> <RoutineInvocation>
+						lineType = Line.LineType.LT_CONST_FUNCT_CALL;
+						{
+							Expression idExpr = buildExpression(red.get(2), tokenPos + 2, _types);
+							int ixAsgnOpr = 3;
+							tokenPos += ixAsgnOpr;
+							if (red.size() > 4) {
+								ixAsgnOpr++;
+								short[] tokenCounter = {++tokenPos};
+								dataType = buildType(red.get(4), _types, tokenCounter, _element);
+								tokenPos = (short)(tokenCounter[0] + 1);
+								// TODO add the type mapping for the constant to _types?
+							}
+							Expression expr = new Expression(Expression.NodeType.OPERATOR,
+									red.get(ixAsgnOpr).asString(), tokenPos);
+							expr.children.add(idExpr);
+							expr.children.add(buildExpression(red.get(ixAsgnOpr + 1), tokenPos + 1, _types));
+							expressions.add(expr);
+							// TODO add the constant value expression to the constant map?
+						}
+						break;
+						
 					case RuleConstants.PROD_CASEDISCRIMINATOR_CASEKEY:
 						// <CaseDiscriminator> ::= CaseKey <ConditionalExpression>
 						lineType = Line.LineType.LT_CASE;

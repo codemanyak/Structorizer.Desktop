@@ -1318,8 +1318,7 @@ public class PythonGenerator extends Generator
 	 * @return true iff all code generation for the instruction line is done
 	 */
 	private boolean generateDeclaration(String _line, Root _root, String _indent, boolean _isDisabled) {
-		StringList tokens = Syntax.splitLexically(_line + " <- 0", true);
-		tokens.removeAll(" ");
+		StringList tokens = Syntax.splitLexically(_line + " <- 0", true, true);
 		String varName = Instruction.getAssignedVarname(tokens, false);
 		if (this.wasDefHandled(_root, varName, false)) {
 			return true;
@@ -1514,8 +1513,7 @@ public class PythonGenerator extends Generator
 	// START KGU#799 2020-02-13: Auxiliary fpor bugfix #812
 	private String getAssignedVarname(String line, boolean pureBasename)
 	{
-		StringList tokens = Syntax.splitLexically(line, true);
-		tokens.removeAll(" ");
+		StringList tokens = Syntax.splitLexically(line, true, true);
 		Syntax.unifyOperators(tokens, true);
 		String var = Instruction.getAssignedVarname(tokens, false);
 		if (var != null && !Syntax.isIdentifier(var, false, "")) {

@@ -1091,7 +1091,7 @@ public class Expression {
 	{
 		// Basically, this follows Dijkstra's shunting yard algorithm
 		Expression expr = null;
-		tokens.removeAll(" ");	// Just in case...
+		tokens.removeBlanks();	// Just in case...
 		LinkedList<Expression> stack = new LinkedList<Expression>();
 		LinkedList<Expression> output = new LinkedList<Expression>();
 		short position = 0;
@@ -1145,6 +1145,11 @@ public class Expression {
 					if (tokens.count() < 2 || !Syntax.isIdentifier(tokens.get(1), false, null)) {
 						throw new SyntaxException("An operator '.' must be followed by an identifier!", tokenNo + position);
 					}
+					if (output.isEmpty()) {
+						throw new SyntaxException("An operator '.' must be preceded by a record operand!", tokenNo + position);
+					}
+					stack.addLast(new Expression(NodeType.OPERATOR, token, (short)(tokenNo + position)));
+					wasOpd = false;
 				}
 				else if (token.equals("?")) {
 					if (tokens.count() < 4 || !tokens.contains(":")) {

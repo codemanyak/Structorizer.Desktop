@@ -594,7 +594,7 @@ public class BasGenerator extends Generator
 					if (asgnPos >= 0)
 					{
 						StringList leftSide = tokens.subSequence(0, asgnPos);
-						leftSide.removeAll(" ");
+						leftSide.removeBlanks();
 						String varName = Instruction.getAssignedVarname(leftSide, false);
 						StringList exprTokens = tokens.subSequence(asgnPos+1, tokens.count()).trim();
 						isArrayInit = !exprTokens.isEmpty() && exprTokens.get(0).equals("{") && exprTokens.get(exprTokens.count()-1).equals("}");
@@ -698,7 +698,7 @@ public class BasGenerator extends Generator
 	 * @param _disabled - whether the element is disabled
 	 */
 	private boolean generateTypeDef(StringList _tokens, Root _root, String _indent, boolean _disabled) {
-		_tokens.removeAll(" ");
+		_tokens.removeBlanks();
 		String typeName = _tokens.get(1);
 		String typeKey = ":" + typeName;
 		TypeMapEntry type = _root.getTypeInfo(routinePool).get(typeKey);

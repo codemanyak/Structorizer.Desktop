@@ -999,8 +999,7 @@ public class PasGenerator extends Generator
 	 */
     private void generateAssignment(String _target, String _expr, String _indent, boolean _isDisabled) {
 		if (_expr.contains("{") && _expr.endsWith("}")) {
-			StringList pureExprTokens = Syntax.splitLexically(_expr, true);
-			pureExprTokens.removeAll(" ");
+			StringList pureExprTokens = Syntax.splitLexically(_expr, true, true);
 			int posBrace = pureExprTokens.indexOf("{");
 			if (pureExprTokens.count() >= 3 && posBrace <= 1) {
 				if (posBrace == 1 && Syntax.isIdentifier(pureExprTokens.get(0), false, null)) {

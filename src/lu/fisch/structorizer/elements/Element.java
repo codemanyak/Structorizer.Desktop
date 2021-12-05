@@ -3081,7 +3081,7 @@ public abstract class Element {
 						// END KGU#371 2019-03-07
 					}
 					//StringList tokens = splitLexically(decl, true);
-					tokens.removeAll(" ");
+					tokens.removeBlanks();
 					if (tokens.count() > 1) {
 						// Is a C or Java array type involved? 
 						if (declGroups.count() == 1 && posColon < 0 || type == null) {
@@ -3266,8 +3266,7 @@ public abstract class Element {
 			typeEntry = typeMap.get(expr);
 			// START KGU#923 2021-02-03: Bugfix #923 complex access paths were ignored
 			if (typeEntry == null && (expr.contains(".") || expr.contains("["))) {
-				StringList tokens = Syntax.splitLexically(expr, true);
-				tokens.removeAll(" ");
+				StringList tokens = Syntax.splitLexically(expr, true, true);
 				String token0 = tokens.get(0);
 				if (Syntax.isIdentifier(token0, false, null)
 						&& (typeEntry = typeMap.get(token0)) != null) {
@@ -3375,8 +3374,7 @@ public abstract class Element {
 			//	typeSpec = "int";
 			//}
 			//catch (NumberFormatException ex) {}
-			StringList tokens = Syntax.splitLexically(expr, true);
-			tokens.removeAll(" ");
+			StringList tokens = Syntax.splitLexically(expr, true, true);
 			tokens.removeAll("+");
 			tokens.removeAll("-");
 			tokens.removeAll("*");

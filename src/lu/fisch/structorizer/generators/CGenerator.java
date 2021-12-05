@@ -678,8 +678,7 @@ public class CGenerator extends Generator {
 					_input = "printf(\"";
 					for (int i = 0; i < exprs.count(); i++) {
 						String expr = exprs.get(i);
-						StringList tokens = Syntax.splitLexically(expr, true);
-						tokens.removeAll(" ");
+						StringList tokens = Syntax.splitLexically(expr, true, true);
 						String fSpec = "?";
 						if (tokens.count() == 1) {
 							String token = tokens.get(0);
@@ -1163,7 +1162,7 @@ public class CGenerator extends Generator {
 		StringList pureTokens = new StringList(tokens);	// will not contain separating space
 		StringList exprTokens = null;	// Tokens of the expression in case of an assignment
 		StringList pureExprTokens = null;	// as before, will not contain separating space
-		pureTokens.removeAll(" ");
+		pureTokens.removeBlanks();
 		String expr = null;	// Original expression
 		int posAsgn = tokens.indexOf("<-");
 		if (posAsgn < 0) {
@@ -1400,7 +1399,7 @@ public class CGenerator extends Generator {
 		else if (!this.suppressTransformation && Instruction.isTypeDefinition(line, typeMap)) {
 			// Attention! The following condition must not be combined with the above one! 
 			if (this.isInternalDeclarationAllowed()) {
-				tokens.removeAll(" ");
+				tokens.removeBlanks();
 				// START KGU#878 2020-10-16: Bugfix #873 - collateral damage of bugfix #808 mended
 				//int posEqu = tokens.indexOf("=");
 				int posEqu = tokens.indexOf("==");
@@ -2826,8 +2825,7 @@ public class CGenerator extends Generator {
 	 */
 	protected void generateAssignment(String _lValue, String _expr, String _indent, boolean _isDisabled) {
 		if (_expr.contains("{") && _expr.endsWith("}")) {
-			StringList pureExprTokens = Syntax.splitLexically(_expr, true);
-			pureExprTokens.removeAll(" ");
+			StringList pureExprTokens = Syntax.splitLexically(_expr, true, true);
 			int posBrace = pureExprTokens.indexOf("{");
 			if (pureExprTokens.count() >= 3 && posBrace <= 1) {
 				if (posBrace == 1 && Syntax.isIdentifier(pureExprTokens.get(0), false, null)) {

@@ -85,6 +85,8 @@ public class Line {
 		LT_FOREACH_LOOP,
 		/** Procedure or function call, 1 expr. (= assignment or proc call) */
 		LT_ROUTINE_CALL,
+		/** Function call with constant definition, 1 expr. (= assignment) + type */
+		LT_CONST_FUNCT_CALL,
 		/** Return instruction, 0..1 expr. */
 		LT_RETURN,
 		/** Leave instruction, 0..1 expr. */
@@ -441,7 +443,7 @@ public class Line {
 		switch (lType) {
 		case LT_VAR_INIT:
 		case LT_CONST_DEF:
-			tokens.removeAll(" ");	// Make sure the token number of the operator is correct
+			tokens.removeBlanks();	// Make sure the token number of the operator is correct
 			tokenPos = (short)tokens.indexOf("<-");
 			declTokens = declTokens.subSequence(0, tokenPos);
 			tokens.remove(0, tokenPos+1);
@@ -507,7 +509,7 @@ public class Line {
 			_type = LineType.LT_RAW;
 		}
 		// Condense the token list
-		_tokens.removeAll(" ");
+		_tokens.removeBlanks();
 		Syntax.unifyOperators(_tokens, false);	// Can we make this an option (argument)?
 		int nTokens = _tokens.count();
 		switch (_type) {
@@ -945,6 +947,7 @@ public class Line {
 		
 		String[] exprTests = new String[] {
 				// "good" expressions
+				"varPart <- conjugateStrings(userInput, entry.keyword, findInfo[1], reflexions)",
 				"c <- 57 > 3 ? 12 : -5",
 				"c + 5 * 3 == 8 ? (423 * 7) : 128 + 9",
 				"(c + 5 * 3 == 8) ? (57 > 3 ? 12 : -5) : 128 + 9",

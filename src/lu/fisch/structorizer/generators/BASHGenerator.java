@@ -953,8 +953,7 @@ public class BASHGenerator extends Generator {
 		// KGU#811 2020-02-21: Bugfix #824 - many absurd bugs found and fixed
 		if (!this.suppressTransformation && !(condition.trim().matches("^\\(\\(.*?\\)\\)$")))
 		{
-			StringList condTokens = Syntax.splitLexically(condition, true);
-			condTokens.removeAll(" ");
+			StringList condTokens = Syntax.splitLexically(condition, true, true);
 			boolean isNumber = false;
 			for (int i = 1; !isNumber && i < condTokens.count()-1; i++) {
 				String token = condTokens.get(i);
@@ -1061,7 +1060,7 @@ public class BASHGenerator extends Generator {
 		{
 			StringList expressions = 
 					Element.splitExpressionList(_interm.substring(output.length()), ",");
-			expressions.removeAll(" ");
+			expressions.removeBlanks();
 			_interm = output + " " + expressions.getLongString();
 		}
 		
@@ -1634,8 +1633,7 @@ public class BASHGenerator extends Generator {
 							String routineId = Integer.toHexString(routine.hashCode());
 							String resultName = "result" + routineId;
 							String source = "${" + resultName + "}";
-							StringList tokens = Syntax.splitLexically(line, true);
-							tokens.removeAll(" ");
+							StringList tokens = Syntax.splitLexically(line, true, true);
 							Syntax.unifyOperators(tokens, true);
 							String target = Instruction.getAssignedVarname(tokens, true);
 							boolean done = false;

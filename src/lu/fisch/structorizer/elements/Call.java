@@ -447,7 +447,7 @@ public class Call extends Instruction {
 	@Override
 	protected int getLineTypeSet(int lineNo) {
 		return Line.LT_ASSIGNMENT_MASK | Line.LT_PROC_CALL_MASK
-				| Line.LT_VAR_INIT_MASK /*| Line.LT_CONST_DEF_MASK*/;
+				| Line.LT_VAR_INIT_MASK | Line.LT_CONST_DEF_MASK;
 	}
 	// END KGU#790 2021-01-17
 }

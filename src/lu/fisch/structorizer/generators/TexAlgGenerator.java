@@ -727,7 +727,7 @@ public class TexAlgGenerator extends Generator {
 				tokens.set(i, token.replace("^", "\\textasciicircum{}"));
 			}
 		}
-		tokens.removeAll(" ");
+		tokens.removeBlanks();
 		return tokens.concatenate(null);
 	}
 
@@ -860,8 +860,7 @@ public class TexAlgGenerator extends Generator {
 				if (packageIndex == 0 /* algorithmicx*/ && Instruction.isTypeDefinition(line)) {
 					addCode("\\Decl{type:}", _indent, false);
 					// get the type name
-					StringList tokens = Syntax.splitLexically(line, true);
-					tokens.removeAll(" ");
+					StringList tokens = Syntax.splitLexically(line, true, true);
 					String typeName = tokens.get(1);
 					addCode(instrCommand
 							.replace("%1", typeName + " = " + transform(tokens.concatenate(" ", 3)))

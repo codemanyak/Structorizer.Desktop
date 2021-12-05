@@ -1219,8 +1219,7 @@ public class ArmGenerator extends Generator {
                     // Is it a function call? Then produce an assignment with variable mapping
                     if (_call.isAssignment()) {
                         // Get the result value
-                        StringList tokens = Syntax.splitLexically(lines.get(0), true);
-                        tokens.removeAll(" ");
+                        StringList tokens = Syntax.splitLexically(lines.get(0), true, true);
                         String target = Call.getAssignedVarname(tokens, false);
                         target = variablesToRegisters(target);
                         appendComment("Subroutine result:", getIndent());
@@ -1475,8 +1474,7 @@ public class ArmGenerator extends Generator {
             //newline = variablesToRegisters(line);
             //generateAssignment(newline.replace("\"", "'"), isDisabled);
             {
-                StringList tokens = Syntax.splitLexically(line, true);
-                tokens.removeAll(" ");
+                StringList tokens = Syntax.splitLexically(line, true, true);
                 StringBuilder charRepr = stringContentToList(tokens.get(2));
                 newline = variablesToRegisters(tokens.get(0)) + "<-" + charRepr.toString();
                 done = generateAssignment(newline, isDisabled);
@@ -1497,7 +1495,7 @@ public class ArmGenerator extends Generator {
                 // Check for a prompt string literal and remove it (plus a possible comma)
                 int ix = inputTokens.count();
                 tokens.remove(0, ix);
-                tokens.removeAll(" ");
+                tokens.removeBlanks();
                 if (!tokens.isEmpty() && (tokens.get(0).startsWith("\"") || tokens.get(0).startsWith("'"))) {
                     tokens.remove(0);
                     appendComment("Prompt string of input instruction ignored", getIndent());
@@ -1790,7 +1788,7 @@ public class ArmGenerator extends Generator {
         //Element.cutOutRedundantMarkers(tokens);
         Syntax.removeDecorators(tokens);
         // END KGU#884 2021-10-25
-        tokens.removeAll(" ");
+        tokens.removeBlanks();
         Syntax.unifyOperators(tokens, false);
         condition = tokens.concatenate(null);
         if (!condition.startsWith("(") || !condition.endsWith(")")) {
@@ -1864,9 +1862,8 @@ public class ArmGenerator extends Generator {
         //        varName = varName.replace(type, "").replace(" ", "");
         //        type = "." + type;
         //    }
-        StringList tokens = Syntax.splitLexically(line, true);
+        StringList tokens = Syntax.splitLexically(line, true, true);
         Syntax.unifyOperators(tokens, true);
-        tokens.removeAll(" ");
         int posAsgnOpr = tokens.indexOf("<-");
         StringList lhSide = tokens.subSequence(0, posAsgnOpr);
         StringList rhSide = tokens.subSequence(posAsgnOpr+1, tokens.count());
@@ -2488,8 +2485,7 @@ public class ArmGenerator extends Generator {
         //    }
         //}
         //generateArrayInitialization(String.format(format, split[0], array), isDisabled, elem);
-        StringList tokens = Syntax.splitLexically(line, true);
-        tokens.removeAll(" ");
+        StringList tokens = Syntax.splitLexically(line, true, true);
         String literal = tokens.get(2);
         StringBuilder array = stringContentToList(literal);
         if (terminateStrings) {
@@ -2681,8 +2677,7 @@ public class ArmGenerator extends Generator {
             if (declPattern == null && (line.contains(addrPattern1)
                     || gnuEnabled && line.contains(addrPattern2))) {
             // END KGU#1003 2021-10-29
-                StringList tokens = Syntax.splitLexically(line, true);
-                tokens.removeAll(" ");
+                StringList tokens = Syntax.splitLexically(line, true, true);
                 arName = tokens.get(tokens.count()-1);
                 if (gnuEnabled) {
                     declPattern = arName + ":";
@@ -2726,8 +2721,7 @@ public class ArmGenerator extends Generator {
         String decl = findArrayDeclaration(register);
         if (decl != null) {
             String type = "";
-            StringList tokens = Syntax.splitLexically(decl.replace("\t", " "), true);
-            tokens.removeAll(" ");
+            StringList tokens = Syntax.splitLexically(decl.replace("\t", " "), true, true);
             int dotPos = -1;
             if (gnuEnabled && (dotPos = tokens.indexOf(".")) >= 0) {
                 type = tokens.get(dotPos + 1);
@@ -3160,8 +3154,7 @@ public class ArmGenerator extends Generator {
                 ARM_INSTR_LOOKUP.add(s);
             }
         }
-        StringList tokens = Syntax.splitLexically(line.toLowerCase(), true);
-        tokens.removeAll(" ");
+        StringList tokens = Syntax.splitLexically(line.toLowerCase(), true, true);
         for (int i = 0; i < tokens.count(); i++) {
             // FIXME: Should we ignore the position? A variable "b" would easily provoke a false positive...
             if (ARM_INSTR_LOOKUP.contains(tokens.get(i))) {

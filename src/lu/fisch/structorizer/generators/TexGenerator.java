@@ -360,8 +360,7 @@ public class TexGenerator extends Generator {
 					code.add(_indent+"\\assign{%");
 					code.add(_indent+this.getIndent() + "\\begin{declaration}[type:]");
 					// get the type name
-					StringList tokens = Syntax.splitLexically(line, true);
-					tokens.removeAll(" ");
+					StringList tokens = Syntax.splitLexically(line, true, true);
 					String typeName = tokens.get(1);
 					code.add(_indent+this.getIndent()+this.getIndent() + "\\description{" + typeName + "}{"
 							+ transform(tokens.concatenate(" ", 3)) + "}");
@@ -372,8 +371,7 @@ public class TexGenerator extends Generator {
 					code.add(_indent+"\\assign{%");
 					code.add(_indent+this.getIndent() + "\\begin{declaration}[variable:]");
 					// get the variable name
-					StringList tokens = Syntax.splitLexically(line + "<-", true);
-					tokens.removeAll(" ");
+					StringList tokens = Syntax.splitLexically(line + "<-", true, true);
 					String varName = Instruction.getAssignedVarname(tokens, false);
 					code.add(_indent+this.getIndent()+this.getIndent() + "\\description{" + varName + "}{"
 							+ transform(line) + "}");

@@ -3533,8 +3533,7 @@ public class Executor implements Runnable
 
 		// ======== PHASE 1: Analysis of the target structure ===========
 
-		StringList tokens = Syntax.splitLexically(target, true);
-		tokens.removeAll(" ");
+		StringList tokens = Syntax.splitLexically(target, true, true);
 		int nTokens = tokens.count();
 		String token0 = tokens.get(0).toLowerCase();
 		String token1;
@@ -5837,11 +5836,8 @@ public class Executor implements Runnable
 		// DEBUG
 		//StringBuilder problems = new StringBuilder();
 		//ExprParser.getInstance().parse(tokens.concatenate(), problems);
-		tokens = Syntax.splitLexically(this.convertStringComparison(tokens.concatenate().trim()), true);
+		tokens = Syntax.splitLexically(this.convertStringComparison(tokens.concatenate().trim()), true, true);
 		// END KGU#490 2018-02-08
-		// START KGU#388 2017-09-13: Enh. #423 support records
-		tokens.removeAll(" ");
-		// END KGU#388 2017-09-13
 		// Watch out for constant arrays or records
 		for (int i = 0; i < tokens.count(); i++) {
 			String token = tokens.get(i);
@@ -7754,9 +7750,9 @@ public class Executor implements Runnable
 	protected Object evaluateExpression(String _expr, boolean _withInitializers, boolean _preserveBrackets) throws EvalError
 	{
 		Object value = null;
-		StringList tokens = Syntax.splitLexically(_expr, true);
 		// START KGU#773 2019-11-28: Bugfix #786 Blanks are not tolerated by the susequent mechanisms like index evaluation
-		tokens.removeAll(" ");
+		//StringList tokens = Syntax.splitLexically(_expr, true);
+		StringList tokens = Syntax.splitLexically(_expr, true, true);
 		// END KGU#773 2019-11-28
 		// START KGU#439 2017-10-13: Enh. #436 Arrays now represented by ArrayLists
 		if (!_preserveBrackets) {

@@ -104,9 +104,9 @@ public class Syntax {
 			"\u221E",
 			// END KGU#920 2021-02-03
 			// START KGU#331 2017-01-13: Enh. #333 Precaution against unicode comparison operators
-			"\u2260",
-			"\u2264",
-			"\u2265"
+			"\u2260", // '≠'
+			"\u2264", // '≤'
+			"\u2265"  // '≥'
 			// END KGU#331 2017-01-13
 	};
 	// END KGU#425 2017-09-29
@@ -501,289 +501,654 @@ public class Syntax {
 	 * 1-character whitespace strings (here: " ", " ", " ", " "). So they can easily be removed
 	 * with removeAll(" ").
 	 * @param _text - String to be exploded into lexical units
-	 * @param _restoreLiterals - if true then accidently split numeric and string literals will be reassembled 
+	 * @param _restoreLiterals - if {@code true} then accidently split numeric and string literals
+	 *        will be reassembled 
 	 * @return StringList consisting of the separated lexemes including isolated spaces etc.
 	 */
 	public static StringList splitLexically(String _text, boolean _restoreStrings)
 	{
-		StringList parts = new StringList();
-		parts.add(_text);
-		
-		// split
-		for (int i = 0; i < LEXICAL_DELIMITERS.length; i++) {
-			parts = StringList.explodeWithDelimiter(parts, LEXICAL_DELIMITERS[i]);
-		}
-
-		// reassemble symbols
-		int i = 0;
-		while (i < parts.count())
-		{
-			String thisPart = parts.get(i);
-			if (i < parts.count()-1)
-			{
-				String nextPart = parts.get(i+1);
-				boolean isInt = false;
-				boolean isSign = false;
-				boolean isEllipse = false;
-				if (thisPart.equals("<") && nextPart.equals("-"))
-				{
-					parts.set(i,"<-");
-					parts.delete(i+1);
-					// START KGU 2014-10-18 potential three-character assignment symbol?
-					if (i < parts.count()-1 && parts.get(i+1).equals("-"))
-					{
-						parts.delete(i+1);
-					}
-					// END KGU 2014-10-18
-				}
-				else if (thisPart.equals(":") && nextPart.equals("="))
-				{
-					parts.set(i,":=");
-					parts.delete(i+1);
-				}
-				else if (thisPart.equals("!") && nextPart.equals("="))
-				{
-					parts.set(i,"!=");
-					parts.delete(i+1);
-				}
-				// START KGU 2015-11-04
-				else if (thisPart.equals("=") && nextPart.equals("="))
-				{
-					parts.set(i,"==");
-					parts.delete(i+1);
-				}
-				// END KGU 2015-11-04
-				else if (thisPart.equals("<"))
-				{
-					if (nextPart.equals(">"))
-					{
-						parts.set(i,"<>");
-						parts.delete(i+1);
-					}
-					else if (nextPart.equals("="))
-					{
-						parts.set(i,"<=");
-						parts.delete(i+1);
-					}
-					// START KGU#92 2015-12-01: Bugfix #41
-					else if (nextPart.equals("<"))
-					{
-						parts.set(i,"<<");
-						parts.delete(i+1);
-					}
-					// END KGU#92 2015-12-01
-				}
-				else if (thisPart.equals(">"))
-				{
-					if (nextPart.equals("="))
-					{
-						parts.set(i,">=");
-						parts.delete(i+1);
-					}
-					// START KGU#92 2015-12-01: Bugfix #41
-					else if (nextPart.equals(">"))
-					{
-						parts.set(i,">>");
-						parts.delete(i+1);
-					}
-					// END KGU#92 2015-12-01
-				}
-				// START KGU#24 2014-10-18: Logical two-character operators should be detected, too ...
-				else if (thisPart.equals("&") && nextPart.equals("&"))
-				{
-					parts.set(i,"&&");
-					parts.delete(i+1);
-				}
-				else if (thisPart.equals("|") && nextPart.equals("|"))
-				{
-					parts.set(i,"||");
-					parts.delete(i+1);
-				}
-				// END KGU#24 2014-10-18
-				// START KGU#26 2015-11-04: Find escaped quotes
-				else if (thisPart.equals("\\"))
-				{
-					if (nextPart.equals("\""))
-					{
-						parts.set(i, "\\\"");
-						parts.delete(i+1);
-					}
-					// START KGU#344 201702-08: Issue #341 - Precaution against string/character delimiter replacement
-					else if (nextPart.equals("'"))
-					{
-						parts.set(i, "\\'");
-						parts.delete(i+1);
-					}
-					// END KGU#344 2017-02-08
-					else if (nextPart.equals("\\"))
-					{
-						parts.set(i, "\\\\");
-						parts.delete(i+1);
-					}
-				}
-				// END KGU#26 2015-11-04
-				// START KGU#331 2017-01-13: Enh. #333 Precaution against unicode comparison operators
-				else if (thisPart.equals("\u2260")) {
-					parts.set(i, "<>");
-				}
-				else if (thisPart.equals("\u2264")) {
-					parts.set(i, "<=");
-				}
-				else if (thisPart.equals("\u2265")) {
-					parts.set(i, ">=");
-				}
-				// END KGU#331 2017-01-13
-				// START KGU#335/KGU#425 2017-09-29: Re-compose floating-point literals (including those starting or ending with ".")
-				// These are legal cases ($ = line end, ? = don't care):
-				// i             i+1             i+2           i+3        comment
-				// .              .               ?             ?         two-dot-ellipse (Pascal range)
-				// .              .               .             ?         three-dot-ellipse (rarely used)
-				// .            FLOAT1            ?             ?         float literal
-				// .            FLOAT2           [+-]        [0-9]+       float literal
-				// [+-]           .            FLOAT1           ?         float literal - reduce this case the the one -2
-				// [+-]           .            FLOAT2         [+-] [0-9]+ float literal - reduce this case the the one -2
-				// [0-9]+         .            FLOAT1           ?         float literal - reduce this case the the one -4
-				// [0-9]+         .            FLOAT2         [+-] [0-9]+ float literal - reduce this case the the one -4
-				// These are the illegal cases:
-				// [+-]           .               $
-				// [+-]           .               ?
-				// [0-9]+         .               .
-				// So we will first do the necessary lookahead before we manipulate parts
-				else if ( (isEllipse = thisPart.equals("."))	// a single dot might merge with another one or a float pattern
-						|| (	// Otherwise a digit sequence might melt with a dot
-								(isInt = INT_PATTERN.matcher(thisPart).matches())
-								|| (isSign = (thisPart.equals("+") || thisPart.equals("-"))	// a sign with a dot requires more...
-										&& i+2 < parts.count())
-								&& nextPart.equals(".")) 
-						) {
-					int nDelete = 0;
-					// Glue the two together - the only pathologic case would be 
-					if (nextPart.equals(".")) {
-						thisPart += nextPart;
-						nDelete = 1;
-						// Is there anything left at all?
-						if (i+2 < parts.count()) {
-							nextPart = parts.get(i+2);
-						}
-						if (isEllipse && nextPart.equals(".")) {
-							// Okay, then be it a three-point ellipse "..."
-							thisPart += nextPart;
-							nDelete++;
-						}
-						// In case of an ellipse we are done here
-					}
-					else {
-						isEllipse = false;
-					}
-					// nextPart.matches("[0-9]+([eE][0-9]+)?")
-					if (!isEllipse && FLOAT_PATTERN1.matcher(nextPart).matches()) {
-						thisPart += nextPart;
-						nDelete++;
-					}
-					// nextPart.matches("[0-9]+[eE]")
-					else if (!isEllipse && FLOAT_PATTERN2.matcher(nextPart).matches()
-							&& i+nDelete+3 < parts.count()
-							&& SIGN_PATTERN.matcher(parts.get(i+nDelete+2)).matches()
-							&& INT_PATTERN.matcher(parts.get(i+nDelete+3)).matches()) {
-						for (int j = 1; j <= 3; j++) {
-							nDelete++;
-							thisPart += parts.get(i+nDelete);
-						}
-					}
-					else if (isSign || isInt && i+2 < parts.count() && parts.get(i+2).equals(".")) {
-						// In this case the amalgamation may not take place
-						nDelete = 0;
-					}
-					// Now carry out the amalgamation if sensible
-					if (nDelete > 0) {
-						parts.set(i, thisPart);
-						parts.remove(i+1, i+nDelete+1);
-					}
-				}
-				// END KGU#335/KGU#425 2017-09-29
-			}
-			i++;
-		}
-		
-		if (_restoreStrings)
-		{
-			// START KGU#344 2017-02-07: Bugfix #341 Wrong loop inclusion
-			//String[] delimiters = {"\"", "'"};
-			final String delimiters = "\"'";
-			// END KGU#344 2017-02-07
-			// START KGU#139 2016-01-12: Bugfix #105 - apparently incomplete strings got lost
-			// We mustn't eat seemingly incomplete strings, instead we re-feed them
-			StringList parkedTokens = new StringList();
-			// END KGU#139 2016-01-12
-			// START #344 2017-02-07: Bugfix #341: Wrong strategy - the token must select the start delimiter
-			//for (int d = 0; d < delimiters.length; d++)
-			//{
-			int ixDelim = -1;	// delimiter index in delimiters
-			String delim = "";	// starting delimiter for matching the closing delimiter
-			// END KGU#344 2017-02-07
-				boolean withinString = false;
-				String composed = "";
-				i = 0;
-				while (i < parts.count())
-				{
-					String lexeme = parts.get(i);
-					if (withinString)
-					{
-						composed = composed + lexeme;
-						// START KGU#344 2017-02-07: Bugfix #341
-						//if (lexeme.equals(delimiters[d]))
-						if (lexeme.equals(delim))
-						// END KGU#344 2017-02-07
-						{
-							// START KGU#139 2016-01-12: Bugfix #105
-							parkedTokens.clear();
-							// END KGU#139 2016-01-12
-							parts.set(i, composed+"");
-							composed = "";
-							withinString = false;
-							i++;
-						}
-						else
-						{
-							// START KGU#139 2016-01-12: Bugfix #105
-							parkedTokens.add(lexeme);
-							// END KGU#139 2016-01-12
-							parts.delete(i);
-						}
-					}
-					// START KGU#344 2017-02-07: Bugfix #341
-					//else if (lexeme.equals(delimiters[d]))
-					else if (lexeme.length() == 1 && (ixDelim = delimiters.indexOf(lexeme)) >= 0)
-					// END KGU#344 2017-02-27
-					{
-						// START KGU#139 2016-01-12: Bugfix #105
-						parkedTokens.add(lexeme);
-						// END KGU#139 2016-01-12
-						withinString = true;
-						// START KGU#344 2017-02-07: Bugfix #341
-						delim = delimiters.substring(ixDelim, ixDelim+1);
-						// END KGU#344 2017-02-07
-						composed = lexeme+"";
-						parts.delete(i);
-					}
-					else
-					{
-						i++;
-					}
-				}
-			// START KGU#344 2017-02-07: Bugfix #341 No outer loop anymore
-			//}
-			// END KGU#344 2017-02-07
-			// START KGU#139 2916-01-12: Bugfix #105
-			if (parkedTokens.count() > 0)
-			{
-				parts.add(parkedTokens);
-			}
-			// END KGU#139 2016-01-12
-		}
-		return parts;
+		// START KGU#790 2021-12-05: Issue #800 replaced by a more efficient version (factor ~10)
+//		StringList parts = new StringList();
+//		parts.add(_text);
+//		
+//		// split
+//		for (int i = 0; i < LEXICAL_DELIMITERS.length; i++) {
+//			parts = StringList.explodeWithDelimiter(parts, LEXICAL_DELIMITERS[i]);
+//		}
+//
+//		// reassemble symbols
+//		int i = 0;
+//		while (i < parts.count())
+//		{
+//			String thisPart = parts.get(i);
+//			if (i < parts.count()-1)
+//			{
+//				String nextPart = parts.get(i+1);
+//				boolean isInt = false;
+//				boolean isSign = false;
+//				boolean isEllipse = false;
+//				if (thisPart.equals("<") && nextPart.equals("-"))
+//				{
+//					parts.set(i,"<-");
+//					parts.delete(i+1);
+//					// START KGU 2014-10-18 potential three-character assignment symbol?
+//					if (i < parts.count()-1 && parts.get(i+1).equals("-"))
+//					{
+//						parts.delete(i+1);
+//					}
+//					// END KGU 2014-10-18
+//				}
+//				else if (thisPart.equals(":") && nextPart.equals("="))
+//				{
+//					parts.set(i,":=");
+//					parts.delete(i+1);
+//				}
+//				else if (thisPart.equals("!") && nextPart.equals("="))
+//				{
+//					parts.set(i,"!=");
+//					parts.delete(i+1);
+//				}
+//				// START KGU 2015-11-04
+//				else if (thisPart.equals("=") && nextPart.equals("="))
+//				{
+//					parts.set(i,"==");
+//					parts.delete(i+1);
+//				}
+//				// END KGU 2015-11-04
+//				else if (thisPart.equals("<"))
+//				{
+//					if (nextPart.equals(">"))
+//					{
+//						parts.set(i,"<>");
+//						parts.delete(i+1);
+//					}
+//					else if (nextPart.equals("="))
+//					{
+//						parts.set(i,"<=");
+//						parts.delete(i+1);
+//					}
+//					// START KGU#92 2015-12-01: Bugfix #41
+//					else if (nextPart.equals("<"))
+//					{
+//						parts.set(i,"<<");
+//						parts.delete(i+1);
+//					}
+//					// END KGU#92 2015-12-01
+//				}
+//				else if (thisPart.equals(">"))
+//				{
+//					if (nextPart.equals("="))
+//					{
+//						parts.set(i,">=");
+//						parts.delete(i+1);
+//					}
+//					// START KGU#92 2015-12-01: Bugfix #41
+//					else if (nextPart.equals(">"))
+//					{
+//						parts.set(i,">>");
+//						parts.delete(i+1);
+//					}
+//					// END KGU#92 2015-12-01
+//				}
+//				// START KGU#24 2014-10-18: Logical two-character operators should be detected, too ...
+//				else if (thisPart.equals("&") && nextPart.equals("&"))
+//				{
+//					parts.set(i,"&&");
+//					parts.delete(i+1);
+//				}
+//				else if (thisPart.equals("|") && nextPart.equals("|"))
+//				{
+//					parts.set(i,"||");
+//					parts.delete(i+1);
+//				}
+//				// END KGU#24 2014-10-18
+//				// START KGU#26 2015-11-04: Find escaped quotes
+//				else if (thisPart.equals("\\"))
+//				{
+//					if (nextPart.equals("\""))
+//					{
+//						parts.set(i, "\\\"");
+//						parts.delete(i+1);
+//					}
+//					// START KGU#344 201702-08: Issue #341 - Precaution against string/character delimiter replacement
+//					else if (nextPart.equals("'"))
+//					{
+//						parts.set(i, "\\'");
+//						parts.delete(i+1);
+//					}
+//					// END KGU#344 2017-02-08
+//					else if (nextPart.equals("\\"))
+//					{
+//						parts.set(i, "\\\\");
+//						parts.delete(i+1);
+//					}
+//				}
+//				// END KGU#26 2015-11-04
+//				// START KGU#331 2017-01-13: Enh. #333 Precaution against unicode comparison operators
+//				else if (thisPart.equals("\u2260")) {
+//					parts.set(i, "<>");
+//				}
+//				else if (thisPart.equals("\u2264")) {
+//					parts.set(i, "<=");
+//				}
+//				else if (thisPart.equals("\u2265")) {
+//					parts.set(i, ">=");
+//				}
+//				// END KGU#331 2017-01-13
+//				// START KGU#335/KGU#425 2017-09-29: Re-compose floating-point literals (including those starting or ending with ".")
+//				// These are legal cases ($ = line end, ? = don't care):
+//				// i             i+1             i+2           i+3        comment
+//				// .              .               ?             ?         two-dot-ellipse (Pascal range)
+//				// .              .               .             ?         three-dot-ellipse (rarely used)
+//				// .            FLOAT1            ?             ?         float literal
+//				// .            FLOAT2           [+-]        [0-9]+       float literal
+//				// [+-]           .            FLOAT1           ?         float literal - reduce this case the the one -2
+//				// [+-]           .            FLOAT2         [+-] [0-9]+ float literal - reduce this case the the one -2
+//				// [0-9]+         .            FLOAT1           ?         float literal - reduce this case the the one -4
+//				// [0-9]+         .            FLOAT2         [+-] [0-9]+ float literal - reduce this case the the one -4
+//				// These are the illegal cases:
+//				// [+-]           .               $
+//				// [+-]           .               ?
+//				// [0-9]+         .               .
+//				// So we will first do the necessary lookahead before we manipulate parts
+//				else if ( (isEllipse = thisPart.equals("."))	// a single dot might merge with another one or a float pattern
+//						|| (	// Otherwise a digit sequence might melt with a dot
+//								(isInt = INT_PATTERN.matcher(thisPart).matches())
+//								|| (isSign = (thisPart.equals("+") || thisPart.equals("-"))	// a sign with a dot requires more...
+//										&& i+2 < parts.count())
+//								&& nextPart.equals(".")) 
+//						) {
+//					int nDelete = 0;
+//					// Glue the two together - the only pathologic case would be 
+//					if (nextPart.equals(".")) {
+//						thisPart += nextPart;
+//						nDelete = 1;
+//						// Is there anything left at all?
+//						if (i+2 < parts.count()) {
+//							nextPart = parts.get(i+2);
+//						}
+//						if (isEllipse && nextPart.equals(".")) {
+//							// Okay, then be it a three-point ellipse "..."
+//							thisPart += nextPart;
+//							nDelete++;
+//						}
+//						// In case of an ellipse we are done here
+//					}
+//					else {
+//						isEllipse = false;
+//					}
+//					// nextPart.matches("[0-9]+([eE][0-9]+)?")
+//					if (!isEllipse && FLOAT_PATTERN1.matcher(nextPart).matches()) {
+//						thisPart += nextPart;
+//						nDelete++;
+//					}
+//					// nextPart.matches("[0-9]+[eE]")
+//					else if (!isEllipse && FLOAT_PATTERN2.matcher(nextPart).matches()
+//							&& i+nDelete+3 < parts.count()
+//							&& SIGN_PATTERN.matcher(parts.get(i+nDelete+2)).matches()
+//							&& INT_PATTERN.matcher(parts.get(i+nDelete+3)).matches()) {
+//						for (int j = 1; j <= 3; j++) {
+//							nDelete++;
+//							thisPart += parts.get(i+nDelete);
+//						}
+//					}
+//					else if (isSign || isInt && i+2 < parts.count() && parts.get(i+2).equals(".")) {
+//						// In this case the amalgamation may not take place
+//						nDelete = 0;
+//					}
+//					// Now carry out the amalgamation if sensible
+//					if (nDelete > 0) {
+//						parts.set(i, thisPart);
+//						parts.remove(i+1, i+nDelete+1);
+//					}
+//				}
+//				// END KGU#335/KGU#425 2017-09-29
+//			}
+//			i++;
+//		}
+//		
+//		if (_restoreStrings)
+//		{
+//			// START KGU#344 2017-02-07: Bugfix #341 Wrong loop inclusion
+//			//String[] delimiters = {"\"", "'"};
+//			final String delimiters = "\"'";
+//			// END KGU#344 2017-02-07
+//			// START KGU#139 2016-01-12: Bugfix #105 - apparently incomplete strings got lost
+//			// We mustn't eat seemingly incomplete strings, instead we re-feed them
+//			StringList parkedTokens = new StringList();
+//			// END KGU#139 2016-01-12
+//			// START #344 2017-02-07: Bugfix #341: Wrong strategy - the token must select the start delimiter
+//			//for (int d = 0; d < delimiters.length; d++)
+//			//{
+//			int ixDelim = -1;	// delimiter index in delimiters
+//			String delim = "";	// starting delimiter for matching the closing delimiter
+//			// END KGU#344 2017-02-07
+//				boolean withinString = false;
+//				String composed = "";
+//				i = 0;
+//				while (i < parts.count())
+//				{
+//					String lexeme = parts.get(i);
+//					if (withinString)
+//					{
+//						composed = composed + lexeme;
+//						// START KGU#344 2017-02-07: Bugfix #341
+//						//if (lexeme.equals(delimiters[d]))
+//						if (lexeme.equals(delim))
+//						// END KGU#344 2017-02-07
+//						{
+//							// START KGU#139 2016-01-12: Bugfix #105
+//							parkedTokens.clear();
+//							// END KGU#139 2016-01-12
+//							parts.set(i, composed+"");
+//							composed = "";
+//							withinString = false;
+//							i++;
+//						}
+//						else
+//						{
+//							// START KGU#139 2016-01-12: Bugfix #105
+//							parkedTokens.add(lexeme);
+//							// END KGU#139 2016-01-12
+//							parts.delete(i);
+//						}
+//					}
+//					// START KGU#344 2017-02-07: Bugfix #341
+//					//else if (lexeme.equals(delimiters[d]))
+//					else if (lexeme.length() == 1 && (ixDelim = delimiters.indexOf(lexeme)) >= 0)
+//					// END KGU#344 2017-02-27
+//					{
+//						// START KGU#139 2016-01-12: Bugfix #105
+//						parkedTokens.add(lexeme);
+//						// END KGU#139 2016-01-12
+//						withinString = true;
+//						// START KGU#344 2017-02-07: Bugfix #341
+//						delim = delimiters.substring(ixDelim, ixDelim+1);
+//						// END KGU#344 2017-02-07
+//						composed = lexeme+"";
+//						parts.delete(i);
+//					}
+//					else
+//					{
+//						i++;
+//					}
+//				}
+//			// START KGU#344 2017-02-07: Bugfix #341 No outer loop anymore
+//			//}
+//			// END KGU#344 2017-02-07
+//			// START KGU#139 2916-01-12: Bugfix #105
+//			if (parkedTokens.count() > 0)
+//			{
+//				parts.add(parkedTokens);
+//			}
+//			// END KGU#139 2016-01-12
+//		}
+//		return parts;
+		return splitLexically(_text, _restoreStrings, false);
+		// END KGU#790 2021-12-05
 	}
 	// END KGU#18/KGU#23 2015-11-04
+	
+	// START KGU#790 2021-12-05: Issue #800 - way more efficient splitter
+	private static enum LexState {
+		LX_0,
+		LX_WHITESPACE,
+		LX_STRING1, LX_STRING2,
+		LX_NAME,
+		LX_INT, LX_INT0, LX_INTB, LX_INTO, LX_INTX,
+		LX_FLOAT, LX_FLOATSE, LX_FLOATE,
+		LX_SYMBOL};
+	private static final String[] LEX_SYMBOLS = {
+			":=", "<-",
+			"<=", ">=", "<>", "==", "!=",
+			"<<", ">>>", ">>",
+			"&&", "||",
+			"..", "...",
+			"\\\\"};
+	private static final StringList LEX_SYMBOL_LIST = new StringList(LEX_SYMBOLS);
+	private static final String LEX_DELIMITERS = ".,;()[]{}-+/*%><=:!?&|~\u221E\u2260\u2264\u2265\\";
+	/**
+	 * Splits the given _text into lexical morphemes (lexemes). This will possibly overdo
+	 * somewhat (e. g. signs of number literals will be separated, but floating-point literals
+	 * like 123.45 or .09e-8 will properly be preserved as contiguous tokens).<br>
+	 * This method uses a state machine approach rather than a repeated splitting and
+	 * recombination as {@link #splitLexically(String, boolean)} does.
+	 * 
+	 * @param _text - String to be exploded into lexical units
+	 * @param _preserveStrings - if {@code true} then string literals will be preserved,
+	 *        otherwise they will be split as if the content were a sequence of lexemes.
+	 * @param _noWhiteSpace - if {@code true} then inter-lexeme whitespace will be eliminated,
+	 *        otherwise it will be left in contiguous chunks of whitespace characters.
+	 * @return StringList consisting of the separated lexemes including isolated spaces etc.
+	 */
+	public static StringList splitLexically(String _text, boolean _preserveStrings, boolean _noWhiteSpace)
+	{
+		StringList tokens = new StringList();
+		LexState state = LexState.LX_0;
+		boolean escape = false;
+		StringBuilder sbToken = new StringBuilder();
+		for (int ix = 0; ix < _text.length(); ix++) {
+			int cp = _text.codePointAt(ix);
+			switch (state) {
+			case LX_0:	// Initial and interregnum state
+				if (Character.isWhitespace(cp)) {
+					if (!_noWhiteSpace) {
+						sbToken.appendCodePoint(cp);
+					}
+					state = LexState.LX_WHITESPACE;
+				}
+				else if (Character.isLetter(cp)) {
+					sbToken.appendCodePoint(cp);
+					state = LexState.LX_NAME;
+				}
+				else if (Character.isDigit(cp)) {
+					sbToken.appendCodePoint(cp);
+					state = cp == '0' ? LexState.LX_INT0 : LexState.LX_INT;
+				}
+				else if (cp == '.') {
+					sbToken.appendCodePoint(cp);
+					int cp1 = 0;
+					if (ix + 1 < _text.length() ||
+							(cp1 = _text.codePointAt(ix+1)) == 'e'
+							|| cp1 == 'E'
+							|| Character.isDigit(cp1)) {
+						state = LexState.LX_FLOAT;
+					}
+					else {
+						state = LexState.LX_SYMBOL;
+					}
+				}
+				else if (cp == '\'') {
+					sbToken.appendCodePoint(cp);
+					state = _preserveStrings ? LexState.LX_STRING1 : LexState.LX_SYMBOL;
+				}
+				else if (cp == '\"') {
+					sbToken.appendCodePoint(cp);
+					state = _preserveStrings ? LexState.LX_STRING2 : LexState.LX_SYMBOL;
+				}
+				else if (LEX_DELIMITERS.indexOf(cp) >= 0) {
+					if (cp == '\u2260') {
+						sbToken.append("<>");
+					}
+					else if (cp == '\u2264') {
+						sbToken.append("<=");
+					}
+					else if (cp == '\u2265') {
+						sbToken.append(">=");
+					}
+					else {
+						if (cp == '\\') {
+							escape = true;
+						}
+						sbToken.appendCodePoint(cp);
+					}
+					state = LexState.LX_SYMBOL;
+				}
+				else {
+					// TODO ignore? collect?
+					System.err.println("Unexpected character in LexState LX_0:" + _text.charAt(ix));
+					sbToken.appendCodePoint(cp);
+				}
+				break;
+			case LX_FLOAT:	// Fraction part of a floating-point literal
+				if (Character.isDigit(cp)) {
+					sbToken.appendCodePoint(cp);
+				}
+				else if (cp == 'e' || cp == 'E') {
+					int cp1 = 0;
+					if (ix + 1 < _text.length() && Character.isDigit(cp1 = _text.codePointAt(ix+1))) {
+						sbToken.appendCodePoint(cp);
+						state = LexState.LX_FLOATE;
+					}
+					else if (ix + 2 < _text.length() && "+-".indexOf(cp1) >= 0 && Character.isDigit(_text.codePointAt(ix+2))) {
+						sbToken.appendCodePoint(cp);
+						state = LexState.LX_FLOATSE;
+					}
+				}
+				else if (cp == 'f' || cp == 'F') {
+					sbToken.appendCodePoint(cp);
+					tokens.add(sbToken.toString());
+					sbToken.delete(0, sbToken.length());
+					state = LexState.LX_0;
+				}
+				else {
+					// Something different seems to start here
+					tokens.add(sbToken.toString());
+					sbToken.delete(0, sbToken.length());
+					state = LexState.LX_0;
+					ix--;	// Process this code point again
+				}
+				break;
+			case LX_FLOATSE: // Exponent of a floating-point literal, sign possible
+				state = LexState.LX_FLOATE;
+				if (cp == '-' || cp == '+') {
+					sbToken.appendCodePoint(cp);
+					break;
+				}
+			case LX_FLOATE:	// Exponent of a floating-point literal, no sign allowed
+				if (Character.isDigit(cp)) {
+					sbToken.appendCodePoint(cp);
+				}
+				else if (cp == 'f' || cp == 'F') {
+					sbToken.appendCodePoint(cp);
+					tokens.add(sbToken.toString());
+					sbToken.delete(0, sbToken.length());
+					state = LexState.LX_0;
+				}
+				else {
+					// Something different seems to start here
+					tokens.add(sbToken.toString());
+					sbToken.delete(0, sbToken.length());
+					state = LexState.LX_0;
+					ix--;	// Process this code point again
+				}
+				break;
+			case LX_INT0:	// Integer literal with initial '0'
+				if (cp == 'b' || cp == 'B'
+					&& ix + 1 < _text.length()
+					&& "01".indexOf(_text.codePointAt(ix+1)) >= 0) {
+					sbToken.appendCodePoint(cp);
+					state = LexState.LX_INTB;
+					break;
+				}
+				else if (cp == 'x' || cp == 'X'
+						&& ix + 1 < _text.length()
+						&& "0123456789ABCDEFabcdef".indexOf(_text.codePointAt(ix+1)) >= 0) {
+					sbToken.appendCodePoint(cp);
+					state = LexState.LX_INTX;
+					break;
+				}
+				else if (cp >= '0' && cp <= '7') {
+					sbToken.appendCodePoint(cp);
+					state = LexState.LX_INTO;
+					break;
+				}
+				else if (Character.isDigit(cp)) {
+					tokens.add(sbToken.toString());
+					sbToken.delete(0, sbToken.length());
+					// Another int literal seems to start here
+					sbToken.appendCodePoint(cp);
+					state = LexState.LX_INT;
+					break;
+				}
+				// No break here!
+			case LX_INT:	// Decimal integer literal ([1-9][0-9]*L?)
+				if (Character.isDigit(cp)) {
+					sbToken.appendCodePoint(cp);
+				}
+				else if (cp == '.') {
+					sbToken.appendCodePoint(cp);
+					state = LexState.LX_FLOAT;
+				}
+				else if (cp == 'e' || cp == 'E') {
+					int cp1 = 0;
+					if (ix + 1 < _text.length() && Character.isDigit(cp1 = _text.codePointAt(ix+1))) {
+						sbToken.appendCodePoint(cp);
+						state = LexState.LX_FLOATE;
+					}
+					else if (ix + 2 < _text.length() && "+-".indexOf(cp1) >= 0 && Character.isDigit(_text.codePointAt(ix+2))) {
+						sbToken.appendCodePoint(cp);
+						state = LexState.LX_FLOATSE;
+					}
+				}
+				else if (cp == 'f' || cp == 'F' || cp == 'l' || cp == 'L') {
+					// Float or long literal: [0-9]+[fl]
+					sbToken.appendCodePoint(cp);
+					tokens.add(sbToken.toString());
+					sbToken.delete(0, sbToken.length());
+					state = LexState.LX_0;
+				}
+				else {
+					// Something different seems to start here
+					tokens.add(sbToken.toString());
+					sbToken.delete(0, sbToken.length());
+					state = LexState.LX_0;
+					ix--;	// Process this code point again
+				}
+				break;
+			case LX_INTB:	// Binary integer literal: 0b[01]+
+				if (cp == '0' || cp == '1') {
+					sbToken.appendCodePoint(cp);
+				}
+				else if (cp == 'l' || cp == 'L') {
+					// binary long literal
+					sbToken.appendCodePoint(cp);
+					tokens.add(sbToken.toString());
+					sbToken.delete(0, sbToken.length());
+					state = LexState.LX_0;
+				}
+				else {
+					// Something different seems to start here
+					tokens.add(sbToken.toString());
+					sbToken.delete(0, sbToken.length());
+					state = LexState.LX_0;
+					ix--;	// Process this code point again
+				}
+				break;
+			case LX_INTO:	// Octal integer literal: 0[0-7]*
+				if (cp >= '0' && cp <= '7') {
+					sbToken.appendCodePoint(cp);
+				}
+				else if (cp == 'l' || cp == 'L') {
+					// octal long literal
+					sbToken.appendCodePoint(cp);
+					tokens.add(sbToken.toString());
+					sbToken.delete(0, sbToken.length());
+					state = LexState.LX_0;
+				}
+				else {
+					// Something different seems to start here
+					tokens.add(sbToken.toString());
+					sbToken.delete(0, sbToken.length());
+					state = LexState.LX_0;
+					ix--;	// Process this code point again
+				}
+				break;
+			case LX_INTX:	// Hexadecimal integer literal: 0x[0-9A-Fa-f]+
+				if (cp >= '0' && cp <= '9'
+					|| cp >= 'A' && cp <= 'F'
+					|| cp >= 'a' && cp <= 'f') {
+					sbToken.appendCodePoint(cp);
+				}
+				else {
+					// Something different seems to start here
+					tokens.add(sbToken.toString());
+					sbToken.delete(0, sbToken.length());
+					state = LexState.LX_0;
+					ix--;	// Process this code point again
+				}
+				break;
+			case LX_NAME:
+				if (Character.isLetterOrDigit(cp) || cp == '_') {
+					sbToken.appendCodePoint(cp);
+				}
+				else {
+					// Something different seems to start here
+					tokens.add(sbToken.toString());
+					sbToken.delete(0, sbToken.length());
+					state = LexState.LX_0;
+					ix--;	// Process this code point again
+				}
+				break;
+			case LX_STRING1:
+			case LX_STRING2:
+				sbToken.appendCodePoint(cp);
+				if (cp == '\\') {
+					escape = !escape;
+				}
+				else if (cp == '\'' && state == LexState.LX_STRING1
+						|| cp == '\"' && state == LexState.LX_STRING2) {
+					escape = false;
+					tokens.add(sbToken.toString());
+					sbToken.delete(0, sbToken.length());
+					state = LexState.LX_0;
+				}
+				break;
+			case LX_WHITESPACE:
+				if (Character.isWhitespace(cp)) {
+					if (!_noWhiteSpace) {
+						sbToken.appendCodePoint(cp);
+					}
+					state = LexState.LX_WHITESPACE;
+				}
+				else {
+					if (sbToken.length() > 0) {
+						tokens.add(sbToken.toString());
+						sbToken.delete(0, sbToken.length());
+					}
+					state = LexState.LX_0;
+					ix--;
+				}
+				break;
+			case LX_SYMBOL:
+				// Lets's see if there is some possible combination
+				if (LEX_DELIMITERS.indexOf(cp) >= 0) {
+					// May belong to the symbol,
+					int oldLen = sbToken.length();
+					sbToken.appendCodePoint(cp);
+					if (!LEX_SYMBOL_LIST.contains(sbToken.toString())) {
+						String token = sbToken.substring(0, oldLen);
+						// May not be part, so push the former symbol
+						tokens.add(token);
+						if (token.equals("<-") && cp == '-') {
+							// Drop the superfluous second hyphen ...
+							oldLen = sbToken.length();
+							// ... and start from scratch
+							state = LexState.LX_0;
+						}
+						// Start a new symbol with the current cp
+						sbToken.delete(0, oldLen);
+					}
+					else if (escape && cp == '\\') {
+						escape = false;
+					}
+				}
+				else if (escape && "0bftnr'\"".indexOf(cp) >= 0) {
+					// Amalgamate the floating escape sequence
+					sbToken.appendCodePoint(cp);
+					tokens.add(sbToken.toString());
+					sbToken.delete(0, sbToken.length());
+					state = LexState.LX_0;
+					escape = false;
+				}
+				else {
+					tokens.add(sbToken.toString());
+					sbToken.delete(0, sbToken.length());
+					state = LexState.LX_0;
+					ix--;
+				}
+				break;
+			default:
+				System.err.println("Unhandled LexState " + state.name());
+				break;
+			}
+		}
+		if (sbToken.length() > 0) {
+			tokens.add(sbToken.toString());
+		}
+		return tokens;
+	}
+	// END KGU#790 2021-12-05
 	
 	/**
 	 * Splits the token list {@code _tokens}, which is supposed to represent a sequence of

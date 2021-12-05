@@ -2919,7 +2919,7 @@ public class Root extends Element {
 			// END KGU#653 2019-02-16
 		}
 
-		tokens.removeAll(" ");
+		tokens.removeBlanks();
 		// Eliminate all keywords
 		for (int kw = 0; kw < _keywords.length; kw++)
 		{
@@ -3310,8 +3310,7 @@ public class Root extends Element {
     public LinkedHashMap<String,String> extractEnumerationConstants(String _typeDefLine)
     {
     	LinkedHashMap<String,String> enumConstants = null;
-    	StringList tokens = Syntax.splitLexically(_typeDefLine, true);
-    	tokens.removeAll(" ");
+    	StringList tokens = Syntax.splitLexically(_typeDefLine, true, true);
     	if (!tokens.get(3).equalsIgnoreCase("enum")) {
     		return null;
     	}
@@ -5000,7 +4999,7 @@ public class Root extends Element {
 						TypeMapEntry recType = _types.get(":"+typeName);
 						if (recType == null || !recType.isRecord()) {
 							//error  = new DetectedError("There is no defined record type «"+typeName+"»!", _instr);
-							addError(_errors, new DetectedError(errorMsg(Menu.error24_5, typeName), _instr), 24);												
+							addError(_errors, new DetectedError(errorMsg(Menu.error24_5, typeName), _instr), 24);
 						}
 						else {
 							// START KGU#559 2018-07-20: Enh. #563  more intelligent initializer evaluation
@@ -5011,13 +5010,13 @@ public class Root extends Element {
 							for (String compName: compNames) {
 								if (!compName.startsWith("§") && !components.containsKey(compName)) {
 									//error  = new DetectedError("Record component «"+compName+"» will not be modified/initialized!", _instr);
-									addError(_errors, new DetectedError(errorMsg(Menu.error24_6, compName), _instr), 24);																					
+									addError(_errors, new DetectedError(errorMsg(Menu.error24_6, compName), _instr), 24);
 								}
 							}
 							for (String compName: components.keySet()) {
 								if (!compName.startsWith("§") && !compNames.contains(compName)) {
 									//error  = new DetectedError("Record type «"+typeName+"» hasn't got a component «"+compName+"»!", _instr);
-									addError(_errors, new DetectedError(errorMsg(Menu.error24_7, new String[]{typeName, compName}), _instr), 24);																					
+									addError(_errors, new DetectedError(errorMsg(Menu.error24_7, new String[]{typeName, compName}), _instr), 24);
 								}
 							}
 						}
@@ -5477,12 +5476,13 @@ public class Root extends Element {
 	/**
 	 * CHECK 31: General grammar-based line syntax check
 	 * @param ele - element to be checked
-	 * @param _errors - global errior list
+	 * @param _errors - global error list
 	 */
 	private void analyse_31(Element _ele, Vector<DetectedError> _errors) {
 		StringList lines = _ele.getUnbrokenText();
 		LineParser parser = LineParser.getInstance();
 		for (int i = 0; i < lines.count(); i++) {
+			// FIXME: suppress replacements of '=' in type definitions
 			String line = parser.preprocessLine(lines.get(i), _ele, i, true);
 			String error = parser.check(line);
 			if (error != null) {
@@ -6086,7 +6086,7 @@ public class Root extends Element {
     			// First attempt: Something after parameter list and "as" or ":"
     			if (tokens.count() > posCloseParenth + 1) {
     				StringList right = tokens.subSequence(posCloseParenth + 1, tokens.count());
-    				right.removeAll(" ");
+    				right.removeBlanks();
     				if (right.count() > 0 && (right.get(0).toLowerCase().equals("as") || right.get(0).equals(":"))) {
     					// START KGU#135 2016-01-08: It was not meant to be split to several lines.
     					//resultType = tokens.getText(posCloseParenth + 2);
@@ -6099,7 +6099,7 @@ public class Root extends Element {
     			//else if (posOpenParenth > 1 && testidentifier(tokens.get(posOpenParenth-1)))
     			if ((resultType == null || resultType.isEmpty()) && posOpenParenth > 1) {
     				StringList left = tokens.subSequence(0, posOpenParenth);
-    				left.removeAll(" ");
+    				left.removeBlanks();
     				if (left.count() > 1 && Syntax.isIdentifier(left.get(left.count()-1), false, null))
     			// END KGU#61 2016-03-22
     				{

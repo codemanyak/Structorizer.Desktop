@@ -58,6 +58,7 @@ package lu.fisch.utils;
  *      A. Simonetta    2021-03-25      Issue #967: New method replaceIfContains
  *      Kay Gürtzig     2021-04-09      Renamed method replaceIfContains to replaceInElements
  *      Kay Gürtzig     2021-10-25      Results added for add(String), addOrdered(String), and addByLength()
+ *      Kay Gürtzig     2021-12-05      New method removeBlanks() for convenience.
  *
  ******************************************************************************************************
  *
@@ -1442,6 +1443,9 @@ public class StringList {
 	 *
 	 * @param _string - the searched string
 	 * @return number of deletions
+	 * 
+	 * @see #removeAll(String, boolean)
+	 * @see #removeBlanks()
 	 */
 	public int removeAll(String _string)
 	// START KGU#375 2017-04-04: For regularity, new method to remove case-independently
@@ -1474,6 +1478,8 @@ public class StringList {
 	 * @param _string - the searched string
 	 * @param _matchCase - if the string is to be compared exactly (or case-ignorantly)
 	 * @return number of deletions
+	 * 
+	 * @see #removeBlanks()
 	 */
 	public int removeAll(String _string, boolean _matchCase) {
 		int nRemoved = 0;
@@ -1701,6 +1707,7 @@ public class StringList {
 	 * 
 	 * @see #removeAll(String)
 	 * @see #removeAll(String, boolean)
+	 * @see #removeBlanks()
 	 * @see #remove(int)
 	 * @see #remove(int, int)
 	 * @see #subSequence(int, int)
@@ -1717,6 +1724,28 @@ public class StringList {
 		return this;
 	}
 	// END KGU 2017-10-29
+	
+	// START KGU#790 2021-12-05: Issue #800 new utility (for modified lexical splitting)
+	/**
+	 * Removes all empty and mere whitespace elements.
+	 * 
+	 * @return the number of removed elements
+	 * 
+	 * @see #removeAll(String)
+	 * @see #trim()
+	 */
+	public int removeBlanks()
+	{
+		int nRemoved = 0;
+		for (int i = strings.size() - 1; i >= 0; i--) {
+			if (strings.get(i).isBlank()) {
+				strings.remove(i);
+				nRemoved++;
+			}
+		}
+		return nRemoved;
+	}
+	// END KGU#790 2021-12-05
 
 	public static void main(String[] args) {
 		StringList sl = new StringList();
