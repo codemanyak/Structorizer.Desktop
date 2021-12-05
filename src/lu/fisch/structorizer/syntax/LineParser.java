@@ -317,9 +317,11 @@ public class LineParser /*extends CodeParser*/
 		final int SYM_TYPEDESCRIPTION                      = 153;  // <TypeDescription>
 		final int SYM_UNARYEXPRESSION                      = 154;  // <UnaryExpression>
 		final int SYM_UNARYEXPRESSIONNOTPLUSMINUS          = 155;  // <UnaryExpressionNotPlusMinus>
-		final int SYM_VARDECLARATION                       = 156;  // <VarDeclaration>
-		final int SYM_VARDECLARATION1                      = 157;  // <VarDeclaration1>
-		final int SYM_VARINITIALISATION                    = 158;  // <VarInitialisation>
+		final int SYM_VARDECL1ORINIT                       = 156;  // <VarDecl1OrInit>
+		final int SYM_VARDECLARATION                       = 157;  // <VarDeclaration>
+		final int SYM_VARDECLARATION1                      = 158;  // <VarDeclaration1>
+		final int SYM_VARINITIALISATION                    = 159;  // <VarInitialisation>
+		final int SYM_VARINITOPT                           = 160;  // <VarInitOpt>
 	};
 
 	// Symbolic constants naming the table indices of the grammar rules
@@ -331,191 +333,194 @@ public class LineParser /*extends CodeParser*/
 		final int PROD_ELEMENTLINE3                                               =   2;  // <ElementLine> ::= <InputInstruction>
 		final int PROD_ELEMENTLINE4                                               =   3;  // <ElementLine> ::= <OutputInstruction>
 		final int PROD_ELEMENTLINE5                                               =   4;  // <ElementLine> ::= <RoutineInvocation>
-		final int PROD_ELEMENTLINE6                                               =   5;  // <ElementLine> ::= <VarDeclaration>
-		final int PROD_ELEMENTLINE7                                               =   6;  // <ElementLine> ::= <ConstDefinition>
-		final int PROD_ELEMENTLINE8                                               =   7;  // <ElementLine> ::= <TypeDefinition>
-		final int PROD_ELEMENTLINE9                                               =   8;  // <ElementLine> ::= <Condition>
-		final int PROD_ELEMENTLINE10                                              =   9;  // <ElementLine> ::= <ForHeader>
-		final int PROD_ELEMENTLINE11                                              =  10;  // <ElementLine> ::= <ForInHeader>
-		final int PROD_ELEMENTLINE12                                              =  11;  // <ElementLine> ::= <Jump>
-		final int PROD_ELEMENTLINE13                                              =  12;  // <ElementLine> ::= <Call>
-		final int PROD_ELEMENTLINE14                                              =  13;  // <ElementLine> ::= <CatchClause>
-		final int PROD_ELEMENTLINE15                                              =  14;  // <ElementLine> ::= <CaseDiscriminator>
-		final int PROD_ELEMENTLINE16                                              =  15;  // <ElementLine> ::= <CaseSelectors>
-		final int PROD_CHARACTERLITERAL_INDIRECTCHARLITERAL                       =  16;  // <CharacterLiteral> ::= IndirectCharLiteral
-		final int PROD_CHARACTERLITERAL_STANDARDESCAPECHARLITERAL                 =  17;  // <CharacterLiteral> ::= StandardEscapeCharLiteral
-		final int PROD_CHARACTERLITERAL_OCTALESCAPECHARLITERAL                    =  18;  // <CharacterLiteral> ::= OctalEscapeCharLiteral
-		final int PROD_CHARACTERLITERAL_HEXESCAPECHARLITERAL                      =  19;  // <CharacterLiteral> ::= HexEscapeCharLiteral
-		final int PROD_DECIMALINTEGERLITERAL_STARTWITHZERODECIMALINTEGERLITERAL   =  20;  // <DecimalIntegerLiteral> ::= StartWithZeroDecimalIntegerLiteral
-		final int PROD_DECIMALINTEGERLITERAL_STARTWITHNOZERODECIMALINTEGERLITERAL =  21;  // <DecimalIntegerLiteral> ::= StartWithNoZeroDecimalIntegerLiteral
-		final int PROD_FLOATPOINTLITERAL_FLOATINGPOINTLITERAL                     =  22;  // <FloatPointLiteral> ::= FloatingPointLiteral
-		final int PROD_FLOATPOINTLITERAL_FLOATINGPOINTLITERALEXPONENT             =  23;  // <FloatPointLiteral> ::= FloatingPointLiteralExponent
-		final int PROD_INTEGERLITERAL                                             =  24;  // <IntegerLiteral> ::= <DecimalIntegerLiteral>
-		final int PROD_INTEGERLITERAL_HEXINTEGERLITERAL                           =  25;  // <IntegerLiteral> ::= HexIntegerLiteral
-		final int PROD_INTEGERLITERAL_OCTALINTEGERLITERAL                         =  26;  // <IntegerLiteral> ::= OctalIntegerLiteral
-		final int PROD_INTEGERLITERAL_BINARYINTEGERLITERAL                        =  27;  // <IntegerLiteral> ::= BinaryIntegerLiteral
-		final int PROD_LITERAL                                                    =  28;  // <Literal> ::= <IntegerLiteral>
-		final int PROD_LITERAL2                                                   =  29;  // <Literal> ::= <FloatPointLiteral>
-		final int PROD_LITERAL_BOOLEANLITERAL                                     =  30;  // <Literal> ::= BooleanLiteral
-		final int PROD_LITERAL3                                                   =  31;  // <Literal> ::= <CharacterLiteral>
-		final int PROD_LITERAL_STRINGLITERAL                                      =  32;  // <Literal> ::= StringLiteral
-		final int PROD_LITERAL_NULLLITERAL                                        =  33;  // <Literal> ::= NullLiteral
-		final int PROD_NAME                                                       =  34;  // <Name> ::= <SimpleName>
-		final int PROD_NAME2                                                      =  35;  // <Name> ::= <QualifiedName>
-		final int PROD_SIMPLENAME_IDENTIFIER                                      =  36;  // <SimpleName> ::= Identifier
-		final int PROD_QUALIFIEDNAME_DOT_IDENTIFIER                               =  37;  // <QualifiedName> ::= <Name> '.' Identifier
-		final int PROD_ARRAYINITIALIZER_LBRACE_RBRACE                             =  38;  // <ArrayInitializer> ::= '{' <ExpressionList> '}'
-		final int PROD_ARRAYINITIALIZER_LBRACE_RBRACE2                            =  39;  // <ArrayInitializer> ::= '{' '}'
-		final int PROD_RECORDINITIALIZER_IDENTIFIER_LBRACE_RBRACE                 =  40;  // <RecordInitializer> ::= Identifier '{' <ComponentInitializers> '}'
-		final int PROD_RECORDINITIALIZER_IDENTIFIER_LBRACE_RBRACE2                =  41;  // <RecordInitializer> ::= Identifier '{' '}'
-		final int PROD_EXPRESSIONLIST                                             =  42;  // <ExpressionList> ::= <Expression>
-		final int PROD_EXPRESSIONLIST_COMMA                                       =  43;  // <ExpressionList> ::= <ExpressionList> ',' <Expression>
-		final int PROD_COMPONENTINITIALIZERS                                      =  44;  // <ComponentInitializers> ::= <ComponentInitializerList>
-		final int PROD_COMPONENTINITIALIZERS2                                     =  45;  // <ComponentInitializers> ::= <ExpressionList>
-		final int PROD_COMPONENTINITIALIZERS_COMMA                                =  46;  // <ComponentInitializers> ::= <ExpressionList> ',' <ComponentInitializerList>
-		final int PROD_COMPONENTINITIALIZERLIST_COMMA                             =  47;  // <ComponentInitializerList> ::= <ComponentInitializerList> ',' <ComponentInitializer>
-		final int PROD_COMPONENTINITIALIZERLIST                                   =  48;  // <ComponentInitializerList> ::= <ComponentInitializer>
-		final int PROD_COMPONENTINITIALIZER_IDENTIFIER_COLON                      =  49;  // <ComponentInitializer> ::= Identifier ':' <Expression>
-		final int PROD_PRIMARY                                                    =  50;  // <Primary> ::= <Literal>
-		final int PROD_PRIMARY_LPAREN_RPAREN                                      =  51;  // <Primary> ::= '(' <Expression> ')'
-		final int PROD_PRIMARY2                                                   =  52;  // <Primary> ::= <FieldAccess>
-		final int PROD_PRIMARY3                                                   =  53;  // <Primary> ::= <MethodInvocation>
-		final int PROD_PRIMARY4                                                   =  54;  // <Primary> ::= <ArrayAccess>
-		final int PROD_FIELDACCESS_DOT_IDENTIFIER                                 =  55;  // <FieldAccess> ::= <Primary> '.' Identifier
-		final int PROD_ROUTINEINVOCATION_LPAREN_RPAREN                            =  56;  // <RoutineInvocation> ::= <Name> '(' <ExpressionList> ')'
-		final int PROD_ROUTINEINVOCATION_LPAREN_RPAREN2                           =  57;  // <RoutineInvocation> ::= <Name> '(' ')'
-		final int PROD_METHODINVOCATION                                           =  58;  // <MethodInvocation> ::= <RoutineInvocation>
-		final int PROD_METHODINVOCATION_DOT_IDENTIFIER_LPAREN_RPAREN              =  59;  // <MethodInvocation> ::= <Primary> '.' Identifier '(' <ExpressionList> ')'
-		final int PROD_METHODINVOCATION_DOT_IDENTIFIER_LPAREN_RPAREN2             =  60;  // <MethodInvocation> ::= <Primary> '.' Identifier '(' ')'
-		final int PROD_ARRAYACCESS_LBRACKET_RBRACKET                              =  61;  // <ArrayAccess> ::= <Name> '[' <ExpressionList> ']'
-		final int PROD_ARRAYACCESS_LBRACKET_RBRACKET2                             =  62;  // <ArrayAccess> ::= <Primary> '[' <ExpressionList> ']'
-		final int PROD_POSTFIXEXPRESSION                                          =  63;  // <PostfixExpression> ::= <Primary>
-		final int PROD_POSTFIXEXPRESSION2                                         =  64;  // <PostfixExpression> ::= <Name>
-		final int PROD_UNARYEXPRESSION_PLUS                                       =  65;  // <UnaryExpression> ::= '+' <UnaryExpression>
-		final int PROD_UNARYEXPRESSION_MINUS                                      =  66;  // <UnaryExpression> ::= '-' <UnaryExpression>
-		final int PROD_UNARYEXPRESSION                                            =  67;  // <UnaryExpression> ::= <UnaryExpressionNotPlusMinus>
-		final int PROD_UNARYEXPRESSIONNOTPLUSMINUS                                =  68;  // <UnaryExpressionNotPlusMinus> ::= <PostfixExpression>
-		final int PROD_UNARYEXPRESSIONNOTPLUSMINUS_TILDE                          =  69;  // <UnaryExpressionNotPlusMinus> ::= '~' <UnaryExpression>
-		final int PROD_UNARYEXPRESSIONNOTPLUSMINUS_EXCLAM                         =  70;  // <UnaryExpressionNotPlusMinus> ::= '!' <UnaryExpression>
-		final int PROD_UNARYEXPRESSIONNOTPLUSMINUS_NOTOPR                         =  71;  // <UnaryExpressionNotPlusMinus> ::= NotOpr <UnaryExpression>
-		final int PROD_MULTIPLICATIVEEXPRESSION                                   =  72;  // <MultiplicativeExpression> ::= <UnaryExpression>
-		final int PROD_MULTIPLICATIVEEXPRESSION_TIMES                             =  73;  // <MultiplicativeExpression> ::= <MultiplicativeExpression> '*' <UnaryExpression>
-		final int PROD_MULTIPLICATIVEEXPRESSION_DIV                               =  74;  // <MultiplicativeExpression> ::= <MultiplicativeExpression> '/' <UnaryExpression>
-		final int PROD_MULTIPLICATIVEEXPRESSION_DIVOPR                            =  75;  // <MultiplicativeExpression> ::= <MultiplicativeExpression> DivOpr <UnaryExpression>
-		final int PROD_MULTIPLICATIVEEXPRESSION_MODOPR                            =  76;  // <MultiplicativeExpression> ::= <MultiplicativeExpression> ModOpr <UnaryExpression>
-		final int PROD_MULTIPLICATIVEEXPRESSION_PERCENT                           =  77;  // <MultiplicativeExpression> ::= <MultiplicativeExpression> '%' <UnaryExpression>
-		final int PROD_ADDITIVEEXPRESSION                                         =  78;  // <AdditiveExpression> ::= <MultiplicativeExpression>
-		final int PROD_ADDITIVEEXPRESSION_PLUS                                    =  79;  // <AdditiveExpression> ::= <AdditiveExpression> '+' <MultiplicativeExpression>
-		final int PROD_ADDITIVEEXPRESSION_MINUS                                   =  80;  // <AdditiveExpression> ::= <AdditiveExpression> '-' <MultiplicativeExpression>
-		final int PROD_SHIFTEXPRESSION                                            =  81;  // <ShiftExpression> ::= <AdditiveExpression>
-		final int PROD_SHIFTEXPRESSION_LTLT                                       =  82;  // <ShiftExpression> ::= <ShiftExpression> '<<' <AdditiveExpression>
-		final int PROD_SHIFTEXPRESSION_GTGT                                       =  83;  // <ShiftExpression> ::= <ShiftExpression> '>>' <AdditiveExpression>
-		final int PROD_SHIFTEXPRESSION_GTGTGT                                     =  84;  // <ShiftExpression> ::= <ShiftExpression> '>>>' <AdditiveExpression>
-		final int PROD_SHIFTEXPRESSION_SHLOPR                                     =  85;  // <ShiftExpression> ::= <ShiftExpression> ShlOpr <AdditiveExpression>
-		final int PROD_SHIFTEXPRESSION_SHROPR                                     =  86;  // <ShiftExpression> ::= <ShiftExpression> ShrOpr <AdditiveExpression>
-		final int PROD_RELATIONALEXPRESSION                                       =  87;  // <RelationalExpression> ::= <ShiftExpression>
-		final int PROD_RELATIONALEXPRESSION_LT                                    =  88;  // <RelationalExpression> ::= <RelationalExpression> '<' <ShiftExpression>
-		final int PROD_RELATIONALEXPRESSION_GT                                    =  89;  // <RelationalExpression> ::= <RelationalExpression> '>' <ShiftExpression>
-		final int PROD_RELATIONALEXPRESSION_LTEQ                                  =  90;  // <RelationalExpression> ::= <RelationalExpression> '<=' <ShiftExpression>
-		final int PROD_RELATIONALEXPRESSION_GTEQ                                  =  91;  // <RelationalExpression> ::= <RelationalExpression> '>=' <ShiftExpression>
-		final int PROD_EQUALITYEXPRESSION                                         =  92;  // <EqualityExpression> ::= <RelationalExpression>
-		final int PROD_EQUALITYEXPRESSION_EQEQ                                    =  93;  // <EqualityExpression> ::= <EqualityExpression> '==' <RelationalExpression>
-		final int PROD_EQUALITYEXPRESSION_EQ                                      =  94;  // <EqualityExpression> ::= <EqualityExpression> '=' <RelationalExpression>
-		final int PROD_EQUALITYEXPRESSION_EXCLAMEQ                                =  95;  // <EqualityExpression> ::= <EqualityExpression> '!=' <RelationalExpression>
-		final int PROD_EQUALITYEXPRESSION_LTGT                                    =  96;  // <EqualityExpression> ::= <EqualityExpression> '<>' <RelationalExpression>
-		final int PROD_ANDEXPRESSION                                              =  97;  // <AndExpression> ::= <EqualityExpression>
-		final int PROD_ANDEXPRESSION_AMP                                          =  98;  // <AndExpression> ::= <AndExpression> '&' <EqualityExpression>
-		final int PROD_EXCLUSIVEOREXPRESSION                                      =  99;  // <ExclusiveOrExpression> ::= <AndExpression>
-		final int PROD_EXCLUSIVEOREXPRESSION_CARET                                = 100;  // <ExclusiveOrExpression> ::= <ExclusiveOrExpression> '^' <AndExpression>
-		final int PROD_INCLUSIVEOREXPRESSION                                      = 101;  // <InclusiveOrExpression> ::= <ExclusiveOrExpression>
-		final int PROD_INCLUSIVEOREXPRESSION_PIPE                                 = 102;  // <InclusiveOrExpression> ::= <InclusiveOrExpression> '|' <ExclusiveOrExpression>
-		final int PROD_CONDITIONALANDEXPRESSION                                   = 103;  // <ConditionalAndExpression> ::= <InclusiveOrExpression>
-		final int PROD_CONDITIONALANDEXPRESSION_AMPAMP                            = 104;  // <ConditionalAndExpression> ::= <ConditionalAndExpression> '&&' <InclusiveOrExpression>
-		final int PROD_CONDITIONALANDEXPRESSION_ANDOPR                            = 105;  // <ConditionalAndExpression> ::= <ConditionalAndExpression> AndOpr <InclusiveOrExpression>
-		final int PROD_CONDITIONALOREXPRESSION                                    = 106;  // <ConditionalOrExpression> ::= <ConditionalAndExpression>
-		final int PROD_CONDITIONALOREXPRESSION_PIPEPIPE                           = 107;  // <ConditionalOrExpression> ::= <ConditionalOrExpression> '||' <ConditionalAndExpression>
-		final int PROD_CONDITIONALOREXPRESSION_OROPR                              = 108;  // <ConditionalOrExpression> ::= <ConditionalOrExpression> OrOpr <ConditionalAndExpression>
-		final int PROD_CONDITIONALEXPRESSION                                      = 109;  // <ConditionalExpression> ::= <ConditionalOrExpression>
-		final int PROD_CONDITIONALEXPRESSION_QUESTION_COLON                       = 110;  // <ConditionalExpression> ::= <ConditionalOrExpression> '?' <Expression> ':' <ConditionalExpression>
-		final int PROD_EXPRESSION                                                 = 111;  // <Expression> ::= <ConditionalExpression>
-		final int PROD_EXPRESSION2                                                = 112;  // <Expression> ::= <ArrayInitializer>
-		final int PROD_EXPRESSION3                                                = 113;  // <Expression> ::= <RecordInitializer>
-		final int PROD_ASSIGNMENT                                                 = 114;  // <Assignment> ::= <LeftHandSide> <AssignmentOperator> <Expression>
-		final int PROD_LEFTHANDSIDE                                               = 115;  // <LeftHandSide> ::= <Name>
-		final int PROD_LEFTHANDSIDE2                                              = 116;  // <LeftHandSide> ::= <FieldAccess>
-		final int PROD_LEFTHANDSIDE3                                              = 117;  // <LeftHandSide> ::= <ArrayAccess>
-		final int PROD_ASSIGNMENTOPERATOR_LTMINUS                                 = 118;  // <AssignmentOperator> ::= '<-'
-		final int PROD_ASSIGNMENTOPERATOR_COLONEQ                                 = 119;  // <AssignmentOperator> ::= ':='
-		final int PROD_VARINITIALISATION                                          = 120;  // <VarInitialisation> ::= <VarDeclaration1> <AssignmentOperator> <Expression>
-		final int PROD_VARINITIALISATION2                                         = 121;  // <VarInitialisation> ::= <TypeDescription> <ArrayDecl> <AssignmentOperator> <Expression>
-		final int PROD_ARRAYDECL_IDENTIFIER                                       = 122;  // <ArrayDecl> ::= Identifier <DimensionList>
-		final int PROD_DIMENSIONLIST                                              = 123;  // <DimensionList> ::= <DimensionList> <Dimension>
-		final int PROD_DIMENSIONLIST2                                             = 124;  // <DimensionList> ::= 
-		final int PROD_DIMENSION_LBRACKET_RBRACKET                                = 125;  // <Dimension> ::= '[' <ShiftExpression> ']'
-		final int PROD_INPUTINSTRUCTION_INPUTKEY                                  = 126;  // <InputInstruction> ::= InputKey
-		final int PROD_INPUTINSTRUCTION_INPUTKEY2                                 = 127;  // <InputInstruction> ::= InputKey <Prompt> <TargetList>
-		final int PROD_TARGETLIST                                                 = 128;  // <TargetList> ::= <LeftHandSide>
-		final int PROD_TARGETLIST_COMMA                                           = 129;  // <TargetList> ::= <TargetList> ',' <LeftHandSide>
-		final int PROD_PROMPT_STRINGLITERAL                                       = 130;  // <Prompt> ::= StringLiteral
-		final int PROD_PROMPT_STRINGLITERAL_COMMA                                 = 131;  // <Prompt> ::= StringLiteral ','
-		final int PROD_PROMPT                                                     = 132;  // <Prompt> ::= 
-		final int PROD_OUTPUTINSTRUCTION_OUTPUTKEY                                = 133;  // <OutputInstruction> ::= OutputKey
-		final int PROD_OUTPUTINSTRUCTION_OUTPUTKEY2                               = 134;  // <OutputInstruction> ::= OutputKey <ExpressionList>
-		final int PROD_VARDECLARATION1_VARKEY_IDENTIFIER_COLON                    = 135;  // <VarDeclaration1> ::= VarKey Identifier ':' <TypeDescription>
-		final int PROD_VARDECLARATION1_DIMKEY_IDENTIFIER_ASKEY                    = 136;  // <VarDeclaration1> ::= DimKey Identifier AsKey <TypeDescription>
-		final int PROD_VARDECLARATION_VARKEY_COLON                                = 137;  // <VarDeclaration> ::= VarKey <IdList> ':' <TypeDescription>
-		final int PROD_VARDECLARATION_DIMKEY_ASKEY                                = 138;  // <VarDeclaration> ::= DimKey <IdList> AsKey <TypeDescription>
-		final int PROD_CONSTDEFINITION_CONSTKEY_IDENTIFIER                        = 139;  // <ConstDefinition> ::= ConstKey Identifier <AssignmentOperator> <Expression>
-		final int PROD_CONSTDEFINITION_CONSTKEY_IDENTIFIER_COLON                  = 140;  // <ConstDefinition> ::= ConstKey Identifier ':' <TypeDescription> <AssignmentOperator> <Expression>
-		final int PROD_CONSTDEFINITION_CONSTKEY_IDENTIFIER_ASKEY                  = 141;  // <ConstDefinition> ::= ConstKey Identifier AsKey <TypeDescription> <AssignmentOperator> <Expression>
-		final int PROD_CONSTDEFINITION_CONSTKEY                                   = 142;  // <ConstDefinition> ::= ConstKey <TypeDescription> <ArrayDecl> <AssignmentOperator> <Expression>
-		final int PROD_TYPEDEFINITION_TYPEKEY_IDENTIFIER_EQ                       = 143;  // <TypeDefinition> ::= TypeKey Identifier '=' <TypeConstruction>
-		final int PROD_TYPECONSTRUCTION                                           = 144;  // <TypeConstruction> ::= <TypeDescription>
-		final int PROD_TYPECONSTRUCTION_RECORDKEY_LBRACE_RBRACE                   = 145;  // <TypeConstruction> ::= RecordKey '{' <ComponentList> '}'
-		final int PROD_TYPECONSTRUCTION_ENUM_LBRACE_RBRACE                        = 146;  // <TypeConstruction> ::= enum '{' <EnumList> '}'
-		final int PROD_TYPEDESCRIPTION_IDENTIFIER                                 = 147;  // <TypeDescription> ::= Identifier <DimsOpt>
-		final int PROD_TYPEDESCRIPTION_UNSIGNED_IDENTIFIER                        = 148;  // <TypeDescription> ::= unsigned Identifier <DimsOpt>
-		final int PROD_TYPEDESCRIPTION                                            = 149;  // <TypeDescription> ::= <ArrayOf> <TypeDescription>
-		final int PROD_DIMSOPT_LBRACKETRBRACKET                                   = 150;  // <DimsOpt> ::= <DimsOpt> '[]'
-		final int PROD_DIMSOPT                                                    = 151;  // <DimsOpt> ::= 
-		final int PROD_ARRAYOF_ARRAYKEY_OFKEY                                     = 152;  // <ArrayOf> ::= ArrayKey OfKey
-		final int PROD_ARRAYOF_ARRAYKEY_LBRACKET_RBRACKET_OFKEY                   = 153;  // <ArrayOf> ::= ArrayKey '[' <RangeList> ']' OfKey
-		final int PROD_RANGELIST                                                  = 154;  // <RangeList> ::= <Range>
-		final int PROD_RANGELIST_COMMA                                            = 155;  // <RangeList> ::= <RangeList> ',' <Range>
-		final int PROD_RANGE                                                      = 156;  // <Range> ::= <ShiftExpression>
-		final int PROD_RANGE_DOTDOT                                               = 157;  // <Range> ::= <IntegerLiteral> '..' <IntegerLiteral>
-		final int PROD_COMPONENTLIST                                              = 158;  // <ComponentList> ::= <ComponentGroup>
-		final int PROD_COMPONENTLIST_SEMI                                         = 159;  // <ComponentList> ::= <ComponentList> ';' <ComponentGroup>
-		final int PROD_COMPONENTGROUP_ASKEY                                       = 160;  // <ComponentGroup> ::= <IdList> AsKey <TypeDescription>
-		final int PROD_COMPONENTGROUP_COLON                                       = 161;  // <ComponentGroup> ::= <IdList> ':' <TypeDescription>
-		final int PROD_IDLIST_IDENTIFIER                                          = 162;  // <IdList> ::= Identifier
-		final int PROD_IDLIST_COMMA_IDENTIFIER                                    = 163;  // <IdList> ::= <IdList> ',' Identifier
-		final int PROD_ENUMLIST                                                   = 164;  // <EnumList> ::= <EnumDef>
-		final int PROD_ENUMLIST_COMMA                                             = 165;  // <EnumList> ::= <EnumList> ',' <EnumDef>
-		final int PROD_ENUMDEF_IDENTIFIER                                         = 166;  // <EnumDef> ::= Identifier
-		final int PROD_ENUMDEF_IDENTIFIER_EQ                                      = 167;  // <EnumDef> ::= Identifier '=' <ShiftExpression>
-		final int PROD_CONDITION_CONDKEY                                          = 168;  // <Condition> ::= CondKey <ConditionalExpression>
-		final int PROD_FORHEADER_FORKEY_IDENTIFIER_TOKEY                          = 169;  // <ForHeader> ::= ForKey Identifier <AssignmentOperator> <Expression> ToKey <Expression> <StepClause>
-		final int PROD_STEPCLAUSE_STEPKEY                                         = 170;  // <StepClause> ::= StepKey <DecimalIntegerLiteral>
-		final int PROD_STEPCLAUSE_STEPKEY_MINUS                                   = 171;  // <StepClause> ::= StepKey '-' <DecimalIntegerLiteral>
-		final int PROD_STEPCLAUSE_STEPKEY_PLUS                                    = 172;  // <StepClause> ::= StepKey '+' <DecimalIntegerLiteral>
-		final int PROD_STEPCLAUSE                                                 = 173;  // <StepClause> ::= 
-		final int PROD_FORINHEADER_FORINKEY_IDENTIFIER_INKEY                      = 174;  // <ForInHeader> ::= ForInKey Identifier InKey <ExpressionList>
-		final int PROD_JUMP_RETURNKEY                                             = 175;  // <Jump> ::= ReturnKey
-		final int PROD_JUMP_RETURNKEY2                                            = 176;  // <Jump> ::= ReturnKey <Expression>
-		final int PROD_JUMP_EXITKEY                                               = 177;  // <Jump> ::= ExitKey
-		final int PROD_JUMP_EXITKEY2                                              = 178;  // <Jump> ::= ExitKey <Expression>
-		final int PROD_JUMP_LEAVEKEY                                              = 179;  // <Jump> ::= LeaveKey
-		final int PROD_JUMP_LEAVEKEY2                                             = 180;  // <Jump> ::= LeaveKey <DecimalIntegerLiteral>
-		final int PROD_JUMP_THROWKEY                                              = 181;  // <Jump> ::= ThrowKey <Expression>
-		final int PROD_CALL_CALLKEY                                               = 182;  // <Call> ::= CallKey <RoutineInvocation>
-		final int PROD_CALL_CALLKEY2                                              = 183;  // <Call> ::= CallKey <LeftHandSide> <AssignmentOperator> <RoutineInvocation>
-		final int PROD_CATCHCLAUSE_CATCHKEY_IDENTIFIER                            = 184;  // <CatchClause> ::= CatchKey Identifier
-		final int PROD_CATCHCLAUSE_CATCHKEY_IDENTIFIER_COLON                      = 185;  // <CatchClause> ::= CatchKey Identifier ':' <TypeDescription>
-		final int PROD_CATCHCLAUSE_CATCHKEY_IDENTIFIER_ASKEY                      = 186;  // <CatchClause> ::= CatchKey Identifier AsKey <TypeDescription>
-		final int PROD_CATCHCLAUSE_CATCHKEY_IDENTIFIER2                           = 187;  // <CatchClause> ::= CatchKey <TypeDescription> Identifier
-		final int PROD_CASEDISCRIMINATOR_CASEKEY                                  = 188;  // <CaseDiscriminator> ::= CaseKey <ConditionalExpression>
-		final int PROD_CASESELECTORS_SELECTORKEY                                  = 189;  // <CaseSelectors> ::= SelectorKey <ExpressionList>
+		final int PROD_ELEMENTLINE6                                               =   5;  // <ElementLine> ::= <VarDecl1OrInit>
+		final int PROD_ELEMENTLINE7                                               =   6;  // <ElementLine> ::= <VarDeclaration>
+		final int PROD_ELEMENTLINE8                                               =   7;  // <ElementLine> ::= <ConstDefinition>
+		final int PROD_ELEMENTLINE9                                               =   8;  // <ElementLine> ::= <TypeDefinition>
+		final int PROD_ELEMENTLINE10                                              =   9;  // <ElementLine> ::= <Condition>
+		final int PROD_ELEMENTLINE11                                              =  10;  // <ElementLine> ::= <ForHeader>
+		final int PROD_ELEMENTLINE12                                              =  11;  // <ElementLine> ::= <ForInHeader>
+		final int PROD_ELEMENTLINE13                                              =  12;  // <ElementLine> ::= <Jump>
+		final int PROD_ELEMENTLINE14                                              =  13;  // <ElementLine> ::= <Call>
+		final int PROD_ELEMENTLINE15                                              =  14;  // <ElementLine> ::= <CatchClause>
+		final int PROD_ELEMENTLINE16                                              =  15;  // <ElementLine> ::= <CaseDiscriminator>
+		final int PROD_ELEMENTLINE17                                              =  16;  // <ElementLine> ::= <CaseSelectors>
+		final int PROD_CHARACTERLITERAL_INDIRECTCHARLITERAL                       =  17;  // <CharacterLiteral> ::= IndirectCharLiteral
+		final int PROD_CHARACTERLITERAL_STANDARDESCAPECHARLITERAL                 =  18;  // <CharacterLiteral> ::= StandardEscapeCharLiteral
+		final int PROD_CHARACTERLITERAL_OCTALESCAPECHARLITERAL                    =  19;  // <CharacterLiteral> ::= OctalEscapeCharLiteral
+		final int PROD_CHARACTERLITERAL_HEXESCAPECHARLITERAL                      =  20;  // <CharacterLiteral> ::= HexEscapeCharLiteral
+		final int PROD_DECIMALINTEGERLITERAL_STARTWITHZERODECIMALINTEGERLITERAL   =  21;  // <DecimalIntegerLiteral> ::= StartWithZeroDecimalIntegerLiteral
+		final int PROD_DECIMALINTEGERLITERAL_STARTWITHNOZERODECIMALINTEGERLITERAL =  22;  // <DecimalIntegerLiteral> ::= StartWithNoZeroDecimalIntegerLiteral
+		final int PROD_FLOATPOINTLITERAL_FLOATINGPOINTLITERAL                     =  23;  // <FloatPointLiteral> ::= FloatingPointLiteral
+		final int PROD_FLOATPOINTLITERAL_FLOATINGPOINTLITERALEXPONENT             =  24;  // <FloatPointLiteral> ::= FloatingPointLiteralExponent
+		final int PROD_INTEGERLITERAL                                             =  25;  // <IntegerLiteral> ::= <DecimalIntegerLiteral>
+		final int PROD_INTEGERLITERAL_HEXINTEGERLITERAL                           =  26;  // <IntegerLiteral> ::= HexIntegerLiteral
+		final int PROD_INTEGERLITERAL_OCTALINTEGERLITERAL                         =  27;  // <IntegerLiteral> ::= OctalIntegerLiteral
+		final int PROD_INTEGERLITERAL_BINARYINTEGERLITERAL                        =  28;  // <IntegerLiteral> ::= BinaryIntegerLiteral
+		final int PROD_LITERAL                                                    =  29;  // <Literal> ::= <IntegerLiteral>
+		final int PROD_LITERAL2                                                   =  30;  // <Literal> ::= <FloatPointLiteral>
+		final int PROD_LITERAL_BOOLEANLITERAL                                     =  31;  // <Literal> ::= BooleanLiteral
+		final int PROD_LITERAL3                                                   =  32;  // <Literal> ::= <CharacterLiteral>
+		final int PROD_LITERAL_STRINGLITERAL                                      =  33;  // <Literal> ::= StringLiteral
+		final int PROD_LITERAL_NULLLITERAL                                        =  34;  // <Literal> ::= NullLiteral
+		final int PROD_NAME                                                       =  35;  // <Name> ::= <SimpleName>
+		final int PROD_NAME2                                                      =  36;  // <Name> ::= <QualifiedName>
+		final int PROD_SIMPLENAME_IDENTIFIER                                      =  37;  // <SimpleName> ::= Identifier
+		final int PROD_QUALIFIEDNAME_DOT_IDENTIFIER                               =  38;  // <QualifiedName> ::= <Name> '.' Identifier
+		final int PROD_ARRAYINITIALIZER_LBRACE_RBRACE                             =  39;  // <ArrayInitializer> ::= '{' <ExpressionList> '}'
+		final int PROD_ARRAYINITIALIZER_LBRACE_RBRACE2                            =  40;  // <ArrayInitializer> ::= '{' '}'
+		final int PROD_RECORDINITIALIZER_IDENTIFIER_LBRACE_RBRACE                 =  41;  // <RecordInitializer> ::= Identifier '{' <ComponentInitializers> '}'
+		final int PROD_RECORDINITIALIZER_IDENTIFIER_LBRACE_RBRACE2                =  42;  // <RecordInitializer> ::= Identifier '{' '}'
+		final int PROD_EXPRESSIONLIST                                             =  43;  // <ExpressionList> ::= <Expression>
+		final int PROD_EXPRESSIONLIST_COMMA                                       =  44;  // <ExpressionList> ::= <ExpressionList> ',' <Expression>
+		final int PROD_COMPONENTINITIALIZERS                                      =  45;  // <ComponentInitializers> ::= <ComponentInitializerList>
+		final int PROD_COMPONENTINITIALIZERS2                                     =  46;  // <ComponentInitializers> ::= <ExpressionList>
+		final int PROD_COMPONENTINITIALIZERS_COMMA                                =  47;  // <ComponentInitializers> ::= <ExpressionList> ',' <ComponentInitializerList>
+		final int PROD_COMPONENTINITIALIZERLIST_COMMA                             =  48;  // <ComponentInitializerList> ::= <ComponentInitializerList> ',' <ComponentInitializer>
+		final int PROD_COMPONENTINITIALIZERLIST                                   =  49;  // <ComponentInitializerList> ::= <ComponentInitializer>
+		final int PROD_COMPONENTINITIALIZER_IDENTIFIER_COLON                      =  50;  // <ComponentInitializer> ::= Identifier ':' <Expression>
+		final int PROD_PRIMARY                                                    =  51;  // <Primary> ::= <Literal>
+		final int PROD_PRIMARY_LPAREN_RPAREN                                      =  52;  // <Primary> ::= '(' <Expression> ')'
+		final int PROD_PRIMARY2                                                   =  53;  // <Primary> ::= <FieldAccess>
+		final int PROD_PRIMARY3                                                   =  54;  // <Primary> ::= <MethodInvocation>
+		final int PROD_PRIMARY4                                                   =  55;  // <Primary> ::= <ArrayAccess>
+		final int PROD_FIELDACCESS_DOT_IDENTIFIER                                 =  56;  // <FieldAccess> ::= <Primary> '.' Identifier
+		final int PROD_ROUTINEINVOCATION_LPAREN_RPAREN                            =  57;  // <RoutineInvocation> ::= <Name> '(' <ExpressionList> ')'
+		final int PROD_ROUTINEINVOCATION_LPAREN_RPAREN2                           =  58;  // <RoutineInvocation> ::= <Name> '(' ')'
+		final int PROD_METHODINVOCATION                                           =  59;  // <MethodInvocation> ::= <RoutineInvocation>
+		final int PROD_METHODINVOCATION_DOT_IDENTIFIER_LPAREN_RPAREN              =  60;  // <MethodInvocation> ::= <Primary> '.' Identifier '(' <ExpressionList> ')'
+		final int PROD_METHODINVOCATION_DOT_IDENTIFIER_LPAREN_RPAREN2             =  61;  // <MethodInvocation> ::= <Primary> '.' Identifier '(' ')'
+		final int PROD_ARRAYACCESS_LBRACKET_RBRACKET                              =  62;  // <ArrayAccess> ::= <Name> '[' <ExpressionList> ']'
+		final int PROD_ARRAYACCESS_LBRACKET_RBRACKET2                             =  63;  // <ArrayAccess> ::= <Primary> '[' <ExpressionList> ']'
+		final int PROD_POSTFIXEXPRESSION                                          =  64;  // <PostfixExpression> ::= <Primary>
+		final int PROD_POSTFIXEXPRESSION2                                         =  65;  // <PostfixExpression> ::= <Name>
+		final int PROD_UNARYEXPRESSION_PLUS                                       =  66;  // <UnaryExpression> ::= '+' <UnaryExpression>
+		final int PROD_UNARYEXPRESSION_MINUS                                      =  67;  // <UnaryExpression> ::= '-' <UnaryExpression>
+		final int PROD_UNARYEXPRESSION                                            =  68;  // <UnaryExpression> ::= <UnaryExpressionNotPlusMinus>
+		final int PROD_UNARYEXPRESSIONNOTPLUSMINUS                                =  69;  // <UnaryExpressionNotPlusMinus> ::= <PostfixExpression>
+		final int PROD_UNARYEXPRESSIONNOTPLUSMINUS_TILDE                          =  70;  // <UnaryExpressionNotPlusMinus> ::= '~' <UnaryExpression>
+		final int PROD_UNARYEXPRESSIONNOTPLUSMINUS_EXCLAM                         =  71;  // <UnaryExpressionNotPlusMinus> ::= '!' <UnaryExpression>
+		final int PROD_UNARYEXPRESSIONNOTPLUSMINUS_NOTOPR                         =  72;  // <UnaryExpressionNotPlusMinus> ::= NotOpr <UnaryExpression>
+		final int PROD_MULTIPLICATIVEEXPRESSION                                   =  73;  // <MultiplicativeExpression> ::= <UnaryExpression>
+		final int PROD_MULTIPLICATIVEEXPRESSION_TIMES                             =  74;  // <MultiplicativeExpression> ::= <MultiplicativeExpression> '*' <UnaryExpression>
+		final int PROD_MULTIPLICATIVEEXPRESSION_DIV                               =  75;  // <MultiplicativeExpression> ::= <MultiplicativeExpression> '/' <UnaryExpression>
+		final int PROD_MULTIPLICATIVEEXPRESSION_DIVOPR                            =  76;  // <MultiplicativeExpression> ::= <MultiplicativeExpression> DivOpr <UnaryExpression>
+		final int PROD_MULTIPLICATIVEEXPRESSION_MODOPR                            =  77;  // <MultiplicativeExpression> ::= <MultiplicativeExpression> ModOpr <UnaryExpression>
+		final int PROD_MULTIPLICATIVEEXPRESSION_PERCENT                           =  78;  // <MultiplicativeExpression> ::= <MultiplicativeExpression> '%' <UnaryExpression>
+		final int PROD_ADDITIVEEXPRESSION                                         =  79;  // <AdditiveExpression> ::= <MultiplicativeExpression>
+		final int PROD_ADDITIVEEXPRESSION_PLUS                                    =  80;  // <AdditiveExpression> ::= <AdditiveExpression> '+' <MultiplicativeExpression>
+		final int PROD_ADDITIVEEXPRESSION_MINUS                                   =  81;  // <AdditiveExpression> ::= <AdditiveExpression> '-' <MultiplicativeExpression>
+		final int PROD_SHIFTEXPRESSION                                            =  82;  // <ShiftExpression> ::= <AdditiveExpression>
+		final int PROD_SHIFTEXPRESSION_LTLT                                       =  83;  // <ShiftExpression> ::= <ShiftExpression> '<<' <AdditiveExpression>
+		final int PROD_SHIFTEXPRESSION_GTGT                                       =  84;  // <ShiftExpression> ::= <ShiftExpression> '>>' <AdditiveExpression>
+		final int PROD_SHIFTEXPRESSION_GTGTGT                                     =  85;  // <ShiftExpression> ::= <ShiftExpression> '>>>' <AdditiveExpression>
+		final int PROD_SHIFTEXPRESSION_SHLOPR                                     =  86;  // <ShiftExpression> ::= <ShiftExpression> ShlOpr <AdditiveExpression>
+		final int PROD_SHIFTEXPRESSION_SHROPR                                     =  87;  // <ShiftExpression> ::= <ShiftExpression> ShrOpr <AdditiveExpression>
+		final int PROD_RELATIONALEXPRESSION                                       =  88;  // <RelationalExpression> ::= <ShiftExpression>
+		final int PROD_RELATIONALEXPRESSION_LT                                    =  89;  // <RelationalExpression> ::= <RelationalExpression> '<' <ShiftExpression>
+		final int PROD_RELATIONALEXPRESSION_GT                                    =  90;  // <RelationalExpression> ::= <RelationalExpression> '>' <ShiftExpression>
+		final int PROD_RELATIONALEXPRESSION_LTEQ                                  =  91;  // <RelationalExpression> ::= <RelationalExpression> '<=' <ShiftExpression>
+		final int PROD_RELATIONALEXPRESSION_GTEQ                                  =  92;  // <RelationalExpression> ::= <RelationalExpression> '>=' <ShiftExpression>
+		final int PROD_EQUALITYEXPRESSION                                         =  93;  // <EqualityExpression> ::= <RelationalExpression>
+		final int PROD_EQUALITYEXPRESSION_EQEQ                                    =  94;  // <EqualityExpression> ::= <EqualityExpression> '==' <RelationalExpression>
+		final int PROD_EQUALITYEXPRESSION_EQ                                      =  95;  // <EqualityExpression> ::= <EqualityExpression> '=' <RelationalExpression>
+		final int PROD_EQUALITYEXPRESSION_EXCLAMEQ                                =  96;  // <EqualityExpression> ::= <EqualityExpression> '!=' <RelationalExpression>
+		final int PROD_EQUALITYEXPRESSION_LTGT                                    =  97;  // <EqualityExpression> ::= <EqualityExpression> '<>' <RelationalExpression>
+		final int PROD_ANDEXPRESSION                                              =  98;  // <AndExpression> ::= <EqualityExpression>
+		final int PROD_ANDEXPRESSION_AMP                                          =  99;  // <AndExpression> ::= <AndExpression> '&' <EqualityExpression>
+		final int PROD_EXCLUSIVEOREXPRESSION                                      = 100;  // <ExclusiveOrExpression> ::= <AndExpression>
+		final int PROD_EXCLUSIVEOREXPRESSION_CARET                                = 101;  // <ExclusiveOrExpression> ::= <ExclusiveOrExpression> '^' <AndExpression>
+		final int PROD_INCLUSIVEOREXPRESSION                                      = 102;  // <InclusiveOrExpression> ::= <ExclusiveOrExpression>
+		final int PROD_INCLUSIVEOREXPRESSION_PIPE                                 = 103;  // <InclusiveOrExpression> ::= <InclusiveOrExpression> '|' <ExclusiveOrExpression>
+		final int PROD_CONDITIONALANDEXPRESSION                                   = 104;  // <ConditionalAndExpression> ::= <InclusiveOrExpression>
+		final int PROD_CONDITIONALANDEXPRESSION_AMPAMP                            = 105;  // <ConditionalAndExpression> ::= <ConditionalAndExpression> '&&' <InclusiveOrExpression>
+		final int PROD_CONDITIONALANDEXPRESSION_ANDOPR                            = 106;  // <ConditionalAndExpression> ::= <ConditionalAndExpression> AndOpr <InclusiveOrExpression>
+		final int PROD_CONDITIONALOREXPRESSION                                    = 107;  // <ConditionalOrExpression> ::= <ConditionalAndExpression>
+		final int PROD_CONDITIONALOREXPRESSION_PIPEPIPE                           = 108;  // <ConditionalOrExpression> ::= <ConditionalOrExpression> '||' <ConditionalAndExpression>
+		final int PROD_CONDITIONALOREXPRESSION_OROPR                              = 109;  // <ConditionalOrExpression> ::= <ConditionalOrExpression> OrOpr <ConditionalAndExpression>
+		final int PROD_CONDITIONALEXPRESSION                                      = 110;  // <ConditionalExpression> ::= <ConditionalOrExpression>
+		final int PROD_CONDITIONALEXPRESSION_QUESTION_COLON                       = 111;  // <ConditionalExpression> ::= <ConditionalOrExpression> '?' <Expression> ':' <ConditionalExpression>
+		final int PROD_EXPRESSION                                                 = 112;  // <Expression> ::= <ConditionalExpression>
+		final int PROD_EXPRESSION2                                                = 113;  // <Expression> ::= <ArrayInitializer>
+		final int PROD_EXPRESSION3                                                = 114;  // <Expression> ::= <RecordInitializer>
+		final int PROD_ASSIGNMENT                                                 = 115;  // <Assignment> ::= <LeftHandSide> <AssignmentOperator> <Expression>
+		final int PROD_LEFTHANDSIDE                                               = 116;  // <LeftHandSide> ::= <Name>
+		final int PROD_LEFTHANDSIDE2                                              = 117;  // <LeftHandSide> ::= <FieldAccess>
+		final int PROD_LEFTHANDSIDE3                                              = 118;  // <LeftHandSide> ::= <ArrayAccess>
+		final int PROD_ASSIGNMENTOPERATOR_LTMINUS                                 = 119;  // <AssignmentOperator> ::= '<-'
+		final int PROD_ASSIGNMENTOPERATOR_COLONEQ                                 = 120;  // <AssignmentOperator> ::= ':='
+		final int PROD_VARINITIALISATION                                          = 121;  // <VarInitialisation> ::= <TypeDescription> <ArrayDecl> <AssignmentOperator> <Expression>
+		final int PROD_VARDECL1ORINIT                                             = 122;  // <VarDecl1OrInit> ::= <VarDeclaration1> <VarInitOpt>
+		final int PROD_VARINITOPT                                                 = 123;  // <VarInitOpt> ::= <AssignmentOperator> <Expression>
+		final int PROD_VARINITOPT2                                                = 124;  // <VarInitOpt> ::= 
+		final int PROD_ARRAYDECL_IDENTIFIER                                       = 125;  // <ArrayDecl> ::= Identifier <DimensionList>
+		final int PROD_DIMENSIONLIST                                              = 126;  // <DimensionList> ::= <DimensionList> <Dimension>
+		final int PROD_DIMENSIONLIST2                                             = 127;  // <DimensionList> ::= 
+		final int PROD_DIMENSION_LBRACKET_RBRACKET                                = 128;  // <Dimension> ::= '[' <ShiftExpression> ']'
+		final int PROD_INPUTINSTRUCTION_INPUTKEY                                  = 129;  // <InputInstruction> ::= InputKey
+		final int PROD_INPUTINSTRUCTION_INPUTKEY2                                 = 130;  // <InputInstruction> ::= InputKey <Prompt> <TargetList>
+		final int PROD_TARGETLIST                                                 = 131;  // <TargetList> ::= <LeftHandSide>
+		final int PROD_TARGETLIST_COMMA                                           = 132;  // <TargetList> ::= <TargetList> ',' <LeftHandSide>
+		final int PROD_PROMPT_STRINGLITERAL                                       = 133;  // <Prompt> ::= StringLiteral
+		final int PROD_PROMPT_STRINGLITERAL_COMMA                                 = 134;  // <Prompt> ::= StringLiteral ','
+		final int PROD_PROMPT                                                     = 135;  // <Prompt> ::= 
+		final int PROD_OUTPUTINSTRUCTION_OUTPUTKEY                                = 136;  // <OutputInstruction> ::= OutputKey
+		final int PROD_OUTPUTINSTRUCTION_OUTPUTKEY2                               = 137;  // <OutputInstruction> ::= OutputKey <ExpressionList>
+		final int PROD_VARDECLARATION1_VARKEY_IDENTIFIER_COLON                    = 138;  // <VarDeclaration1> ::= VarKey Identifier ':' <TypeDescription>
+		final int PROD_VARDECLARATION1_DIMKEY_IDENTIFIER_ASKEY                    = 139;  // <VarDeclaration1> ::= DimKey Identifier AsKey <TypeDescription>
+		final int PROD_VARDECLARATION_VARKEY_IDENTIFIER_COMMA_COLON               = 140;  // <VarDeclaration> ::= VarKey Identifier ',' <IdList> ':' <TypeDescription>
+		final int PROD_VARDECLARATION_DIMKEY_IDENTIFIER_COMMA_ASKEY               = 141;  // <VarDeclaration> ::= DimKey Identifier ',' <IdList> AsKey <TypeDescription>
+		final int PROD_CONSTDEFINITION_CONSTKEY_IDENTIFIER                        = 142;  // <ConstDefinition> ::= ConstKey Identifier <AssignmentOperator> <Expression>
+		final int PROD_CONSTDEFINITION_CONSTKEY_IDENTIFIER_COLON                  = 143;  // <ConstDefinition> ::= ConstKey Identifier ':' <TypeDescription> <AssignmentOperator> <Expression>
+		final int PROD_CONSTDEFINITION_CONSTKEY_IDENTIFIER_ASKEY                  = 144;  // <ConstDefinition> ::= ConstKey Identifier AsKey <TypeDescription> <AssignmentOperator> <Expression>
+		final int PROD_CONSTDEFINITION_CONSTKEY                                   = 145;  // <ConstDefinition> ::= ConstKey <TypeDescription> <ArrayDecl> <AssignmentOperator> <Expression>
+		final int PROD_TYPEDEFINITION_TYPEKEY_IDENTIFIER_EQ                       = 146;  // <TypeDefinition> ::= TypeKey Identifier '=' <TypeConstruction>
+		final int PROD_TYPECONSTRUCTION                                           = 147;  // <TypeConstruction> ::= <TypeDescription>
+		final int PROD_TYPECONSTRUCTION_RECORDKEY_LBRACE_RBRACE                   = 148;  // <TypeConstruction> ::= RecordKey '{' <ComponentList> '}'
+		final int PROD_TYPECONSTRUCTION_ENUM_LBRACE_RBRACE                        = 149;  // <TypeConstruction> ::= enum '{' <EnumList> '}'
+		final int PROD_TYPEDESCRIPTION_IDENTIFIER                                 = 150;  // <TypeDescription> ::= Identifier <DimsOpt>
+		final int PROD_TYPEDESCRIPTION_UNSIGNED_IDENTIFIER                        = 151;  // <TypeDescription> ::= unsigned Identifier <DimsOpt>
+		final int PROD_TYPEDESCRIPTION                                            = 152;  // <TypeDescription> ::= <ArrayOf> <TypeDescription>
+		final int PROD_DIMSOPT_LBRACKETRBRACKET                                   = 153;  // <DimsOpt> ::= <DimsOpt> '[]'
+		final int PROD_DIMSOPT                                                    = 154;  // <DimsOpt> ::= 
+		final int PROD_ARRAYOF_ARRAYKEY_OFKEY                                     = 155;  // <ArrayOf> ::= ArrayKey OfKey
+		final int PROD_ARRAYOF_ARRAYKEY_LBRACKET_RBRACKET_OFKEY                   = 156;  // <ArrayOf> ::= ArrayKey '[' <RangeList> ']' OfKey
+		final int PROD_RANGELIST                                                  = 157;  // <RangeList> ::= <Range>
+		final int PROD_RANGELIST_COMMA                                            = 158;  // <RangeList> ::= <RangeList> ',' <Range>
+		final int PROD_RANGE                                                      = 159;  // <Range> ::= <ShiftExpression>
+		final int PROD_RANGE_DOTDOT                                               = 160;  // <Range> ::= <IntegerLiteral> '..' <IntegerLiteral>
+		final int PROD_COMPONENTLIST                                              = 161;  // <ComponentList> ::= <ComponentGroup>
+		final int PROD_COMPONENTLIST_SEMI                                         = 162;  // <ComponentList> ::= <ComponentList> ';' <ComponentGroup>
+		final int PROD_COMPONENTGROUP_ASKEY                                       = 163;  // <ComponentGroup> ::= <IdList> AsKey <TypeDescription>
+		final int PROD_COMPONENTGROUP_COLON                                       = 164;  // <ComponentGroup> ::= <IdList> ':' <TypeDescription>
+		final int PROD_IDLIST_IDENTIFIER                                          = 165;  // <IdList> ::= Identifier
+		final int PROD_IDLIST_COMMA_IDENTIFIER                                    = 166;  // <IdList> ::= <IdList> ',' Identifier
+		final int PROD_ENUMLIST                                                   = 167;  // <EnumList> ::= <EnumDef>
+		final int PROD_ENUMLIST_COMMA                                             = 168;  // <EnumList> ::= <EnumList> ',' <EnumDef>
+		final int PROD_ENUMDEF_IDENTIFIER                                         = 169;  // <EnumDef> ::= Identifier
+		final int PROD_ENUMDEF_IDENTIFIER_EQ                                      = 170;  // <EnumDef> ::= Identifier '=' <ShiftExpression>
+		final int PROD_CONDITION_CONDKEY                                          = 171;  // <Condition> ::= CondKey <ConditionalExpression>
+		final int PROD_FORHEADER_FORKEY_IDENTIFIER_TOKEY                          = 172;  // <ForHeader> ::= ForKey Identifier <AssignmentOperator> <Expression> ToKey <Expression> <StepClause>
+		final int PROD_STEPCLAUSE_STEPKEY                                         = 173;  // <StepClause> ::= StepKey <DecimalIntegerLiteral>
+		final int PROD_STEPCLAUSE_STEPKEY_MINUS                                   = 174;  // <StepClause> ::= StepKey '-' <DecimalIntegerLiteral>
+		final int PROD_STEPCLAUSE_STEPKEY_PLUS                                    = 175;  // <StepClause> ::= StepKey '+' <DecimalIntegerLiteral>
+		final int PROD_STEPCLAUSE                                                 = 176;  // <StepClause> ::= 
+		final int PROD_FORINHEADER_FORINKEY_IDENTIFIER_INKEY                      = 177;  // <ForInHeader> ::= ForInKey Identifier InKey <ExpressionList>
+		final int PROD_JUMP_RETURNKEY                                             = 178;  // <Jump> ::= ReturnKey
+		final int PROD_JUMP_RETURNKEY2                                            = 179;  // <Jump> ::= ReturnKey <Expression>
+		final int PROD_JUMP_EXITKEY                                               = 180;  // <Jump> ::= ExitKey
+		final int PROD_JUMP_EXITKEY2                                              = 181;  // <Jump> ::= ExitKey <Expression>
+		final int PROD_JUMP_LEAVEKEY                                              = 182;  // <Jump> ::= LeaveKey
+		final int PROD_JUMP_LEAVEKEY2                                             = 183;  // <Jump> ::= LeaveKey <DecimalIntegerLiteral>
+		final int PROD_JUMP_THROWKEY                                              = 184;  // <Jump> ::= ThrowKey <Expression>
+		final int PROD_CALL_CALLKEY                                               = 185;  // <Call> ::= CallKey <RoutineInvocation>
+		final int PROD_CALL_CALLKEY2                                              = 186;  // <Call> ::= CallKey <LeftHandSide> <AssignmentOperator> <RoutineInvocation>
+		final int PROD_CATCHCLAUSE_CATCHKEY_IDENTIFIER                            = 187;  // <CatchClause> ::= CatchKey Identifier
+		final int PROD_CATCHCLAUSE_CATCHKEY_IDENTIFIER_COLON                      = 188;  // <CatchClause> ::= CatchKey Identifier ':' <TypeDescription>
+		final int PROD_CATCHCLAUSE_CATCHKEY_IDENTIFIER_ASKEY                      = 189;  // <CatchClause> ::= CatchKey Identifier AsKey <TypeDescription>
+		final int PROD_CATCHCLAUSE_CATCHKEY_IDENTIFIER2                           = 190;  // <CatchClause> ::= CatchKey <TypeDescription> Identifier
+		final int PROD_CASEDISCRIMINATOR_CASEKEY                                  = 191;  // <CaseDiscriminator> ::= CaseKey <ConditionalExpression>
+		final int PROD_CASESELECTORS_SELECTORKEY                                  = 192;  // <CaseSelectors> ::= SelectorKey <ExpressionList>
 	};
 	
 	/** Collection of expression list rule identifiers used in
@@ -727,23 +732,33 @@ public class LineParser /*extends CodeParser*/
 						expr.children.add(buildExpression(red.get(2), tokenPos + 1, _types));
 						break;
 					}
-					case RuleConstants.PROD_VARINITIALISATION: {
-						// <VarInitialisation> ::= <VarDeclaration1> <AssignmentOperator> <Expression>
-						lineType = Line.LineType.LT_VAR_INIT;
+					case RuleConstants.PROD_VARDECL1ORINIT: {
+						// <VarDecl1OrInit> ::= <VarDeclaration1> <VarInitOpt>
+						lineType = Line.LineType.LT_VAR_DECL;
 						Reduction declRed = red.get(0).asReduction();
 						// <VarDeclaration1> ::= VarKey Identifier ':' <TypeDescription>
 						// <VarDeclaration1> ::= DimKey Identifier AsKey <TypeDescription>
 						String id = getContent_R(declRed.get(1), "");
-						short[] tokenCounter = {(short)(tokenPos + 3)};
+						Expression idExpr = new Expression(Expression.NodeType.IDENTIFIER, id, ++tokenPos);
+						short[] tokenCounter = {(short)(tokenPos + 2)};
 						dataType = buildType(declRed.get(3), _types, tokenCounter, _element);
-						Expression initExpr = new Expression(Expression.NodeType.OPERATOR, getContent_R(red.get(1), ""), ++tokenCounter[0]);
-						initExpr.children.add(new Expression(Expression.NodeType.IDENTIFIER, id, ++tokenPos));
-						initExpr.children.add(buildExpression(red.get(2), ++tokenCounter[0], _types));
-						expressions.add(initExpr);
+						red = red.get(1).asReduction();
+						// <VarInitOpt> ::= <AssignmentOperator> <Expression>
+						// <VarInitOpt> ::= 
+						if (red.size() > 0) {
+							lineType = Line.LineType.LT_VAR_INIT;
+							Expression initExpr = new Expression(Expression.NodeType.OPERATOR, getContent_R(red.get(0), ""), ++tokenCounter[0]);
+							initExpr.children.add(idExpr);
+							initExpr.children.add(buildExpression(red.get(1), ++tokenCounter[0], _types));
+							expressions.add(initExpr);
+						}
+						else {
+							expressions.add(idExpr);
+						}
 						// TODO add the type mapping for the variable to _types?
 						break;
 					}
-					case RuleConstants.PROD_VARINITIALISATION2: {
+					case RuleConstants.PROD_VARINITIALISATION: {
 						// <VarInitialisation> ::= <TypeDescription> <ArrayDecl> <AssignmentOperator> <Expression>
 						lineType = Line.LineType.LT_VAR_INIT;
 						short[] tokenCounter = {tokenPos};
@@ -811,18 +826,22 @@ public class LineParser /*extends CodeParser*/
 						expressions.add(buildExpression(parser.getCurrentToken(), tokenPos, _types));
 						break;
 
-					case RuleConstants.PROD_VARDECLARATION_VARKEY_COLON:
-						// <VarDeclaration> ::= VarKey <IdList> ':' <TypeDescription>
-					case RuleConstants.PROD_VARDECLARATION_DIMKEY_ASKEY:
-						// <VarDeclaration> ::= DimKey <IdList> AsKey <TypeDescription>
+					case RuleConstants.PROD_VARDECLARATION_VARKEY_IDENTIFIER_COMMA_COLON:
+						// <VarDeclaration> ::= VarKey Identifier ',' <IdList> ':' <TypeDescription>
+					case RuleConstants.PROD_VARDECLARATION_DIMKEY_IDENTIFIER_COMMA_ASKEY:
+						// <VarDeclaration> ::= DimKey Identifier ',' <IdList> AsKey <TypeDescription>
 						lineType = Line.LineType.LT_VAR_DECL;
 						{
-							this.buildExpressionList(red.get(1), tokenPos + 1, expressions, _types);
+							
+							Expression idExpr1 = buildExpression(red.get(1), ++tokenPos, _types);
+							tokenPos += idExpr1.getLength();
+							expressions.add(idExpr1);
+							this.buildExpressionList(red.get(3), tokenPos + 1, expressions, _types);
 							for (Expression expr: expressions) {
 								tokenPos += expr.getLength() + 1;
 							}
 							short[] tokenCounter = {++tokenPos};
-							dataType = buildType(red.get(3), _types, tokenCounter, _element);
+							dataType = buildType(red.get(5), _types, tokenCounter, _element);
 						}
 						// TODO add the type mapping for the variables to _types?
 						break;
@@ -1950,7 +1969,8 @@ public class LineParser /*extends CodeParser*/
 				"§COND§ !!!isNice",
 				"§COND§ not (isNice)",
 				"§COND§ answer == 'J' or answer == 'N'",
-				"§COND§ (value < 15.5) and not (length(array)*2 >= 5) or a <> b",
+				"§COND§ (value < 15.5) and not (length(arrow)*2 >= 5) or a <> b",
+				"§COND§ (value < 15.5) and ! (length(arrow)*2 >= 5) or a <> b",
 				"§LEAVE§",
 				"§LEAVE§ 3",
 				"§RETURN§",

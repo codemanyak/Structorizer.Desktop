@@ -435,6 +435,9 @@ public class Line {
 			}
 		}
 		StringList declTokens = new StringList(tokens);
+		if (lType == null) {
+			lType = LineType.LT_RAW;
+		}
 		switch (lType) {
 		case LT_VAR_INIT:
 		case LT_CONST_DEF:
@@ -770,6 +773,11 @@ public class Line {
 	{
 		StringBuilder sb = new StringBuilder();
 		sb.append(this.type.toString());
+		if (this.dataType != null) {
+			sb.append("(");
+			sb.append(dataType.toString());
+			sb.append(")");
+		}
 		if (this.expressions != null) {
 			sb.append("[");
 			String sepa = "";

@@ -56,7 +56,9 @@
 !                                       and Indentifier lists in <VarDeclaration>
 !                                       allowed, Identifier syntax widened to
 !                                       {All Latin} instead of {Letter}
-! V 0.7     2021-12-04  Kay Gürtzig     <RoutineInvocation> added to <ElementLine>                
+! V 0.7     2021-12-04  Kay Gürtzig     <RoutineInvocation> added to <ElementLine>,
+!                                       conflict among <VarDeclaration> and
+!                                       <VarInitialisation> resolved                
 ! -----------------------------------------------------------------------
 
 "Name"    = 'StructorizerLine'
@@ -154,6 +156,7 @@ SelectorKey = '§SELECT§'
          |  <InputInstruction>
          |  <OutputInstruction>
          |  <RoutineInvocation>
+         |  <VarDecl1OrInit>
          |  <VarDeclaration>
          |  <ConstDefinition>
          |  <TypeDefinition>
@@ -390,8 +393,14 @@ SelectorKey = '§SELECT§'
 !         |  '|='
 
 <VarInitialisation>
-        ::= <VarDeclaration1> <AssignmentOperator> <Expression>
-         |  <TypeDescription> <ArrayDecl> <AssignmentOperator> <Expression>
+        ::= <TypeDescription> <ArrayDecl> <AssignmentOperator> <Expression>
+         
+<VarDecl1OrInit>
+        ::= <VarDeclaration1> <VarInitOpt>
+
+<VarInitOpt>
+        ::= <AssignmentOperator> <Expression>
+         |  
          
 <ArrayDecl>
         ::= Identifier <DimensionList>
@@ -425,8 +434,8 @@ SelectorKey = '§SELECT§'
          |  DimKey Identifier AsKey <TypeDescription>
          
 <VarDeclaration>
-        ::= VarKey <IdList> ':' <TypeDescription>
-         |  DimKey <IdList> AsKey <TypeDescription>
+        ::= VarKey Identifier ',' <IdList> ':' <TypeDescription>
+         |  DimKey Identifier ',' <IdList> AsKey <TypeDescription>
          
 <ConstDefinition>
         ::= ConstKey Identifier <AssignmentOperator> <Expression>
