@@ -289,9 +289,19 @@ public class Expression {
 		put("?,!", new Operator("ifthenelse"));
 	}};
 	
-	/** COMPONENT means the colon separating a component name and a component value in a record initializer,<br/>
-	 * QUALIFIER is the dot separating a record and a component name (whereas the dot in a method call is handled as OPERATOR) <br/>
-	 * PARENTH symbolizes an opening parenthesis and is only temporarily used within the shunting yard algorithm in {@link Expression#parse(StringList, StringList, short)} */
+	/** 
+	 * Indicates the type of the node in the syntax tree.<br/>
+	 * Remarks:
+	 * <ul>
+	 * <li>{@code COMPONENT} means the colon separating a component name and a
+	 *    component value in a record initializer,</li>
+	 * <li>{@code QUALIFIER} is the dot separating a record and a component name
+	 *    (whereas the dot in a method call is handled as {@code OPERATOR}) </li>
+	 * <li>{@code PARENTH} symbolizes an opening parenthesis and is only temporarily
+	 *    used within the shunting yard algorithm in
+	 *    {@link Expression#parse(StringList, StringList, short)}</li>
+	 * </ul>
+	 */
 	public static enum NodeType {
 		/** leaf node, a literal of an unambiguous data type (safe) */
 		LITERAL,
@@ -459,9 +469,9 @@ public class Expression {
 	 * 
 	 * @param tokens - a non-null {@link StringList} to append my tokens to.
 	 * @param parentPrec - the operator precedence of the operator this expression forms an
-	 * operand for. -1 means there is no parent operator.
+	 *     operand for. -1 means there is no parent operator.
 	 * @param alternOprs - a customized operator precedence map (if empty, then composed
-	 * operand expressions will be parenthesized).
+	 *     operand expressions will be parenthesized).
 	 * 
 	 * @see #appendToTokenList(StringList)
 	 */
@@ -1072,23 +1082,27 @@ public class Expression {
 	 * syntactical errors.
 	 * 
 	 * @param tokens - a {@link StringList} containing the tokenized (and not necessarily
-	 * unified) expression text, will be consumed on parsing until a first token that
-	 * does not fit well. Spaces will be eliminated (if still present).
+	 *     unified) expression text, will be consumed on parsing until a first token
+	 *     that does not fit well. Spaces will be eliminated (if still present).
 	 * @param stopTokens - a {@link StringList} containing possible delimiters,
-	 * which, at top level, shall stop the parsing. The found stop token will not be
-	 * consumed from {@code tokens}. If being {@code null} then stops without
-	 * exception at the first token not being expected, provided the stack is empty
-	 * and output is already containing an Expression.
+	 *     which, at top level, shall stop the parsing. The found stop token will not
+	 *     be consumed from {@code tokens}. If being {@code null}, parsing will stop
+	 *     without throwing an exception at the first token not being expected, provided
+	 *     the stack is empty and output is already containing an Expression.
 	 * @param tokenNo - the number of preceding tokens of he line not contained in
-	 * {@code tokens}, i.e. the overall index of the first token within {@code tokens}
+	 *     {@code tokens}, i.e. the overall index of the first token within {@code tokens}
 	 * @return the syntax tree or null.
 	 * 
 	 * @throws ExpressionException
 	 * 
 	 * @see {@link #parseList(StringList, String, String, StringList)}
 	 */
+	// FIXME: We might add a string parameter containing additional identifier characters
 	public static LinkedList<Expression> parse(StringList tokens, StringList stopTokens, short tokenNo) throws SyntaxException
 	{
+		/* FIXME: Handling of stopTokens is inconsistent with specification above
+		 * (which is inconsistent in itself, by the way)
+		 */
 		// Basically, this follows Dijkstra's shunting yard algorithm
 		Expression expr = null;
 		tokens.removeBlanks();	// Just in case...
@@ -1176,6 +1190,14 @@ public class Expression {
 				signPos = !token.equals(".");
 				wasOpd = false;
 			}
+			// START KGU#790 2021-12-07: Issue #920
+			else if (token.equals("∞") || token.equals("Infinity")) {
+				// Floating-point literal
+				wasOpd = true;
+				expr = new Expression(NodeType.LITERAL, token, (short)(tokenNo + position));
+				output.addLast((expr));
+			}
+			// END KGU#790 2021-12-07
 			else if (Syntax.isIdentifier(token, false, null)
 					&& (stopTokens == null || !stopTokens.contains(token))) {
 				String nextToken = null;
@@ -1436,8 +1458,9 @@ public class Expression {
 				stopped = true;
 			}
 			else {
-				// TODO Can we infer a syntactical error here?
-				System.err.println("Unexpected token «" + token + "» skipped.");
+				// Seems we can infer a syntactical error here
+				//System.err.println("Unexpected token «" + token + "» skipped.");
+				throw new SyntaxException("Unexpected token «" + token + "»", tokenNo);
 			}
 			if (!stopped) {
 				tokens.remove(0); position++;

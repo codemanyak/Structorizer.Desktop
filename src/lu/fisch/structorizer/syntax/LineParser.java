@@ -557,6 +557,12 @@ public class LineParser /*extends CodeParser*/
 	{
 		String className = _element.getClass().getSimpleName();
 		StringList tokens = Syntax.splitLexically(_line, true);
+		//StringList tokens1 = Syntax.splitLexically(_line, true, false);
+		//if (tokens.indexOf(tokens1, 0, true) != 0) {
+		//	System.err.println("Splitting differs for: " + _line);
+		//	System.out.println(tokens);
+		//	System.out.println(tokens1);
+		//}
 		if (className.equals("Alternative")
 				|| className.equals("While")
 				|| className.equals("Repeat")) {

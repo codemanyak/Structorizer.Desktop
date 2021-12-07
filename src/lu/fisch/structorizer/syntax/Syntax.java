@@ -35,6 +35,9 @@ package lu.fisch.structorizer.syntax;
  *      Kay Gürtzig     2020-08-12      First Issue
  *      Kay Gürtzig     2020-11-01      Further methods from Element and Function moved hitherto
  *      Kay Gürtzig     2021-10-25      Method removeDecorators now replaces Element.cutOutRedundantMarkers
+ *      Kay Gürtzig     2021-12-05      Fundamental redesign of splitLexically(): final automaton instead of
+ *                                      repeated splitting (much more efficient), direct elimination of
+ *                                      whitespace enabled (also way more efficient than posterior deletion)
  *
  ******************************************************************************************************
  *
@@ -51,85 +54,89 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.regex.Pattern;
 
 import lu.fisch.structorizer.io.Ini;
 import lu.fisch.utils.StringList;
 
 /**
+ * This class is not intended to be instanced but serves as a library of static
+ * methods to do lexical scanning and syntactic checks.
+ * 
  * @author Kay Gürtzig
  */
 public class Syntax {
 
-	private static final Pattern FLOAT_PATTERN1 = Pattern.compile("[0-9]+([eE][0-9]+)?");
-	private static final Pattern FLOAT_PATTERN2 = Pattern.compile("[0-9]+[eE]");
-	private static final Pattern INT_PATTERN = Pattern.compile("[0-9]+");
-	private static final Pattern SIGN_PATTERN = Pattern.compile("[+-]");
-	public static final Pattern STRING_PATTERN = Pattern.compile("(^\\\".*\\\"$)|(^\\\'.*\\\'$)");
-	// START KGU#425 2017-09-29: Lexical core mechanisms revised
-	private static final String[] LEXICAL_DELIMITERS = new String[] {
-			" ",
-			"\t",
-			"\n",
-			".",
-			",",
-			";",
-			"(",
-			")",
-			"[",
-			"]",
-			// START KGU#100 2016-01-14: We must also catch the initialiser delimiters
-			"{",
-			"}",
-			// END KGU#100 2016-01-14
-			"-",
-			"+",
-			"/",
-			"*",
-			">",
-			"<",
-			"=",
-			":",
-			"!",
-			"'",
-			"\"",
-			"\\",
-			"%",
-			// START KGU#790 2020-10-31: Issue #800 We need the bitwise and and the address operator too
-			"&",
-			"|",
-			"~",
-			// END KGU#790 2020-10-31
-			// START KGU#920 2021-02-03: Enh. #920 We allow ∞ as synonym for Infinity
-			"\u221E",
-			// END KGU#920 2021-02-03
-			// START KGU#331 2017-01-13: Enh. #333 Precaution against unicode comparison operators
-			"\u2260", // '≠'
-			"\u2264", // '≤'
-			"\u2265"  // '≥'
-			// END KGU#331 2017-01-13
-	};
-	// END KGU#425 2017-09-29
+	// START KGU#790 2021-12-05 Obsolete with redesign of splitLexically
+//	private static final Pattern FLOAT_PATTERN1 = Pattern.compile("[0-9]+([eE][0-9]+)?");
+//	private static final Pattern FLOAT_PATTERN2 = Pattern.compile("[0-9]+[eE]");
+//	private static final Pattern INT_PATTERN = Pattern.compile("[0-9]+");
+//	private static final Pattern SIGN_PATTERN = Pattern.compile("[+-]");
+//	public static final Pattern STRING_PATTERN = Pattern.compile("(^\\\".*\\\"$)|(^\\\'.*\\\'$)");
+//	// START KGU#425 2017-09-29: Lexical core mechanisms revised
+//	private static final String[] LEXICAL_DELIMITERS = new String[] {
+//			" ",
+//			"\t",
+//			"\n",
+//			".",
+//			",",
+//			";",
+//			"(",
+//			")",
+//			"[",
+//			"]",
+//			// START KGU#100 2016-01-14: We must also catch the initialiser delimiters
+//			"{",
+//			"}",
+//			// END KGU#100 2016-01-14
+//			"-",
+//			"+",
+//			"/",
+//			"*",
+//			">",
+//			"<",
+//			"=",
+//			":",
+//			"!",
+//			"'",
+//			"\"",
+//			"\\",
+//			"%",
+//			// START KGU#790 2020-10-31: Issue #800 We need the bitwise and and the address operator too
+//			"&",
+//			"|",
+//			"~",
+//			// END KGU#790 2020-10-31
+//			// START KGU#920 2021-02-03: Enh. #920 We allow ∞ as synonym for Infinity
+//			"\u221E",
+//			// END KGU#920 2021-02-03
+//			// START KGU#331 2017-01-13: Enh. #333 Precaution against unicode comparison operators
+//			"\u2260", // '≠'
+//			"\u2264", // '≤'
+//			"\u2265"  // '≥'
+//			// END KGU#331 2017-01-13
+//	};
+//	// END KGU#425 2017-09-29
+	// END KGU#790 2021-12-05
 
 
-	private static Syntax instance = null;
-	
+//	private static Syntax instance = null;
+//	
 //	/**
 //	 * Maps Element IDs to vectors of syntactical representations of the
 //	 * respective unbroken lines of the Element text.
 //	 */
 //	private HashMap<Long, Line[]> syntaxMap = new HashMap<Long, Line[]>();
 //	
-	/**
-	 * @return the instance of this class
-	 */
-	public static Syntax getInstance()
-	{
-		if (instance == null) {
-			instance = new Syntax();
-		}
-		return instance;
-	}
+//	/**
+//	 * @return the instance of this class
+//	 */
+//	public static Syntax getInstance()
+//	{
+//		if (instance == null) {
+//			instance = new Syntax();
+//		}
+//		return instance;
+//	}
 	
 	// START KGU#165 2016-03-25: Once and for all: It should be a transparent choice, ...
 	/**
@@ -500,10 +507,17 @@ public class Syntax {
 	 * more precisely: a sequence of whitespace characters (like {@code "    "}) will form a series of
 	 * 1-character whitespace strings (here: " ", " ", " ", " "). So they can easily be removed
 	 * with removeAll(" ").
+	 * 
 	 * @param _text - String to be exploded into lexical units
 	 * @param _restoreLiterals - if {@code true} then accidently split numeric and string literals
 	 *        will be reassembled 
-	 * @return StringList consisting of the separated lexemes including isolated spaces etc.
+	 * @return StringList consisting of the separated lexemes (including contiguous whitespace
+	 *        sequences). Use {@link StringList#removeBlanks()} to get rid of these contained
+	 *        whitespace sequences or use {@link #splitLexically(String, boolean, boolean)} in
+	 *        the first place to avoid whitespace in the result.
+	 * 
+	 * @see #splitLexically(String, boolean, boolean)
+	 * @see StringList#removeBlanks()
 	 */
 	public static StringList splitLexically(String _text, boolean _restoreStrings)
 	{
@@ -784,6 +798,16 @@ public class Syntax {
 //			// END KGU#139 2016-01-12
 //		}
 //		return parts;
+		/* The new, more efficient approach behaves slightly different:
+		 * W.r.t. names:
+		 * Previously, all characters not explicitly listed among the LEXICAL_DELIMITERS
+		 * could mix into a name. Now, conversely, all characters not explicitly allowed
+		 * as identifier, literal, or operator symbol parts will inevitably handled as
+		 * separate tokens.
+		 * W.r.t. whitespace:
+		 * Before the result split whitespace sequences into sequences of single whitespace
+		 * characters, now whitespace sequences will be held together as tokens.
+		 */
 		return splitLexically(_text, _restoreStrings, false);
 		// END KGU#790 2021-12-05
 	}
@@ -795,6 +819,7 @@ public class Syntax {
 		LX_WHITESPACE,
 		LX_STRING1, LX_STRING2,
 		LX_NAME,
+		LX_INTERNAL_KEY,	// pseudo identifiers §[A-Z]+§
 		LX_INT, LX_INT0, LX_INTB, LX_INTO, LX_INTX,
 		LX_FLOAT, LX_FLOATSE, LX_FLOATE,
 		LX_SYMBOL};
@@ -804,9 +829,12 @@ public class Syntax {
 			"<<", ">>>", ">>",
 			"&&", "||",
 			"..", "...",
+			"++", "--",
+			"+=", "-=", "*=", "/=", "%=", "&=", "|=", "<<=", ">>=",
 			"\\\\"};
 	private static final StringList LEX_SYMBOL_LIST = new StringList(LEX_SYMBOLS);
-	private static final String LEX_DELIMITERS = ".,;()[]{}-+/*%><=:!?&|~\u221E\u2260\u2264\u2265\\";
+	private static final String SYMBOL_CONTINUATORS = ".+-<>=:&|\\";
+	private static final String SPEC_OPR_SYMBOLS = "\u2260\u2264\u2265";
 	/**
 	 * Splits the given _text into lexical morphemes (lexemes). This will possibly overdo
 	 * somewhat (e. g. signs of number literals will be separated, but floating-point literals
@@ -866,28 +894,27 @@ public class Syntax {
 					sbToken.appendCodePoint(cp);
 					state = _preserveStrings ? LexState.LX_STRING2 : LexState.LX_SYMBOL;
 				}
-				else if (LEX_DELIMITERS.indexOf(cp) >= 0) {
+				else if (SPEC_OPR_SYMBOLS.indexOf(cp) >= 0) {
 					if (cp == '\u2260') {
-						sbToken.append("<>");
+						tokens.add("<>");
 					}
 					else if (cp == '\u2264') {
-						sbToken.append("<=");
+						tokens.add("<=");
 					}
 					else if (cp == '\u2265') {
-						sbToken.append(">=");
+						tokens.add(">=");
 					}
-					else {
-						if (cp == '\\') {
-							escape = true;
-						}
-						sbToken.appendCodePoint(cp);
-					}
-					state = LexState.LX_SYMBOL;
+				}
+				else if (cp == '§') {
+					sbToken.appendCodePoint(cp);
+					state = LexState.LX_INTERNAL_KEY;
 				}
 				else {
-					// TODO ignore? collect?
-					System.err.println("Unexpected character in LexState LX_0:" + _text.charAt(ix));
 					sbToken.appendCodePoint(cp);
+					if (cp == '\\') {
+						escape = true;
+					}
+					state = LexState.LX_SYMBOL;
 				}
 				break;
 			case LX_FLOAT:	// Fraction part of a floating-point literal
@@ -1058,6 +1085,34 @@ public class Syntax {
 					ix--;	// Process this code point again
 				}
 				break;
+			case LX_INTERNAL_KEY:
+				if (Character.isUpperCase(cp)) {
+					sbToken.appendCodePoint(cp);
+				}
+				else if (cp == '§') {
+					if (sbToken.length() > 1) {
+						// Accomplishes the internal key
+						sbToken.appendCodePoint(cp);
+						tokens.add(sbToken.toString());
+						sbToken.delete(0, sbToken.length());
+						state = LexState.LX_0;
+					}
+					else {
+						// Nothing between the two '§'
+						// Handle one of them as singular token and stay in the state
+						tokens.add("§");
+						// The new '§' is again a potential start (already in sbToken)
+					}
+				}
+				else {
+					// Make the initial '§' a single token and check the remainder
+					tokens.add("§");
+					sbToken.deleteCharAt(0);
+					// If not empty it's an upper-case letter sequence, thus a name
+					state = sbToken.length() > 0 ? state = LexState.LX_NAME : LexState.LX_0;
+					ix--;	// Process this code point again
+				}
+				break;
 			case LX_NAME:
 				if (Character.isLetterOrDigit(cp) || cp == '_') {
 					sbToken.appendCodePoint(cp);
@@ -1097,12 +1152,12 @@ public class Syntax {
 						sbToken.delete(0, sbToken.length());
 					}
 					state = LexState.LX_0;
-					ix--;
+					ix--;	// Process this code point again
 				}
 				break;
 			case LX_SYMBOL:
 				// Lets's see if there is some possible combination
-				if (LEX_DELIMITERS.indexOf(cp) >= 0) {
+				if (SYMBOL_CONTINUATORS.indexOf(cp) >= 0) {
 					// May belong to the symbol,
 					int oldLen = sbToken.length();
 					sbToken.appendCodePoint(cp);
@@ -1124,7 +1179,7 @@ public class Syntax {
 					}
 				}
 				else if (escape && "0bftnr'\"".indexOf(cp) >= 0) {
-					// Amalgamate the floating escape sequence
+					// Amalgamate the floating (outside a string literal) escape sequence
 					sbToken.appendCodePoint(cp);
 					tokens.add(sbToken.toString());
 					sbToken.delete(0, sbToken.length());
@@ -1135,7 +1190,7 @@ public class Syntax {
 					tokens.add(sbToken.toString());
 					sbToken.delete(0, sbToken.length());
 					state = LexState.LX_0;
-					ix--;
+					ix--;	// Process this code point again
 				}
 				break;
 			default:

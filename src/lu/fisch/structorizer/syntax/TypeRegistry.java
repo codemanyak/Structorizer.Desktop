@@ -164,6 +164,11 @@ public class TypeRegistry {
 		if (Expression.BOOL_LITERALS.contains(literal)) {
 			stdType = TypeRegistry.getStandardType("boolean");
 		}
+		// START KGU#790 2021-12-07: Issue #920
+		if ("∞".equals(literal) || "Infinity".equals(literal)) {
+			stdType = TypeRegistry.getStandardType("double");
+		}
+		// END KGU#790 2021-12-07
 		else if (literal.startsWith("'") && literal.endsWith("'")) {
 			// This is a very rough heuristics but not worse than before in Element.identifyExprType()
 			if (literal.length() == 3 || literal.length() == 4 && literal.charAt(1) == '\\') {
@@ -185,7 +190,7 @@ public class TypeRegistry {
 		}
 		// END KGU#354 2017-05-22
 		else {
-			// In this cascade the last successful try simply wins the game
+			// In this cascade the last successful attempt simply wins the game
 			try {
 				Double.parseDouble(literal);
 				stdType = getStandardType("double");
