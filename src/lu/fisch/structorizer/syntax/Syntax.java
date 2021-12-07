@@ -54,6 +54,7 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
 import lu.fisch.structorizer.io.Ini;
 import lu.fisch.utils.StringList;
@@ -71,7 +72,7 @@ public class Syntax {
 //	private static final Pattern FLOAT_PATTERN2 = Pattern.compile("[0-9]+[eE]");
 //	private static final Pattern INT_PATTERN = Pattern.compile("[0-9]+");
 //	private static final Pattern SIGN_PATTERN = Pattern.compile("[+-]");
-//	public static final Pattern STRING_PATTERN = Pattern.compile("(^\\\".*\\\"$)|(^\\\'.*\\\'$)");
+	public static final Pattern STRING_PATTERN = Pattern.compile("(^\\\".*\\\"$)|(^\\\'.*\\\'$)");
 //	// START KGU#425 2017-09-29: Lexical core mechanisms revised
 //	private static final String[] LEXICAL_DELIMITERS = new String[] {
 //			" ",
