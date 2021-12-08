@@ -420,7 +420,7 @@ public class PasGenerator extends Generator
 		StringList paramNames = new StringList();
 		StringList paramTypes = new StringList();
 		_root.collectParameters(paramNames, paramTypes, null);
-		String resultType = _root.getResultType();
+		String resultType = _root.getResultTypeDescr();
 		String pr = "program";
 		if (!_root.isProgram()) {
 			pr = "function";
@@ -460,7 +460,7 @@ public class PasGenerator extends Generator
 			if (resultType != null || _root.returnsValue == Boolean.TRUE || vars.contains("result", false) || vars.contains(fnName))
 			// END KGU#990 2021-10-02
 			{
-				resultType = transformType(_root.getResultType(), "Integer");
+				resultType = transformType(_root.getResultTypeDescr(), "Integer");
 				signature += ": " + resultType;
 			}
 			else 
@@ -2181,7 +2181,7 @@ public class PasGenerator extends Generator
 		//if (_root.getResultType() != null) {
 		// START KGU#990 2021-10-03: Bugfix #990 _root may not be the current root
 		//if (_root.getResultType() != null || this.returns || this.isResultSet || this.isFunctionNameSet) {
-		if (_root.getResultType() == null && _root.returnsValue != Boolean.TRUE && !_varNames.contains("result", false) && !_varNames.contains(functionName)) {
+		if (_root.getResultTypeDescr() == null && _root.returnsValue != Boolean.TRUE && !_varNames.contains("result", false) && !_varNames.contains(functionName)) {
 		// END KGU#990 2021-10-03
 		// END KGU 2020-03-25
 			// START KGU#990 2021-10-03: Bugfix #990 _root may not be the current root

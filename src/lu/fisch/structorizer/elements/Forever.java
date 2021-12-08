@@ -438,10 +438,4 @@ public class Forever extends Element implements ILoop {
 	}
 	// END KGU#602 2018-10-25
 
-	// START KGU#790 2021-01-17: Enh. #800
-	@Override
-	protected int getLineTypeSet(int lineNo) {
-		return 0;	// Nothing expected nor acceptable
-	}
-	// END KGU#790 2021-01-17
 }

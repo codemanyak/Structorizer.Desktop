@@ -249,9 +249,9 @@ import java.util.EmptyStackException;
 
 import lu.fisch.graphics.*;
 import lu.fisch.utils.*;
-import lu.fisch.structorizer.syntax.Line;
 import lu.fisch.structorizer.syntax.LineParser;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.Type;
 import lu.fisch.structorizer.syntax.TypeRegistry;
 import lu.fisch.structorizer.helpers.GENPlugin;
 import lu.fisch.structorizer.io.*;
@@ -3393,9 +3393,12 @@ public class Root extends Element {
      * Creates (if not already cached), caches, and returns the static overall type map
      * for this diagram and its included definition providers (if having been available
      * on the first creation).<br/>
-     * Every change to this diagram clears the cache and hence leads to an info refresh.  
+     * Every change to this diagram clears the cache and hence leads to an info refresh.
+     * 
      * @return the type table mapping prefixed type names and variable names to their
      * respective defined or declared TypeMapEntries with structural information.
+     * 
+     * @deprecated Use {@link #getDataTypes()} instead
      */
     public HashMap<String, TypeMapEntry> getTypeInfo()
     // START KGU#678 2019-03-30: Enh. #696: For batch export mode, we must provide an alternative pool for includes
@@ -3408,9 +3411,13 @@ public class Root extends Element {
      * for this diagram and its included definition providers retrieved from {@code routinePool}
      * if given, otherwise from {@link Arranger} if available.<br/>
      * Every change to this diagram clears the cache and hence leads to an info refresh.
+     * 
      * @param routinePool - a diagram pool to search for includables (default: {@link Arranger} instance)
      * @return the type table mapping prefixed type names and variable names to their
-     * respective defined or declared TypeMapEntries with structural information.
+     *     respective defined or declared TypeMapEntries with structural information.
+     * 
+     * @deprecated Use {@link #getDataTypes(IRoutinePool)} instead (with a different API)
+
      */
     public HashMap<String, TypeMapEntry> getTypeInfo(IRoutinePool routinePool)    
     // END KGU#678 2019-03-30
@@ -3471,7 +3478,14 @@ public class Root extends Element {
     	return this.typeMap;
     }
     
-    /** Also consider clearVarAndTypeInfo() */
+    /**
+     * Discards the type info map. Also consider {@link #clearVarAndTypeInfo(boolean)}
+     * 
+     * @see #getTypeInfo()
+     * @see #getTypeInfo(IRoutinePool)
+     * 
+     * @deprecated Use {@link #clearDataTypes()} instead
+     */
     private void clearTypeInfo()
     {
     	// START KGU#502 2018-03-12: Bugfix #518
@@ -3481,13 +3495,20 @@ public class Root extends Element {
     }
     // END KGU#261 2017-01-20
 
-	// START KGU#701/KGU#703 2019-03-30: Issue #718, #720
+    // START KGU#701/KGU#703 2019-03-30: Issue #718, #720
 	/**
 	 * Clears (invalidates) all cached variable names and type information.
 	 * Also resets the drawing information recursively if {@link Element#E_VARHIGHLIGHT}
 	 * is true.
+	 * 
 	 * @param clearDrawInfo - if true then drawing info will also be reset (otherwise only
 	 * in case of {@link Element#E_VARHIGHLIGHT}).
+	 * 
+	 * @see #clearTypeInfo()
+	 * @see #getTypeInfo()
+	 * @see #getTypeInfo(IRoutinePool)
+	 * 
+	 * @deprecated Use {@link #clearVarsAndDataTypes(boolean)} instead
 	 */
 	public void clearVarAndTypeInfo(boolean clearDrawInfo)
 	{
@@ -3505,8 +3526,12 @@ public class Root extends Element {
 
 	// START KGU#261/KGU#332 2017-02-01: Enh. #259/#335
 	/**
-	 * Adds all parameter declarations to the given map (varname -> typeinfo).
-	 * @param typeMap
+	 * Adds all parameter declarations to the given map (varname -> TypeMapEntry).
+	 * 
+	 * @param typeMap - the (possibly temporary) type map to be used (e.g. for
+	 *     analysis purposes)
+	 * 
+	 * @deprecated Use {@link #updateTypeRegistry(TypeRegistry)} instead
 	 */
 	public void updateTypeMap(HashMap<String, TypeMapEntry> typeMap)
 	{
@@ -3521,7 +3546,7 @@ public class Root extends Element {
 			}
 		}
 		if (this.isSubroutine()) {
-			typeSpec = this.getResultType();
+			typeSpec = this.getResultTypeDescr();
 			if (typeSpec != null) {
 				// START KGU#593 2018-10-05: Issue #619 - missing declarations on C++ export
 				// This is somewhat tricky here: The result type is an explicit return variable declaration for
@@ -3535,6 +3560,111 @@ public class Root extends Element {
 		}
 	}
 	// END KGU#261/KGU#332 2017-02-01
+
+	// START KGU#790 2021-12-08: Issue #800
+	/**
+     * Creates (if not already cached), caches, and returns the overall data type
+     * registry for this diagram and its included definition providers (if having been
+     * available on the first creation).<br/>
+     * Every change to this diagram clears the cache and hence leads to a registry
+     * refresh.
+     *
+     * @return the type table mapping prefixed type names and variable names to their
+     * respective defined or declared TypeMapEntries with structural information.
+	 */
+	public TypeRegistry getDataTypes() {
+		return getDataTypes(null);
+	}
+
+	/**
+     * Creates (if not already cached), caches, and returns the overall type registry
+     * for this diagram and its included definition providers retrieved from
+     * {@code routinePool} if given, otherwise from {@link Arranger} if available.<br/>
+     * Every change to this diagram clears the cache and hence leads to a registry
+     * refresh.
+     * 
+     * @param routinePool - a diagram pool to search for includables (default: {@link Arranger} instance)
+     * @return the type table mapping prefixed type names and variable names to their
+     * respective defined or declared TypeMapEntries with structural information.
+	 */
+	public TypeRegistry getDataTypes(IRoutinePool routinePool) {
+    	if (this.dataTypes == null) {
+    		this.dataTypes = new TypeRegistry();
+    		// FIXME: The import registry may easily get obsolete without being noticed!
+    		if (this.includeList != null) {
+    			for (int i = 0; i < this.includeList.count(); i++) {
+    				String inclName = this.includeList.get(i);
+    				IRoutinePool pool = routinePool;
+    				if (pool == null && (pool = specialRoutinePool) == null && Arranger.hasInstance()) {
+    					pool = Arranger.getInstance();
+    				}
+    				if (pool != null) {
+    					for (Root incl: pool.findIncludesByName(inclName, this, true)) {
+    						dataTypes.addTypesFrom(incl.getDataTypes(routinePool), false);
+    					}
+    				}
+    			}
+    		}
+    		IElementVisitor collector = new IElementVisitor() {
+    			@Override
+    			public boolean visitPreOrder(Element _ele) {
+    				if (!_ele.isDisabled(false)) {
+    					
+    					_ele.updateTypeMap(typeMap);
+    				}
+    				return true;
+    			}
+
+    			@Override
+    			public boolean visitPostOrder(Element _ele) {
+    				return true;
+    			}
+    			
+    		};
+    		this.traverse(collector);
+    	}
+		return dataTypes;
+	}
+
+	private void clearDataTypes()
+	{
+		this.dataTypes = null;
+	}
+
+	public void clearVarsAndDataTypes(boolean clearDrawInfo)
+	{
+		this.variables = null;
+		this.constants.clear();
+		this.clearDataTypes();
+		// START KGU#990 2021-10-02: Bugfix #990 - new fields to facilitate export
+		this.returnsValue = null;
+		// END KGU#990 2021-10-02
+		if (clearDrawInfo || E_VARHIGHLIGHT) {
+			this.resetDrawingInfoDown();
+		}
+	}
+
+	/**
+	 * Adds all parameter declarations to the given map (varname -> typeinfo).
+	 * @param typeMap
+	 */
+	public void updateTypeRegistry(TypeRegistry _dataTypes)
+	{
+		ArrayList<Param> parameters = getParams();
+		Type parType;
+		for (Param par: parameters) {
+			if ((parType = par.getDataType(_dataTypes)) != null) {
+				_dataTypes.putTypeFor(par.getName(), parType, this, 0, true);
+			}
+		}
+		if (this.isSubroutine()) {
+			Type resultType = this.getResultType();
+			if (resultType != null) {
+				_dataTypes.putTypeFor(this.getMethodName(), resultType, this, 0, true);
+			}
+		}
+	}
+	// END KGU#790 2021-12-08
 
 	// START BFI 2015-12-10
 	/**
@@ -5772,7 +5902,7 @@ public class Root extends Element {
      * @see #getParameterDefaults()
      * @see #collectParameters(StringList, StringList, StringList)
      * @see #getMethodName()
-     * @see #getResultType()
+     * @see #getResultTypeDescr()
      */
     public StringList getParameterNames()
     {
@@ -5797,7 +5927,7 @@ public class Root extends Element {
      * @see #getParameterDefaults()
      * @see #collectParameters(StringList, StringList, StringList)
      * @see #getMethodName()
-     * @see #getResultType()
+     * @see #getResultTypeDescr()
      */
     public StringList getParameterTypes()
     {
@@ -5821,7 +5951,7 @@ public class Root extends Element {
      * @see #getParameterTypes()
      * @see #collectParameters(StringList, StringList, StringList)
      * @see #getMethodName()
-     * @see #getResultType()
+     * @see #getResultTypeDescr()
      */
     public StringList getParameterDefaults()
     {
@@ -5898,7 +6028,7 @@ public class Root extends Element {
      * @see #getParameterNames()
      * @see #getParameterTypes()
      * @see #getParameterDefaults()
-     * @see #getResultType()
+     * @see #getResultTypeDescr()
      * @see #isProgram()
      * @see #isSubroutine()
      * @see #isInclude()
@@ -5922,7 +6052,7 @@ public class Root extends Element {
      * @see #getParameterNames()
      * @see #getParameterTypes()
      * @see #getParameterDefaults()
-     * @see #getResultType()
+     * @see #getResultTypeDescr()
      * @see #isProgram()
      * @see #isSubroutine()
      * @see #isInclude()
@@ -6031,7 +6161,7 @@ public class Root extends Element {
      * @see #getParameterNames()
      * @see #getParameterTypes()
      * @see #getParameterDefaults()
-     * @see #getResultType()
+     * @see #getResultTypeDescr()
      * @see #isProgram()
      * @see #isSubroutine()
      * @see #isInclude()
@@ -6052,7 +6182,7 @@ public class Root extends Element {
      * @see #getParameterNames()
      * @see #getParameterTypes()
      * @see #getParameterDefaults()
-     * @see #getResultType()
+     * @see #getResultTypeDescr()
      * @see #isProgram()
      * @see #isSubroutine()
      * @see #isInclude()
@@ -6076,10 +6206,11 @@ public class Root extends Element {
      * @see #getParameterNames()
      * @see #getParameterTypes()
      * @see #getParameterDefaults()
+     * @see #getResultType()
      * @see #getMethodName()
      * @see #isSubroutine()
      */
-    public String getResultType()
+    public String getResultTypeDescr()
     {
         // FIXME: This is not consistent to getMethodName()!
     	String resultType = null;
@@ -6128,6 +6259,40 @@ public class Root extends Element {
     	
     	return resultType;
     }
+    
+    // START KGU#790 2021-12-08: Issue #800
+    /**
+     * Returns the result Type object if this is a subroutine diagram and a
+     * result type is declared or inferrable.
+     * 
+     * @return {@code null} or a {@link Type} object representing the data type of
+     *     the function result
+     * 
+     * @see #getParameterNames()
+     * @see #getParameterTypes()
+     * @see #getParameterDefaults()
+     * @see #getResultTypeDescr()
+     * @see #getMethodName()
+     * @see #isSubroutine()
+     */
+    public Type getResultType()
+    {
+        Type resType = null;
+        if (this.diagrType == DiagramType.DT_SUB) {
+            resType = this.getDataTypes().getTypeFor(this.getMethodName());
+            if (resType == null) {
+                String typeDescr = getResultTypeDescr();
+                if (Syntax.isIdentifier(typeDescr, false, null)) {
+                    resType = this.getDataTypes().getType(typeDescr);
+                }
+                if (resType == null) {
+                // TODO parse / construct the type frm typeDescr
+                }
+            }
+        }
+        return resType;
+    }
+    // END KGU#790 2021-12-08
 
     /**
      * Extracts parameter names and types from the parenthesis content of the Root text
@@ -6141,7 +6306,7 @@ public class Root extends Element {
      * @see #getParameterNames()
      * @see #getParameterTypes()
      * @see #getParameterDefaults()
-     * @see #getResultType()
+     * @see #getResultTypeDescr()
      * @see #getMethodName()
      * @see #getSignatureString(boolean, boolean)
      * @see #isSubroutine()
@@ -6280,7 +6445,7 @@ public class Root extends Element {
      * @see #getParameterNames()
      * @see #getParameterTypes()
      * @see #getParameterDefaults()
-     * @see #getResultType()
+     * @see #getResultTypeDescr()
      * @see #getMinParameterCount()
      */
     public String getSignatureString(boolean _addPath, boolean _qualified) {
@@ -6577,7 +6742,7 @@ public class Root extends Element {
         // START KGU#78 2015-11-25: Delegated to a more general function
         //String first = this.getText().get(0).trim();
         //boolean isFunction = first.toLowerCase().contains(") as ") || first.contains(") :") || first.contains("):");
-        boolean isFunction = getResultType() != null;
+        boolean isFunction = getResultTypeDescr() != null;
         // END KGU#78 2015-11-25
 
         // CHECK: var = programname (#9)
@@ -7357,13 +7522,4 @@ public class Root extends Element {
 	}
 	// END KGU#178/KGU#624 2018-12-26
 	
-	// START KGU#790 2021-01-17: Enh. #800
-	@Override
-	protected int getLineTypeSet(int lineNo) {
-		if (this.isSubroutine()) {
-			return Line.LT_ROUTINE_MASK;
-		}
-		return 0;
-	}
-	// END KGU#790 2021-01-17
 }

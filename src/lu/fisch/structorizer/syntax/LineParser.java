@@ -686,7 +686,7 @@ public class LineParser /*extends CodeParser*/
 	 * line
 	 * 
 	 * @see #preprocessLine(String, Element, int, boolean)
-	 * @see #parse(String, Element, int, StringBuilder, TypeRegistry)
+	 * @see #parse(String, Element, int, TypeRegistry)
 	 */
 	public String check(String _lineToCheck)
 	{
@@ -701,25 +701,25 @@ public class LineParser /*extends CodeParser*/
 	}
 
 	/**
-	 * Parses the given Element line {@code _textToParse} for the {@link Element}, gathering
-	 * a possible parsing error in {@code _problems}.
+	 * Parses the given Element line {@code _textToParse} for the {@link Element}. A possible
+	 * parsing error description will be available via {@link Line#getParserError()}.
+	 * 
 	 * @param _textToParse - the (unbroken) line to parse (must already have been preprocessed
-	 *         in case {@code _element} is {@code null}!)
+	 *     in case {@code _element} is {@code null}!)
 	 * @param _element - the origin Element (if available) or {@code null} (in the latter
-	 *         case the line must already have been preprocessed!)
+	 *     case the line must already have been preprocessed!)
 	 * @param _lineNo - the number of the line within the origin element
-	 * @param _problems - a {@link StringBuilder} where a possible error description may be
-	 *         added to.
 	 * @param _types - a {@link TypeRegistry} or {@code null}
 	 * @return The composed {@link Line} object, or {@code null} in case of an error or
-	 *         lacking implementation
+	 *     lacking implementation
 	 *         
 	 * @see #preprocessLine(String, Element, int, boolean)
 	 * @see #check(String)
 	 */
-	public Line parse(String _textToParse, Element _element, int _lineNo, StringBuilder _problems, TypeRegistry _types)
+	public Line parse(String _textToParse, Element _element, int _lineNo, TypeRegistry _types)
 	{
 		Line line = null;
+		StringBuilder problems = new StringBuilder();
 		Line.LineType lineType = Line.LineType.LT_RAW;
 		ArrayList<Expression> expressions = new ArrayList<Expression>();
 //		synchronized(this) {
@@ -926,7 +926,7 @@ public class LineParser /*extends CodeParser*/
 							//}
 						}
 						catch (SyntaxException ex) {
-							_problems.append(ex.getMessage());
+							problems.append(ex.getMessage());
 						}
 						break;
 
@@ -1066,24 +1066,26 @@ public class LineParser /*extends CodeParser*/
 					line = new Line(lineType, expressions.toArray(new Expression[expressions.size()]), dataType);
 				}
 				catch (SyntaxException ex) {
-					_problems.append(ex.getMessage());
+					problems.append(ex.getMessage());
 					int pos = ex.getPosition();
 					StringList tokens = Syntax.splitLexically(_textToParse, true);
-					_problems.append(": ");
+					problems.append(": ");
 					int ix = 0;
 					while (ix < tokens.count() && pos > 0) {
 						String token = tokens.get(ix++);
 						if (!token.isBlank()) {
 							pos--;
 						}
-						_problems.append(token);
+						problems.append(token);
 					}
-					_problems.append(" ► ");
-					_problems.append(tokens.concatenate("", ix));
+					problems.append(" ► ");
+					problems.append(tokens.concatenate("", ix));
+					line = new Line(lineType, problems.toString());
 				}
 			}
 			else {
-				composeErrorString(_textToParse, _problems);
+				composeErrorString(_textToParse, problems);
+				line = new Line(lineType, problems.toString());
 			}
 //		}
 
@@ -2084,12 +2086,12 @@ public class LineParser /*extends CodeParser*/
 		int nTests = 0;
 		LineParser parser = new LineParser();
 		for (String text: lineTests) {
-			StringBuilder errors = new StringBuilder();
+			String error = null;
 			long startTime = System.currentTimeMillis();
-			Line line = parser.parse(text, null, 0, errors, null);
+			Line line = parser.parse(text, null, 0, null);
 			long endTime = System.currentTimeMillis();
-			if (line == null) {
-				System.err.println(errors);
+			if (line != null && (error = line.getParserError()) != null) {
+				System.err.println(error);
 			}
 			else {
 				System.out.println(line);

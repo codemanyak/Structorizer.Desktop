@@ -1440,7 +1440,7 @@ public class TexAlgGenerator extends Generator {
 		
 		// Start the environment
 		String argString = _root.getParameterNames().concatenate(", ");
-		String resultType = _root.getResultType();
+		String resultType = _root.getResultTypeDescr();
 		int commandIndex = 0;	// for main
 		if (_root.isSubroutine()) {
 			commandIndex = 1;
@@ -1580,7 +1580,7 @@ public class TexAlgGenerator extends Generator {
 		boolean hasIncludes = _root.includeList != null && _root.includeList.count() > 0;
 		if (_root.isSubroutine() || hasIncludes) {
 			String indent2 = _indent + this.getIndent();
-			String resType = _root.getResultType();
+			String resType = _root.getResultTypeDescr();
 			ArrayList<Param> params = _root.getParams();
 			if (!params.isEmpty() || resType != null || hasIncludes) {
 				switch (packageIndex) {

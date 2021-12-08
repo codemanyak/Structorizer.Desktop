@@ -223,6 +223,7 @@ import lu.fisch.utils.*;
 import lu.fisch.graphics.*;
 import lu.fisch.structorizer.syntax.Expression;
 import lu.fisch.structorizer.syntax.Line;
+import lu.fisch.structorizer.syntax.LineParser;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.structorizer.syntax.SyntaxException;
 import lu.fisch.structorizer.syntax.TypeRegistry;
@@ -1239,9 +1240,11 @@ public abstract class Element {
 	 * Parses the (unbroken) lines of the text and returns the array of associated
 	 * {@link Line} objects for each unbroken line. Does <b>not</b> overwrite
 	 * {@link #parsedLines}.
+	 * 
 	 * @param problems - a {@link StringList} gathering occurred syntax complaints
 	 * @param typeMap - a data type map to retrieve from and add to, or {@code null}
 	 * @return the array of parse results per line
+	 * 
 	 * @see #getParsedText(StringList, StringList, TypeRegistry, StringList)
 	 * @see #parseLines()
 	 */
@@ -1250,41 +1253,33 @@ public abstract class Element {
 		StringList unbrText = this.getUnbrokenText();
 		Line[] lines = new Line[unbrText.count()];
 		for (int i = 0; i < lines.length; i++) {
-			lines[i] = Line.parse(unbrText.get(i), getLineTypeSet(i), typeMap, problems);
+			lines[i] = LineParser.getInstance().parse(unbrText.get(i), this, i, typeMap);
 		}
 		return lines;
 	}
 
 	/**
 	 * Retrieves an array of parsed lines (a {@link Line} object for each unbroken line)
+	 * 
 	 * @param declaredVars - unused by now (is it to gather the declared variables en passant?)
 	 * @param usedVars - unused by now (is it to gather the used variables en passant?)
 	 * @param typeMap - a data type map to retrieve from and add to, or {@code null}
 	 * @param problems a {@link StringList} gathering occurred syntax complaints
 	 * @return the array of parse results per line
 	 */
-	public Line[] getParsedText(StringList declaredVars, StringList usedVars, TypeRegistry typeMap, StringList problems)
+	public Line[] getParsedText(StringList assignedVars, StringList declaredVars, StringList usedVars, TypeRegistry typeMap, StringList problems)
 	{
-		// TODO: What is to be done with declaredVars and usedVars here?
 		StringList unbrText = this.getUnbrokenText();
 		Line[] lines = new Line[unbrText.count()];
 		for (int i = 0; i < lines.length; i++) {
-			lines[i] = Line.parse(unbrText.get(i), getLineTypeSet(i), typeMap, problems);
+			lines[i] = LineParser.getInstance().parse(unbrText.get(i), this, i, typeMap);
+			if (lines[i].getType() != Line.LineType.LT_RAW) {
+				lines[i].gatherVariables(assignedVars, declaredVars, usedVars);
+			}
 		}
 		return lines;
 	}
 	// END KGU#790 2020-11-01
-	
-	// START KGU#790 2021-01-17: Enh. #800 The Element should specify the expected line types
-	/**
-	 * Returns a bit pattern where set bits indicate that the associated {@link Line.LineType}
-	 * is expected and acceptable for the (unbroken) text line with index {@code lineNo}
-	 * @param lineNo - number of the line (in case it matters), might be ignored
-	 * @return a bit pattern, e.g. {@code Line.LT_RETURN_MASK | Line.LT_EXIT_MASK |
-	 * line.LT_LEAVE_MASK | Line.LT_THROW_MASK}
-	 */
-	protected abstract int getLineTypeSet(int lineNo);
-	// END KGU#790 2021-01-07
 	
 	// START KGU#602 2018-10-25: Issue #419 - Tool to break very long lines is requested
 	/**
@@ -4769,7 +4764,8 @@ public abstract class Element {
 	
 	/**
 	 * Internal helper for {@link #getRelatedErrors(boolean)}
-	 * @param getAll - if not {@code true} then only the result will only contain the
+	 * 
+	 * @param getAll - if not {@code true} then the result will contain only the
 	 * first related {@link DetectedError} found (allowing an efficient existence check)
 	 * @param errorMap - a map from element to lists of related {@link DetectedError} objects,
 	 *  may be empty
@@ -4831,13 +4827,23 @@ public abstract class Element {
 	
 	// START KGU#790 2020-11-02: Issue #800
 	/**
-	 * Get the parsed line structure for the text line {@code lineNo} if
-	 * it exists. If the line type (to be obtained with {@link Line#getType()})
-	 * is {@link Line.LineType#LT_RAW} then something will have gone wrong and
-	 * the original text line is all you can rely on.
+	 * Get the parsed line structure for the text line {@code lineNo} if it exists.
+	 * If the line type (to be obtained with {@link Line#getType()}) is
+	 * {@link Line.LineType#LT_RAW} then something will have gone wrong and
+	 * the original text line is all you can rely on. The corresponding error
+	 * message can be obtained via {@link Line#getParserError()} in this case.<br/>
+	 * <b>Note:</b> If there haven't been associated Line structures cached then
+	 * this method will do the parsing for all lines of this element and cache the
+	 * parsed Lines. If you want to obtain an array of freshly parsed Line objects
+	 * without setting the cache then you might consider using
+	 * {@link #getParsedText(StringList, TypeRegistry)} instead.
+	 * 
 	 * @param lineNo - index of the text line (w.r.t. unbroken text) - must be between
-	 * 0 and the number of lines - 1.
+	 *     0 and the number of lines - 1.
 	 * @return a {@link Line} structure for the requested text line.
+	 * 
+	 * @see #parseLines()
+	 * @see #resetParsedLines()
 	 */
 	public Line getParsedLine(int lineNo)
 	{
@@ -4850,7 +4856,10 @@ public abstract class Element {
 	/**
 	 * Re-parses all text lines no matter whether there have already been parsed
 	 * lines in the cache. Overwrites {@link #parsedLines}.
+	 * 
 	 * @return A {@link StringList} of possible error descriptions
+	 * 
+	 * @see #getParsedLine(int)
 	 * @see #getParsedText(StringList, Typeregistry)
 	 * @see #getParsedText(StringList, StringList, Typeregistry, StringList)
 	 */
@@ -4860,9 +4869,13 @@ public abstract class Element {
 		StringList errors = new StringList();
 		StringList unbrokenLines = this.getUnbrokenText();
 		parsedLines = new Line[unbrokenLines.count()];
+		Root root = getRoot(this);
 		for (int i = 0; i < parsedLines.length; i++) {
-			// FIXME guess a suited line type, ought to be delegated to subclasses, though
-			parsedLines[i] = Line.parse(unbrokenLines.get(i), getLineTypeSet(i), null, errors);
+			parsedLines[i] = LineParser.getInstance().parse(unbrokenLines.get(i), this, i, root == null ? null : root.getDataTypes());
+			String trouble = parsedLines[i].getParserError();
+			if (trouble != null) {
+				errors.add(trouble);
+			}
 		}
 		return errors;
 	}

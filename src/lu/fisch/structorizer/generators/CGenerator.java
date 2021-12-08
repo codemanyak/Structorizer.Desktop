@@ -411,7 +411,7 @@ public class CGenerator extends Generator {
 			// START KGU#990 2021-10-02: Bugfix #990 _root is not necessarily the current Root
 			StringList vars = _root.getVarNames();
 			// END KGU#990 2021-10-02
-			fnHeader = transformTypeWithLookup(_root.getResultType(),
+			fnHeader = transformTypeWithLookup(_root.getResultTypeDescr(),
 					// START KGU#990 2021-10-02: Bugfix #990 These values could be from a different root
 					//((this.returns || this.isResultSet || this.isFunctionNameSet) ? "int" : "void"));
 					((_root.returnsValue == Boolean.TRUE || vars.contains("result", false) || vars.contains(fnName)) ? "int" : "void"));
@@ -3018,7 +3018,7 @@ public class CGenerator extends Generator {
 			code.add(_indent + "return 0;");
 		}
 		else if (_root.isSubroutine() &&
-				(returns || _root.getResultType() != null || isFunctionNameSet || isResultSet) && !alwaysReturns)
+				(returns || _root.getResultTypeDescr() != null || isFunctionNameSet || isResultSet) && !alwaysReturns)
 		{
 			String result = "0";
 			if (isFunctionNameSet)

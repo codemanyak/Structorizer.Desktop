@@ -1943,7 +1943,7 @@ public class PapGenerator extends Generator {
 		if (header.contains(";")) {
 			// We might convert it to C or to some pseudo Pascal syntax with commas
 			header = root.getMethodName();
-			String resType = root.getResultType();
+			String resType = root.getResultTypeDescr();
 			StringList paramNames = new StringList();
 			StringList paramTypes = new StringList();
 			if (root.collectParameters(paramNames, paramTypes, null)) {

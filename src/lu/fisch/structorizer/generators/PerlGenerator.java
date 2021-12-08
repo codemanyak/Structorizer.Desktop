@@ -1352,7 +1352,7 @@ public class PerlGenerator extends Generator {
 	@Override
 	protected String generateResult(Root _root, String _indent, boolean alwaysReturns, StringList varNames)
 	{
-		if (_root.isSubroutine() && (returns || _root.getResultType() != null || isFunctionNameSet || isResultSet) && !alwaysReturns)
+		if (_root.isSubroutine() && (returns || _root.getResultTypeDescr() != null || isFunctionNameSet || isResultSet) && !alwaysReturns)
 		{
 			String result = "";
 			if (isFunctionNameSet)

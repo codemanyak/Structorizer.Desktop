@@ -21,6 +21,7 @@
 package lu.fisch.structorizer.syntax;
 
 import java.util.HashMap;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 import lu.fisch.structorizer.elements.Element;
@@ -310,8 +311,8 @@ public class TypeRegistry {
 	/**
 	 * Registers the given {@link Type} {@code type} being defined in line
 	 * {@code defLine} of Element {@code definingEl} under the passed name
-	 * {@code typeId} name unless it is anonymous or there is already an 
-	 * entry with the same name.<br/>
+	 * {@code typeId} name as an alias unless it is anonymous or there is
+	 * already an entry with the same name.<br/>
 	 * Both restrictions can be overridden with {@code force = true}.
 	 * Standard types may not be overridden in any case.
 	 * 
@@ -398,5 +399,36 @@ public class TypeRegistry {
 			putType(type, false);
 		}
 		return result;
+	}
+
+	/**
+	 * Merges the type registry entries from {@code _other} to this TypeRegistry.
+	 * If there are key collisions then {@code _override} decides whether the entries
+	 * from {@code _other} are to replace the ones in this or not.
+	 * 
+	 * @param _other - another {@link TypeRegistry}
+	 * @param _override - whether entries with same key from {@code _other} are to
+	 *     replace the corresponding entries of this.
+	 * @return the number of maintained colliding entries in case {@code _override}
+	 *     is {@code false} (otherwise the result will always be 0).
+	 */
+	public int addTypesFrom(TypeRegistry _other, boolean _override) {
+		int nColls = 0;
+		if (_other != null) {
+			if (_override) {
+				typeMap.putAll(_other.typeMap);
+			}
+			else {
+				for (Map.Entry<String, TypeRegEntry> entry: _other.typeMap.entrySet()) {
+					if (!typeMap.containsKey(entry.getKey())) {
+						typeMap.put(entry.getKey(), entry.getValue());
+					}
+					else {
+						nColls++;
+					}
+				}
+			}
+		}
+		return nColls;
 	}
 }

@@ -1460,7 +1460,7 @@ public class Expression {
 			else {
 				// Seems we can infer a syntactical error here
 				//System.err.println("Unexpected token «" + token + "» skipped.");
-				throw new SyntaxException("Unexpected token «" + token + "»", tokenNo);
+				throw new SyntaxException("Unexpected token «" + token + "»", tokenNo + position);
 			}
 			if (!stopped) {
 				tokens.remove(0); position++;
@@ -1705,6 +1705,38 @@ public class Expression {
 		return complete;
 	}
 
+	/**
+	 * Replaces all Structorizer-accepted operator symbols (and some literals) by
+	 * standard intermediate operators (mostly Java operators) according to the
+	 * following list:
+	 * <ul>
+	 * <li>Assignment:	"<-"</li>
+	 * <li>Comparison:	"==", "<", ">", "<=", ">=", "!="</li>
+	 * <li>Logic:		"&&", "||", "!", "^"</li>
+	 * <li>Arithmetics:	usual Java operators where "div" remaines</li>
+	 * <li>Literals:    "Infinity"
+	 * </ul>
+	 * 
+	 * @return total number of replacements
+	 * 
+	 * @see Syntax#unifyOperators(StringList, boolean)
+	 * @see #appendToTokenList(StringList, HashMap)
+	 */
+	public int unifyOperators()
+	{
+		int count = 0;
+		String subst;
+		if ((this.type == NodeType.OPERATOR || this.type == NodeType.LITERAL)
+				&& (subst = Syntax.UNIFICATION_MAP.get(this.text)) != null) {
+			this.text = subst;
+			count++;
+		}
+		for (Expression child: this.children) {
+			count += child.unifyOperators();
+		}
+		return count;
+	}
+	
 	/**
 	 * Tries to evaluate this if it is a constant expression
 	 * 

@@ -19,14 +19,10 @@
  */
 package lu.fisch.structorizer.syntax;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import lu.fisch.structorizer.elements.Element;
-import lu.fisch.structorizer.syntax.Declaration.DeclarationRule;
-import lu.fisch.structorizer.syntax.Expression.NodeType;
 import lu.fisch.structorizer.syntax.Expression.Operator;
 import lu.fisch.utils.StringList;
 
@@ -115,27 +111,6 @@ public class Line {
 		LT_ROUTINE
 	};
 	
-	public static final int LT_ASSIGNMENT_MASK   = 1 << LineType.LT_ASSIGNMENT.ordinal();
-	public static final int LT_INPUT_MASK        = 1 << LineType.LT_INPUT.ordinal();
-	public static final int LT_OUTPUT_MASK       = 1 << LineType.LT_OUTPUT.ordinal();
-	public static final int LT_CONDITION_MASK    = 1 << LineType.LT_CONDITION.ordinal();
-	public static final int LT_FOR_LOOP_MASK     = 1 << LineType.LT_FOR_LOOP.ordinal();
-	public static final int LT_FOREACH_LOOP_MASK = 1 << LineType.LT_FOREACH_LOOP.ordinal();
-	public static final int LT_PROC_CALL_MASK    = 1 << LineType.LT_ROUTINE_CALL.ordinal();
-	public static final int LT_LEAVE_MASK        = 1 << LineType.LT_LEAVE.ordinal();
-	public static final int LT_RETURN_MASK       = 1 << LineType.LT_RETURN.ordinal();
-	public static final int LT_EXIT_MASK         = 1 << LineType.LT_EXIT.ordinal();
-	public static final int LT_THROW_MASK        = 1 << LineType.LT_THROW.ordinal();
-	public static final int LT_CASE_MASK         = 1 << LineType.LT_CASE.ordinal();
-	public static final int LT_SELECTOR_MASK     = 1 << LineType.LT_SELECTOR.ordinal();
-	public static final int LT_DEFAULT_MASK      = 1 << LineType.LT_DEFAULT.ordinal();
-	public static final int LT_CATCH_MASK        = 1 << LineType.LT_CATCH.ordinal();
-	public static final int LT_TYPE_DEF_MASK     = 1 << LineType.LT_TYPE_DEF.ordinal();
-	public static final int LT_CONST_DEF_MASK    = 1 << LineType.LT_CONST_DEF.ordinal();
-	public static final int LT_VAR_DECL_MASK     = 1 << LineType.LT_VAR_DECL.ordinal();
-	public static final int LT_VAR_INIT_MASK     = 1 << LineType.LT_VAR_INIT.ordinal();
-	public static final int LT_ROUTINE_MASK      = 1 << LineType.LT_ROUTINE.ordinal();
-	
 	/**
 	 * Maps internal prefix keys and some actual keywords like "var", "dim", "const",
 	 * "type" to corresponding {@link LineType}s
@@ -163,6 +138,8 @@ public class Line {
 	private LineType type;
 	private Expression[] expressions;
 	private Type dataType = null;
+	private String parserError = null;
+	
 	
 	public Line(LineType _type, Expression[] _expressions)
 	{
@@ -175,6 +152,13 @@ public class Line {
 		type = _type;
 		expressions = _expressions;
 		dataType = _dataType;
+	}
+	
+	public Line(LineType _type, String _errorMessage)
+	{
+		type = _type;
+		expressions = null;
+		parserError = _errorMessage;
 	}
 	
 	/**
@@ -190,12 +174,13 @@ public class Line {
 	/**
 	 * Get the {@code _index}-th associated parsed expression (a syntax tree) for this
 	 * line.
-	 * @param _index - the index of the wanted expression
-	 * @return the requested expression as syntax tree if available, null otherwise.
+	 * 
+	 * @param _index - the index of the requested expression (0 .. {@link #getExprCount()}-1)
+	 * @return the requested expression as syntax tree if available, {@code null}
+	 *     otherwise.
+	 * 
 	 * @see #getExprCount()
 	 * @see #getType()
-	 * @see #getMinExprCount(LineType)
-	 * @see #getMaxExprCount(LineType)
 	 */
 	public Expression getExpression(int _index)
 	{
@@ -207,9 +192,8 @@ public class Line {
 	}
 	
 	/**
-	 * @return the number of stored expression syntax trees. Value should lie between
-	 * {@link #getMinExprCount(LineType)} and {@link #getMaxExprCount(LineType)} for
-	 * this {@link LineType}
+	 * @return the number of stored expression syntax trees.
+	 * 
 	 * @see #getType()
 	 * @see #getExpression(int)
 	 */
@@ -222,12 +206,15 @@ public class Line {
 	}
 	
 	/**
-	 * Yields teh associated data type.
-	 * @param _explicitOnly - st this {@code true} if you are only interested in an
-	 * explicitly assigned type here (e.g. from a type definition or variable declaration),
-	 * otherwise the attached expressions will be asked for their data type.
-	 * @return the explicitly associated data type (e.g. in case of a type definition
-	 * or variable declaration)
+	 * Yields the associated data type.
+	 * 
+	 * @param _explicitOnly - set this {@code true} if you are only interested in
+	 *    an explicitly assigned type here (e.g. from a type definition or variable
+	 *    declaration), otherwise the attached expressions will be asked for their
+	 *    data type, where the first expression associated with a data type will
+	 *    determine the result.
+	 * @return the (explicitly) associated data type (e.g. in case of a type definition
+	 *    or variable declaration)
 	 */
 	public Type getDataType(boolean _explicitOnly)
 	{
@@ -243,533 +230,14 @@ public class Line {
 	}
 	
 	/**
-	 * @param _type - the {@link LineType} the query is for
-	 * @return the minimum number of required expressions for this type.
-	 * @see #getMaxExprCount(LineType)
-	 * @see #getType()
-	 * @see #getExprCount()
-	 * @see #getExpression(int)
+	 * @return a parser error message if no line structure could be built due to
+	 *     a lexical or syntactical error, otherwise {@code null}
 	 */
-	public static int getMinExprCount(LineType _type)
+	public String getParserError()
 	{
-		int count = -1;
-		switch (_type) {
-		case LT_ASSIGNMENT:
-		case LT_CASE:
-		case LT_SELECTOR:
-		case LT_CATCH:
-		case LT_CONDITION:
-		case LT_EXIT:
-		case LT_ROUTINE_CALL:
-		case LT_THROW:
-		case LT_INPUT:
-		case LT_CONST_DEF:
-		case LT_VAR_DECL:
-			count = 1;
-			break;
-		case LT_FOR_LOOP:
-			count = 3;
-			break;
-		case LT_FOREACH_LOOP:
-			count = 2;
-			break;
-		case LT_LEAVE:
-		case LT_OUTPUT:
-		case LT_RAW:
-		case LT_RETURN:
-		case LT_TYPE_DEF:
-			count = 0;
-		case LT_ROUTINE:
-			count = 1;
-			break;
-		default:
-			break;
-		}
-		return count;
+		return parserError;
 	}
-	
-	/**
-	 * @param _type - the {@link LineType} the query is for
-	 * @return the maximum number of associated expressions for this type
-	 * @see #getMinExprCount(LineType)
-	 * @see #getType()
-	 * @see #getExprCount()
-	 * @see #getExpression(int)
-	 */
-	public static int getMaxExprCount(LineType _type)
-	{
-		int count = -1;
-		switch(_type) {
-		case LT_ASSIGNMENT:
-		case LT_CASE:
-		case LT_CATCH:
-		case LT_CONDITION:
-		case LT_CONST_DEF:
-		case LT_EXIT:
-		case LT_LEAVE:
-		case LT_THROW:
-		case LT_RETURN:
-		case LT_ROUTINE_CALL:
-		case LT_VAR_INIT:
-			count = 1;
-			break;
-		case LT_ROUTINE:
-			// Name (id) and parameter list
-			count = 2;
-			break;
-		case LT_FOR_LOOP:
-			count = 4;
-			break;
-		case LT_INPUT:
-		case LT_OUTPUT:
-		case LT_SELECTOR:
-		case LT_FOREACH_LOOP:
-		case LT_VAR_DECL:
-		case LT_RAW:
-			count = Integer.MAX_VALUE;
-			break;
-		case LT_TYPE_DEF:
-			count = 0;
-			break;
-		default:
-			break;
-		}
-		return count;
-	}
-	
-	/**
-	 * Tries to parse the given (unbroken) {@code textLine} into a Line structure
-	 * 
-	 * @param tokens - the tokenized text line (without operator unification!)
-	 * @param expectedTypes - a bitmap marking the expected line types (may depend on the
-	 * Element type). Controls the validity.
-	 * @param typeMap - a {@link TypeRegistry} for data type retrieval or creation, may be
-	 * {@code null}
-	 * @return a Line object or {@code null} (e.g. in case of an empty line)
-	 * 
-	 * @throws SyntaxException if there is a syntactic error in the text
-	 * 
-	 * @see #parse(String, LineType, TypeRegistry, StringList)
-	 */
-	public static Line parse(StringList tokens, int expectedTypes, TypeRegistry typeMap) throws SyntaxException
-	{
-		Type dType = null;
-		short tokenPos = 0;
-		// Check if the line starts with a command keyword
-		LineType lType = null;	// Detected line type
-		String token0 = null;	// Starting token
-		ArrayList<Expression> exprs = new ArrayList<Expression>();
-		/* First of all, condense all keywords (i.e. replace the respective token lists
-		 * by a single compact token), then unify the operators and remove spaces.
-		 */
-		for (String key: Syntax.keywordSet()) {
-			String keyword = Syntax.getKeyword(key);
-			if (keyword != null && !keyword.trim().isEmpty()) {
-				StringList splitKey = Syntax.getSplitKeyword(key);
-				int len = splitKey.count();
-				int start = -1;
-				while ((start = tokens.indexOf(splitKey, start+1, !Syntax.ignoreCase)) >= 0) {
-					tokens.remove(start, start + len);
-					// Don't reinsert redundant keywords
-					if (!key.startsWith("post") || key.startsWith("postFor")) {
-						tokens.insert(keyword, start);	// FIXME shouldn't we insert key here?
-					}
-					else {
-						start--;
-					}
-				}
-			}
-		}
-		// Level case for "var", "dim", and "as" keywords
-		tokens.replaceAllCi("var", "var");
-		tokens.replaceAllCi("dim", "dim");
-		tokens.replaceAllCi("as", "as");
-		tokens.trim();
-		Syntax.unifyOperators(tokens, false);
-		// Now check the start token against prefix keywords
-		// FIXME: We should get rid of postfix keywords
-		if (!tokens.isEmpty()) {
-			token0 = tokens.get(0);
-			for (Map.Entry<String, LineType> entry: lineStartsToTypes.entrySet()) {
-				String keyword = Syntax.getKeyword(entry.getKey());
-				if (keyword != null && token0.equals(keyword) 
-						// This applies e.g. for "var", "dim", "const", "type" etc.
-						|| keyword == null && token0.equals(entry.getKey())) {
-					lType = entry.getValue();
-					// Initial keyword is identified, so we can remove it
-					tokens.remove(0);
-					break;
-				}
-			}
-		}
-		if (tokens.contains("<-")) {
-			if (lType == null) {
-				lType = LineType.LT_ASSIGNMENT;
-			}
-			else if (lType == LineType.LT_VAR_DECL) {
-				lType = LineType.LT_VAR_INIT;
-			}
-		}
-		// The type may still be unidentified (e.g. if no optional pre-key was used)
-		if (lType != null && (expectedTypes & (1 << lType.ordinal())) == 0) {
-			// Something is wrong here, list all accepted line types
-			StringList acceptedTypes = new StringList();
-			for (LineType lt: LineType.values()) {
-				if ((expectedTypes & (1 << lt.ordinal())) != 0) {
-					acceptedTypes.add(lt.toString());
-				}
-			}
-			throw new SyntaxException("wrongLineType",
-					new String[] {lType.toString(), acceptedTypes.concatenate("|")},
-					0, null, 0);
-		}
-		if (lType == null) {
-			// Adopt the expected type if unique
-			for (LineType lt: LineType.values()) {
-				if ((expectedTypes & (1 << lt.ordinal())) != 0) {
-					if (lType != null) {
-						// More than one accepted type - wipe it again
-						lType = null;
-						break;
-					}
-					lType = lt;
-				}
-			}
-		}
-		StringList declTokens = new StringList(tokens);
-		if (lType == null) {
-			lType = LineType.LT_RAW;
-		}
-		switch (lType) {
-		case LT_VAR_INIT:
-		case LT_CONST_DEF:
-			tokens.removeBlanks();	// Make sure the token number of the operator is correct
-			tokenPos = (short)tokens.indexOf("<-");
-			declTokens = declTokens.subSequence(0, tokenPos);
-			tokens.remove(0, tokenPos+1);
-		case LT_VAR_DECL: {
-			dType = Declaration.parse(declTokens, Declaration.DeclarationRule.VDECL, (short)0, typeMap, exprs);
-			if (tokenPos >= 0 && exprs.size() == 1) {
-				List<Expression> valueExprs = Expression.parse(tokens, null, (short)(tokenPos+1));
-				Expression asgnmt = new Expression(Expression.NodeType.OPERATOR, "<-", tokenPos);
-				asgnmt.children.add(exprs.get(0));
-				asgnmt.children.add(valueExprs.get(0));
-				exprs.clear();
-				exprs.add(asgnmt);
-			}
-			break;
-		}
-		case LT_TYPE_DEF:
-		{
-			/* TODO
-			 * These are the possible syntax variants to detect:
-			 * type <id> '=' <record>'{' <record_group_List> '}';
-			 * type <id> '=' enum '{' <enum_list> '}';
-			 * type <id> '=' <type>
-			 * where:
-			 * <colon> ::= ':' | as
-			 * <record> ::= record | struct
-			 */
-			int nTokens = tokens.count();
-			if (nTokens < 3
-					|| !Syntax.isIdentifier(tokens.get(0), false, null)
-					|| !tokens.get(1).equals("=")) {
-				throw new SyntaxException("Wrong type definition syntax: missing '='", 2);
-			}
-			dType = Declaration.parse(tokens, Declaration.DeclarationRule.TYPE_DEF, tokenPos, typeMap, exprs);
-		}
-			break;
-		default:
-			// Identify the separators and extract the expressions
-			lType = extractExpressions(tokens, lType, exprs, typeMap);
-		}
-		return new Line(lType, exprs.toArray(new Expression[exprs.size()]));
-	}
-
-	/**
-	 * Extract the expressions from the unprefixed token list {@code _tokens} according
-	 * to the expected or detected line type {@code _type} and gather them in {@code _exprs}.
-	 * Consider the known variable names {@code _varNames} if given.
-	 * 
-	 * @param _tokens - The token list without an identified leading keyword (this should
-	 * reflect in the given {@code _type}). May still contain blanks and non-unified operators.
-	 * Any still contained keyword must already have been condensed into a single token.
-	 * @param _type - the {@link LineType} as far as already detected or expected (or {@code null})
-	 * @param _exprs - the {@link ArrayList} to which the parsed expressions are to be added.
-	 * @param _typeMap  - a {@link TypeRegistry} for data type retrieval or creation, may be
-	 * {@code null}
-	 * @return the eventual line type
-	 * 
-	 * @throws SyntaxException if there are syntactic errors
-	 */
-	private static LineType extractExpressions(StringList _tokens, LineType _type, 
-			ArrayList<Expression> _exprs, TypeRegistry _typeMap) throws SyntaxException
-	{
-		if (_type == null) {
-			_type = LineType.LT_RAW;
-		}
-		// Condense the token list
-		_tokens.removeBlanks();
-		Syntax.unifyOperators(_tokens, false);	// Can we make this an option (argument)?
-		int nTokens = _tokens.count();
-		switch (_type) {
-		case LT_ASSIGNMENT:
-		{
-			// This might be a variable initialisation in C or Java style - so try both
-			SyntaxException wrongExpr = null;
-			boolean assignmentFailed = false;
-			int posAsgn = _tokens.indexOf("<-");
-			List<Expression> parsed = null;
-			try {
-				parsed = Expression.parse(_tokens, null, (short)0);
-				if (nTokens == 0 && parsed.size() == 1) {
-					_exprs.add(parsed.get(0));
-				}
-				else {
-					assignmentFailed = true;
-				}
-			}
-			catch (SyntaxException ex) {
-				wrongExpr = ex;
-				assignmentFailed = true;
-			}
-			if (assignmentFailed) {
-				// FIXME still relevant here?
-				ArrayList<Expression> ids = new ArrayList<Expression>();
-				Type varType = Declaration.parse(_tokens, DeclarationRule.CDECL, (short)0, _typeMap, ids);
-				parsed = Expression.parse(_tokens.subSequence(posAsgn+1, nTokens), null, (short)(posAsgn+1));
-				if (nTokens == 0 && parsed.size() == 1) {
-					_exprs.add(parsed.get(0));
-					_type = LineType.LT_VAR_INIT;
-				}
-				else if (wrongExpr != null) {
-					throw wrongExpr;
-				}
-			}
-		}
-			break;
-		case LT_CONST_DEF:
-			// It might involve a type association ("typed constant" in Pascal)
-		{
-			int posAsgn = _tokens.indexOf("<-");
-			StringList left = _tokens.subSequence(0, posAsgn).trim();
-			if (left.contains(":") || left.contains("as", false) || left.count() > 1) {
-				// Same handling as in LT_VAR_INIT
-				StringList right = _tokens.subSequence(posAsgn+1, nTokens);
-				ArrayList<Expression> ids = new ArrayList<Expression>();
-				Type constType = Declaration.parse(left, DeclarationRule.VDECL, (short)1, _typeMap, ids);
-				List<Expression> parsed = Expression.parse(right, null, (short)(posAsgn + 2));
-				if (ids.size() == 1 && right.isEmpty() && parsed.size() == 1) {
-					_exprs.add(ids.get(0));
-					_exprs.add(parsed.get(0));
-					break;
-				}
-				else {
-					// Obviously something went wrong
-					throw new SyntaxException("Wrong constant expression", nTokens - right.count());
-				}
-			}
-			// Otherwise do the same thing as follows
-		}
-		case LT_CASE:
-		case LT_CONDITION:
-		case LT_EXIT:
-		case LT_THROW:
-		case LT_ROUTINE_CALL:
-			// We expect exactly one expression and no further keywords in general
-			{
-				List<Expression> parsed = Expression.parse(_tokens, null, (short)0);
-				if (_tokens.isEmpty() && parsed.size() == 1) {
-					_exprs.add(parsed.get(0));
-				}
-				else {
-					if (_type == LineType.LT_EXIT || _type == LineType.LT_THROW
-							|| _type == LineType.LT_CONST_DEF) {
-						nTokens++;	// A keyword had been cut off
-					}
-					throw new SyntaxException("Wrong expression", nTokens - _tokens.count());
-				}
-			}
-			break;
-		case LT_FOREACH_LOOP:
-		case LT_FOR_LOOP:
-			// This might still be a loop of the respective other kind
-			{
-				int ixIn = _tokens.indexOf(Syntax.getSplitKeyword("postForIn"), 0, !Syntax.ignoreCase);
-				int ixTo = _tokens.indexOf(Syntax.getSplitKeyword("postFor"), 0, !Syntax.ignoreCase);
-				if (Syntax.getKeyword("preFor").equals(Syntax.getKeyword("preForIn"))) {
-					if (ixIn > 0) {
-						_type = LineType.LT_FOREACH_LOOP;
-					}
-					else if (ixTo > 0) {
-						_type = LineType.LT_FOR_LOOP;
-					}
-				}
-				boolean isForIn = _type == LineType.LT_FOREACH_LOOP;
-				if (isForIn && ixTo > 0 || !isForIn && ixIn > 0) {
-					// This is obviously wrong
-					throw new SyntaxException("wrongForLoop",
-							new String[] {
-									(isForIn ? "@f" : "@e"),
-									(isForIn ? Syntax.getKeyword("postFor") : Syntax.getKeyword("postForIn"))
-									},
-							1 + (isForIn ? ixTo : ixIn), null, 0);
-				}
-				int ix0 = isForIn ? ixIn : ixTo;
-				// This should contain the first expression (an assignment or a variable name, respectively)
-				StringList tokens0 = _tokens.subSequence(0, ix0);
-				List<Expression> parsed = Expression.parse(tokens0, null, (short)1);
-				if (tokens0.isEmpty() && parsed.size() == 1) {
-					Expression varSpec = parsed.get(0);
-					if (isForIn && varSpec.type != NodeType.IDENTIFIER ||
-							!isForIn && (varSpec.type != NodeType.OPERATOR
-							|| !varSpec.text.equals("<-") && !varSpec.text.equals(":=")
-							|| varSpec.children.size() != 2
-							|| varSpec.children.getFirst().type != Expression.NodeType.IDENTIFIER)) {
-						throw new SyntaxException("Wrong loop variable specification: " + parsed.toString(), 1);
-					}
-					if (isForIn) {
-						_exprs.add(parsed.get(0));
-					}
-					else {
-						// append assigned variable and start value expression separately
-						_exprs.addAll(varSpec.children);
-					}
-				}
-				else {
-					// FIXME Just for debugging? Otherwise we better throw an exception or leave
-					System.err.println("Wrong parsing result or remainder: "
-							+ parsed.toString() + " | " + tokens0.concatenate(null));
-				}
-				// The tail contains either end value and step clause or the item list
-				_tokens.remove(0, ix0+1);
-				_tokens = _tokens.trim();
-				if (isForIn) {
-					// Extract the item list (may be an array initializer, a variable or a sequence of expressions)
-					parsed = Expression.parse(_tokens, null, (short)(ix0 + 2));
-					if (_tokens.isEmpty() && !parsed.isEmpty()) {
-						_exprs.addAll(parsed);
-					}
-					else {
-						throw new SyntaxException("Incorrect item list: " + _tokens.concatenate(null),
-								ix0 + 2);
-					}
-				}
-				else {
-					// First extract the end value expression
-					String stepKey = Syntax.getKeyword("stepFor");
-					nTokens = _tokens.count();
-					parsed = Expression.parse(_tokens, StringList.getNew(stepKey), (short)(ix0 + 2));
-					if (parsed.size() == 1) {
-						_exprs.addAll(parsed);
-					}
-					else {
-						throw new SyntaxException("Wrong end value specification: " + parsed.toString(),
-								ix0 + 2);
-					}
-					// Then get the increment, which ought to be an integral literal
-					if (!_tokens.isEmpty()) {
-						int consumed = nTokens - _tokens.count();	
-						if (_tokens.get(0).equals(stepKey)) {
-							_tokens.remove(0);
-							consumed++;
-							parsed = Expression.parse(_tokens, null, (short)(ix0+2 + consumed));
-							if (parsed.size() == 1) {
-								_exprs.addAll(parsed);
-								// TODO we might check for signed or unsigned literal
-							}
-							else {
-								throw new SyntaxException("Wrong step value specification: " + parsed.toString(),
-										ix0+2 + consumed);
-							}
-						}
-						else {
-							throw new SyntaxException("Wrong step syntax: " + _tokens.concatenate(null),
-									ix0+2 + consumed);
-						}
-					}
-				}
-			}
-			break;
-		case LT_INPUT:
-			{
-				List<Expression> parsed = Expression.parse(_tokens, null, (short)1);
-				if (!parsed.isEmpty()) {
-					Expression first = parsed.get(0);
-					if (first.type != Expression.NodeType.LITERAL) {
-						// Insert null to make clear that there is no prompt string
-						parsed.add(0, null);
-					}
-				}
-				_exprs.addAll(parsed);
-			}
-			break;
-		case LT_LEAVE:
-		case LT_RETURN:
-			{
-				List<Expression> parsed = Expression.parse(_tokens, null, (short)1);
-				if (_tokens.isEmpty() && parsed.size() <= 1) {
-					// TODO: In case of leave we ought to check that it is a cardinal number
-					_exprs.addAll(parsed);
-				}
-				else {
-					throw new SyntaxException("Wrong exit value specification: "
-							+ parsed.toString() + " | " + _tokens.concatenate(null), 0);
-				}
-			}
-			break;
-		case LT_RAW:
-			{
-				// Just give it a try, we will only attach expressions if they cover the entire line
-				try {
-					List<Expression> parsed = Expression.parse(_tokens, null, (short)0);
-					if (_tokens.isEmpty()) {
-						_exprs.addAll(parsed);
-					}
-				}
-				catch (SyntaxException exc) {}
-			}
-		case LT_OUTPUT:
-			// Just extract all available expressions
-			_exprs.addAll(Expression.parse(_tokens, null, (short)1));
-			break;
-		case LT_ROUTINE:
-			break;
-		default:
-			break;
-		}
-		return _type;
-	}
-
-	/**
-	 * Tries to parse the given (unbroken) {@code textLine} into a Line structure
-	 * 
-	 * @param textLine - the (unbroken) text line as string
-	 * @param expectedTypes - a bit pattern composed of LineType masks, e.g.
-	 *        {@code LT_ASSIGNMENT_MASK | LT_VAR_INIT_MASK} to specify the
-	 *        set of expected (and acceptable) line types (may depend on the Element
-	 *        type). Controls the validity.
-	 * @param typeMap - a data type map to retrieve from and add to, or {@code null}
-	 * @param errors - all detected errors and warnings will be appended to this {@link StringList}.
-	 * @return a Line object. In case of syntactic errors, a Line of type {@link LineType#LT_RAW}
-	 * would be returned.
-	 */
-	public static Line parse(String textLine, int expectedTypes, TypeRegistry typeMap,
-			StringList errors)
-	{
-		StringList tokens = Syntax.splitLexically(textLine, true).trim();
-		if (!tokens.isEmpty()) {
-			try {
-				return parse(tokens, expectedTypes, typeMap);
-			} catch (SyntaxException exc) {
-				if (errors != null) {
-					errors.add(exc.getMessage());
-				}
-			}
-		}
-		return new Line(LineType.LT_RAW, null);
-	}
-	
+		
 	@Override
 	public String toString()
 	{
@@ -792,6 +260,11 @@ public class Line {
 				sepa = "; ";
 			}
 			sb.append("]");
+		}
+		if (this.parserError != null) {
+			sb.append("(");
+			sb.append(this.parserError);
+			sb.append(")");
 		}
 		return sb.toString();
 	}
@@ -977,29 +450,30 @@ public class Line {
 				"7 * (15 - sin(1.3)) }, { 16, \"doof\", 45+9, b}",
 				"6[-6 * -a] + 34",
 				"(23 + * 6",
+				" 23, \"hserjj\", 'i', 'ojj8f', {746, #, rod}",
 				"(23 + * / 6)",
-				"z * y.98",		// a double literal following to a variable
-				"w <- 76[56].(aha)"	// non-identifier following to a '.' operator
+				"z * y.98",	// a double literal following to a variable
+				"w <- 76[56].(aha)"		// non-identifier following to a '.' operator
 		};
 		String[] lineTests = new String[] {
-				"foreach i in {17+ 9, -3, pow(17, 11.4, -8.1), \"doof\"}",
-				"for k <- 23/4 to pow(2, 6) " + Syntax.getKeyword("stepFor") + " 2",
-				"foreach val in 34 + 8 19 true \"doof\"",
-				"foreach thing in 67/5 + 8, \"fun\" + \"ny\", pow(67, 3)",
-				"if not isNice",
-				"while answer == 'J' or answer == 'N'",
-				"until (value < 15.5) and not (length(array)*2 >= 5) or a <> b",
-				"leave",
-				"leave 3",
-				"RETURN",
-				"return {\"dull\", \"silly\", \"braindead\", \"as thick as the wall\"}",
-				"exit 5",
-				"throw \"all wrong here\"",
-				"input",
-				"INPUT a, b[3]",
-				"input \"prompt\" date.year, date.month",
-				"output",
-				"OUTPUT 17, a*z, 18 + \" km/h\""
+				"§FOREACH§ i §IN§ {17+ 9, -3, pow(17, 11.4, -8.1), \"doof\"}",
+				"§FOR§ k <- 23/4 §TO§ pow(2, 6) §STEP§ 2",
+				"§FOREACH§ val §IN§ 34 + 8 19 true \"doof\"",
+				"§FOREACH§ thing §IN§ 67/5 + 8, \"fun\" + \"ny\", pow(67, 3)",
+				"§COND§ !isNice",
+				"§COND§ answer == 'J' or answer == 'N'",
+				"§COND§ (value < 15.5) and not (length(array)*2 >= 5) or a <> b",
+				"§LEAVE§",
+				"§LEAVE§ 3",
+				"§RETURN§",
+				"§RETURN§ {\"dull\", \"silly\", \"braindead\", \"as thick as the wall\"}",
+				"§EXIT§ 5",
+				"§THROW§ \"all wrong here\"",
+				"§INPUT§",
+				"§INPUT§ a, b[3]",
+				"§INPUT§ \"prompt\" date.year, date.month",
+				"§OUTPUT§",
+				"§OUTPUT§ 17, a*z, 18 + \" km/h\""
 		};
 		String[] negationTests = new String[] {
 				"a < 5 && b >= c || isDone",
@@ -1073,7 +547,8 @@ public class Line {
 			StringList vars1 = new StringList();
 			StringList vars2 = new StringList();
 			StringList vars3 = new StringList();
-			Line aLine = Line.parse(line, ~0, null, errors);
+			//Line aLine = Line.parse(line, ~0, null, errors);
+			Line aLine = LineParser.getInstance().parse(line, null, 0, types);
 			System.out.println(aLine);
 			System.err.println(errors.getText());
 			boolean okay = aLine.gatherVariables(vars1, vars2, vars3);

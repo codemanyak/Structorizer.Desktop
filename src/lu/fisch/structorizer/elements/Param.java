@@ -20,6 +20,10 @@
 
 package lu.fisch.structorizer.elements;
 
+import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.Type;
+import lu.fisch.structorizer.syntax.TypeRegistry;
+
 /******************************************************************************************************
  *
  *      Author:         Bob Fisch
@@ -43,23 +47,31 @@ package lu.fisch.structorizer.elements;
  ******************************************************************************************************///
 
 /**
- * Parameter record for subroutine diagrams, contains name, type, and possibly
- * a default value
+ * Parameter record for subroutine diagrams, contains name, type description, and
+ * possibly a default value (in case of an optional parameter)
  * @author robertfisch
  */
 public class Param {
+	/** The parameter name (identifier) */
     protected String name;
+    /** A type name or description*/
     protected String type;
     // START KGU#371 2019-03-07: Enh. #385 - allow default values for parameters
-    protected String defaultValue;
+    /**
+     * Default value (as string) for this parameter, or {@code null} in case of
+     * a mandatory argument
+     */
+    protected String defaultValue = null;
 
     /**
      * Creates a Param object for a (possibly optional) parameter
+     * 
      * @param name - the parameter name as declared
      * @param type - the (possibly prefixed) type description as declared
-     * (a possible prefix might be "const")
+     *     (a possible prefix might be "const")
      * @param defaultLiteral a default value description (usually some literal)
-     * for an optional parameter, {@code null} for a mandatory parameter
+     *     for an optional parameter, {@code null} for a mandatory parameter
+     * 
      */
     public Param(String name, String type, String defaultLiteral) {
         this.name = name;
@@ -130,4 +142,19 @@ public class Param {
     }
     // END KGU#371 2019-03-07
     
+    // START KGU#790 2021-12-08: Issue #800
+    public Type getDataType(TypeRegistry _dataTypes) {
+        Type paramType = _dataTypes.getTypeFor(name);
+        if (paramType == null) {
+            String typeDescr = getType(true);
+            if (Syntax.isIdentifier(typeDescr, false, null)) {
+                return _dataTypes.getType(typeDescr);
+            }
+            else {
+                // TODO parse / construct the type from typeDescr
+            }
+        }
+        return paramType;
+    }
+    // END KGU#790 2021-12-08
 }

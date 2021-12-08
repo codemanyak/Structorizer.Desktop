@@ -38,6 +38,7 @@ package lu.fisch.structorizer.syntax;
  *      Kay Gürtzig     2021-12-05      Fundamental redesign of splitLexically(): final automaton instead of
  *                                      repeated splitting (much more efficient), direct elimination of
  *                                      whitespace enabled (also way more efficient than posterior deletion)
+ *      Kay Gürtzig     2021-12-08      Redesign of unifyOperators()
  *
  ******************************************************************************************************
  *
@@ -145,6 +146,31 @@ public class Syntax {
 	 */
 	public static boolean ignoreCase = true;
 	// END KGU#165 2016-03-25
+	
+	/**
+	 * Look-up table to unify operator (and some other) symbols in a token list or
+	 * Expression instance
+	 */
+	protected static final HashMap<String, String> UNIFICATION_MAP = new HashMap<String, String>();
+	static {
+		UNIFICATION_MAP.put(":=", "<-");
+		UNIFICATION_MAP.put("\u2190", "<-");
+		UNIFICATION_MAP.put("=", "==");
+		UNIFICATION_MAP.put("<>", "!=");
+		UNIFICATION_MAP.put("\u221E", "!=");
+		UNIFICATION_MAP.put("mod", "%");
+		UNIFICATION_MAP.put("shl", "<<");
+		UNIFICATION_MAP.put("shr", ">>");
+		UNIFICATION_MAP.put("and", "&&");
+		UNIFICATION_MAP.put("or", "||");
+		UNIFICATION_MAP.put("not", "!");
+		UNIFICATION_MAP.put("not", "!");
+		UNIFICATION_MAP.put("xor", "^");
+		UNIFICATION_MAP.put("\u2260", "!=");
+		UNIFICATION_MAP.put("\u2264", "<=");
+		UNIFICATION_MAP.put("\u2265", ">=");
+		UNIFICATION_MAP.put("\u221E", "Infinity");
+	}
 
 	// START KGU#288 2016-11-06: Issue #279: Access limited to private, compensated by new methods
 	//public static final HashMap<String, String> keywordMap = new LinkedHashMap<String, String>();
@@ -501,21 +527,22 @@ public class Syntax {
 	/**
 	 * Splits the given _text into lexical morphemes (lexemes). This will possibly overdo
 	 * somewhat (e. g. signs of number literals will be separated, but floating-point literals
-	 * like 123.45 or .09e-8 will properly be preserved as contiguous tokens).<br>
-	 * By setting {@code _restoreStrings} true, string literals will be re-assembled, too, consuming
-	 * a little more time, of course.<br>
-	 * Note that inter-lexeme whitespace will NOT be eliminated but forms elements of the result,
-	 * more precisely: a sequence of whitespace characters (like {@code "    "}) will form a series of
-	 * 1-character whitespace strings (here: " ", " ", " ", " "). So they can easily be removed
-	 * with removeAll(" ").
+	 * like 123.45 or .09e-8 will properly be preserved as contiguous tokens).<br/>
+	 * By default, {@code _restoreStrings} should be set {@code true}, which ensures that
+	 * string and character literals will be preserved (for keyword preferences, however,
+	 * which possibly contain quotes like {@code "jusqu'à"} it may be necessary to set it
+	 * {@code false}<br/>
+	 * Note that inter-lexeme whitespace will <b>not</b> be eliminated but forms elements of
+	 * the result, more precisely: a sequence of whitespace characters (like {@code " \t  \n"})
+	 * will form a contiguous token. Whitespace tokens may be removed afterwards with method
+	 * {@link StringList#removeBlanks()}. Alternatively, inter-lexeme whitespace may be
+	 * suppressed by using {@link #splitLexically(String, boolean, boolean)} in the first place.
 	 * 
 	 * @param _text - String to be exploded into lexical units
 	 * @param _restoreLiterals - if {@code true} then accidently split numeric and string literals
 	 *        will be reassembled 
 	 * @return StringList consisting of the separated lexemes (including contiguous whitespace
-	 *        sequences). Use {@link StringList#removeBlanks()} to get rid of these contained
-	 *        whitespace sequences or use {@link #splitLexically(String, boolean, boolean)} in
-	 *        the first place to avoid whitespace in the result.
+	 *        sequences).
 	 * 
 	 * @see #splitLexically(String, boolean, boolean)
 	 * @see StringList#removeBlanks()
@@ -837,11 +864,12 @@ public class Syntax {
 	private static final String SYMBOL_CONTINUATORS = ".+-<>=:&|\\";
 	private static final String SPEC_OPR_SYMBOLS = "\u2260\u2264\u2265";
 	/**
-	 * Splits the given _text into lexical morphemes (lexemes). This will possibly overdo
-	 * somewhat (e. g. signs of number literals will be separated, but floating-point literals
-	 * like 123.45 or .09e-8 will properly be preserved as contiguous tokens).<br>
-	 * This method uses a state machine approach rather than a repeated splitting and
-	 * recombination as {@link #splitLexically(String, boolean)} does.
+	 * Splits the given _text into lexical morphemes (lexemes). This may possibly overdo
+	 * somewhat (e. g. signs of number literals will be separated, but floating-point
+	 * literals like {@code 123.45} or {@code .09e-8} will properly be preserved as
+	 * contiguous tokens).<br/>
+	 * This method now uses a finite state machine approach instead of repeated splitting
+	 * and recombination.
 	 * 
 	 * @param _text - String to be exploded into lexical units
 	 * @param _preserveStrings - if {@code true} then string literals will be preserved,
@@ -1289,15 +1317,19 @@ public class Syntax {
 
 	// START KGU#18/KGU#23 2015-10-24 intermediate transformation added and decomposed
 	/**
-	 * Converts the operator symbols accepted by Structorizer into mostly Java operators:
+	 * Converts the operator symbols (and some literals) accepted by Structorizer into
+	 * the following (mostly Java) operators:
 	 * <ul>
 	 * <li>Assignment:	"<-"</li>
 	 * <li>Comparison:	"==", "<", ">", "<=", ">=", "!="</li>
 	 * <li>Logic:		"&&", "||", "!", "^"</li>
-	 * <li>Arithmetics:	"div", "&infin;", and usual Java operators (e.g. "mod" -> "%")</li>
+	 * <li>Arithmetics:	usual Java operators (e.g. "mod" -> "%") plus "div"</li>
+	 * <li>Literals:    "Infinity" (from "&infin;")
 	 * </ul>
-	 * @param _expression - an Element's text in practically unknown syntax
+	 * 
+	 * @param _expression - an Element's text (in practically unknown syntax)
 	 * @return an equivalent of the {@code _expression} String with replaced operators
+	 * 
 	 * @see #unifyOperators(StringList, boolean)
 	 */
 	public static String unifyOperators(String _expression)
@@ -1312,45 +1344,56 @@ public class Syntax {
 
 	// START KGU#92 2015-12-01: Bugfix #41 Okay now, here is the new approach (still a sketch)
 	/**
-	 * Converts the operator symbols accepted by Structorizer into intermediate operators
-	 * (mostly Java operators):
+	 * Replaces the operator symbols (and some literals) accepted by Structorizer in
+	 * the given token list {@code _tokens} with the following (mostly Java) operators:
 	 * <ul>
 	 * <li>Assignment:	"<-"</li>
 	 * <li>Comparison:	"==", "<", ">", "<=", ">=", "!="</li>
 	 * <li>Logic:		"&&", "||", "!", "^"</li>
-	 * <li>Arithmetics:	"div", "&infin;", and usual Java operators (e. g. "mod" -> "%")</li>
+	 * <li>Arithmetics:	usual Java operators (e. g. "mod" -> "%") plus "div"</li>
+	 * <li>Literals:	"Infinity" (from "&infin;")
 	 * </ul>
-	 * @param _tokens - a tokenised line of an Element's text (in practically unknown syntax),
-	 * will be modified by the method
+	 * 
+	 * @param _tokens - a tokenised line of an Element's text (in practically unknown
+	 *     syntax), <b>will be modified by the method</b>
 	 * @param _assignmentOnly - if {@code true} then only assignment operators will be unified
-	 * @return total number of deletions / replacements
+	 * @return total number of replacements
 	 */
 	public static int unifyOperators(StringList _tokens, boolean _assignmentOnly)
 	{
 		int count = 0;
-		count += _tokens.replaceAll(":=", "<-");
-		// START KGU#115 2015-12-23: Bugfix #74 - logical inversion
-		//if (_assignmentOnly)
-		if (!_assignmentOnly)
-			// END KGU#115 2015-12-23
-		{
-			count += _tokens.replaceAll("=", "==");
-			count += _tokens.replaceAll("<>", "!=");
-			count += _tokens.replaceAllCi("mod", "%");
-			count += _tokens.replaceAllCi("shl", "<<");
-			count += _tokens.replaceAllCi("shr", ">>");
-			count += _tokens.replaceAllCi("and", "&&");
-			count += _tokens.replaceAllCi("or", "||");
-			count += _tokens.replaceAllCi("not", "!");
-			count += _tokens.replaceAllCi("xor", "^");
-			// START KGU#843 2020-04-11: Bugfix #847 Inconsistency in handling operators (we don't count this, though)
-			count += _tokens.replaceAllCi("DIV", "div");
-			// END KGU#843 2020-04-11
-			// START KGU#920 2021-02-03: Issue #920 Handle Infinity literal
-			count += _tokens.replaceAll("\u221E", "Infinity");
-			// END KGU#920 2021-02-03
+		// START KGU#790 2021-12-08: More efficient solution (1 pass instead of 12)
+//		count += _tokens.replaceAll(":=", "<-");
+//		// START KGU#115 2015-12-23: Bugfix #74 - logical inversion
+//		//if (_assignmentOnly)
+//		if (!_assignmentOnly)
+//		// END KGU#115 2015-12-23
+//		{
+//			count += _tokens.replaceAll("=", "==");
+//			count += _tokens.replaceAll("<>", "!=");
+//			count += _tokens.replaceAllCi("mod", "%");
+//			count += _tokens.replaceAllCi("shl", "<<");
+//			count += _tokens.replaceAllCi("shr", ">>");
+//			count += _tokens.replaceAllCi("and", "&&");
+//			count += _tokens.replaceAllCi("or", "||");
+//			count += _tokens.replaceAllCi("not", "!");
+//			count += _tokens.replaceAllCi("xor", "^");
+//			// START KGU#843 2020-04-11: Bugfix #847 Inconsistency in handling operators (we don't count this, though)
+//			count += _tokens.replaceAllCi("DIV", "div");
+//			// END KGU#843 2020-04-11
+//			// START KGU#920 2021-02-03: Issue #920 Handle Infinity literal
+//			count += _tokens.replaceAll("\u221E", "Infinity");
+//			// END KGU#920 2021-02-03
+//		}
+		for (int i = 0; i < _tokens.count(); i++) {
+			String subst = UNIFICATION_MAP.get(_tokens.get(i).toLowerCase());
+			if (subst != null && (!_assignmentOnly || subst.equals("<-"))) {
+				_tokens.set(i, subst);
+				count++;
+			}
 		}
 		return count;
+		// END KGU#790 2021-12-08
 	}
 	// END KGU#92 2015-12-01
 

@@ -3396,7 +3396,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		StringList paramNames = new StringList();
 		StringList paramTypes = new StringList();
 		_root.collectParameters(paramNames, paramTypes, null);
-		String resultType = _root.getResultType();
+		String resultType = _root.getResultTypeDescr();
 		// START KGU#61/KGU#129 2016-03-22: Now common field for all generator classes
 		//StringList varNames = _root.getVarNames(_root, false, true);	// FOR loop vars are missing
 		// START KGU#333 2017-01-20: Bugfix #336 - Correct way to include loop variables and exclude parameters

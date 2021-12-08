@@ -206,7 +206,7 @@ public class CPlusPlusGenerator extends CGenerator {
 			StringList vars = _root.getVarNames();
 			// END KGU#990 2021-10-02
 			// Start with the result type
-			fnHeader = transformType(_root.getResultType(),
+			fnHeader = transformType(_root.getResultTypeDescr(),
 					// START KGU#990 2021-10-02: Bugfix #990 These values could be from a different root
 					//((returns || isResultSet || isFunctionNameSet) ? "int" : "void"));
 					((_root.returnsValue == Boolean.TRUE || vars.contains("result", false) || vars.contains(fnName)) ? "int" : "void"));

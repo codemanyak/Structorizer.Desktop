@@ -1291,7 +1291,7 @@ public class OberonGenerator extends Generator {
 									defaults.subSequence(call.paramCount(), defaults.count()).concatenate(", ") + ")";
 						}
 						// START KGU#766 2019-11-14: Issue #780 Check if it might yet be a function
-						if (called.getResultType() != null) {
+						if (called.getResultTypeDescr() != null) {
 							isFctCall = true;
 						}
 						// END KGU#766 2019-11-14
@@ -2187,7 +2187,7 @@ public class OberonGenerator extends Generator {
 	@Override
 	protected String generateResult(Root _root, String _indent, boolean alwaysReturns, StringList varNames)
 	{
-		if ((this.returns || _root.getResultType() != null || isFunctionNameSet || isResultSet) && !alwaysReturns) {
+		if ((this.returns || _root.getResultTypeDescr() != null || isFunctionNameSet || isResultSet) && !alwaysReturns) {
 			String result = "0";
 			if (isFunctionNameSet) {
 				result = _root.getMethodName();

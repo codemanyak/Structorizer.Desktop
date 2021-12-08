@@ -109,7 +109,6 @@ import lu.fisch.structorizer.arranger.Arranger;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
 import lu.fisch.structorizer.syntax.Function;
-import lu.fisch.structorizer.syntax.Line;
 
 /**
  * This Structorizer class represents a procedure or function Call in a diagram.
@@ -421,7 +420,7 @@ public class Call extends Instruction {
 			String signature = called.getSignatureString();
 			Root myRoot = Element.getRoot(this);
 			if (myRoot.getSignatureString(false, false).equals(signature)) {
-				typeSpec = myRoot.getResultType();
+				typeSpec = myRoot.getResultTypeDescr();
 			}
 			// START KGU#676 2019-03-31: Issue #696 batch export
 			//else if (Arranger.hasInstance()) {
@@ -432,7 +431,7 @@ public class Call extends Instruction {
 				Vector<Root> routines = pool.findRoutinesBySignature(called.getName(), called.paramCount(), myRoot, true);
 			// END KGU#676 2019-03-31
 				if (routines.size() == 1) {
-					typeSpec = routines.get(0).getResultType();
+					typeSpec = routines.get(0).getResultTypeDescr();
 				}
 			}
 			if (typeSpec == null) {
@@ -443,11 +442,4 @@ public class Call extends Instruction {
 	}
 	// END KGU#261 2017-02-20
 	
-	// START KGU#790 2021-01-17: Enh. #800
-	@Override
-	protected int getLineTypeSet(int lineNo) {
-		return Line.LT_ASSIGNMENT_MASK | Line.LT_PROC_CALL_MASK
-				| Line.LT_VAR_INIT_MASK | Line.LT_CONST_DEF_MASK;
-	}
-	// END KGU#790 2021-01-17
 }

@@ -695,7 +695,7 @@ public class JsGenerator extends CGenerator {
 	protected String generateResult(Root _root, String _indent, boolean alwaysReturns, StringList varNames)
 	{
 		if (_root.isSubroutine() &&
-				(returns || _root.getResultType() != null || isFunctionNameSet || isResultSet) && !alwaysReturns)
+				(returns || _root.getResultTypeDescr() != null || isFunctionNameSet || isResultSet) && !alwaysReturns)
 		{
 			String result = "0";
 			if (isFunctionNameSet)

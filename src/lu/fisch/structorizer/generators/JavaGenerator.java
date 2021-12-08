@@ -1475,7 +1475,7 @@ public class JavaGenerator extends CGenerator
 	@Override
 	protected String generateResult(Root _root, String _indent, boolean alwaysReturns, StringList varNames)
 	{
-		if ((this.returns || _root.getResultType() != null || isFunctionNameSet || isResultSet) && !alwaysReturns) {
+		if ((this.returns || _root.getResultTypeDescr() != null || isFunctionNameSet || isResultSet) && !alwaysReturns) {
 			String result = "0";
 			if (isFunctionNameSet) {
 				result = _root.getMethodName();

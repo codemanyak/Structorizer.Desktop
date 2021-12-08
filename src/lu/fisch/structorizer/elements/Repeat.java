@@ -69,7 +69,6 @@ import javax.swing.ImageIcon;
 import lu.fisch.graphics.*;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
-import lu.fisch.structorizer.syntax.Line;
 import lu.fisch.utils.*;
 
 /**
@@ -470,13 +469,6 @@ public class Repeat extends Element implements ILoop {
 	}
 	// END KGU#602 2018-10-25
 	
-	// START KGU#790 2021-01-17: Enh. #800
-	@Override
-	protected int getLineTypeSet(int lineNo) {
-		return Line.LT_CONDITION_MASK;
-	}
-	// END KGU#790 2021-01-17
-
 	// START KGU#979 2021-09-17: Enh. #926, #979 - tooltip on the Analyser marker 
 	/**
 	 * Returns the bounds for the Analyser marker "driehoekje" with respect to the given

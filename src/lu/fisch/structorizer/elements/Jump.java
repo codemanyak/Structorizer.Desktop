@@ -125,7 +125,6 @@ import lu.fisch.graphics.*;
 import lu.fisch.utils.*;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
-import lu.fisch.structorizer.syntax.Line;
 import lu.fisch.structorizer.syntax.Syntax;
 
 /**
@@ -503,13 +502,5 @@ public class Jump extends Instruction {
 		return false;
 	}
 	// END KGU#408 2021-02-26
-
-	// START KGU#790 2021-01-17: Enh. #800
-	@Override
-	protected int getLineTypeSet(int lineNo) {
-		return Line.LT_LEAVE_MASK | Line.LT_RETURN_MASK | Line.LT_EXIT_MASK
-				| Line.LT_THROW_MASK;
-	}
-	// END KGU#790 2021-01-17
 
 }

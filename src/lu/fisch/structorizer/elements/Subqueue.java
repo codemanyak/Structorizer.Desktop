@@ -796,10 +796,4 @@ public class Subqueue extends Element implements IElementSequence {
 	}
 	// END KGU#695 2021-01-23
 
-	// START KGU#790 2021-01-17: Enh. #800
-	@Override
-	protected int getLineTypeSet(int lineNo) {
-		return 0;
-	}
-	// END KGU#790 2021-01-17
 }

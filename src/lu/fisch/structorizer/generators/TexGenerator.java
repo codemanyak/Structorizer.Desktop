@@ -804,7 +804,7 @@ public class TexGenerator extends Generator {
 			String indent1 = this.getIndent();
 			String indent2 = indent1 + indent1;
 			String indent3 = indent2 + indent1;
-			String resType = _root.getResultType();
+			String resType = _root.getResultTypeDescr();
 			ArrayList<Param> params = _root.getParams();
 			if (!params.isEmpty() || resType != null || hasIncludes) {
 				code.add(indent1 + "\\assign{%");

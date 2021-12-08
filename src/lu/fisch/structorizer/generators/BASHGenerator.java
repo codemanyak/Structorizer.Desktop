@@ -1250,7 +1250,7 @@ public class BASHGenerator extends Generator {
 		}
 		if (varNames.contains(varName)) {
 			TypeMapEntry typeEntry = this.typeMap.get(varName);
-			String resultType = root.getResultType();
+			String resultType = root.getResultTypeDescr();
 			TypeMapEntry resTypeEntry = null;
 			boolean isArray = typeEntry != null && typeEntry.isArray()
 					|| resultType != null && (resultType.startsWith("@") || resultType.startsWith("array "));
@@ -1638,7 +1638,7 @@ public class BASHGenerator extends Generator {
 							String target = Instruction.getAssignedVarname(tokens, true);
 							boolean done = false;
 							if (target != null && this.varNames.contains(target)) {
-								String resultType = routine.getResultType();
+								String resultType = routine.getResultTypeDescr();
 								TypeMapEntry resTypeEntry = this.typeMap.get(target);
 								boolean isArray = (resTypeEntry != null && resTypeEntry.isArray());
 								boolean isRecord = (resTypeEntry != null && resTypeEntry.isRecord());

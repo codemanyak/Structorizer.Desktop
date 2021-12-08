@@ -83,7 +83,6 @@ import javax.swing.ImageIcon;
 import lu.fisch.graphics.*;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
-import lu.fisch.structorizer.syntax.Line;
 import lu.fisch.utils.*;
 
 /**
@@ -1217,17 +1216,4 @@ public class Case extends Element implements IFork
 	}
 	// END KGU#916 2021-01-24
 
-
-	// START KGU#790 2021-01-17: Enh. #800
-	@Override
-	protected int getLineTypeSet(int lineNo) {
-		if (lineNo == 0) {
-			return Line.LT_CASE_MASK;
-		}
-		else if (lineNo == this.getUnbrokenText().count()-1) {
-			return Line.LT_DEFAULT_MASK;
-		}
-		return Line.LT_SELECTOR_MASK;
-	}
-	// END KGU#790 2021-01-17
 }

@@ -1243,7 +1243,7 @@ public class COBOLGenerator extends Generator {
 		 * Root we must not make use of analysis information that is only
 		 * available while we are processing sub as current Root.
 		 */
-		String resultType = sub.getResultType();
+		String resultType = sub.getResultTypeDescr();
 		if (resultType != null && !resultType.isEmpty() && !resultType.equals("???")) {
 			TypeMapEntry typeInfo = typeMap.get(":" + resultType);
 			if (typeInfo != null) {
@@ -1389,12 +1389,12 @@ public class COBOLGenerator extends Generator {
 		String procdiv = "PROCEDURE DIVISION";
 		StringList params = _root.getParameterNames();
 		boolean hasNumericResult = false;
-		if (returns || _root.getResultType() != null || isFunctionNameSet || isResultSet) {
+		if (returns || _root.getResultTypeDescr() != null || isFunctionNameSet || isResultSet) {
 			// We will enforce that the effective result variable will be named "result"
 			// But in order to find out the result type we must know which variable to
 			// check
 			String resultName = "result";
-			String resultType = _root.getResultType();
+			String resultType = _root.getResultTypeDescr();
 			if (resultType != null) {
 				hasNumericResult = isNumericType(resultType);
 			}
@@ -1476,7 +1476,7 @@ public class COBOLGenerator extends Generator {
 	{
 		addCode("CODE SECTION.", _indent, false);	// start with any section name (???)
 		if (_root.isSubroutine() &&
-				(returns || _root.getResultType() != null || isFunctionNameSet || isResultSet) && !alwaysReturns)
+				(returns || _root.getResultTypeDescr() != null || isFunctionNameSet || isResultSet) && !alwaysReturns)
 		{
 			if (isFunctionNameSet && !isResultSet)
 			{

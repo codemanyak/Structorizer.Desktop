@@ -784,10 +784,4 @@ public class Parallel extends Element
 	}
 	// END KGU#602 2018-10-25
 
-	@Override
-	protected int getLineTypeSet(int lineNo) {
-		// No actual parsed lines accepted, just an integer literal
-		return 0;
-	}
-	
 }
