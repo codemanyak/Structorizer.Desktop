@@ -261,7 +261,9 @@ import lu.fisch.structorizer.archivar.IRoutinePool;
 import lu.fisch.structorizer.arranger.Arranger;
 import lu.fisch.structorizer.generators.GeneratorSyntaxChecker;
 import lu.fisch.structorizer.gui.*;
+import lu.fisch.structorizer.syntax.Expression;
 import lu.fisch.structorizer.syntax.Function;
+import lu.fisch.structorizer.syntax.Line;
 
 /**
  * This class represents the "root" of a diagram or the program/sub itself.
@@ -3609,8 +3611,8 @@ public class Root extends Element {
     			@Override
     			public boolean visitPreOrder(Element _ele) {
     				if (!_ele.isDisabled(false)) {
-    					
-    					_ele.updateTypeMap(typeMap);
+    					// FIXME: Retrieve type associations from declarations, definitions etc.
+    					//_ele.updateTypeMap(typeMap);
     				}
     				return true;
     			}
@@ -3626,11 +3628,28 @@ public class Root extends Element {
 		return dataTypes;
 	}
 
+	/**
+	 * Resets the TypeRegistry of this Root.
+	 * 
+	 * @see #getDataTypes()
+	 * @see #getDataTypes(IRoutinePool)
+	 * @see #clearVarsAndDataTypes(boolean)
+	 */
 	private void clearDataTypes()
 	{
 		this.dataTypes = null;
 	}
 
+	/**
+	 * Clears (invalidates) all cached variable names and type information.
+	 * Also resets the drawing information recursively if {@link Element#E_VARHIGHLIGHT}
+	 * is true.
+	 * 
+	 * @param clearDrawInfo - if true then drawing info will also be reset (otherwise only
+	 * in case of {@link Element#E_VARHIGHLIGHT}).
+	 * 
+	 * @see #clearDataTypes()
+	 */
 	public void clearVarsAndDataTypes(boolean clearDrawInfo)
 	{
 		this.variables = null;
@@ -5541,6 +5560,129 @@ public class Root extends Element {
 		}
 	}
 	// END KGU#758 2019-11-08
+	// START KGU#790 2021-12-10: Issue #800
+	/**
+	 * CHECK 27: CASE selectors be integer constants<br/>
+	 * CHECK 28: duplicate CASE selectors
+	 * CHECK 29: CASE discriminators of structured types
+	 * @param _case -  Case element to be analysed
+	 * @param _errors - global error list
+	 * @param _types - a temporary TypeRegistry
+	 */
+	private void analyse_27_28_29(Case _case, Vector<DetectedError> _errors, TypeRegistry _types)
+	{
+		HashSet<String> selectors = new HashSet<String>();
+		HashSet<Object> values = new HashSet<Object>();
+		StringList caseText = _case.getUnbrokenText();
+		StringList duplicates = new StringList();
+		String aNonNumber = null;
+		// cf. checkValues
+		Line discr = _case.getParsedLine(0);
+		if (discr.getType() == Line.LineType.LT_CASE) {
+			Type discrType = discr.getOrInferDataType(_types);
+			if (discrType != null && discrType.isStructured()) {
+				//error  = new DetectedError("The discriminator (%) is structured - which is unsuited for CASE!", _case);
+				addError(_errors, new DetectedError(errorMsg(Menu.error29, caseText.get(0)), _case), 29);
+			}
+		}
+		for (int i = 1; i < caseText.count() - 1; i++) {
+			StringList items = Element.splitExpressionList(caseText.get(i), ",");
+			Line sels = _case.getParsedLine(i);
+			if (sels.getType() == Line.LineType.LT_SELECTOR && sels.getExprCount() > 0) {
+				for (int j = 0; j < sels.getExprCount(); j++) {
+					Expression expr = sels.getExpression(j);
+					Object val = expr.evaluateConstantExpr(constants, null);
+					if (val == null) {
+						Type dType = expr.getDataType();
+						if (dType == null) {
+							dType = expr.inferType(_types, true);
+						}
+						if (dType == null || !dType.isNumeric()) {
+							aNonNumber = items.get(j);
+						}
+					}
+					else {
+						if (!(val instanceof Number) && !(val instanceof Character)) {
+							aNonNumber = items.get(j);
+						}
+						if (!values.add(val)) {
+							duplicates.addIfNew(val.toString());
+						}
+					}
+				}
+			}
+			else {
+				for (int j = 0; j < items.count(); j++) {
+					int val = 0;
+					String item = items.get(j);
+					// Check for duplicates (including the default label)
+					if (!selectors.add(item)) {
+						duplicates.addIfNew(item);
+					}
+					// Check for non-integers and non-characters (without the default branch label)
+					if (i < caseText.count()-1) {
+						String constVal = this.getConstValueString(item);
+						if (constVal == null) {
+							constVal = item;
+						}
+						// Check if it is not a character literal
+						if (constVal.startsWith("'") && constVal.endsWith("'")) {
+							String content = constVal.substring(1, constVal.length()-1);
+							if (content.indexOf("\\") >= 0) {
+								content = content
+										.replace("\\b", "\b")
+										.replace("\\f", "\f")
+										.replace("\\r", "\r")
+										.replace("\\t", "\t")
+										.replace("\\n", "\n")
+										.replace("\\\\", "\\");
+							}
+							if (content.isEmpty() || content.length() > 1) {
+								aNonNumber = item;
+							}
+							else if (!values.add(content.charAt(i))) {
+								duplicates.addIfNew(constVal);
+							}
+						}
+						else {
+							try {
+								if (constVal.startsWith("0")) {
+									val = Integer.parseInt(constVal, 8);
+								}
+								else if (constVal.startsWith("0b")) {
+									val = Integer.parseInt(constVal.substring(2), 2);
+								}
+								else if (constVal.startsWith("0x")) {
+									val = Integer.parseInt(constVal.substring(2), 16);
+								}
+								else {
+									val = Integer.parseInt(constVal);
+								}
+								if (!values.add(val)) {
+									duplicates.addIfNew(constVal);
+								}
+							}
+							catch (NumberFormatException ex) {
+								aNonNumber = item;
+							}
+						}
+					}
+				}
+			}
+		}
+		if (aNonNumber != null) {
+			//error  = new DetectedError("Some selector item seems not to be an integer constant.", _case);
+			addError(_errors, new DetectedError(errorMsg(Menu.error27, aNonNumber), _case), 27);
+		}
+		if (!values.add(caseText.get(caseText.count()-1))) {
+			duplicates.add(aNonNumber);
+		}
+		if (!duplicates.isEmpty()) {
+			//error  = new DetectedError("There are multiple (conflicting) selector items (%) in the CASE element!", _case);
+			addError(_errors, new DetectedError(errorMsg(Menu.error28, duplicates.concatenate(", ")), _case), 28);
+		}
+	}
+	// END KGU#790 2021-12-10
 	
 	// START KGU#928 2021-02-08: Enh. #928 - check for structured types
 	/**
@@ -5619,14 +5761,29 @@ public class Root extends Element {
 	 * @param _errors - global error list
 	 */
 	private void analyse_31(Element _ele, Vector<DetectedError> _errors) {
-		StringList lines = _ele.getUnbrokenText();
-		LineParser parser = LineParser.getInstance();
-		for (int i = 0; i < lines.count(); i++) {
-			// FIXME: suppress replacements of '=' in type definitions
-			String line = parser.preprocessLine(lines.get(i), _ele, i, true);
-			String error = parser.check(line);
-			if (error != null) {
-				addError(_errors, new DetectedError(errorMsg(Menu.error31, new String[] {Integer.toString(i+1), error.replace("error.syntax:", "")}), _ele), 31);
+		if (_ele.parsedLines != null) {
+			// The parsing has already taken place - just check for stored error messages
+			for (int i = 0; i < _ele.parsedLines.length; i++) {
+				String error = _ele.getParsedLine(i).getParserError();
+				if (error != null) {
+					addError(_errors, new DetectedError(errorMsg(Menu.error31, new String[] {Integer.toString(i+1), error.replace("error.syntax:", "")}), _ele), 31);
+				}
+			}
+		}
+		else {
+			// Just do a temporary parser check (quicker) for the unbroken text lines
+			StringList lines = _ele.getUnbrokenText();
+			LineParser parser = LineParser.getInstance();
+			int nLines = lines.count();
+			if (_ele instanceof Case) {
+				nLines--;
+			}
+			for (int i = 0; i < nLines; i++) {
+				String line = parser.preprocessLine(lines.get(i), _ele, i, true);
+				String error = parser.check(line);
+				if (error != null) {
+					addError(_errors, new DetectedError(errorMsg(Menu.error31, new String[] {Integer.toString(i+1), error.replace("error.syntax:", "")}), _ele), 31);
+				}
 			}
 		}
 	}
@@ -5917,8 +6074,8 @@ public class Root extends Element {
 
     // START KGU 2015-11-29
     /**
-     * Retrieves the names of the types associated to the declared parameters in 
-     * ase this is a routine diagram, otherwise an empty {@link StringList}.
+     * Retrieves the names of the types associated to the declared parameters in
+     * case this is a routine diagram, otherwise an empty {@link StringList}.
      * 
      * @return the list of parameter type names in order of parameter declaration
      * (may be empty)
@@ -6259,40 +6416,47 @@ public class Root extends Element {
     	
     	return resultType;
     }
-    
-    // START KGU#790 2021-12-08: Issue #800
-    /**
-     * Returns the result Type object if this is a subroutine diagram and a
-     * result type is declared or inferrable.
-     * 
-     * @return {@code null} or a {@link Type} object representing the data type of
-     *     the function result
-     * 
-     * @see #getParameterNames()
-     * @see #getParameterTypes()
-     * @see #getParameterDefaults()
-     * @see #getResultTypeDescr()
-     * @see #getMethodName()
-     * @see #isSubroutine()
-     */
-    public Type getResultType()
-    {
-        Type resType = null;
-        if (this.diagrType == DiagramType.DT_SUB) {
-            resType = this.getDataTypes().getTypeFor(this.getMethodName());
-            if (resType == null) {
-                String typeDescr = getResultTypeDescr();
-                if (Syntax.isIdentifier(typeDescr, false, null)) {
-                    resType = this.getDataTypes().getType(typeDescr);
-                }
-                if (resType == null) {
-                // TODO parse / construct the type frm typeDescr
-                }
-            }
-        }
-        return resType;
-    }
-    // END KGU#790 2021-12-08
+
+	// START KGU#790 2021-12-08: Issue #800
+	/**
+	 * Returns the result Type object if this is a subroutine diagram and a
+	 * result type is declared or inferrable.
+	 * 
+	 * @return {@code null} or a {@link Type} object representing the data type of
+	 *     the function result
+	 * 
+	 * @see #getParameterNames()
+	 * @see #getParameterTypes()
+	 * @see #getParameterDefaults()
+	 * @see #getResultTypeDescr()
+	 * @see #getMethodName()
+	 * @see #isSubroutine()
+	 */
+	public Type getResultType()
+	{
+		Type resType = null;
+		if (this.diagrType == DiagramType.DT_SUB) {
+			resType = this.getDataTypes().getTypeFor(this.getMethodName());
+			if (resType == null) {
+				String typeDescr = getResultTypeDescr();
+				if (typeDescr != null) {
+					if (Syntax.isIdentifier(typeDescr, false, null)) {
+						resType = this.getDataTypes().getType(typeDescr);
+					}
+					if (resType == null) {
+						Line decl = LineParser.getInstance().parse(
+								"var " + getMethodName() + ": " + typeDescr, null,
+								0, dataTypes);
+						if (decl.getType() == Line.LineType.LT_VAR_DECL) {
+							resType = decl.getDataType(true);
+						}
+					}
+				}
+			}
+		}
+		return resType;
+	}
+	// END KGU#790 2021-12-08
 
     /**
      * Extracts parameter names and types from the parenthesis content of the Root text

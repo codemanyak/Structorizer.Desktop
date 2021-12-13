@@ -442,6 +442,11 @@ public class Executor implements Runnable
 	};
 	// END KGU#311 2016-12-22
 
+	/**
+	 * Implementations of built-in functions and procedures<br/>
+	// NOTE: Any additions and modifications are to be synchronised with
+	 * {@link Function#knownResultTypes}!
+	 */
 	private static final String[] builtInFunctions = new String[] {
 			"public int random(int max) { return (int) (Math.random()*max); }",
 			"public void randomize() {  }",
@@ -754,7 +759,9 @@ public class Executor implements Runnable
 	
 	/**
 	 * Returns the singleton instance IF THERE IS ONE. Does NOT create an instance!
+	 * 
 	 * @return the existing instance or null.
+	 * 
 	 * @see #getInstance(Diagram, DiagramController)
 	 */
 	public static Executor getInstance()
@@ -775,6 +782,7 @@ public class Executor implements Runnable
 	//		DiagramController diagramController)
 	/**
 	 * Ensures there is a (singleton) instance and returns it
+	 * 
 	 * @param diagram - the Diagram instance requesting the instance
 	 *        (also used for conflict detection)
 	 * @param diagramControllers - façades of additionally controllable modules

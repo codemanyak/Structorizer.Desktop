@@ -38,6 +38,12 @@ package lu.fisch.structorizer.syntax;
  *
  *      Comment:
  *      
+ *      2021-12-10 Kay Gürtzig
+ *      - It might be sensible to replace all direct Type references by type names to achieve more
+ *        robustness against redefinitions of referenced types, e.g. in included diagrams or preceding
+ *        type definitions. A direct type reference would not reflect such changes and require complete
+ *        reconstruction of the entire type tree. Of course, retrieval would cost more time but due to
+ *        the incorporated TypeRegistry reference it would be feasible.
  *
  ******************************************************************************************************///
 
@@ -136,4 +142,21 @@ public class RedirType extends Type {
 		return getType().isStructured();
 	}
 	
+	/**
+	 * Recursively refreshes all incorporated type references via name
+	 * retrieval from the {@link #registry}.
+	 */
+	@Override
+	public void updateTypeReferences()
+	{
+		Type refType = null;
+		if (referredType != null) {
+			refType = getType(referredType.getName());
+			if (refType != null) {
+				refType.updateTypeReferences();
+				referredType = refType;
+			}
+		}
+	}
+
 }

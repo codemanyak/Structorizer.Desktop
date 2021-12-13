@@ -324,19 +324,33 @@ public class Expression {
 		/** temporary type (during parsing): parentheses, brackets or braces, parent of expressions */
 		PARENTH,
 		/** a routine header (its name), parent of parameter {@link #DECLARATION}s, data type is declared for result */
-		ROUTINE};
+		ROUTINE
+	};
+
+	/** Type of the node (e.g. OPERATOR, IDENTIFIER, LITERAL) */
 	public NodeType type;
+	/** Textual content of the node (e.g. operator symbol, identifier, literal string) */
 	public String text;
+	/** List of child expressions (e.g. operands,function  arguments etc.) */
 	public final LinkedList<Expression> children = new LinkedList<Expression>();
+	/** Token position within the expression or line */
 	public short tokenPos = 0;
-	/**
-	 * May hold a retrieved expression data type
-	 * Type retrieval can be forced by {@link #inferType(HashMap, boolean)}
-	 */
-	public Type dataType = null;
+	/** May hold a retrieved expression data type */
+	private Type dataType = null;
 	/** Signals whether {@link #dataType} is final (e.g. with literals or function results) */
 	public boolean isDataTypeSafe = false;
 	
+	/**
+	 * Creates a new Expression node of type {@code _type} and label {@code _text}
+	 * with (initially) no expressions {@code _children} as children, where
+	 * {@code _position} is the token number.
+	 * 
+	 * @param _type - node type (e.g. LITERAL or IDENTIFIER)
+	 * @param _text - node content (label, token)
+	 * @param _position - token number of the root symbol in the source text
+	 * 
+	 * @see #Expression(NodeType, String, short, LinkedList)
+	 */
 	public Expression(NodeType _type, String _text, short _position)
 	{
 		type = _type;
@@ -344,6 +358,16 @@ public class Expression {
 		tokenPos = _position;
 	}
 	
+	/**
+	 * Creates a new Expression tree with a node of type {@code _type} and label
+	 * {@code _text} as root and the expressions {@code _children} as children
+	 * (operands or the like), where {@code _position} is the token number.
+	 * 
+	 * @param _type - node type of the root
+	 * @param _text - node content (label)
+	 * @param _position - token number of the root symbol in the source text
+	 * @param _children - the expressions to attach as subtrees
+	 */
 	public Expression(NodeType _type, String _text, short _position, LinkedList<Expression> _children)
 	{
 		type = _type;
@@ -353,31 +377,126 @@ public class Expression {
 	}
 	
 	/**
-	 * Derives the tree from the given tokens.
-	 * Use {@link #parse(StringList, StringList, short)} instead.
-	 * @param _tokens
-	 */
-	@Deprecated
-	public Expression(StringList _tokens)
-	{
-		// FIXME: Derive the tree from _tokens
-		type = NodeType.LITERAL;
-		text = "";
-	}
-	
-	/**
-	 * Counts the nodes contained in the hierarchy. To obtain the number of tokens
-	 * consider {@link #appendToTokenList(StringList)} and to apply method count()
-	 * to the result.
+	 * Counts the nodes contained in the hierarchy.<br/>
+	 * 
+	 * <b>Note:</b> To obtain the number of originating (or resulting) tokens in
+	 * standard representation, {@link #getTokenCount(boolean)} should be used instead.
+	 * In fact both results do not necessarily coincide exactly since e.g.
+	 * parentheses and braces are not represented as nodes whereas bracket pairs
+	 * and ternary operator pairs are represented by a single node.
+	 * 
 	 * @return the number of nodes on traversing
+	 * 
+	 * @see #getTokenCount(boolean)
 	 */
-	public int getLength()
+	public int getNodeCount()
 	{
 		int length = 1;
 		for (Expression child: children) {
-			length += child.getLength();
+			length += child.getTokenCount(true);
 		}
 		return length;
+	}
+	
+	/**
+	 * Provides the estimated number of tokens this expression<ul>
+	 * <li>a) was derived from (if {@code _fromPositions} is {@code true});</li>
+	 * <li>b) would be written with in standard representation (if {@code _fromPositions} is {@code false}).</li>
+	 * </ul>
+	 * Note that neither of the results may be exactly equal to the true number
+	 * of tokens of the originally parsed expressions string because enclosing
+	 * parentheses will not leave a trace in the nodes whereas on writing superfluous
+	 * parentheses won't be inserted again while auxiliary parentheses might be
+	 * added, in particular with ternary operators
+	 * 
+	 * @return the estimated number of tokens this expression was derived from or
+	 * be represented with.
+	 * 
+	 * @see #getNodeCount()
+	 */
+	public int getTokenCount(boolean _fromPositions)
+	{
+		int nTokens = 1;
+		if (_fromPositions) {
+			short[] posRange = getPositionRange();
+			nTokens = posRange[1] - posRange[0] + 1;
+		}
+		else {
+			StringList tokens = new StringList();
+			this.appendToTokenList(tokens);
+			tokens.removeBlanks();
+			nTokens = tokens.count();
+		}
+		return nTokens;
+	}
+	
+	/**
+	 * Helper method for {@link #getTokenCount(boolean)}, retrieves the minimum
+	 * and maximum stored token position of the expression (with some heuristic
+	 * extrapolation).
+	 * 
+	 * @return a pair of minimum token position and maximum token position
+	 */
+	private short[] getPositionRange()
+	{
+		short[] posMinMax = {tokenPos, tokenPos};
+		for (Expression child: children) {
+			short[] minMax = child.getPositionRange();
+			if (minMax[0] < posMinMax[0]) {
+				posMinMax[0] = minMax[0];
+			}
+			if (minMax[1] > posMinMax[1]) {
+				posMinMax[1] = minMax[1];
+			}
+		}
+		/* Now correct the maximum token position with regard to some tokens not
+		 * explicitly stored as nodes (e.g. closing parentheses, braces, or
+		 * brackets). Unfortunately, there is no easy way to guess whether there
+		 * might have been some surrounding parentheses unless we assume that the
+		 * first token would always have had position 0 but posMinMax[0] > 0.
+		 * But in fact this expression might have been nested, so this assumption
+		 * will not be correct.
+		 */
+		switch (type) {
+		case METHOD:
+			if (children.size() == 1) {
+				// Count the left parenthesis
+				posMinMax[1]++;
+			}
+		case FUNCTION:
+			if (children.isEmpty()) {
+				// Count the left parenthesis
+				posMinMax[1]++;
+			}
+		case ARRAY_INITIALIZER:
+		case PARENTH:
+		case RECORD_INITIALIZER:
+			// Count the right bracket
+			posMinMax[1]++;
+			break;
+		case OPERATOR:
+			if ("[]".equals(text)) {
+				// Count the right bracket
+				posMinMax[1] += 1;
+			}
+			break;
+		default:
+			break;
+		}
+		return posMinMax;
+	}
+	
+	/**
+	 * @return the data type of the expression if it had been retrieved or explicitly
+	 * associated data<br/>
+	 * Type retrieval can be forced by {@link #inferType(HashMap, boolean)}
+	 * 
+	 * @see #inferType(TypeRegistry, boolean)
+	 * @see #clearDataTypes(boolean)
+	 */
+	public Type getDataType()
+	{
+		return dataType;
 	}
 	
 	/* (non-Javadoc)
@@ -622,7 +741,7 @@ public class Expression {
 				tokens.add("(");
 				int ix = 0;
 				for (Expression child: children) {
-					boolean paren = child.type != NodeType.TERNARY && child.getLength() > parenThresh;
+					boolean paren = child.type != NodeType.TERNARY && child.getTokenCount(true) > parenThresh;
 					if (paren) {
 						tokens.add("(");
 					}
@@ -733,7 +852,9 @@ public class Expression {
 	/**
 	 * Checks whether this expression represents a function call, i.e. something like
 	 * {@code <function_name>(<arg>, ...)}.
+	 * 
 	 * @return {@code true} if the expression represents a function call
+	 * 
 	 * @see #isMethodCall()
 	 */
 	public boolean isFunctionCall()
@@ -744,6 +865,7 @@ public class Expression {
 	/**
 	 * Checks whether this expression represents a method call, i.e. something like
 	 * {@code <object>.<method_name>(<arg>, ...)}.
+	 * 
 	 * @return {@code true} if the expression represents a method call
 	 */
 	public boolean isMethodCall()
@@ -754,13 +876,14 @@ public class Expression {
 	
 	/**
 	 * Checks whether the inferred data type of this expression is numeric
-	 * (i.e. integral or floating-point of some size and precision)
+	 * (i.e. integral or floating-point of some size and precision).
+	 * 
 	 * @param _typeMap - a {@link TypeRegistry} helping to retrieve the
-	 * operand types if variables are involved.
+	 *     operand types if variables are involved.
 	 * @param _trueIfUnknown - the given default value if a definite data
-	 * type could not be detected.
+	 *     type could not be detected.
 	 * @return {@code true} if the data type is definitely numeric or if it
-	 * is unknown and {@code _trueIfUnkbown} is {@code true}
+	 *     is unknown and {@code _trueIfUnkbown} is {@code true}
 	 */
 	public boolean isNumeric(TypeRegistry _typeMap, boolean _trueIfUnknown)
 	{
@@ -848,13 +971,13 @@ public class Expression {
 			 */
 			{
 				Function fun = new Function(this.toString());
-				String typName = "???";
-				if (fun.isFunction() && (typName = fun.getResultType("???")) != null) {
+				String typeName = "???";
+				if (fun.isFunction() && (typeName = fun.getResultType("???")) != null) {
 					if (_typeMap != null) {
-						dType = _typeMap.getType(typName);
+						dType = _typeMap.getType(typeName);
 					}
 					else {
-						dType = TypeRegistry.getStandardType(typName);
+						dType = TypeRegistry.getStandardType(typeName);
 					}
 				}
 			}
@@ -1650,6 +1773,12 @@ public class Expression {
 					complete = false;
 				}
 				else {
+					/* With a METHOD, the first expression is the target object,
+					 * representing a tricky case: may the target object be modified,
+					 * i.e. would it have to count as an assigned variable? For now
+					 * we decided: no. It may contain used variables, though, e.g.
+					 * in index expressions.
+					 */
 					for (Expression child: children) {
 						complete = child.gatherVariables(assignedVars, usedVars, false) && complete;
 					}
@@ -1660,7 +1789,7 @@ public class Expression {
 				break;
 			case OPERATOR:
 				if ("<-".equals(text) || ":=".equals(text)) {
-					if (isLeftSide) {
+					if (isLeftSide || children.size() != 2) {
 						// There cannot be an assignment on the left-hand side of an assignment
 						complete = false;
 					}
@@ -1683,7 +1812,7 @@ public class Expression {
 				else {
 					for (Expression child: children) {
 						complete = child.gatherVariables(assignedVars, usedVars, false) && complete;
-					}					
+					}
 				}
 				break;
 			case IDENTIFIER:
@@ -1716,6 +1845,7 @@ public class Expression {
 	 * <li>Arithmetics:	usual Java operators where "div" remaines</li>
 	 * <li>Literals:    "Infinity"
 	 * </ul>
+	 * <b>Note: This will modify the expression!</b>
 	 * 
 	 * @return total number of replacements
 	 * 
@@ -1738,7 +1868,7 @@ public class Expression {
 	}
 	
 	/**
-	 * Tries to evaluate this if it is a constant expression
+	 * Tries to evaluate this as far as it is a constant expression.
 	 * 
 	 * @param _constants - a look-up table mapping constant names to literal strings
 	 *        (may be {@code null}, in which case named constants will not be evaluable)
@@ -1855,4 +1985,44 @@ public class Expression {
 		return result;
 	}
 
+	//========================================================================
+	// Provisional test stuff
+	//========================================================================
+	
+	// DEBUG
+//	public void traverseInOrder(StringBuilder sb)
+//	{
+//		if ((type != NodeType.OPERATOR || !text.endsWith("1")) && type != NodeType.TERNARY) {
+//			sb.append(text);
+//			sb.append("$");
+//			sb.append(tokenPos);
+//			sb.append(" ");
+//		}
+//		if (children.size() >= 1) {
+//			children.get(0).traverseInOrder(sb);
+//		}
+//		if ((type == NodeType.OPERATOR && !text.endsWith("1"))) {
+//			sb.append(text);
+//			sb.append("$");
+//			sb.append(tokenPos);
+//			sb.append(" ");
+//		}
+//		else if (type == NodeType.TERNARY) {
+//			sb.append("?");
+//			sb.append(tokenPos);
+//			sb.append(" ");
+//		}
+//		if (children.size() >= 2) {
+//			children.get(1).traverseInOrder(sb);
+//		}
+//		if (type == NodeType.TERNARY) {
+//			sb.append(":");
+//			sb.append(tokenPos);
+//			sb.append(" ");
+//		}
+//		for (int i = 2; i < children.size(); i++) {
+//			children.get(i).traverseInOrder(sb);
+//		}
+//	}
+	
 }

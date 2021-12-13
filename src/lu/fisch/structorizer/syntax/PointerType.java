@@ -48,8 +48,7 @@ package lu.fisch.structorizer.syntax;
  */
 public class PointerType extends Type {
 	
-	// FIXME It may be sensible to replace this with a type name (for registry consistency)
-	private Type refType;
+	private Type referredType;
 
 	/**
 	 * Constructs a new pointer type with given {@code name} and pointing to
@@ -60,14 +59,14 @@ public class PointerType extends Type {
 	 */
 	public PointerType(String name, Type referencedType) throws SyntaxException {
 		super(name);
-		refType = referencedType;
+		referredType = referencedType;
 	}
 	
 	@Override
 	protected String toStringWithName(String altName, boolean deep)
 	{
-		Type rType = refType;
-		if (refType == null) {
+		Type rType = referredType;
+		if (referredType == null) {
 			rType = getDummyType();
 		}
 		return "^" + this.name + "(" + (deep ? rType.toString(true) : rType.getName()) + ")";
@@ -78,7 +77,23 @@ public class PointerType extends Type {
 	 */
 	public Type getReferencedType()
 	{
-		return this.refType;
+		return this.referredType;
 	}
 
+	/**
+	 * Recursively refreshes all incorporated type references via name
+	 * retrieval from the {@link #registry}.
+	 */
+	@Override
+	public void updateTypeReferences()
+	{
+		Type refType = null;
+		if (referredType != null) {
+			refType = getType(referredType.getName());
+			if (refType != null) {
+				refType.updateTypeReferences();
+				referredType = refType;
+			}
+		}
+	}
 }

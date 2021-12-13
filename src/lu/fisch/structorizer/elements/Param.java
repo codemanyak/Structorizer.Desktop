@@ -20,7 +20,10 @@
 
 package lu.fisch.structorizer.elements;
 
+import lu.fisch.structorizer.syntax.Line;
+import lu.fisch.structorizer.syntax.LineParser;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.SyntaxException;
 import lu.fisch.structorizer.syntax.Type;
 import lu.fisch.structorizer.syntax.TypeRegistry;
 
@@ -71,7 +74,6 @@ public class Param {
      *     (a possible prefix might be "const")
      * @param defaultLiteral a default value description (usually some literal)
      *     for an optional parameter, {@code null} for a mandatory parameter
-     * 
      */
     public Param(String name, String type, String defaultLiteral) {
         this.name = name;
@@ -143,15 +145,35 @@ public class Param {
     // END KGU#371 2019-03-07
     
     // START KGU#790 2021-12-08: Issue #800
+    /**
+     * With help of TypeRegistry {@code _dataTypes} retrieves a {@link Type} object
+     * representing the data type of this parameter if it can be identified. In case
+     * {@code null} is returned, it does not necessarily mean that no type was specified;
+     * check {@link #getType(boolean)} in this case in order to find out the textual
+     * type description if there was any.
+     * 
+     * @param _dataTypes - a type registry holding the known types and type associations
+     * @return a {@link Type} object reflecting the structure of the parameter values.
+     */
     public Type getDataType(TypeRegistry _dataTypes) {
         Type paramType = _dataTypes.getTypeFor(name);
         if (paramType == null) {
             String typeDescr = getType(true);
             if (Syntax.isIdentifier(typeDescr, false, null)) {
-                return _dataTypes.getType(typeDescr);
+                paramType = _dataTypes.getType(typeDescr);
+                if (paramType == null) {
+                    try {
+                        paramType = new Type(typeDescr);
+                    } catch (SyntaxException exc) {}
+                }
             }
             else {
-                // TODO parse / construct the type from typeDescr
+                // parse / construct the type from typeDescr
+                Line decl = LineParser.getInstance().parse(
+                        "var " + name + ": " + typeDescr, null, 0, _dataTypes);
+                if (decl.getType() == Line.LineType.LT_VAR_DECL) {
+                    paramType = decl.getDataType(true);
+                }
             }
         }
         return paramType;

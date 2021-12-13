@@ -53,7 +53,7 @@ public class Type {
 	 */
 	
 	/**
-	 * Link to the owning {@link TypeRegistry}
+	 * Link to the owning {@link TypeRegistry}, required to retrieve 
 	 */
 	protected TypeRegistry registry = null;
 	
@@ -102,7 +102,9 @@ public class Type {
 	
 	/**
 	 * Answers a string containing a concise, human-readable description of the receiver.
+	 * 
 	 * @return a printable (shallow) symbolic type specification for the receiver.
+	 * 
 	 * @see #toString(boolean)
 	 */
 	@Override
@@ -116,9 +118,11 @@ public class Type {
 	 * ({@code deep = false}) or in a completely recursive way ({@code deep = true}).
 	 * On this level, the result will just be the sequence of modifiers and (as tail)
 	 * the name.
+	 * 
 	 * @param deep - whether possible substructure is to be fully described (otherwise
-	 * embedded types will just be represented by their names (if the are named).
+	 *     embedded types will just be represented by their names (if the are named).
 	 * @return the composed string
+	 * 
 	 * @see #toString()
 	 */
 	public String toString(boolean deep)
@@ -131,11 +135,13 @@ public class Type {
 	 * ({@code deep = false}) or in a completely recursive way ({@code deep = true}).
 	 * The result will either involve the passed-in {@code altName}, or the internal
 	 * name if {@code altName} is {@code null}.
+	 * 
 	 * @param altName - an alternative name to be used instead of {@link #getName()},
 	 * if {@code null} then the internal identifier will be used.
 	 * @param deep - whether possible substructure is to be fully described (otherwise
 	 * embedded types will just be represented by their names (if the are named).
 	 * @return the composed string
+	 * 
 	 * @see #toString()
 	 */
 	protected String toStringWithName(String altName, boolean deep)
@@ -144,7 +150,7 @@ public class Type {
 	}
 	
 	/**
-	 * @return this type.
+	 * @return this type (or a referenced type if this is a type alias).
 	 */
 	protected Type getType()
 	{
@@ -242,4 +248,13 @@ public class Type {
 		}
 		return equiv;
 	}
+	
+	/**
+	 * Recursively refreshes all incorporated type references via name
+	 * retrieval from the {@link #registry}.
+	 */
+	public void updateTypeReferences()
+	{
+	}
+	
 }

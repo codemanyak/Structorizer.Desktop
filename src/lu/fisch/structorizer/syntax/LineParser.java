@@ -742,7 +742,7 @@ public class LineParser /*extends CodeParser*/
 								getContent_R(red.get(1).asReduction(), ""), (short)0);
 						expressions.add(expr);
 						expr.children.add(buildExpression(red.get(0), tokenPos, _types));
-						tokenPos += expr.children.get(0).getLength();
+						tokenPos += expr.children.get(0).getTokenCount(true);
 						expr.tokenPos = tokenPos;
 						expr.children.add(buildExpression(red.get(2), tokenPos + 1, _types));
 						break;
@@ -802,7 +802,7 @@ public class LineParser /*extends CodeParser*/
 							Reduction promptRed = red.get(1).asReduction();
 							if (promptRed.size() > 0) {
 								expressions.add(buildExpression(promptRed.get(0), tokenPos + 1, _types));
-								tokenPos += expressions.get(0).getLength();
+								tokenPos += expressions.get(0).getTokenCount(true);
 								if (red.size() > 1) {
 									tokenPos++;
 								}
@@ -819,7 +819,7 @@ public class LineParser /*extends CodeParser*/
 							targets.addFirst(buildExpression(tgtToken, tokenPos, _types));
 							for (Expression tgt: targets) {
 								tgt.tokenPos = tokenPos;
-								tokenPos += tgt.getLength() + 1;
+								tokenPos += tgt.getTokenCount(true) + 1;
 							}
 							expressions.addAll(targets);
 						}
@@ -849,11 +849,11 @@ public class LineParser /*extends CodeParser*/
 						{
 							
 							Expression idExpr1 = buildExpression(red.get(1), ++tokenPos, _types);
-							tokenPos += idExpr1.getLength();
+							tokenPos += idExpr1.getTokenCount(true);
 							expressions.add(idExpr1);
 							this.buildExpressionList(red.get(3), tokenPos + 1, expressions, _types);
 							for (Expression expr: expressions) {
-								tokenPos += expr.getLength() + 1;
+								tokenPos += expr.getTokenCount(true) + 1;
 							}
 							short[] tokenCounter = {++tokenPos};
 							dataType = buildType(red.get(5), _types, tokenCounter, _element);
@@ -992,7 +992,7 @@ public class LineParser /*extends CodeParser*/
 							Expression expr = new Expression(Expression.NodeType.OPERATOR,
 									red.get(2).asString(), (short)tokenPos);
 							expr.children.add(buildExpression(red.get(1), tokenPos, _types));
-							tokenPos += expr.children.getFirst().getLength();
+							tokenPos += expr.children.getFirst().getTokenCount(true);
 							expr.tokenPos = tokenPos;
 							expr.children.add(buildExpression(red.get(3), tokenPos + 1, _types));
 							expressions.add(expr);
@@ -1110,10 +1110,10 @@ public class LineParser /*extends CodeParser*/
 			Expression expr = new Expression(Expression.NodeType.OPERATOR,
 					getContent_R(_reduction.get(2).asReduction(), ""), (short)(_tokenPos));
 			expr.children.add(buildExpression(_reduction.get(1), _tokenPos + 1, _types));
-			_tokenPos += 2 + expr.getLength();
+			_tokenPos += 2 + expr.getTokenCount(true);
 			expr.children.add(buildExpression(_reduction.get(3), _tokenPos + 1, _types));
 			_expressions.add(expr);
-			_tokenPos = (short)(2 + expr.getLength());
+			_tokenPos = (short)(2 + expr.getTokenCount(true));
 			_expressions.add(buildExpression(_reduction.get(5), _tokenPos, _types));
 			// <StepClause>
 			_reduction = _reduction.get(6).asReduction();
@@ -1121,7 +1121,7 @@ public class LineParser /*extends CodeParser*/
 				// <StepClause> ::= StepKey <DecimalIntegerLiteral>
 				// <StepClause> ::= StepKey '-' <DecimalIntegerLiteral>
 				// <StepClause> ::= StepKey '+' <DecimalIntegerLiteral>
-				_tokenPos += _expressions.get(1).getLength() + 1;
+				_tokenPos += _expressions.get(1).getTokenCount(true) + 1;
 				expr = buildExpression(_reduction.get(_reduction.size() - 1), _tokenPos, _types);
 				if (_reduction.size() > 2) {
 					// has sign
@@ -1327,7 +1327,7 @@ public class LineParser /*extends CodeParser*/
 			// <FieldAccess> ::= <Primary> '.' Identifier
 		{
 			Expression expr0 = buildExpression(_reduction.get(0), _tokenPos, _types);
-			_tokenPos += expr0.getLength();
+			_tokenPos += expr0.getTokenCount(true);
 			expr = new Expression(Expression.NodeType.OPERATOR, ".", (short)_tokenPos);
 			expr.children.add(expr0);
 			expr.children.add(new Expression(Expression.NodeType.IDENTIFIER, _reduction.get(2).asString(), (short)(_tokenPos + 1)));
@@ -1378,7 +1378,7 @@ public class LineParser /*extends CodeParser*/
 						expr.children.getLast().text,
 						(short)_tokenPos);
 				expr1.children.addLast(expr.children.getFirst());
-				_tokenPos += 3 + expr1.children.getFirst().getLength();
+				_tokenPos += 3 + expr1.children.getFirst().getTokenCount(true);
 				expr = expr1;
 			}
 			else if (_reduction.get(0).getType() == SymbolType.NON_TERMINAL) {
@@ -1401,9 +1401,9 @@ public class LineParser /*extends CodeParser*/
 			// <MethodInvocation> ::= <Primary> '.' Identifier '(' ')'
 			expr = new Expression(Expression.NodeType.METHOD, _reduction.get(2).asString(), (short)_tokenPos);
 			expr.children.add(buildExpression(_reduction.get(0), _tokenPos, _types));
+			expr.tokenPos += (1 + expr.children.getFirst().getTokenCount(true));
 			if (_reduction.size() > 4) {
-				_tokenPos += expr.children.getFirst().getLength() + 3;
-				buildExpressionList(_reduction.get(4), _tokenPos, expr.children, _types);
+				buildExpressionList(_reduction.get(4), _tokenPos + 2, expr.children, _types);
 			}
 			break;
 		case RuleConstants.PROD_ARRAYACCESS_LBRACKET_RBRACKET:
@@ -1412,7 +1412,7 @@ public class LineParser /*extends CodeParser*/
 			// <ArrayAccess> ::= <Primary> '[' <ExpressionList> ']'
 			expr = new Expression(Expression.NodeType.OPERATOR, "[]", (short)_tokenPos);
 			expr.children.addLast(buildExpression(_reduction.get(0), _tokenPos, _types));
-			expr.tokenPos += expr.children.getFirst().getLength();
+			expr.tokenPos += expr.children.getFirst().getTokenCount(true);
 			// We check the type of the primary expression: Must not be e.g. a scalar literal
 			if (expr.children.getLast().type == Expression.NodeType.LITERAL) {
 				throw new SyntaxException("Not an array", expr.tokenPos);
@@ -1508,7 +1508,7 @@ public class LineParser /*extends CodeParser*/
 					_reduction.get(1).asString(),
 					(short)0);
 			expr.children.addLast(buildExpression(_reduction.get(0), _tokenPos, _types));
-			_tokenPos += expr.children.getFirst().getLength();
+			_tokenPos += expr.children.getFirst().getTokenCount(true);
 			expr.tokenPos = (short)_tokenPos;
 			expr.children.addLast(buildExpression(_reduction.get(2), _tokenPos + 1, _types));
 			break;
@@ -1519,10 +1519,10 @@ public class LineParser /*extends CodeParser*/
 					"?,:",
 					(short)0);
 			expr.children.addLast(buildExpression(_reduction.get(0), _tokenPos, _types));
-			_tokenPos += expr.children.getFirst().getLength();
+			_tokenPos += expr.children.getFirst().getTokenCount(true);
 			expr.tokenPos = (short)_tokenPos;
 			expr.children.addLast(buildExpression(_reduction.get(2), _tokenPos + 1, _types));
-			_tokenPos += expr.children.getLast().getLength() + 2;
+			_tokenPos += expr.children.getLast().getTokenCount(true) + 2;
 			expr.children.addLast(buildExpression(_reduction.get(4), _tokenPos, _types));
 			break;
 		default:
@@ -1567,7 +1567,7 @@ public class LineParser /*extends CodeParser*/
 		exprs.addFirst(buildExpression(_token, 0, _types));
 		for (Expression expr: exprs) {
 			expr.tokenPos = (short)_tokenPos;
-			_tokenPos += expr.getLength() + 1;
+			_tokenPos += expr.getTokenCount(true) + 1;
 		}
 		_expressions.addAll(exprs);
 		return _tokenPos;
@@ -1627,7 +1627,7 @@ public class LineParser /*extends CodeParser*/
 						compExpr = compExpr.children.getFirst();
 					}
 					if (compExpr != null) {
-						_tokenPos = compExpr.tokenPos + compExpr.getLength() + 1;
+						_tokenPos = compExpr.tokenPos + compExpr.getTokenCount(true) + 1;
 					}
 				}
 				red = red.get(2).asReduction();
@@ -1650,12 +1650,12 @@ public class LineParser /*extends CodeParser*/
 				Expression compExpr = new Expression(Expression.NodeType.COMPONENT, compName, (short)_tokenPos);
 				compExpr.children.add(valExpr);
 				_expressions.addFirst(compExpr);
-				_tokenPos += compExpr.getLength() + 1;
+				_tokenPos += compExpr.getTokenCount(true) + 1;
 				for (Expression expr: exprs) {
 					if (_tokenPos > expr.tokenPos) {
 						expr.tokenPos = (short)_tokenPos;
 					}
-					_tokenPos += expr.getLength() + 2;	// colon and comma
+					_tokenPos += expr.getTokenCount(true) + 2;	// colon and comma
 				}
 				_expressions.addAll(exprs);
 				break;
@@ -1748,9 +1748,9 @@ public class LineParser /*extends CodeParser*/
 							Reduction rangeRed = tokRg.asReduction();
 							Expression exprLow = buildExpression(rangeRed.get(0), _tokenCounter[0], _types);
 							Object ixObjLo = exprLow.evaluateConstantExpr(constMap, null);
-							_tokenCounter[0] += exprLow.getLength() + 1;
+							_tokenCounter[0] += exprLow.getTokenCount(true) + 1;
 							Expression exprHigh = buildExpression(rangeRed.get(2), _tokenCounter[0], _types);
-							_tokenCounter[0] += exprHigh.getLength();
+							_tokenCounter[0] += exprHigh.getTokenCount(true);
 							Object ixObjHi = exprHigh.evaluateConstantExpr(constMap, null);
 							if (ixObjLo instanceof Integer && ixObjHi instanceof Integer) {
 								dim = new int[] {(int)ixObjLo, (int)ixObjHi};
@@ -1761,7 +1761,7 @@ public class LineParser /*extends CodeParser*/
 						}
 						else {
 							Expression exprRg = buildExpression(tokRg, _tokenCounter[0], _types);
-							_tokenCounter[0] += exprRg.getLength();
+							_tokenCounter[0] += exprRg.getTokenCount(true);
 							Object rgObj = exprRg.evaluateConstantExpr(constMap, null);
 							if (rgObj instanceof Integer) {
 								dim = (int)rgObj;

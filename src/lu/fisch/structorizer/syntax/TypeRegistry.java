@@ -402,6 +402,26 @@ public class TypeRegistry {
 	}
 
 	/**
+	 * Constructs a Type object from a canonic type description as produced by
+	 * {@link Type#toString()}, {@link Type#toString(boolean)}, or
+	 * {@link Type#toStringWithName(String, boolean)}. <br/>
+	 * Remark: To parse a user type description as to be found in Element texts,
+	 * you may better use
+	 * {@code LineParser.getInstance().parse("var xxxx: " + _typedescr, null, 0, this)}
+	 * and then extract the type from the {@link Line} object via
+	 * {@link Line#getDataType(boolean)}.
+	 * 
+	 * @param _typeDescription
+	 * @return a Type object (re)constructed or identified from
+	 *     {@code _canonicDescription}
+	 */
+	public Type interpretTypeString(String _canonicDescription)
+	{
+		Type type = null;
+		return type;
+	}
+	
+	/**
 	 * Merges the type registry entries from {@code _other} to this TypeRegistry.
 	 * If there are key collisions then {@code _override} decides whether the entries
 	 * from {@code _other} are to replace the ones in this or not.

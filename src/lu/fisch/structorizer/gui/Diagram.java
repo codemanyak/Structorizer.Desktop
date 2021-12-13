@@ -11136,6 +11136,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 	 * @param selected - if true enables, otherwise disables the specified
 	 * controller
 	 * @return true if the specified controller class was found.
+	 * 
 	 * @see #getEnabledControllers()
 	 * @see #isControllerEnabled(String)
 	 */
@@ -11165,8 +11166,10 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		//	}
 		//	mask <<= 1;
 		//}
+		boolean updateFunction = false;
 		if (turtle != null && !diagramControllers.containsKey(turtle)) {
 			diagramControllers.put(turtle, null);
+			updateFunction = true;
 		}
 		for (Map.Entry<DiagramController, Root> entry : diagramControllers.entrySet()) {
 			if (entry.getKey().getClass().getName().equals(className)) {
@@ -11190,15 +11193,29 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 					}
 					// We must ensure the possible enumerators are visible
 					if (statusChanged) {
+						// START KGU#790 2021-12-10: Issue #800 Allow for type inference
+						Function.setupControllerRoutineMap(diagramControllers.keySet());
+						updateFunction = false;
+						// END KGU#790 2021-12-10
 						this.resetDrawingInfo();
 						analyse();
 						redraw();
 					}
 				}
+				// START KGU#790 2021-12-10: Issue #800 Allow for type inference
+				if (updateFunction) {
+					Function.setupControllerRoutineMap(diagramControllers.keySet());
+				}
+				// END KGU#790 2021-12-10
 				return true;
 			}
 		}
 		// END KGU#911 2021-01-10
+		// START KGU#790 2021-12-10: Issue #800 Allow for type inference
+		if (updateFunction) {
+			Function.setupControllerRoutineMap(diagramControllers.keySet());
+		}
+		// END KGU#790 2021-12-10
 		return false;
 	}
 	// END KGU#448 2018-01-14

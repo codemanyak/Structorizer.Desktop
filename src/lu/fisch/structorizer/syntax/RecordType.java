@@ -42,6 +42,7 @@ package lu.fisch.structorizer.syntax;
  ******************************************************************************************************///
 
 import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Map.Entry;
 
 import lu.fisch.utils.StringList;
@@ -166,4 +167,29 @@ public class RecordType extends Type {
 	{
 		return new StringList(this.compTypes.keySet().toArray(new String[this.compTypes.size()]));
 	}
+	
+	/**
+	 * Recursively refreshes all incorporated type references via name
+	 * retrieval from the {@link #registry}.
+	 */
+	@Override
+	public void updateTypeReferences()
+	{
+		if (compTypes != null) {
+			LinkedHashMap<String, Type> compMap = new LinkedHashMap<String, Type>();
+			for (Map.Entry<String, Type> entry: compTypes.entrySet()) {
+				Type compType = entry.getValue();
+				if (compType != null) {
+					Type refType = getType(compType.getName());
+					if (refType != null) {
+						compType = refType;
+					}
+					compType.updateTypeReferences();
+				}
+				compMap.put(entry.getKey(), compType);
+			}
+			compTypes = compMap;
+		}
+	}
+
 }

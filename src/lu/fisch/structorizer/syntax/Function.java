@@ -45,6 +45,7 @@ package lu.fisch.structorizer.syntax;
  *      Kay Gürtzig     2020-11-02      Issue #800: Completely revised, now using Syntax and Expression
  *      Kay Gürtzig     2021-03-05      Bugfix #961: Method isFunction() extended (for method tests)
  *      Kay Gürtzig     2021-06-06      sgn function added to knownResultTypes
+ *      Kay Gürtzig     2021-12-10      New result type mapping for DiagramController routines added
  *
  ******************************************************************************************************
  *
@@ -52,10 +53,14 @@ package lu.fisch.structorizer.syntax;
  *
  ******************************************************************************************************///
 
+import java.lang.reflect.Method;
+
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Set;
 
+import lu.fisch.diagrcontrol.DiagramController;
 //import lu.fisch.structorizer.syntax.Expression;
 //import lu.fisch.structorizer.syntax.Syntax;
 //import lu.fisch.structorizer.syntax.SyntaxException;
@@ -70,6 +75,12 @@ import lu.fisch.utils.StringList;
 public class Function
 {
 	// START KGU#332 2017-01-29: Enh. #335 - result type forecast
+	/**
+	 * Maps signatures of built-in functions and procedures (see
+	 * {@link Executor#builtInFunctions}) to Java type names (where "void" indicates
+	 * a procedure).<br/>
+	 * The signature syntax is: {@code "<name>#<arg_count>"}.
+	 */
 	private static final Map<String, String> knownResultTypes;
 	static {
 		knownResultTypes = new HashMap<String,String>();
@@ -128,6 +139,19 @@ public class Function
 		// END KGU#790 2020-11-01
 	}
 	// END KGU#332 2017-01-29
+	// START KGU#448/KGU#790 2021-12-10: Issues #443, #800
+	/**
+	 * Maps signatures of currently enabled DiagramController functions and procedures
+	 * to Java type names (where "void" indicates a procedure).<br/>
+	 * This map is supposed to be updated whenever the set of enabled controllers changes.
+	 * The signature syntax is: {@code "<name>#<arg_count>"}.
+	 * 
+	 * @see #setupControllerRoutineMap(Set)
+	 */
+	private static HashMap<String, String> controllerRoutineTypes =
+			new HashMap<String, String>();
+	// END KGU#448/KGU#790 2021-12-10
+
 	private String str = new String();		// The original string this is derived from
 	// START KGU#790 2020-11-02: Issue #800 No longer needed
 	// START KGU#56 2015-10-27: Performance improvement approach (bug fixed 2015-11-09)
@@ -139,17 +163,19 @@ public class Function
 	// END KGU#790 2020-11-02
 
 	/**
-	 * Parses the expression held in string {@code exp} and tries to bild a
+	 * Parses the expression held in string {@code expr} and tries to build a
 	 * Function object from it. The resulting object can be asked if it
 	 * actually represents a valid function (or method) invocation.
-	 * @param exp - a linearised expression in Structorizer syntax as string
+	 * 
+	 * @param exprStr - a linearised expression in Structorizer syntax as string
+	 * 
 	 * @see #Function(Expression)
 	 * @see #isFunction()
 	 * @see #isMethod()
 	 */
-	public Function(String exp)
+	public Function(String exprStr)
 	{
-		this.str = exp.trim();
+		this.str = exprStr.trim();
 		// START KGU#790 2020-11-02: Issue #800 - totally redesigned
 //		// START KGU#56 2015-10-27
 //		// START KGU#332 2017-01-29: Enh. #335 We need a more precise test
@@ -187,7 +213,7 @@ public class Function
 //            // END KGU#341 2017-02-06
 //		}
 //		// END KGU#56 2015-10-27
-		StringList tokens = Syntax.splitLexically(exp, true);
+		StringList tokens = Syntax.splitLexically(exprStr, true);
 		try {
 			LinkedList<Expression> exprs = Expression.parse(tokens, null, (short)0);
 			if (exprs.size() == 1) {
@@ -238,13 +264,17 @@ public class Function
 	 * function and method. So if you want to know whether this is a pure
 	 * function, you will also have to check that {@link #isMethod()} does
 	 * <i>not</i> return {@code true}.
+	 * 
 	 * @return {@code true} if this object represents a syntactically correct
 	 * function or method call, i.e. one of:
 	 * <ul>
 	 * <li>{@code <functionname>(<arg>,...)}</li>
 	 * <li>{@code <object>.<methodname>(<arg>, ...) }</li>
 	 * </ul>
+	 * 
 	 * @see #isMethod()
+	 * @see #isFunction(String, boolean)
+	 * @see #isFunction(Expression, boolean)
 	 */
 	public boolean isFunction()
 	{
@@ -255,23 +285,29 @@ public class Function
 	/**
 	 * Checks that this represents a method call (OOP); will return {@code false}
 	 * if this is a mere function (not-OO).
+	 * 
 	 * @return {@code true} if this object represents a syntactically correct
 	 * method call, i.e. something like {@code <object>.<methodname>(<arg>, ...) }.
+	 * 
 	 * @see #isFunction()
+	 * @see #isFunction(String, boolean)
+	 * @see #isFunction(Expression, boolean)
 	 */
 	public boolean isMethod()
 	{
-		return expr != null && ".".equals(expr.text);
+		return expr != null && expr.isMethodCall();
 	}
 	
 	/**
 	 * Checks the given {@link Expression} for correct function or method
 	 * call syntax.
+	 * 
 	 * @param expr - an {@link Expression} to be checked for method
 	 * or function call syntax.
 	 * @param acceptQualifiers - whether a qualified name (i.e an explicit method call)
 	 *  is okay
-	 * * @return {@code true} if this is either a method or function call
+	 * @return {@code true} if this is either a method or function call
+	 * 
 	 * @see #isFunction(String, boolean)
 	 */
 	// START KGU#959 2021-03-05: Issue #961 We need a possibility to detect method calls
@@ -478,43 +514,7 @@ public class Function
 	}
 
 	// START KGU#332 2017-01-29: Enh. #335 - type map
-	/**
-	 * Returns the name of the result type of this subroutine call if known as
-	 * built-in function with unambiguous type.
-	 * If this is known as built-in procedure then it returns "void".
-	 * If unknown then returns the given defaultType
-	 * @param defaultType - null or some default type name for unsuccessful retrieval
-	 * @return name of the result type (Java type name), or {@code null} in case
-	 * this function does not actually represent a function
-	 * @see #isFunction()
-	 */
-	public String getResultType(String defaultType)
-	{
-//		return getResultType(false, defaultType);
-		// START KGU#790 2020-11-02: Issue #800
-		//String type = knownResultTypes.get(this.name + "#" + this.paramCount());
-		//if (type == null) {
-		//	// START KGU
-		//	type = defaultType;
-		//}
-		String type = null;
-		if (expr != null) {
-			type = knownResultTypes.get(this.getName() + "#" + this.paramCount());
-			if (type == null) {
-				// We must not call expr.inferType() here because this in turn calls getResultType()
-				Type dataType = expr.dataType;
-				if (dataType != null) {
-					type = dataType.getName();
-				}
-			}
-			if (type == null) {
-				type = defaultType;
-			}
-		}
-		// END KGU#790 2020-11-02
-		return type;
-	}
-
+	// START KGU#790 2020-11-27: Issue #800
 //    /**
 //     * Returns the name of the result type of this subroutine call if known as
 //     * built-in function with unambiguous type.
@@ -531,7 +531,83 @@ public class Function
 //        }
 //        return type;
 //    }
+	/**
+	 * Returns the name of the result type of this subroutine call if known as
+	 * built-in function with unambiguous type.
+	 * If this is known as built-in procedure then it returns "void".
+	 * If unknown then returns the given defaultType
+	 * @param defaultType - null or some default type name for unsuccessful retrieval
+	 * @return name of the result type (Java type name), or {@code null} in case
+	 * this function does not actually represent a function
+	 * @see #isFunction()
+	 */
+	public String getResultType(String defaultType)
+	{
+		String typeName = null;
+		if (expr != null) {
+			// We must not call expr.inferType() here because this in turn calls getResultType()
+			Type type = expr.getDataType();
+			if (type != null) {
+				typeName = type.getName();
+			}
+			else {
+				String signature = this.getName() + "#" + this.paramCount();
+				typeName = knownResultTypes.get(signature);
+				if (typeName == null) {
+					typeName = controllerRoutineTypes.get(signature);
+				}
+			}
+		}
+		if (typeName == null) {
+			typeName = defaultType;
+		}
+		return typeName;
+	}
+	// END KGU#790 2020-11-27
 	// END KGU#332 2017-01-29
+
+	// START KGU#448/KGU#790 2021-12-10: Issues #443, #800
+	/**
+	 * Sets up the DiagramController API tables for data type inference
+	 */
+	public static void setupControllerRoutineMap(Set<DiagramController> controllers) {
+		controllerRoutineTypes.clear();
+		StringList conflicts = new StringList();	// Signature conflicts
+		for (DiagramController controller: controllers) {
+			for (Map.Entry<String, Method> entry: controller.getFunctionMap().entrySet()) {
+				String typeName = "void";
+				String key = entry.getKey();
+				Class<?> typeClass = entry.getValue().getReturnType();
+				if (typeClass != null) {
+					typeName = typeClass.getSimpleName();
+				}
+				if (controllerRoutineTypes.containsKey(key)
+						&& !typeName.equals(controllerRoutineTypes.get(key))) {
+					// We will remove the conflicting entries in the end
+					conflicts.addIfNew(key);
+				}
+				else {
+					controllerRoutineTypes.put(key, typeName);					
+				}
+			}
+			for (Map.Entry<String, Method> entry: controller.getProcedureMap().entrySet()) {
+				String key = entry.getKey();
+				if (controllerRoutineTypes.containsKey(key)
+						&& !"void".equals(controllerRoutineTypes.get(key))) {
+					// We will remove the conflicting entries in the end
+					conflicts.addIfNew(key);
+				}
+				else {
+					controllerRoutineTypes.put(key, "void");
+				}
+			}
+		}
+		// Now remove all conflicting entries
+		for (int i = 0; i < conflicts.count(); i++) {
+			controllerRoutineTypes.remove(conflicts.get(i));
+		}
+	}
+	// END KGU#448/KGU#790 2021-12-10
 
 	// START KGU#790 2020-11-01: Issue #800 - moved to Syntax (renamed to .isIdentifier())
 //    // START KGU#61 2016-03-22: Moved hitherto from Root (was a private member method there)
@@ -587,6 +663,7 @@ public class Function
 	// END KGU#790 2020-11-01
 
 	// START KGU 2016-10-16: More informative self-description
+	@Override
 	public String toString()
 	{
 		// START KGU#790 2020-11-02: Issue #800
@@ -606,12 +683,29 @@ public class Function
 	// START KGU#311 2016-12-22: Enh. #314 - We need the expression length for replacements
 	/**
 	 * Returns the length of the original String that was parsed to this Function
+	 * 
 	 * @return length of the code source snippet representing this function call
+	 * 
+	 * @see #getTokenCount()
 	 */
 	public int getSourceLength()
 	{
 		return str.length();
 	}
 	// END KGU#311 2016-12-22
+	
+	/**
+	 * @return the number of lexical tokens representing this function call.
+	 * 
+	 * @see #getSourceLength()
+	 * @see Expression#getTokenCount(boolean)
+	 */
+	public int getTokenCount()
+	{
+		if (expr != null) {
+			return expr.getTokenCount(false);
+		}
+		return 0;
+	}
 
 }

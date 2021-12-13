@@ -19,13 +19,6 @@
  */
 package lu.fisch.structorizer.syntax;
 
-import java.util.HashMap;
-import java.util.List;
-
-import lu.fisch.structorizer.elements.Element;
-import lu.fisch.structorizer.syntax.Expression.Operator;
-import lu.fisch.utils.StringList;
-
 /******************************************************************************************************
  *
  *      Author:         Kay Gürtzig
@@ -41,6 +34,7 @@ import lu.fisch.utils.StringList;
  *      Kay Gürtzig     2019-12-27      First Issue
  *      Kay Gürtzig     2020-10-24      Changed from Interface to Class
  *      Kay Gürtzig     2020-11-01      Parsing and variable gathering mechanism implemented
+ *      Kay Gürtzig     2021-12-09      Method parse discarded in favour of LineParser
  *
  ******************************************************************************************************
  *
@@ -48,6 +42,13 @@ import lu.fisch.utils.StringList;
  *      
  *
  ******************************************************************************************************///
+
+import java.util.HashMap;
+import java.util.List;
+
+import lu.fisch.structorizer.elements.Element;
+import lu.fisch.structorizer.syntax.Expression.Operator;
+import lu.fisch.utils.StringList;
 
 /**
  * Represents the syntactic structure of a line of an {@link Element}
@@ -213,20 +214,71 @@ public class Line {
 	 *    declaration), otherwise the attached expressions will be asked for their
 	 *    data type, where the first expression associated with a data type will
 	 *    determine the result.
-	 * @return the (explicitly) associated data type (e.g. in case of a type definition
-	 *    or variable declaration)
+	 * @return the explicitly associated data type (e.g. in case of a type definition
+	 *    or variable declaration) or the data type associated to the involved
+	 *    expressions (without an attempt to infer the type, which would require a
+	 *    {@link TypeRegistry}.
+	 *    
+	 * @see #getOrInferDataType(TypeRegistry)
 	 */
 	public Type getDataType(boolean _explicitOnly)
 	{
 		Type dType = dataType;
 		if (dType == null && !_explicitOnly && expressions != null) {
 			for (Expression expr: expressions) {
-				if ((dType = expr.dataType) != null) {
+				if ((dType = expr.getDataType()) != null) {
 					return dType;
 				}
 			}
 		}
 		return dType;
+	}
+	
+	/**
+	 * Yields the explicitly associated data type (e.g. from a type definition or
+	 * variable declaration) or gets or infers the data type from the contained
+	 * expressions where the first responding expression determines the result.
+	 *
+	 * @param _registry - the {@link TypeRegistry} to retrieve the data types from
+	 * @return the explicitly associated data type (e.g. in case of a type definition
+	 *    or variable declaration) or the data type inferred from to the involved
+	 *    expressions
+	 *
+	 * @see #getDataType(boolean)
+	 */
+	public Type getOrInferDataType(TypeRegistry _registry)
+	{
+		Type dType = dataType;
+		if (dataType == null && expressions != null) {
+			for (Expression expr: expressions) {
+				if ((dType = expr.getDataType()) != null 
+						|| (dType = expr.inferType(_registry, false)) != null) {
+					break;
+				}
+			}
+		}
+		return dType;
+	}
+	
+	/**
+	 * Ensures that all valid type references get properly updated (with respect
+	 * to possibly replaced underlying types in the associated or given
+	 * {@link TypeReference}).
+	 */
+	public void updateTypeReferences(TypeRegistry _dataTypes) {
+		if (dataType != null) {
+			Type refType = (dataType.registry == null ? _dataTypes : dataType.registry).
+					getType(dataType.getName());
+			if (refType != null) {
+				dataType = refType;
+			}
+		}
+		if (expressions != null) {
+			for (int i = 0; i < expressions.length; i++) {
+				expressions[i].clearDataTypes(false);
+				expressions[i].inferType(_dataTypes, true);
+			}
+		}
 	}
 	
 	/**
@@ -270,44 +322,54 @@ public class Line {
 	}
 	
 	/**
-	 * Retrieves all
-	 * @param assignedVars
-	 * @param declaredVars
-	 * @param usedVars
-	 * @return
+	 * Recursively retrieves the names of all variables (and constants) occurring
+	 * in this expression, be it as initialisation/assignment target, as declaration
+	 * subject, or as value source.
+	 * 
+	 * @param assignedVars - {@link StringList} to gather names of assignment targets,
+	 *     or {@code null} (if there is no interest in them)
+	 * @param declaredVars - {@link StringList} to gather names of variables that are
+	 *     explicitly declared
+	 * @param usedVars - {@link StringList} to gather names of variables that are merely
+	 *     used as value source.
+	 * @param problems - a {@link StringList} to gather syntax problem descriptions, or
+	 *     {@code null}. A possible problem might e.g. be a duplicate declaration.
+	 * @return {@code false} if the line consistency or expression structure is wrong
 	 */
-	public boolean gatherVariables(StringList assignedVars, StringList declaredVars, StringList usedVars)
+	public boolean gatherVariables(StringList assignedVars, StringList declaredVars, StringList usedVars, StringList problems)
 	{
 		boolean okay = true;
 		switch (this.type) {
-		case LT_CONST_DEF:
 		case LT_ASSIGNMENT:
 		case LT_CATCH:
+		case LT_CASE:
+		case LT_CONDITION:
+		case LT_ROUTINE_CALL:
 			if (expressions != null && expressions.length == 1) {
 				okay = expressions[0].gatherVariables(assignedVars, usedVars,
 						this.type == LineType.LT_CATCH);
 			}
+			else {
+				okay = false;
+			}
 			break;
-		case LT_CASE:
-		case LT_CONDITION:
 		case LT_EXIT:
 		case LT_LEAVE:
 		case LT_RETURN:
 		case LT_THROW:
 		case LT_OUTPUT:
-		case LT_ROUTINE_CALL:
-			for (Expression expr: expressions) {
-				okay = expr.gatherVariables(assignedVars, usedVars, false) && okay;
+			if (expressions != null) {
+				for (Expression expr: expressions) {
+					okay = expr.gatherVariables(assignedVars, usedVars, false) && okay;
+				}
 			}
 			break;
 		case LT_FOREACH_LOOP:
 		case LT_FOR_LOOP:
 			if (expressions != null && expressions.length > 1) {
-				if (assignedVars != null) {
-					assignedVars.addIfNew(expressions[0].text);
-				}
-				for (int i = 1; i < expressions.length; i++) {
-					okay = expressions[i].gatherVariables(assignedVars, usedVars, false) && okay;
+				for (int i = 0; i < expressions.length; i++) {
+					boolean isLeft = i == 0 && this.type == Line.LineType.LT_FOREACH_LOOP;
+					okay = expressions[i].gatherVariables(assignedVars, usedVars, isLeft) && okay;
 				}
 			}
 			else {
@@ -326,12 +388,27 @@ public class Line {
 		case LT_TYPE_DEF:
 			// Nothing to do here
 			break;
+		case LT_CONST_DEF:
+		case LT_CONST_FUNCT_CALL:
+		case LT_VAR_INIT:
 		case LT_VAR_DECL:
 			if (this.expressions != null && this.expressions.length >= 1) {
 				Expression firstExpr = this.expressions[0];
 				if (firstExpr.type == Expression.NodeType.OPERATOR
-						&& "<-,:=".contains(firstExpr.text)) {
-					okay = firstExpr.gatherVariables(assignedVars, usedVars, false);
+						&& ("<-".equals(firstExpr.text) || ":=".equals(firstExpr.text))) {
+					// Variables that are both explicitly declared and assigned
+					StringList targets = new StringList();
+					okay = firstExpr.gatherVariables(targets, usedVars, false);
+					if (declaredVars != null) {
+						for (int i = 0; i < targets.count(); i++) {
+							if (!declaredVars.addIfNew(targets.get(i)) && problems != null) {
+								problems.add("declaration.duplicate: " + targets.get(i));
+							}
+						}
+					}
+					if (assignedVars != null) {
+						assignedVars.addIfNew(targets);
+					}
 				}
 				else if (declaredVars != null) {
 					for (Expression expr: expressions) {
@@ -517,6 +594,20 @@ public class Line {
 					else {
 						System.out.println("No type retrieved");
 					}
+//					int count1 = expr.getNodeCount();
+//					int count2 = expr.getTokenCount(true);
+//					int count3 = expr.getTokenCount(false);
+//					if (count1 != count2 || count1 != count3) {
+//						System.err.println(String.format("# nodes: %d, # tokens in: %d, # tokens out: %d",
+//								count1, count2, count3));
+//						StringBuilder sb = new StringBuilder();
+//						expr.traverseInOrder(sb);
+//						System.err.println(sb.toString());
+//					}
+//					else {
+//						System.out.println(String.format("# nodes: %d, # tokens in: %d, # tokens out: %d",
+//							count1, count2, count3));
+//					}
 					i++;
 				}
 				long timeDiff = endTime - startTime;
@@ -551,7 +642,7 @@ public class Line {
 			Line aLine = LineParser.getInstance().parse(line, null, 0, types);
 			System.out.println(aLine);
 			System.err.println(errors.getText());
-			boolean okay = aLine.gatherVariables(vars1, vars2, vars3);
+			boolean okay = aLine.gatherVariables(vars1, vars2, vars3, null);
 			System.out.println("Assigned: " + vars1.toString() +
 					", declared: " + vars2.toString() + 
 					", used: " + vars3.toString() + (okay ? "" : ", errors"));

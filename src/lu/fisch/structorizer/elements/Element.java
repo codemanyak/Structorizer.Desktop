@@ -226,6 +226,7 @@ import lu.fisch.structorizer.syntax.Line;
 import lu.fisch.structorizer.syntax.LineParser;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.structorizer.syntax.SyntaxException;
+import lu.fisch.structorizer.syntax.Type;
 import lu.fisch.structorizer.syntax.TypeRegistry;
 import lu.fisch.structorizer.executor.Executor;
 import lu.fisch.structorizer.gui.FindAndReplace;
@@ -1246,7 +1247,7 @@ public abstract class Element {
 	 * @return the array of parse results per line
 	 * 
 	 * @see #getParsedText(StringList, StringList, TypeRegistry, StringList)
-	 * @see #parseLines()
+	 * @see #parseLines(TypeRegistry)
 	 */
 	public Line[] getParsedText(StringList problems, TypeRegistry typeMap)
 	{
@@ -1264,7 +1265,7 @@ public abstract class Element {
 	 * @param declaredVars - unused by now (is it to gather the declared variables en passant?)
 	 * @param usedVars - unused by now (is it to gather the used variables en passant?)
 	 * @param typeMap - a data type map to retrieve from and add to, or {@code null}
-	 * @param problems a {@link StringList} gathering occurred syntax complaints
+	 * @param problems - a {@link StringList} gathering occurred syntax complaints
 	 * @return the array of parse results per line
 	 */
 	public Line[] getParsedText(StringList assignedVars, StringList declaredVars, StringList usedVars, TypeRegistry typeMap, StringList problems)
@@ -1274,7 +1275,7 @@ public abstract class Element {
 		for (int i = 0; i < lines.length; i++) {
 			lines[i] = LineParser.getInstance().parse(unbrText.get(i), this, i, typeMap);
 			if (lines[i].getType() != Line.LineType.LT_RAW) {
-				lines[i].gatherVariables(assignedVars, declaredVars, usedVars);
+				lines[i].gatherVariables(assignedVars, declaredVars, usedVars, problems);
 			}
 		}
 		return lines;
@@ -4571,12 +4572,83 @@ public abstract class Element {
 	 * Adds own variable declarations (only this element, no substructure!) to the given
 	 * map (varname -> typeinfo).
 	 * @param typeMap
+	 * 
+	 * @deprecated Use {@link #updateTypeRegistry(TypeRegistry)} instead
 	 */
 	public void updateTypeMap(HashMap<String, TypeMapEntry> typeMap)
 	{
 		// Does nothing - to be sub-classed if necessary
 	}
 	// END KGU#261 2017-01-19
+	
+	/**
+	 * Adds own variable declarations and type definitions (only this element,
+	 * no substructure!) to the given {@link TypeRegistry}.
+	 * 
+	 * @param _dataTypes
+	 */
+	public void updateTypeRegistry(TypeRegistry _dataTypes)
+	{
+		Line[] lines = this.getParsedText(comment, _dataTypes);
+		for (int i = 0; i < lines.length; i++) {
+			Line line = lines[i];
+			Type dataType = line.getDataType(false);
+			if (dataType != null) {
+				boolean force = false;
+				int nExpr = line.getExprCount();
+				Expression expr;
+				switch (line.getType()) {
+				case LT_CONST_DEF:
+				case LT_VAR_INIT:
+					force = true;
+				case LT_ASSIGNMENT:
+				case LT_FOR_LOOP:
+					if (nExpr > 0
+							&& (expr = line.getExpression(0)) != null
+							&& expr.type == Expression.NodeType.OPERATOR
+							&& expr.children.size() == 2
+							&& (expr = expr.children.get(0)).type == Expression.NodeType.IDENTIFIER) {
+						_dataTypes.putTypeFor(expr.text, dataType, force);
+					}
+					break;
+				case LT_CATCH:
+					if (nExpr > 0
+							&& (expr = line.getExpression(0)).type == Expression.NodeType.IDENTIFIER) {
+						// FIXME: How to cope with block scope here?
+						_dataTypes.putTypeFor(expr.text, dataType, this, i, true);
+					}
+					break;
+					// TODO To be done in Call class
+//				case LT_CONST_FUNCT_CALL: 
+//					break;
+//				case LT_ROUTINE_CALL:
+//					break;
+				case LT_FOREACH_LOOP:
+					if (nExpr > 0
+							&& (expr = line.getExpression(0)).type == Expression.NodeType.IDENTIFIER) {
+						// FIXME: How to cope with block scope here?
+						_dataTypes.putTypeFor(expr.text, dataType, this, i, false);
+					}
+					break;
+				case LT_TYPE_DEF:
+					// FIXME Cause an error if the type already had been defined
+					_dataTypes.putType(dataType, this, i, true);
+					break;
+				case LT_VAR_DECL:
+					for (int j = 0; j < nExpr; j++) {
+						expr = line.getExpression(j);
+						if (expr.type == Expression.NodeType.IDENTIFIER) {
+							// FIXME We should warn / raise an error if there had already been a type
+							_dataTypes.putTypeFor(expr.text, dataType, this, i, true);
+						}
+					}
+					break;
+				default:
+					break;
+				}
+			}
+		}
+	}
 	
 	// START KGU#261 2017-01-26: Enh. #259
 	/**
@@ -4842,7 +4914,7 @@ public abstract class Element {
 	 *     0 and the number of lines - 1.
 	 * @return a {@link Line} structure for the requested text line.
 	 * 
-	 * @see #parseLines()
+	 * @see #parseLines(TypeRegistry)
 	 * @see #resetParsedLines()
 	 */
 	public Line getParsedLine(int lineNo)
@@ -4865,13 +4937,28 @@ public abstract class Element {
 	 */
 	protected StringList parseLines()
 	{
+		Root root = getRoot(this);
+		return parseLines(root == null ? null : root.getDataTypes());
+	}
+	/**
+	 * Re-parses all text lines no matter whether there have already been parsed
+	 * lines in the cache. Overwrites {@link #parsedLines}.
+	 * @param _dataTypes TODO
+	 * 
+	 * @return A {@link StringList} of possible error descriptions
+	 * 
+	 * @see #getParsedLine(int)
+	 * @see #getParsedText(StringList, Typeregistry)
+	 * @see #getParsedText(StringList, StringList, Typeregistry, StringList)
+	 */
+	protected StringList parseLines(TypeRegistry _dataTypes)
+	{
 		// FIXME both this and getParsedText() needed?
 		StringList errors = new StringList();
 		StringList unbrokenLines = this.getUnbrokenText();
 		parsedLines = new Line[unbrokenLines.count()];
-		Root root = getRoot(this);
 		for (int i = 0; i < parsedLines.length; i++) {
-			parsedLines[i] = LineParser.getInstance().parse(unbrokenLines.get(i), this, i, root == null ? null : root.getDataTypes());
+			parsedLines[i] = LineParser.getInstance().parse(unbrokenLines.get(i), this, i, _dataTypes);
 			String trouble = parsedLines[i].getParserError();
 			if (trouble != null) {
 				errors.add(trouble);
@@ -4879,7 +4966,7 @@ public abstract class Element {
 		}
 		return errors;
 	}
-	
+
 	/**
 	 * Wipes the parsing results for all text lines, thus forcing a reparsing
 	 * on next {@link #getParsedLine(int)} call. This methd should be called

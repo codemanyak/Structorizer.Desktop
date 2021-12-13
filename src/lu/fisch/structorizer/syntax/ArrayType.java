@@ -253,4 +253,22 @@ public class ArrayType extends Type {
 		}
 		return null;
 	}
+	
+	/**
+	 * Recursively refreshes all incorporated type references via name
+	 * retrieval from the {@link #registry}.
+	 */
+	@Override
+	public void updateTypeReferences()
+	{
+		Type refType = null;
+		if (elType != null) {
+			refType = getType(elType.getName());
+			if (refType != null) {
+				refType.updateTypeReferences();
+				elType = refType;
+			}
+		}
+	}
+
 }
