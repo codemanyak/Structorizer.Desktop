@@ -240,7 +240,7 @@ public class CaseEditHelper {
 	 * @return a String representation for {@code Value}
 	 */
 	private String string4Value(Object value) {
-		String str = "null";
+		String str;
 		if (value instanceof String) {
 			str = "\"" + value + "\"";
 		}

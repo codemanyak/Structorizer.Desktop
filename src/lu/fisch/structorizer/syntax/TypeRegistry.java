@@ -21,7 +21,9 @@
 package lu.fisch.structorizer.syntax;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import lu.fisch.structorizer.elements.Element;
@@ -152,6 +154,31 @@ public class TypeRegistry {
 	public static Type getStandardType(String name)
 	{
 		return getGlobalInstance().getType(name);
+	}
+	
+	/**
+	 * @return the entire set of registered keys, comprising both type keys (prefixed with
+	 *     ':') and variable/constant names.
+	 * 
+	 * @see #getTypeIds()
+	 */
+	public Set<String> getKeySet()
+	{
+		return typeMap.keySet();
+	}
+	
+	/**
+	 * @return the set of registered type identifiers
+	 */
+	public Set<String> getTypeIds()
+	{
+		Set<String> typeIds = new HashSet<String>();
+		for (String key: typeMap.keySet()) {
+			if (key.startsWith(":")) {
+				typeIds.add(key.substring(1));
+			}
+		}
+		return typeIds;
 	}
 	
 	/**

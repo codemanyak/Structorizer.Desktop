@@ -148,6 +148,8 @@ public class Expression {
 	public static final StringList BOOL_OPERATORS = StringList.explode("&&,and,||,or,xor", ",");
 	/** Comparison operator symbols in complementary order, i.e. first is complementary to last etc. */
 	public static final StringList RELATION_OPERATORS = StringList.explode("==,=,<,>,<=,>=,<>,!=", ",");
+	/** Assignment operator symbols, i.e. "<-" and ":=" */
+	public static final StringList ASSIGNMENT_OPERATORS = StringList.explode("<-,:=", ",");
 	
 	/**
 	 * Export operator specification for expression mapping. Operator names from the
@@ -892,6 +894,20 @@ public class Expression {
 			return _trueIfUnknown;	// there is no "maybe"
 		}
 		return dataType.isNumeric();
+	}
+	
+	/**
+	 * Check whether this is an assignment expression, i.e., has one of the
+	 * officially allowed {@link #ASSIGNMENT_OPERATORS} as root node and two
+	 * child expressions.
+	 * 
+	 * @return {@code true} if it seems to be an assignment, {@code false}
+	 *     otherwise
+	 */
+	public boolean isAssignment()
+	{
+		return type == NodeType.OPERATOR && ASSIGNMENT_OPERATORS.contains(text)
+				&& children.size() == 2;
 	}
 	
 	/**

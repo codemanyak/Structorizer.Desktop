@@ -765,7 +765,7 @@ public class PasGenerator extends Generator
 				//else	// no return
 				// START KGU#504 2018-03-13: Bugfix #520, #521 - consider transformation suppression
 				//if (!Instruction.isTypeDefinition(line, null) && !line.toLowerCase().startsWith("const "))
-				if (this.suppressTransformation || !Instruction.isTypeDefinition(line, null) && !line.toLowerCase().startsWith("const "))
+				if (this.suppressTransformation || !Instruction.isTypeDefinition(line) && !line.toLowerCase().startsWith("const "))
 				// END KGU#504 2018-03-13
 				// END KGU#375 2017-09-21
 				{

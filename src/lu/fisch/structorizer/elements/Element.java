@@ -3160,21 +3160,25 @@ public abstract class Element {
 	}
 
 	/**
-	 * Decomposes the interior of a record initializer of the form
-	 * [typename]{compname1: value1, compname2: value2, ...} into a hash table
-	 * mapping the component names to the corresponding value strings.
+	 * Decomposes the interior of a record initializer of the form<br/>
+	 * [typename]{compname1: value1, compname2: value2, ...}<br/>
+	 * into a hash table mapping the component names to the corresponding value
+	 * strings.<br/>
 	 * If there is text following the closing brace it will be mapped to key "§TAIL§".
 	 * If the typename is given then it will be provided mapped to key "§TYPENAME§".
 	 * If {@code _typeInfo} is given and either {@code typename} was omitted or matches
 	 * name of {@code _typeInfo} then unprefixed component values will be associated
 	 * to the component names of the type in order of occurrence unless an explicit
 	 * component name prefix occurs.<br/>
-	 * If {@code _typeInfo} is null and {@code generateDummyCompNames} is true then generic
-	 * component names of form {@code "FIXME_<typename>_<i>"} may be provided for components
-	 * with missing names in the {@code _text}.
+	 * If {@code _typeInfo} is null and {@code generateDummyCompNames} is {@code true}
+	 * then generic component names of form {@code "FIXME_<typename>_<i>"} may be
+	 * provided for components with missing names in the {@code _text}.
+	 * 
 	 * @param _text - the initializer expression with or without typename but with braces.
 	 * @param _typeInfo - the type map entry for the corresponding record type if available
-	 * @param _generateDummyCompNames - if true then missing component names (not retrievable) will be replaced by generic ones
+	 * @param _generateDummyCompNames - if {@code true} then missing component names (not
+	 *     retrievable) will be replaced by generic ones
+	 * 
 	 * @return the component map (or null if there are no braces).
 	 */
 	public static HashMap<String, String> splitRecordInitializer(String _text, TypeMapEntry _typeInfo, boolean _generateDummyCompNames)

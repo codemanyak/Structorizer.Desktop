@@ -101,6 +101,7 @@ import lu.fisch.structorizer.gui.IconLoader;
 import lu.fisch.structorizer.gui.SelectedSequence;
 import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TypeRegistry;
 //import lu.fisch.structorizer.gui.IconLoader;
 import lu.fisch.utils.*;
 
@@ -526,14 +527,11 @@ public class Instruction extends Element {
 	protected void addFullText(StringList _lines, boolean _instructionsOnly)
 	{
 		if (!this.isDisabled(false)) {
-			// START KGU#413 2017-06-09: Enh. #416 cope with user-inserted line breaks
-			//_lines.add(this.getText());
-			// START KGU#388 2017-09-13: Enh. #423: We must not add type definition lines
-			//_lines.add(this.getUnbrokenText());
 			StringList myLines = this.getUnbrokenText();
 			for (int i = 0; i < myLines.count(); i++) {
 				String line = myLines.get(i);
-				if (!isTypeDefinition(line, null)) {
+				// if (!isTypeDefinition(line, null)) {
+				if (!isTypeDefinition(line)) {
 					_lines.add(line);
 				}
 				// START KGU#542 2019-11-17: Enh. #739 special treatment for enum type definitions
@@ -550,8 +548,6 @@ public class Instruction extends Element {
 				}
 				// END KGU#542 2019-11-17
 			}
-			// END KGU#388 2017-09-13
-			// END KGU#413 2017-06-09
 		}
 	}
 	// END KGU 2015-10-16
@@ -823,12 +819,14 @@ public class Instruction extends Element {
 	
 	// START KGU#322 2016-07-06: Enh. #335
 	/**
-	 * Returns true if the current line of code is a variable declaration of one of the following types:<br/>
+	 * Returns true if the current line of code is a variable declaration of
+	 * one of the following types:<br/>
 	 * a) var &lt;id&gt; {, &lt;id&gt;} : &lt;type&gt; [&lt;- &lt;expr&gt;]<br/>
 	 * b) dim &lt;id&gt; {, &lt;id&gt;} as &lt;type&gt; [&lt;- &lt;expr&gt;]<br/>
 	 * c) &lt;type&gt; &lt;id&gt; &lt;- &lt;expr&gt;
+	 * 
 	 * @param line - String comprising one line of code
-	 * @return true iff line is of one of the forms a), b), c)
+	 * @return {@code true} iff line is of one of the forms a), b), c)
 	 */
 	public static boolean isDeclaration(String line)
 	{
@@ -878,8 +876,11 @@ public class Instruction extends Element {
 		}
 		return typeA || typeB || typeC;
 	}
-	/** @return true if all non-empty lines are declarations
-	 * @see #isDeclaration(String) */
+	/**
+	 * @return true if all non-empty lines are declarations
+	 * 
+	 * @see #isDeclaration(String)
+	 */
 	public boolean isDeclaration()
 	{
 		boolean isDecl = true;
@@ -896,8 +897,12 @@ public class Instruction extends Element {
 		// END KGU#413 2017-06-09
 		return isDecl;
 	}
-	/** @return true if at least one line of {@code this} complies to {@link #isDeclaration(String)}
-	 * @see #isDeclaration(String) */
+	/**
+	 * @return true if at least one line of {@code this} complies to
+	 *     {@link #isDeclaration(String)}
+	 * 
+	 * @see #isDeclaration(String)
+	 */
 	public boolean hasDeclarations()
 	{
 		boolean hasDecl = false;
@@ -918,33 +923,40 @@ public class Instruction extends Element {
 
 	// START KGU#388 2017-07-03: Enh. #423
 	/**
-	 * Returns true if the given {@code line} of code is a type definition of one of the following forms:<br>
-	 * a) type &lt;id&gt; = &lt;record&gt;{ &lt;id&gt; {, &lt;id&gt;} &lt;as&gt; &lt;type&gt; {; &lt;id&gt; {, &lt;id&gt;} &lt;as&gt; &lt;type&gt;} };<br>
-	 * b) type &lt;id&gt; = &lt;record&gt;{ &lt;type&gt; &lt;id&gt; {, &lt;id&gt;}; {; &lt;type&gt; &lt;id&gt; {, &lt;id&gt;}} };<br>
-	 * c) type &lt;id&gt; = enum{ &lt;id&gt [ = &lt;value&gt; ] {, &lt;id&gt [ = &lt;value&gt; ]} };<br/>
+	 * Returns true if the given {@code line} of code is a type definition of one
+	 * of the following forms:<br/>
+	 * a) type &lt;id&gt; = &lt;record&gt;{ &lt;id&gt; {, &lt;id&gt;} &lt;as&gt;
+	 *     &lt;type&gt; {; &lt;id&gt; {, &lt;id&gt;} &lt;as&gt; &lt;type&gt;} };<br/>
+	 * b) type &lt;id&gt; = &lt;record&gt;{ &lt;type&gt; &lt;id&gt; {, &lt;id&gt;};
+	 *     {; &lt;type&gt; &lt;id&gt; {, &lt;id&gt;}} };<br/>
+	 * c) type &lt;id&gt; = enum{ &lt;id&gt [ = &lt;value&gt; ] {, &lt;id&gt
+	 *     [ = &lt;value&gt; ]} };<br/>
 	 * d) type &lt;id&gt; = &lt;type&gt;<br/>
-	 * where
-	 * &lt;record&gt; ::= record | struct
-	 * &lt;as&gt; ::= ':' | as | AS
+	 * where<br/>
+	 * &lt;record&gt; ::= record | struct<br/>
+	 * &lt;as&gt; ::= ':' | as | AS<br/>
+	 * 
 	 * @param line - String comprising one line of code
-	 * @return true iff line is of one of the forms a) through e)
-	 * @see #isTypeDefinition(String, HashMap)
+	 * @return {@code true} iff line is of one of the forms a) through d)
+	 * 
+	 * @see #isTypeDefinition(String, Typeregistry)
 	 * @see #isTypeDefinition()
 	 * @see #isEnumTypeDefinition(String)
 	 */
 	public static boolean isTypeDefinition(String line)
 	{
+		// TODO: check type of parsed line instead
 		return isTypeDefinition(line, null);
 	}
 	/**
-	 * Returns true if the given {@code line} of code is a type definition (with possibly registered type, see argument {@code typeMap})
+	 * Returns true if the given {@code line} of code is a type definition (with possibly registered type, see argument {@code typeMap})<br/>
 	 * a) type &lt;id&gt; = &lt;record&gt;{ &lt;id&gt; {, &lt;id&gt;} &lt;as&gt; &lt;type&gt; {; &lt;id&gt; {, &lt;id&gt;} &lt;as&gt; &lt;type&gt;} };<br>
 	 * b) type &lt;id&gt; = &lt;record&gt;{ &lt;type&gt; &lt;id&gt; {, &lt;id&gt;}; {; &lt;type&gt; &lt;id&gt; {, &lt;id&gt;}} };<br>
 	 * c) type &lt;id&gt; = enum{ &lt;id&gt [ = &lt;value&gt; ] {, &lt;id&gt [ = &lt;value&gt; ]} };<br/>
 	 * d) type &lt;id&gt; = &lt;type&gt;<br/>
-	 * where
-	 * &lt;record&gt; ::= record | struct
-	 * &lt;as&gt; ::= ':' | as | AS
+	 * where<br/>
+	 * &lt;record&gt; ::= record | struct<br/>
+	 * &lt;as&gt; ::= ':' | as | AS<br/>
 	 * Type names and descriptions &lt;type&gt; are checked against existing types in {@code typeMap} if given.
 	 * @param line - String comprising one line of code
 	 * @param typeMap - if given then the type name must have been registered in typeMap in order to be accepted (otherwise
@@ -953,6 +965,8 @@ public class Instruction extends Element {
 	 * @see #isTypeDefinition(String)
 	 * @see #isTypeDefinition(HashMap, boolean)
 	 * @see #isTypeDefinition()
+	 * 
+	 * @deprecated Check type of parsed Line instead
 	 */
 	public static boolean isTypeDefinition(String line, HashMap<String, TypeMapEntry> typeMap)
 	{
@@ -986,9 +1000,11 @@ public class Instruction extends Element {
 
 	/**
 	 * Determines if this element contains valid type definitions
+	 * 
 	 * @param typeMap - a type map for verification of types
 	 * @param allLines - if the result should only be true if all lines are type definitions
 	 * @return true if this element contains type definitions
+	 * 
 	 * @see #isTypeDefinition(String, HashMap)
 	 */
 	public boolean isTypeDefinition(HashMap<String, TypeMapEntry> typeMap, boolean allLines)
@@ -1162,6 +1178,8 @@ public class Instruction extends Element {
 	 * Adds own variable declarations (only this element, no substructure!) to the given
 	 * map (varname -> typeinfo).
 	 * @param typeMap
+	 * 
+	 * @deprecated Fetch the types from parsedLines
 	 */
 	@Override
 	public void updateTypeMap(HashMap<String, TypeMapEntry> typeMap)
@@ -1177,6 +1195,7 @@ public class Instruction extends Element {
 		// END KGU#413 2017-06-09
 	}
 	
+	@Deprecated
 	public void updateTypeMapFromLine(HashMap<String, TypeMapEntry> typeMap, String line, int lineNo)
 	{
 		StringList tokens = Syntax.splitLexically(line, true, true);

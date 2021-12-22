@@ -66,7 +66,8 @@ or more conflict messages but no egt file. In this case you will have to reformu
 rules until the grammar passes the GOLDbuild process. This may get tricky if the language
 itself is intrinsically ambiguous.
 Again, the GOLDBuilder (mentioned in section 1) is way more informative and mighty
-than the GOLDBuild.exe - it leads you step by step to the grammar table. 
+than the GOLDBuild.exe - it leads you step by step to the grammar table and even includes
+a test window where you may check whether or not potential sentences will pass. 
 
 3. PARSER CLASS SKELETON
 If you have luckily obtained an egt file (or have downloaded an also suited cgt file -

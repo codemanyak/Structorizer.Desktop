@@ -211,6 +211,7 @@ package lu.fisch.structorizer.executor;
  *      Kay Gürtzig     2021-04-14      Bugfix #969: Precaution against relative currentDirectory (caused NPE)
  *      Kay Gürtzig     2021-11-01      Bugfix #1013: Eternal loop in setVar(...) on array access after some extraordinary
  *                                      array initialisation.
+ *      Kay Gürtzig     2021-12-22      Parts of builtInFunctions delegated to class Function
  *
  ******************************************************************************************************
  *
@@ -442,82 +443,13 @@ public class Executor implements Runnable
 	};
 	// END KGU#311 2016-12-22
 
+	// START KGU#790 2021-12-22: Issue #800 non-File-API stuff moved to Function, renamed
 	/**
 	 * Implementations of built-in functions and procedures<br/>
 	// NOTE: Any additions and modifications are to be synchronised with
 	 * {@link Function#knownResultTypes}!
 	 */
-	private static final String[] builtInFunctions = new String[] {
-			"public int random(int max) { return (int) (Math.random()*max); }",
-			"public void randomize() {  }",
-			// START KGU#391 2017-05-07: Enh. #398 - we need a sign function to ease the rounding support for COBOL import
-			"public int sgn(int i) { return (i == 0 ? 0 : (i > 0 ? 1 : -1)); }",
-			"public int sgn(double d) { return (d == 0 ? 0 : (d > 0 ? 1 : -1)); }",
-			// END KGU#391 2017-05-07
-			// square
-			"public double sqr(double d) { return d * d; }",
-			// square root
-			"public double sqrt(double d) { return Math.sqrt(d); }",
-			// length of a string
-			"public int length(String s) { return s.length(); }",
-			// position of a substring inside another string
-			"public int pos(String subs, String s) { return s.indexOf(subs)+1; }",
-			"public int pos(Character subs, String s) { return s.indexOf(subs)+1; }",
-			// return a substring of a string
-			// START KGU#275 2016-10-09: Bugfix #266: length tolerance of copy function had to be considered
-			//"public String copy(String s, int start, int count) { return s.substring(start-1,start-1+count); }",
-			"public String copy(String s, int start, int count) { int end = Math.min(start-1+count, s.length()); return s.substring(start-1,end); }",
-			// END KGU#275 2016-10-09
-			// delete a part of a string
-			"public String delete(String s, int start, int count) { return s.substring(0,start-1)+s.substring(start+count-1); }",
-			// insert a string into another one
-			"public String insert(String what, String s, int start) { return s.substring(0,start-1)+what+s.substring(start-1); }",
-			// string transformation
-			"public String lowercase(String s) { return s.toLowerCase(); }",
-			"public String uppercase(String s) { return s.toUpperCase(); }",
-			"public String trim(String s) { return s.trim(); }",
-			// START KGU#410 2017-05-24: Enh. #413: Introduced to facilitate COBOL import but generally useful
-			// If we passed the result of String.split() directly then we would obtain a String[] object the 
-			// Executor cannot display.
-			"public ArrayList split(String s, String p)"
-					+ "{ p = java.util.regex.Pattern.quote(p);"
-					+ " String[] parts = s.split(p, -1);"
-					+ "ArrayList results = new ArrayList(parts.length);"
-					+ " for (int i = 0; i < parts.length; i++) {"
-					+ "		results.add(parts[i]);"
-					+ "}"
-					+ "return results; }",
-			"public ArrayList split(String s, char c)"
-					+ "{ return split(s, \"\" + c); }",
-			// END KGU#410 2017-05-24
-			// START KGU#651 2019-02-13: Issue #678 C function facilitating code import
-			"public int strcmp(String s1, String s2)"
-					+ "{ return s1.compareTo(s2); }",
-			// END KGU#651 2019-02-13
-			// START KGU#57 2015-11-07: More interoperability for characters and Strings
-			// char transformation
-			"public Character lowercase(Character ch) { return (Character)Character.toLowerCase(ch); }",
-			"public Character uppercase(Character ch) { return (Character)Character.toUpperCase(ch); }",
-			// START KGU#150 2016-04-03
-			"public int ord(Character ch) { return (int)ch; }",
-			// START KGU 2016-04-26: It is conform to many languages just to use the first character
-			//"public int ord(String s) throws Exception { if (s.length() == 1) return (int)s.charAt(0); else throw new Exception(); }",
-			"public int ord(String s) { return (int)s.charAt(0); }",
-			// END KGU 2016-04-26
-			"public char chr(int code) { return (char)code; }",
-			// END KGU#150 2016-04-03
-			// END KGU#57 2015-11-07
-			// START KGU#322 2017-01-06: Enh. #325 - reflection functions
-			"public boolean isArray(Object obj) { return (obj instanceof ArrayList); }",
-			"public boolean isString(Object obj) { return (obj instanceof String); }",
-			"public boolean isChar(Object obj) { return (obj instanceof Character); }",
-			"public boolean isBool(Object obj) { return (obj instanceof Boolean); }",
-			"public boolean isNumber(Object obj) { return (obj instanceof Integer) || (obj instanceof Double); }",
-			// START KGU#439 2017-10-13: Issue #436
-			//"public int length(Object[] arr) { return arr.length; }",
-			"public int length(ArrayList arr) { return arr.size(); }",
-			// END KGU#439 2017-10-13
-			// END KGU#322 2017-01-06
+	private static final String[] fileApiRoutines = new String[] {
 			// START KGU 2016-12-18: #314: Support for simple text file API
 			"public int fileOpen(String filePath) { "
 					+ "int fileNo = 0; "
@@ -736,25 +668,6 @@ public class Executor implements Runnable
 					+ "if (!ok) { throw new java.io.IOException(\"" + Control.msgInvalidFileNumberWrite.getText() + "\"); } "
 					+ "}",
 			// END KGU 2016-12-18
-			// START KGU#439 2017-10-13: Issue #436 Array representation changed from Object[] to ArrayList<Object>
-			//"public ArrayList copyArray(Object[] sourceArray) {"
-			//		+ "ArrayList targetArray = new ArrayList(sourceArray.length);"
-			//		+ "for (int i = 0; i < sourceArray.length; i++) {"
-			//		+ "targetArray.add(sourceArray[i]);"
-			//		+ "}"
-			//		+ "return targetArray;"
-			//		+ "}",
-			"public ArrayList copyArray(ArrayList sourceArray) {"
-					// START KGU#492 2018-02-11: Bugfix #509 - wrong use of arguments
-					//+ "return new ArrayList(targetArray);"
-					+ "return new ArrayList(sourceArray);"
-					// END KGU#492 2018-02-11
-					+ "}",
-			// END KGU#439 2017-10-13
-			// START KGU#388 2017-09-13: Enh. #423 Workaround for missing support of HashMap<?,?>.clone() in bsh-2.0b4.jar
-			"public HashMap copyRecord(HashMap sourceRecord) {"
-					+ "return new HashMap(sourceRecord);"
-					+ "}"
 	};
 	
 	/**
@@ -2885,9 +2798,15 @@ public class Executor implements Runnable
 			// END KGU#969 2021-04-14
 			// END KGU 2016-12-18
 
-			for (int i = 0; i < builtInFunctions.length; i++) {
-				interpreter.eval(builtInFunctions[i]);
+			// START KGU#790 2021-12-22: Issue #800 decomposition of built-in stuff
+			//for (int i = 0; i < builtInFunctions.length; i++) {
+			//	interpreter.eval(builtInFunctions[i]);
+			//}
+			Function.implementBuiltInFunctions(interpreter);
+			for (int i = 0; i < fileApiRoutines.length; i++) {
+				interpreter.eval(fileApiRoutines[i]);
 			}
+			// END KGU#790 2021-12-22
 			
 		} catch (EvalError ex)
 		{

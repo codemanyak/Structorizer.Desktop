@@ -582,6 +582,7 @@ public class Menu extends LangMenuBar implements NSDController, LangEventListene
 	// START KGU#375 2017-04-04: Enh. #388 - New check for constants depending on non-constant values or be redefined.
 	public static final LangTextHolder error22_1 = new LangTextHolder("Constant «%1» depends on apparently non-constant value(s) %2.");
 	public static final LangTextHolder error22_2 = new LangTextHolder("Attempt to modify the value of constant «%»!");
+	public static final LangTextHolder error22_3 = new LangTextHolder("Attempt to redeclare variable or constant «%»!");
 	public static final LangTextHolder errorLineReference = new LangTextHolder(" (line %)");
 	// END KGU#375 2017-04-04
 	// START KGU#376 2017-04-11/21: Enh. #389 
@@ -599,7 +600,7 @@ public class Menu extends LangMenuBar implements NSDController, LangEventListene
 	public static final LangTextHolder error24_1 = new LangTextHolder("Type definition in (composed) line % is malformed.");
 	public static final LangTextHolder error24_2 = new LangTextHolder("Type name «%» is illegal or colliding with another identifier.");
 	public static final LangTextHolder error24_3 = new LangTextHolder("Component name «%» is illegal or duplicate.");
-	public static final LangTextHolder error24_4 = new LangTextHolder("Component type «%» is undefined or unknown.");
+	public static final LangTextHolder error24_4 = new LangTextHolder("Type of component «%» is undefined or unknown.");
 	public static final LangTextHolder error24_5 = new LangTextHolder("There is no defined record type «%»!");
 	public static final LangTextHolder error24_6 = new LangTextHolder("Record component «%» will not be modified/initialized!");
 	public static final LangTextHolder error24_7 = new LangTextHolder("Record type «%1» hasn't got a component «%2»!");
