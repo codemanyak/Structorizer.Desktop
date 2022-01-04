@@ -79,6 +79,7 @@ Current development version 3.32-06 (2022-01-04)
       code generators (including code preview) to fail.
 - 06: Bugfix #1025 Insufficient detection of binary, octal, and hexadecimal
       literals in CASE selector consistency checks.
+- 06: Bugfix #1026 Line continuation in Jump elements fooled Analyser <2>
 - 06: Issue #800: Parts of the new expression parsing mechanism established,
       new grammar-based line syntax check in Analyser. <2>
 

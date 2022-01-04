@@ -180,6 +180,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2021-12-05      Bugfix #1024: Malformed record initializer killed Analyser in check 24
  *      Kay Gürtzig     2021-12-04      Issue #800: Grammar-based Analyser syntax check added
  *      Kay Gürtzig     2021-12-13      Bugfix #1025: Lacking evaluation of binary, octal and hexadecimal literals in check 27
+ *      Kay Gürtzig     2022-01-04      Bugfix #1026: Analyser defect on broken lines in Jump or Instruction elements
  *      Kay Gürtzig     2022-01-04      Issue #800: Analyser redesign based on parsed lines continued
  *      
  ******************************************************************************************************
@@ -5056,7 +5057,10 @@ public class Root extends Element {
 	 */
 	private void analyse_13_16_jump(Jump ele, Vector<DetectedError> _errors, StringList _myVars, boolean[] _resultFlags)
 	{
-		StringList sl = ele.getText();
+		// START KGU#1023 2022-01-04: Bugfix #1026 line continuation wasn't recognised
+		//StringList sl = ele.getText();
+		StringList sl = ele.getUnbrokenText();
+		// END KGU#1023 2022-01-04
 		String preReturn = Syntax.getKeywordOrDefault("preReturn", "return");
 		String preLeave = Syntax.getKeywordOrDefault("preLeave", "leave");
 		String preExit = Syntax.getKeywordOrDefault("preExit", "exit");
@@ -5088,6 +5092,17 @@ public class Root extends Element {
 				lineComp.matches("exit([\\W].*|$)") ||	// Also check hard-coded keywords
 				lineComp.matches("break([\\W].*|$)");	// Also check hard-coded keywords
 		Element parent = ele.parent;
+		// START KGU#179 2022-01-04: Issue #161 similar check in multi-line case
+		if (sl.count() > 1
+				&& ((isReturn = Jump.isReturn(line))
+						|| (isLeave = Jump.isLeave(line))
+						|| (isExit = Jump.isExit(line))
+						|| (isThrow = Jump.isThrow(line)))
+				&& !sl.concatenate("", 1).trim().isEmpty()) {
+			//error = new DetectedError("Instruction isn't reachable after a JUMP!",((Subqueue)parent).getElement(pos+1)));
+			addError(_errors, new DetectedError(errorMsg(Menu.error16_7, ""), ele), 16);	
+		}
+		// END KGU#179 2022-01-04
 		// START KGU#179 2016-04-12: Enh. #161 New check for unreachable instructions
 		int pos = -1;
 		if (parent instanceof Subqueue && (pos = ((Subqueue)parent).getIndexOf(ele)) < ((Subqueue)parent).getSize()-1)
@@ -5109,7 +5124,7 @@ public class Root extends Element {
 			addError(_errors, new DetectedError(errorMsg(Menu.error16_1, jumpKeywords), ele), 16);
 		}
 		// CHECK: Correct usage of return (nearby check result mechanisms) (#13, #16)
-		else if (isReturn)
+		if (isReturn)
 		{
 			// START KGU#343 2017-02-07: Disabled to suppress the warnings - may there be side-effects?
 			//_resultFlags[0] = true;
@@ -5201,7 +5216,10 @@ public class Root extends Element {
 	 */
 	private void analyse_13_16_instr(Instruction ele, Vector<DetectedError> _errors, boolean _isLastElement, StringList _myVars, boolean[] _resultFlags)
 	{
-		StringList sl = ele.getText();
+		// START KGU#1023 2022-01-04: Bugfix #1026 line continuation wasn't recognised
+		//StringList sl = ele.getText();
+		StringList sl = ele.getUnbrokenText();
+		// END KGU#1023 2022-01-04
 		String preReturn =  Syntax.getKeywordOrDefault("preReturn", "return").trim();
 		String preLeave = Syntax.getKeywordOrDefault("preLeave", "leave").trim();
 		String preExit = Syntax.getKeywordOrDefault("preExit", "exit").trim();
@@ -8369,15 +8387,19 @@ public class Root extends Element {
 				// end we can see which variables aren't always initialized.
 				Hashtable<String, Integer> myInitVars = new Hashtable<String, Integer>();
 				// adapt size if there is no "default" branch
-				if ( caseEle.getText().get(caseEle.getText().count()-1).equals("%") )
+				// START KGU#1023 2022-01-04: Bugfix #1026 line continuation vulnerability
+				//if ( caseEle.getText().get(caseEle.getText().count()-1).equals("%") )
+				StringList lines = caseEle.getUnbrokenText();
+				if ( lines.get(lines.count()-1).equals("%") )
+				// END KGU#1023 2022-01-04
 				{
 					nBranches--;
 				}
-				for (int j=0; j < nBranches; j++)
+				for (int j = 0; j < nBranches; j++)
 				{
 					StringList caseVars = new StringList(initialVars);
-					getUninitializedVars((Subqueue) caseEle.qs.get(j),caseVars,_args);
-					for(int v = 0; v<caseVars.count(); v++)
+					getUninitializedVars((Subqueue) caseEle.qs.get(j), caseVars, _args);
+					for(int v = 0; v < caseVars.count(); v++)
 					{
 						String varName = caseVars.get(v);
 						if(myInitVars.containsKey(varName))
