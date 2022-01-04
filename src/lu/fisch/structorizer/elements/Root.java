@@ -180,6 +180,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2021-12-05      Bugfix #1024: Malformed record initializer killed Analyser in check 24
  *      Kay Gürtzig     2021-12-04      Issue #800: Grammar-based Analyser syntax check added
  *      Kay Gürtzig     2021-12-13      Bugfix #1025: Lacking evaluation of binary, octal and hexadecimal literals in check 27
+ *      Kay Gürtzig     2022-01-04      Issue #800: Analyser redesign based on parsed lines continued
  *      
  ******************************************************************************************************
  *
@@ -3808,7 +3809,7 @@ public class Root extends Element {
 			}
 			// END KGU#1012 2021-11-14
 
-			// CHECK: assignment in condition (#8)
+			// CHECK #8: assignment in condition
 			if (eleClassName.equals("While")
 					|| eleClassName.equals("Repeat")
 					|| eleClassName.equals("Alternative"))
@@ -3946,7 +3947,7 @@ public class Root extends Element {
 			}
 
 			// CHECK: loop var modified (#1) and loop parameter consistency (#14 new!)
-			if (eleClassName.equals("For"))
+			else if (eleClassName.equals("For"))
 			{
 				// START KGU#923 2021-02-01: Bugfix #923 FOR loops introduce variables!
 				if (ele instanceof For) {
@@ -3957,7 +3958,7 @@ public class Root extends Element {
 			}
 
 			// CHECK: if with empty T-block (#4)
-			if (eleClassName.equals("Alternative"))
+			else if (eleClassName.equals("Alternative"))
 			{
 				if(((Alternative)ele).qTrue.getSize()==0)
 				{
@@ -3967,7 +3968,7 @@ public class Root extends Element {
 			}
 
 			// CHECK: Inconsistency risk due to concurrent variable access by parallel threads (#17) New!
-			if (eleClassName.equals("Parallel"))
+			else if (eleClassName.equals("Parallel"))
 			{
 				analyse_17((Parallel) ele, _errors);
 			}
@@ -4129,9 +4130,9 @@ public class Root extends Element {
 		} // for(int i=0; i < _node.size(); i++)...
 	}
 	/**
-	 * Analyses the subtree, which _node is local root of
+	 * Analyses the subtree, which {@code _node} is local root of.
 	 * 
-	 * @param _node - subtree root
+	 * @param _node - a {@link Subqueue} representing the subtree root (forest)
 	 * @param _errors - the collected errors (may be enhanced by the call)
 	 * @param _vars - names of variables being set within the subtree
 	 * @param _uncertainVars - names of variables being set in some branch of the subtree 
@@ -4146,21 +4147,91 @@ public class Root extends Element {
 		for (int i = 0; i < _node.getSize(); i++)
 		{
 			Element ele = _node.getElement(i);
-			// START KGU#277 2016-10-13: Enh. #270 - disabled elements are to be handled as if they wouldn't exist
+			// Enh. #270 - disabled elements are to be handled as if they wouldn't exist
 			if (ele.isDisabled(true)) continue;
-			// END KGU#277 2016-10-13
 			String eleClassName = ele.getClass().getSimpleName();
 
 			// get all set variables from actual instruction (just this level, no substructre)
-			StringList myVars = getVarNames(ele);
-
 			// START KGU#790 2021-12-04: Issue #800 Grammar-based check
-			if (check(31) && !eleClassName.equals("Parallel")) {
-				analyse_31(ele, _errors);
+			//StringList myVars = getVarNames(ele);
+			StringList myVars = new StringList();
+			StringList myUsed = new StringList();
+			if (!eleClassName.equals("Parallel")) {
+				if (ele.parsedLines == null) {
+					ele.parseLines(_dataTypes);
+				}
+				for (int j = 0; j < ele.parsedLines.length; j++) {
+					Line line = ele.getParsedLine(j);
+					switch (line.getType()) {
+					case LT_ASSIGNMENT:
+					case LT_CONST_DEF:
+					case LT_INPUT:
+					case LT_OUTPUT:
+					case LT_TYPE_DEF:
+					case LT_VAR_DECL:
+					case LT_VAR_INIT:
+						if (eleClassName.equals("Jump")) {
+							String preReturn = Syntax.getKeywordOrDefault("preReturn", "return");
+							String preLeave = Syntax.getKeywordOrDefault("preLeave", "leave");
+							String preExit = Syntax.getKeywordOrDefault("preExit", "exit");
+							String preThrow = Syntax.getKeywordOrDefault("preThrow", "throw");
+							String jumpKeywords = "«" + preLeave + "», «" + preReturn +	"», «" + preExit + "», «" + preThrow + "»";
+							//error = new DetectedError("A JUMP element must contain exactly one of «exit n», «return <expr>», or «leave [n]»!",(Element) _node.getElement(i));
+							addError(_errors, new DetectedError(errorMsg(Menu.error16_1, jumpKeywords), ele), 16);
+						}
+						break;
+					case LT_CONST_FUNCT_CALL:
+						break;
+					case LT_CASE:
+						break;
+					case LT_CATCH:
+						break;
+					case LT_CONDITION:
+						break;
+					case LT_DEFAULT:
+						break;
+					case LT_FOREACH_LOOP:
+						break;
+					case LT_FOR_LOOP:
+						break;
+					case LT_LEAVE:
+					case LT_RETURN:
+					case LT_EXIT:
+					case LT_THROW:
+						if (j + 1 < ele.parsedLines.length) {
+							//error = new DetectedError("Instruction isn't reachable after a JUMP!",((Subqueue)parent).getElement(pos+1)));
+							addError(_errors, new DetectedError(Menu.error16_7.getText(), ele), 16);
+						}
+						else {
+							int pos = -1;
+							if ((pos = _node.getIndexOf(ele)) < _node.getSize()-1)
+							{
+								//error = new DetectedError("Instruction isn't reachable after a JUMP!",((Subqueue)parent).getElement(pos+1)));
+								addError(_errors, new DetectedError(Menu.error16_7.getText(), _node.getElement(pos+1)), 16);
+							}
+						}
+						break;
+					case LT_ROUTINE_CALL:
+						break;
+					case LT_SELECTOR:
+						break;
+					default:
+						break;
+					
+					}
+					if (check(31)) {
+						String error = line.getParserError();
+						if (error != null) {
+							addError(_errors, new DetectedError(errorMsg(Menu.error31, new String[] {Integer.toString(i+1), error.replace("error.syntax:", "")}), ele), 31);
+						}
+					}
+					line.gatherVariables(myVars, null, myUsed, null);
+				}
 			}
 			// END KGU#790 2021-12-04
 
-			// START KGU#1012 2021-11-14: Enh. #967
+			// START KGU#1012 2021-11-14: Enh. #967 special check for ArmGenerator
+			// We check for plugin-specific syntax restrictions
 			if (pluginSyntaxCheckers != null && !eleClassName.equals("Root") && !eleClassName.equals("Parallel")) {
 				for (Map.Entry<String, GeneratorSyntaxChecker> chkEntry: pluginSyntaxCheckers.entrySet()) {
 					if (pluginChecks.get(chkEntry.getKey()) == true) {
@@ -4188,10 +4259,11 @@ public class Root extends Element {
 			}
 			// END KGU#1012 2021-11-14
 
-			// CHECK: assignment in condition (#8)
-			if (eleClassName.equals("While")
-					|| eleClassName.equals("Repeat")
-					|| eleClassName.equals("Alternative"))
+			// CHECK: assignment in condition (#8), superfluous if check 31 is on
+			if (!check(31)
+					&& (eleClassName.equals("While")
+							|| eleClassName.equals("Repeat")
+							|| eleClassName.equals("Alternative")))
 			{
 				analyse_8(ele, _errors);
 			}
@@ -4224,8 +4296,10 @@ public class Root extends Element {
 			}
 
 			// START KGU#992 2021-10-05: Enh. #992
-			// CHECK #30: Bracket balancing
-			analyse_30(ele, _errors);
+			// CHECK #30: Bracket balancing, makes only sense if grammar-based check is off
+			if (!check(31)) {
+				analyse_30(ele, _errors);
+			}
 			// END KGU#992 2021-10-05
 
 			// CHECK: non-initialised var (except REPEAT)  (#3)
@@ -4236,7 +4310,6 @@ public class Root extends Element {
 //				// FIXME: linewise test for Instruction elements needed
 //				analyse_3(ele, _errors, _vars, _uncertainVars, myUsed);
 //			}
-			StringList myUsed = new StringList();
 			if (eleClassName.equals("Instruction"))
 			{
 				@SuppressWarnings("unchecked")
@@ -4518,7 +4591,9 @@ public class Root extends Element {
 
 	/**
 	 * CHECK  #1: loop var modified<br/>
+	 * CHECK  #2: zero step (no progress)<br/>
 	 * CHECK #14: loop parameter consistency
+	 * 
 	 * @param ele - For element to be analysed
 	 * @param _errors - global list of errors
 	 */
@@ -4592,7 +4667,7 @@ public class Root extends Element {
 			}
 			catch (NumberFormatException ex)
 			{
-				addError(_errors, error, 14);                                    		
+				addError(_errors, error, 14);
 			}
 		}
 		// END KGU#3 2015-11-03
@@ -5404,6 +5479,8 @@ public class Root extends Element {
 	 * 
 	 * @see #analyse_24(Element, Vector, HashMap)
 	 * @see #analyse_24_tokens(Element, Vector, HashMap, StringList)
+	 * 
+	 * @deprecated Use {@link #analyse_22_24(Instruction, Vector, StringList, StringList, HashMap, TypeRegistry)}
 	 */
 	private void analyse_22_24(Instruction _instr, Vector<DetectedError> _errors,
 			StringList _vars, StringList _uncertainVars, HashMap<String, String> _definedConsts,

@@ -4931,36 +4931,46 @@ public abstract class Element {
 	
 	/**
 	 * Re-parses all text lines no matter whether there have already been parsed
-	 * lines in the cache. Overwrites {@link #parsedLines}.
+	 * lines in the cache. Overwrites {@link #parsedLines}. Uses the
+	 * {@link TypeRegistry} of he owning {@link Root} for data type retrieval.
 	 * 
 	 * @return A {@link StringList} of possible error descriptions
 	 * 
+	 * @see #parseLines(TypeRegistry)
 	 * @see #getParsedLine(int)
 	 * @see #getParsedText(StringList, Typeregistry)
 	 * @see #getParsedText(StringList, StringList, Typeregistry, StringList)
 	 */
 	protected StringList parseLines()
 	{
-		Root root = getRoot(this);
-		return parseLines(root == null ? null : root.getDataTypes());
+		return parseLines(null);
 	}
 	/**
 	 * Re-parses all text lines no matter whether there have already been parsed
-	 * lines in the cache. Overwrites {@link #parsedLines}.
-	 * @param _dataTypes TODO
+	 * lines in the cache. Overwrites {@link #parsedLines}. Uses the passed-in
+	 * {@link TypeRegistry} {@code _dataTypes} for data type retrieval rather than
+	 * the one held by the owning {@link Root}.
 	 * 
+	 * @param _dataTypes - the {@link TypeRegistry} to be used for data type
+	 *     retrieval, falls back to {@link Root#getDataTypes()} if {@code null}.
 	 * @return A {@link StringList} of possible error descriptions
 	 * 
+	 * @see #parseLines()
 	 * @see #getParsedLine(int)
 	 * @see #getParsedText(StringList, Typeregistry)
 	 * @see #getParsedText(StringList, StringList, Typeregistry, StringList)
 	 */
 	protected StringList parseLines(TypeRegistry _dataTypes)
 	{
-		// FIXME both this and getParsedText() needed?
 		StringList errors = new StringList();
 		StringList unbrokenLines = this.getUnbrokenText();
 		parsedLines = new Line[unbrokenLines.count()];
+		if (_dataTypes == null) {
+			Root root = getRoot(this);
+			if (root != null) {
+				_dataTypes = root.getDataTypes();
+			}
+		}
 		for (int i = 0; i < parsedLines.length; i++) {
 			parsedLines[i] = LineParser.getInstance().parse(unbrokenLines.get(i), this, i, _dataTypes);
 			String trouble = parsedLines[i].getParserError();
