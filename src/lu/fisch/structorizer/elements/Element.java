@@ -3835,7 +3835,10 @@ public abstract class Element {
 							// END KGU#701 2019-03-29
 						}
 						// START KGU#388 2017-09-17: Enh. #423 Highlighting of defined types
-						else if (_root.getTypeInfo().containsKey(":" + display) || TypeMapEntry.isStandardType(display)) {
+						// START KGU#790 2022-04-25: Issue #800
+						//else if (_root.getTypeInfo().containsKey(":" + display) || TypeMapEntry.isStandardType(display)) {
+						else if (_root.getDataTypes().getType(display) != null) {
+						// END KGU#790 2022-04-25
 							// black, bold
 							// START KGU#701 2019-03-29: Issue #718
 							//_canvas.setFont(boldFont);
