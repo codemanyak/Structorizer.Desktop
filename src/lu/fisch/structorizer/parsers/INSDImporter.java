@@ -31,7 +31,7 @@ package lu.fisch.structorizer.parsers;
  *
  *      Author          Date            Description
  *      ------          ----            -----------
- *      Kay Gürtzig     2017.04.26      First Issue
+ *      Kay Gürtzig     2017-04-26      First Issue
  *
  ******************************************************************************************************
  *
@@ -54,26 +54,30 @@ public interface INSDImporter {
 
 	/**
 	 * Returns a title for dialog message references
+	 * 
 	 * @return the importer name for dialog
 	 */
 	public String getDialogTitle();
 
 	/**
 	 * Returns a description of the file type for the file chooser
+	 * 
 	 * @return file description text
 	 */
 	public String getFileDescription();
 
 	/**
-	 * Returns expected file name extensions for the file filter 
-	 * @return list of extensions (without dot!)
+	 * Returns expected file name extensions for the file filter
+	 * 
+	 * @return list of extensions (without dot!) as String array
 	 */
 	public String[] getFileExtensions();
 
 	/**
-	 * Returns a suitable FileFilter matching the parameters provided by
+	 * Returns a suitable {@code FileFilter} matching the parameters provided by
 	 * {@link #getFileDescription()} and {@link #getFileExtensions()}.
-	 * @return
+	 * 
+	 * @return the {@link javax.swing.filechooser.FileFilter} object
 	 */
 	public javax.swing.filechooser.FileFilter getFileFilter();
 	
@@ -81,8 +85,10 @@ public interface INSDImporter {
 	 * Parses the file with path {@code _filename} (possibly employing a SAX
 	 * parser) and converts the content into a Structorizer diagram that is
 	 * to be returned
+	 * 
 	 * @param _filename - path of the file assumed to represent a structured algorithm
 	 * @return the extracted Nassi-Shneiderman diagram as Structorizer {@link Root} object
+	 * 
 	 * @throws SAXException in case of some XML format or schema violation
 	 * @throws IOException - in case of a general IO error (e.g. file not readable)
 	 */
