@@ -1958,6 +1958,7 @@ public class Root extends Element {
 	/**
 	 * Like {@link #copy()} but also copies the file paths (particularly important
 	 * for recursive execution to avoid eternal saving requests).
+	 * 
 	 * @return the copied {@link Root}
 	 */
 	public Root copyWithFilepaths()
