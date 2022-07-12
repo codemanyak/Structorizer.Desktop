@@ -133,6 +133,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2021-10-25      Issue #800: cutOutRedundantMarkers substituted by Syntax.removeDecorators()
  *      Kay Gürtzig     2021-11-17      Bugfix #1021 in getHighlightUnits()
  *      Kay Gürtzig     2022-05-31      Bugfix #1037 in getHighlightUnits()
+ *      Kay Gürtzig     2022-07-07      Issue #653: Consistency with Colors.defaultColors ensured
  *
  ******************************************************************************************************
  *
@@ -556,15 +557,26 @@ public abstract class Element {
 			"FF80C0",
 			"C0C0C0",
 			"FF8000",
-			"8080FF"			
+			"8080FF"
 	};
 	public final static Color[] colors = new Color[defaultColors.length];
 	static {
 		for (int i = 0; i < colors.length; i++) {
 			colors[i] = Color.decode("0x" + defaultColors[i]);
 		}
-	};
+	}
 	// END KGU#245 2018-02-07
+	// START KGU#622 2022-07-07: Issue #653 the default colours in Colors had differed
+	/**
+	 * @return the array of default colours (for external use) */
+	public static final Color[] getDefaultColors() {
+		Color[] defCols = new Color[defaultColors.length];
+		for (int i = 0; i < colors.length; i++) {
+			defCols[i] = Color.decode("0x" + defaultColors[i]);
+		}
+		return defCols;
+	}
+	// END KGU#622 2022-07-07
 
 	// text "constants"
 	public static String preAlt = "(?)";
