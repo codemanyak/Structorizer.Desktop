@@ -50,7 +50,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2019-03-28      Enh. #657: Retrieval for called subroutine now with group filter
  *      Kay Gürtzig     2019-03-30      Enh. #696: subroutine retrieval now possible from an alternative pool
  *      Kay Gürtzig     2021-01-04      Enh. #906: New field pauseAfterCall to support the debug mode "step over"
- *      Kay Gürtzig     2021-02-26      Enh. #410: New field isMethodDeclaration and method derivatates for
+ *      Kay Gürtzig     2021-02-26      Enh. #410: New field isMethodDeclaration and method derivates for
  *                                      the representation of imported methods (OOP approach)
  *
  ******************************************************************************************************

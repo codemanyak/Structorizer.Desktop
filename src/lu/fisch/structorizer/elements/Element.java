@@ -363,6 +363,7 @@ public abstract class Element {
 	" - ZH-TW: Joe Chem <hueyan_chen@yahoo.com.tw>\n"+
 	" - CZ: Vladimír Vaščák <vascak@spszl.cz>\n"+
 	" - RU: Юра Лебедев <elita.alegator@gmail.com>\n"+
+	" - FR: tph002 (https://github.com/tph002)\n"+
 	"\n"+
 	"Different good ideas and improvements contributed by\n"+
 	" - Serge Marelli <serge.marelli@education.lu>\n"+
@@ -4792,8 +4793,9 @@ public abstract class Element {
 
 	/**
 	 * Negates the given condition as intelligently as possible.
+	 * 
 	 * @param condition - a boolean expression (in Structorizer-conform syntax)
-	 * @return an expression reprsenting the logical opposite of {@code condition}
+	 * @return an expression representing the logical opposite of {@code condition}
 	 */
 	public static String negateCondition(String condition)
 	{
