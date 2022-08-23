@@ -39,6 +39,8 @@ package lu.fisch.structorizer.syntax;
  *                                      repeated splitting (much more efficient), direct elimination of
  *                                      whitespace enabled (also way more efficient than posterior deletion)
  *      Kay Gürtzig     2021-12-08      Redesign of unifyOperators()
+ *      Kay Gürtzig     2022-08-20      Enh. #1066: New static method retrieveComponentNames()
+ *      Kay Gürtzig     2022-08-23      Bugfix #1068: splitExpressionList returned wrong results with empty lists
  *
  ******************************************************************************************************
  *
@@ -57,6 +59,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
+import lu.fisch.structorizer.elements.TypeMapEntry;
 import lu.fisch.structorizer.io.Ini;
 import lu.fisch.utils.StringList;
 
@@ -1243,11 +1246,14 @@ public class Syntax {
 	 * The analysis stops as soon as there is a level underflow (i.e. an unmatched right
 	 * parenthesis, bracket, or the like).<br/>
 	 * The list of the remaining tokens from the unsatisfied right parenthesis, bracket, or
-	 * brace on will be added as last element to the result if {@code _appendTail} is true.
+	 * brace on will be added as last element to the result.
 	 * If the last result element is empty then the expression list was syntactically "clean".<br/>
-	 * FIXME If the expression was given without some parentheses as delimiters then a tail won't be added.
+	 * FIXME If the expression was given without some parentheses as delimiters then a tail
+	 * won't be added.
+	 * 
 	 * @param _tokens - {@link StringList} containing one or more expressions in tokenized form
-	 * @param _listSeparator - a character sequence serving as separator among the expressions (default: ",") 
+	 * @param _listSeparator - a character sequence serving as separator among the expressions
+	 *     (default: ",") 
 	 * @return a list consisting of the separated tokenized expressions and the tail.
 	 */
 	public static ArrayList<StringList> splitExpressionList(StringList _tokens, String _listSeparator)
@@ -1259,6 +1265,7 @@ public class Syntax {
 		boolean isWellFormed = true;
 		Stack<String> enclosings = new Stack<String>();
 		int tokenCount = _tokens.count();
+		
 		StringList currExpr = new StringList();
 		StringList tail = new StringList();
 		for (int i = 0; isWellFormed && parenthDepth >= 0 && i < tokenCount; i++)
@@ -1292,14 +1299,22 @@ public class Syntax {
 					isWellFormed = parenthDepth > 0 && token.equals(enclosings.pop());
 					parenthDepth--;
 				}
+				
+				
 				if (isWellFormed)
 				{
 					currExpr.add(token);
 				}
 				else
 				{
-					expressionList.add(currExpr.trim());
-					currExpr = new StringList();
+					// START KGU#1061 2022-08-23: Bugfix #1068 an empty list generated a list with empty string
+					//expressionList.add(currExpr.trim();
+					if (!(currExpr = currExpr.trim()).isEmpty() || !expressionList.isEmpty()) {
+						// There must have been at least one separator - so add even an empty term
+						expressionList.add(currExpr);
+					}
+					// END KGU#1061 2022-08-23
+					currExpr = new StringList();	// We must not clear() because it would be shared
 					tail = _tokens.subSequence(i, _tokens.count()).trim();
 				}
 			}
@@ -1314,6 +1329,117 @@ public class Syntax {
 		return expressionList;
 	}
 	// END KGU#101 2015-12-11
+
+	// START KGU#1057 2022-08-20: Enh. #1066 Interactive input assistent
+	/**
+	 * Analyses the token list {@code tokens} preceding a dot in backwards direction for
+	 * record structure information.<br/>
+	 * If the pretext describes an object with record structure then returns the list
+	 * of component names.
+	 * 
+	 * @param tokens - the lexically split line content up to (but not including) a dot
+	 * @param typeMap - the current mapping of variables and type names to type info
+	 * @param firstSeen - must either be {@code null} or an int array with at least one
+	 *     element, at position 0 of which the index of the first token that contributed
+	 *     to the analysis will be placed.
+	 * @return either a list of component names or {@code null}
+	 */
+	public static ArrayList<String> retrieveComponentNames(
+			StringList tokens,
+			HashMap<String, TypeMapEntry> typeMap,
+			int[] firstSeen) {
+		// FIXME: To be converted to new TypeRegistry system
+		ArrayList<String> proposals = null;
+		tokens.removeAll(" ");
+		// Go as far backward as we can go to find the base variable
+		// We will not go beyond a function call, so what may precede is an id or ']'
+		StringList path = new StringList();
+		int ix = tokens.count() -1;
+		while (path != null && ix >= 0) {
+			String prevToken = tokens.get(ix);
+			// There might be several index expressions
+			while (path != null && prevToken.equals("]")) {
+				// We will have to find the corresponding opening bracket
+				int ixClose = ix;
+				int level = 1;
+				ix--;
+				while (level > 0 && ix >= 0) {
+					prevToken = tokens.get(ix);
+					if (prevToken.equals("]")) {
+						level++;
+					}
+					else if (prevToken.equals("[")) {
+						level--;
+					}
+					ix--;
+					/* If more than one index expression is listed here,
+					 * then we will find out via expression analysis below
+					 */
+				}
+				if (level > 0) {
+					path = null;
+				}
+				else {
+					// Now find out how many indices are given between the brackets
+					ArrayList<StringList> indexExprs = splitExpressionList(
+							tokens.subSequence(ix + 2, ixClose + 1), ",");
+					// Add as many bracket pairs to the path
+					for (int i = 0; i < indexExprs.size() - 1; i++) {
+						path.add("[]");
+					}
+					prevToken = tokens.get(ix);
+				}
+			}
+			if (path != null && isIdentifier(prevToken, true, null)) {
+				path.add(prevToken);
+				ix--;
+				if (ix > 0 && tokens.get(ix).equals(".")) {
+					ix--; // Continue path collection
+				}
+				else {
+					break;	// Stop analysis, path may be valid
+				}
+			}
+			else {
+				path = null;
+			}
+		}
+		if (path != null && path.count() >= 1) {
+			// Now we may have a reverse valid access path
+			path = path.reverse();
+			TypeMapEntry varType = typeMap.get(path.get(0));
+			path.remove(0);
+			while (varType != null && !path.isEmpty()) {
+				if (varType.isArray() && path.get(0).equals("[]")) {
+					String typeStr = varType.getCanonicalType(true, true);
+					while (typeStr.startsWith("@") && !path.isEmpty()
+							&& path.get(0).equals("[]")) {
+						typeStr = typeStr.substring(1);
+						path.remove(0);
+					}
+					varType = typeMap.get(":" + typeStr);
+				}
+				if (varType != null && varType.isRecord()) {
+					if (!path.isEmpty()) {
+						var compInfo = varType.getComponentInfo(true);
+						varType = compInfo.get(path.get(0));
+						path.remove(0);
+					}
+				}
+			}
+			if (varType != null && varType.isRecord()) {
+				// path must now be exhausted, the component names are our proposals
+				var compInfo = varType.getComponentInfo(true);
+				proposals = new ArrayList<String>();
+				proposals.addAll(compInfo.keySet());
+			}
+		}
+		if (firstSeen != null && firstSeen.length > 0) {
+			firstSeen[0] = ix + 1;
+		}
+		return proposals;
+	}
+	// END KGU#1057 2022-08-20
 
 	// START KGU#18/KGU#23 2015-10-24 intermediate transformation added and decomposed
 	/**
