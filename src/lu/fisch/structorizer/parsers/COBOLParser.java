@@ -117,7 +117,9 @@ package lu.fisch.structorizer.parsers;
  *      Kay Gürtzig     2022-08-11      Issue #1057: LENGTH OF operator is now converted to a symbolic sizeof() call
  *                                      Bugfix #1058: Handling of negated condition names revised
  *      Kay Gürtzig     2022-08-14      Bugfix #851/3: Float literals without digit left of the decimal point enabled
- *      Kay Gürtzig     2022-08-15      Bugfix #1059: Complete redesign of transformCondition()
+ *      Kay Gürtzig     2022-08-15      Bugfix #1059: Complete redesign of transformCondition();
+ *                                      Issue #1064: Pseudo-Calls marking paragraphs and sections now permanently disabled
+ *      Kay Gürtzig     2022-08-17      Bugfix #1059: Some finishing of negation handling in conditions.
  *
  ******************************************************************************************************
  *
@@ -5916,7 +5918,10 @@ public class COBOLParser extends CodeParser
 
 			// add to NSD
 			Call sec = new Call(name);
-			sec.setDisabled(true);
+			// START KGU#1055 2022-08-16: Issue #1064 Now permanently disabled via Java import mechanism
+			//sec.setDisabled(true);
+			sec.isMethodDeclaration = true;
+			// END KGU#1055 202208-16
 			_parentNode.addElement(this.equipWithSourceComment(sec, _reduction));
 			sec.getComment().insert("Definition of section " + name, 0);
 
@@ -5936,7 +5941,10 @@ public class COBOLParser extends CodeParser
 
 			// add to NSD
 			Call par = new Call(name);
-			par.setDisabled(true);
+			// START KGU#1055 2022-08-16: Issue #1064 Now permanently disabled via Java import mechanism
+			//par.setDisabled(true);
+			par.isMethodDeclaration = true;
+			// END KGU#1055 202208-16
 			_parentNode.addElement(this.equipWithSourceComment(par, _reduction));
 			par.getComment().insert("Definition of paragraph " + name, 0);
 
@@ -9783,6 +9791,7 @@ public class COBOLParser extends CodeParser
 						&& isComparisonOperator(tokStr)) {
 					if (afterNot) {
 						tokStr = this.negateCondition(tokStr);
+						afterNot = false;
 					}
 					_relOpr = tokStr.trim();
 					state = CondState.CS2_REL_OPR;
@@ -9823,15 +9832,21 @@ public class COBOLParser extends CodeParser
 						condSB.append(" not");
 						afterNot = false;
 					}
-					condSB.append("(");
+					condSB.append(" (");
 					state = CondState.CS4_CONTINUE;	// Or CS0?
 					break;
 				}
 				else if (var != null && tok.getName().equals("COBOLWord")) {
 					tokStr = var.getQualifiedName();
 				}
-				condSB.append(" " + _operand1.trim() + " "
-						+ _relOpr.trim() + " " + tokStr.trim());
+				tokStr = _operand1.trim() + " "
+						+ _relOpr.trim() + " " + tokStr.trim();
+				if (afterNot) {
+					// Rather unlikely here, but you'll never know in COBOL...
+					tokStr = this.negateCondition(tokStr);
+					afterNot = false;
+				}
+				condSB.append(" " + tokStr.trim());
 				state = CondState.CS3_END;
 				break;
 			case CS3_END:
@@ -9858,7 +9873,14 @@ public class COBOLParser extends CodeParser
 				}
 				else {
 					// All three parts should be different from null here...
-					condSB.append(" " + _operand1.trim() + " " + _relOpr.trim() + " " + tokStr.trim());
+					tokStr = _operand1.trim() + " "
+							+ _relOpr.trim() + " " + tokStr.trim();
+					if (afterNot) {
+						// Rather unlikely here, but you'll never know in COBOL...
+						tokStr = this.negateCondition(tokStr);
+						afterNot = false;
+					}
+					condSB.append(" " + tokStr.trim());
 					state = CondState.CS3_END;
 				}
 				break;

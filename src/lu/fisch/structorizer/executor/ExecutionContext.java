@@ -36,7 +36,7 @@ package lu.fisch.structorizer.executor;
  *      Kay Gürtzig     2015-11-26      Extended by loopDepth (needed for the JUMP execution)
  *      Kay Gürtzig     2016-12-12      Issue #307: Extended by forLoopVars
  *      Kay Gürtzig     2017-04-21      Enh. #389: Extensions for import calls, conversion into a context cartridge
- *      Kay Gürtzig     2018-03-19      Enh. #389: Renamed in ExecutionContext
+ *      Kay Gürtzig     2018-03-19      Enh. #389: Renamed as ExecutionContext
  *
  ******************************************************************************************************
  *
@@ -110,7 +110,7 @@ public class ExecutionContext {
 	
 	/** Holds the prepared return value (if any) */
 	public Object returnedValue = null;
-
+	
 	/**
 	 * Sets up a new execution context for the given {@link Root} {@code _root}
 	 * @param _root
