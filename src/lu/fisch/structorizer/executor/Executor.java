@@ -218,6 +218,9 @@ package lu.fisch.structorizer.executor;
  *      Kay Gürtzig     2022-08-21/22   Bugfix #1068: Consistency of supported array index notations,
  *                                      problems with access to record components within arrays on the left-hand side,
  *                                      problems with type inference on assignments to array elements
+ *      Kay Gürtzig     2022-09-29      Bugfix #1067: There had still been many occasions where an EvalError slipped
+ *                                      through because of an empty raw method and missing fallback mechanisms, new
+ *                                      method getEvalErrorMessage() generated.
  *
  ******************************************************************************************************
  *
@@ -1378,11 +1381,14 @@ public class Executor implements Runnable
 						{
 							// START KGU#1024 2022-01-05: Upgrade bsh-2.0b6.jar to bsh-2.1.0.jar
 							//logger.log(Level.WARNING, "convertStringComparison(\"{0}\"): {1}", new Object[]{str, ex.getMessage()});
-							String msg = ex.getRawMessage();
-							int pilcrowPos = -1;
-							if (msg != null && (pilcrowPos = msg.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-								msg = msg.substring(0, pilcrowPos);
-							}
+							// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+							//String msg = ex.getRawMessage();
+							//int pilcrowPos = -1;
+							//if ((pilcrowPos = msg.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+							//	msg = msg.substring(0, pilcrowPos);
+							//}
+							String msg = getEvalErrorMessage(ex);
+							// END KGU#1058 2022-09-29
 							logger.log(Level.WARNING, "convertStringComparison(\"{0}\"): {1}", new Object[]{str, msg});
 							// END KGU#1024 2022-01-05
 						}
@@ -1744,16 +1750,17 @@ public class Executor implements Runnable
 						// END KGU#160 2016-04-26
 					} catch (EvalError ex)
 					{
-						trouble = ex.getLocalizedMessage();
-						if (trouble == null) {
-							trouble = ex.getRawMessage();
-						}
-						// START KGU#1024 2022-01-05: Upgrade bsh-2.0b6.jar to bsh-2.1.0.jar
-						int pilcrowPos = -1;
-						if (trouble != null && (pilcrowPos = trouble.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-							trouble = trouble.substring(0, pilcrowPos);
-						}
-						// END KGU#1024 2022-01-05
+						// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+						//trouble = ex.getLocalizedMessage();
+						//if (trouble == null) {
+						//	trouble = ex.getRawMessage();
+						//}
+						//int pilcrowPos = -1;
+						//if ((pilcrowPos = trouble.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+						//	trouble = trouble.substring(0, pilcrowPos);
+						//}
+						trouble = getEvalErrorMessage(ex);
+						// END KGU#1058 2022-09-29
 						break;
 					}
 				// START KGU#2 (#9) 2015-11-13: If root was called then just assign the arguments
@@ -1785,16 +1792,17 @@ public class Executor implements Runnable
 					}
 					catch (EvalError ex)
 					{
-						trouble = ex.getLocalizedMessage();
-						if (trouble == null) {
-							trouble = ex.getRawMessage();
-						}
-						// START KGU#1024 2022-01-05: Upgrade bsh-2.0b6.jar to bsh-2.1.0.jar
-						int pilcrowPos = -1;
-						if (trouble != null && (pilcrowPos = trouble.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-							trouble = trouble.substring(0, pilcrowPos);
-						}
-						// END KGU#1024 2022-01-05
+						// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+						//trouble = ex.getLocalizedMessage();
+						//if (trouble == null) {
+						//	trouble = ex.getRawMessage();
+						//}
+						//int pilcrowPos = -1;
+						//if ((pilcrowPos = trouble.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+						//	trouble = trouble.substring(0, pilcrowPos);
+						//}
+						trouble = getEvalErrorMessage(ex);
+						// END KGU#1058 2022-09-29
 						break;
 					}
 				}
@@ -2122,17 +2130,23 @@ public class Executor implements Runnable
 							if (!context.constants.containsKey(constName)) {
 								try {
 									context.constants.put(constName, impInfo.interpreter.get(constName));
-								} catch (EvalError e) {
+								} catch (EvalError ex) {
 									if (!errorString.isEmpty()) {
 										errorString += "\n";
 									}
 									// START KGU#1024 2022-01-05: Upgrade bsh-2.0b6.jar to bsh-2.1.0.jar
-									//errorString += e.getMessage();
-									String trouble = e.getRawMessage();
-									int pilcrowPos = -1;
-									if (trouble != null && (pilcrowPos = trouble.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-										trouble = trouble.substring(0, pilcrowPos);
-									}
+									//errorString += ex.getMessage();
+									// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+									//String trouble = ex.getLocalizedMessage();
+									//if (trouble == null) {
+									//	trouble = ex.getRawMessage();
+									//}
+									//int pilcrowPos = -1;
+									//if ((pilcrowPos = trouble.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+									//	trouble = trouble.substring(0, pilcrowPos);
+									//}
+									String trouble = getEvalErrorMessage(ex);
+									// END KGU#1058 2022-09-29
 									errorString += trouble;
 									// END KGU#1024 2022-01-05
 								}
@@ -2896,11 +2910,14 @@ public class Executor implements Runnable
 			//java.io.IOException
 			// START KGU#1024 2022-01-05: Upgrade bsh-2.0b6.jar to bsh-2.1.0.jar
 			//logger.log(Level.SEVERE, ex.getMessage());
-			String msg = ex.getRawMessage();
-			int pilcrowPos = -1;
-			if (msg != null && (pilcrowPos = msg.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-				msg = msg.substring(0, pilcrowPos);
-			}
+			// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+			//String msg = ex.getRawMessage();
+			//int pilcrowPos = -1;
+			//if ((pilcrowPos = msg.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+			//	msg = msg.substring(0, pilcrowPos);
+			//}
+			String msg = getEvalErrorMessage(ex);
+			// END KGU#1058 2022-09-29
 			logger.log(Level.SEVERE, msg);
 			// END KGU#1024 2022-01-05
 
@@ -3466,14 +3483,17 @@ public class Executor implements Runnable
 		catch (EvalError ex) {
 			// START KGU#1024 2022-01-05: Upgrade bsh-2.0b6.jar to bsh-2.1.0.jar
 			//String msg = ex.getMessage();
-			String msg = ex.getRawMessage();
-			int pilcrowPos = -1;
-			if (msg != null && (pilcrowPos = msg.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-				msg = msg.substring(0, pilcrowPos);
-			}
+			// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+			//String msg = ex.getRawMessage();
+			//int pilcrowPos = -1;
+			//if ((pilcrowPos = msg.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+			//	msg = msg.substring(0, pilcrowPos);
+			//}
+			String msg = getEvalErrorMessage(ex);
+			// END KGU#1058 2022-09-29
 			// END KGU#1024 2022-01-05
 			int idx = -1;
-			if (msg != null && (idx = msg.indexOf("Lexical error ")) >= 0 && msg.substring(idx).contains("\\")) {
+			if ((idx = msg.indexOf("Lexical error ")) >= 0 && msg.substring(idx).contains("\\")) {
 				// Apparently the backslash(es) weren't meant to be escape characters.
 				this.evaluateExpression(target + " = " + rawInput.replace("\\", "\\\\"), false, false);
 			}
@@ -4367,7 +4387,14 @@ public class Executor implements Runnable
 			catch (EvalError ex) {
 				// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
 				//if (MTCH_EVAL_ERROR_ARRAY.reset(ex.getMessage()).matches()) {
-				if (MTCH_EVAL_ERROR_ARRAY.reset(ex.getRawMessage()).matches()) {
+				// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+				String msg = ex.getRawMessage();
+				if ((msg == null || msg.isBlank()) && (msg = ex.getMessage()).isEmpty()) {
+					// This will always yield a non-empty string
+					msg = ex.toString();
+				}
+				// END KGU#1058 2022-08-19
+				if (MTCH_EVAL_ERROR_ARRAY.reset(msg).matches()) {
 				// END KGU#1024 2022-01-05
 					// Stored array type is an obstacle for re-assignment, so drop it
 					context.interpreter.unset(target);
@@ -4962,11 +4989,14 @@ public class Executor implements Runnable
 				//errors.add(varName + ": " + err.getMessage());
 				// END KGU#441 2017-10-13
 				//logger.log(Level.WARNING, "adoptVarChanges({}) on {0}: {1}", new Object[]{newValues, varName, err.getMessage()});
-				String msg = err.getRawMessage();
-				int pilcrowPos = -1;
-				if (msg != null && (pilcrowPos = msg.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-					msg = msg.substring(0, pilcrowPos);
-				}
+				// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+				//String msg = err.getRawMessage();
+				//int pilcrowPos = -1;
+				//if ((pilcrowPos = msg.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+				//	msg = msg.substring(0, pilcrowPos);
+				//}
+				String msg = getEvalErrorMessage(err);
+				// END KGU#1058 2022-09-29
 				errors.add(varName + ": " + msg);
 				logger.log(Level.WARNING, "adoptVarChanges({}) on {0}: {1}", new Object[]{newValues, varName, msg});
 				// END KGU#1024 2022-01-05
@@ -5481,17 +5511,14 @@ public class Executor implements Runnable
 				// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
 				//trouble = ex.getLocalizedMessage();
 				//if (trouble == null) trouble = ex.getMessage();
-				trouble = ex.getRawMessage();
-				// START KGU#1058 2022-08-19: Bugfix #1067 some errors passed unnoticed
-				if (trouble == null || trouble.isBlank()) {
-					// Tis will always yield a non-empty string
-					trouble = ex.toString();
-				}
-				// END KGU#1058 2022-08-19
-				int pilcrowPos = -1;
-				if ((pilcrowPos = trouble.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-					trouble = trouble.substring(0, pilcrowPos);
-				}
+				// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+				//trouble = ex.getRawMessage();
+				//int pilcrowPos = -1;
+				//if (trouble != null && (pilcrowPos = trouble.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+				//	trouble = trouble.substring(0, pilcrowPos);
+				//}
+				trouble = getEvalErrorMessage(ex);
+				// END KGU#1058 2022-09-29
 				// END KGU#1024 2022-01-05
 				if (trouble.endsWith("TargetError")) {
 					String errorText = ex.getErrorText();
@@ -5622,11 +5649,14 @@ public class Executor implements Runnable
 				// START KGU#1024 2022-01-05: Upgrade bsh-2.0b6.jar to bsh-2.1.0.jar
 				//trouble = ex.getLocalizedMessage();
 				//if (trouble == null) trouble = ex.getMessage();
-				trouble = ex.getRawMessage();
-				int pilcrowPos = -1;
-				if (trouble != null && (pilcrowPos  = trouble.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-					trouble = trouble.substring(0, pilcrowPos);
-				}
+				// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+				//trouble = ex.getRawMessage();
+				//int pilcrowPos = -1;
+				//if ((pilcrowPos = trouble.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+				//	trouble = trouble.substring(0, pilcrowPos);
+				//}
+				trouble = getEvalErrorMessage(ex);
+				// END KGU#1058 2022-09-29
 				// END KGU#1024 2022-01-05
 			}
 
@@ -5738,11 +5768,14 @@ public class Executor implements Runnable
 					// START KGU#1024 2022-01-05: Upgrade bsh-2.0b6.jar to bsh-2.1.0.jar
 					//String exMessage = ex.getLocalizedMessage();
 					//if (exMessage == null) exMessage = ex.getMessage();
-					String exMessage = ex.getRawMessage();
-					int pilcrowPos = -1;
-					if (exMessage != null && (pilcrowPos  = exMessage.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-						exMessage = exMessage.substring(0, pilcrowPos);
-					}
+					// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+					//String exMessage = ex.getRawMessage();
+					//int pilcrowPos = -1;
+					//if (exMessage != null && (pilcrowPos = exMessage.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+					//	exMessage = exMessage.substring(0, pilcrowPos);
+					//}
+					String exMessage = getEvalErrorMessage(ex);
+					// END KGU#1058 2022-09-29
 					// END KGU#1024 2022-01-05
 					trouble = control.msgWrongExit.getText().replace("%1", exMessage);
 					// END KGU#197 2016-07-27
@@ -6634,11 +6667,14 @@ public class Executor implements Runnable
 					// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
 					//String exMessage = ex.getLocalizedMessage();
 					//if (exMessage == null) exMessage = ex.getMessage();
-					String exMessage = ex.getRawMessage();
-					int pilcrowPos = -1;
-					if (exMessage != null && (pilcrowPos = exMessage.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-						exMessage = exMessage.substring(0, pilcrowPos);
-					}
+					// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+					//String exMessage = ex.getRawMessage();
+					//int pilcrowPos = -1;
+					//if (exMessage != null && (pilcrowPos = exMessage.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+					//	exMessage = exMessage.substring(0, pilcrowPos);
+					//}
+					String exMessage = getEvalErrorMessage(ex);
+					// END KGU#1058 2022-09-29
 					// END KGU#1024 2022-01-05
 					trouble += (!trouble.isEmpty() ? "\n" : "") +
 							"PARAM " + (p+1) + ": " + exMessage;
@@ -6893,11 +6929,14 @@ public class Executor implements Runnable
 			// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
 			//trouble = ex.getLocalizedMessage();
 			//if (trouble == null) trouble = ex.getMessage();
-			trouble = ex.getRawMessage();
-			int pilcrowPos = -1;
-			if (trouble != null && (pilcrowPos = trouble.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-				trouble = trouble.substring(0, pilcrowPos);
-			}
+			// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+			//trouble = ex.getRawMessage();
+			//int pilcrowPos = -1;
+			//if ((pilcrowPos = trouble.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+			//	trouble = trouble.substring(0, pilcrowPos);
+			//}
+			trouble = getEvalErrorMessage(ex);
+			// END KGU#1058 2022-09-29
 			// END KGU#1024 2022-01-05
 		}
 		
@@ -7006,11 +7045,14 @@ public class Executor implements Runnable
 			// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
 			//trouble = ex.getLocalizedMessage();
 			//if (trouble == null) trouble = ex.getMessage();
-			trouble = ex.getRawMessage();
-			int pilcrowPos = -1;
-			if (trouble != null && (pilcrowPos = trouble.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-				trouble = trouble.substring(0, pilcrowPos);
-			}
+			// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+			//trouble = ex.getRawMessage();
+			//int pilcrowPos = -1;
+			//if ((pilcrowPos = trouble.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+			//	trouble = trouble.substring(0, pilcrowPos);
+			//}
+			trouble = getEvalErrorMessage(ex);
+			// END KGU#1058 2022-09-29
 			// END KGU#1024 2022-01-05
 		}
 		return trouble;
@@ -7158,17 +7200,13 @@ public class Executor implements Runnable
 			 */
 		} catch (EvalError ex)
 		{
-			// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
-			//trouble = ex.getMessage();
-			trouble = ex.getRawMessage();
-			int pilcrowPos = -1;
-			if (trouble != null && (pilcrowPos = trouble.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-				trouble = trouble.substring(0, pilcrowPos);
-			}
+			// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+			trouble = getEvalErrorMessage(ex);
 			// END KGU#1024 2022-01-05
 		}
 		return trouble;
 	}
+
 	
 	private String stepRepeat(Repeat element)
 	{
@@ -7307,11 +7345,14 @@ public class Executor implements Runnable
 		{
 			// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
 			//trouble = ex.getMessage();
-			trouble = ex.getRawMessage();
-			int pilcrowPos = -1;
-			if (trouble != null && (pilcrowPos = trouble.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-				trouble = trouble.substring(0, pilcrowPos);
-			}
+			// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+			//trouble = ex.getRawMessage();
+			//int pilcrowPos = -1;
+			//if ((pilcrowPos = trouble.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+			//	trouble = trouble.substring(0, pilcrowPos);
+			//}
+			trouble = getEvalErrorMessage(ex);
+			// END KGU#1058 2022-09-29
 			// END KGU#1024 2022-01-05
 		}
 		return trouble;
@@ -7463,11 +7504,14 @@ public class Executor implements Runnable
 		{
 			// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
 			//trouble = ex.getMessage();
-			trouble = ex.getRawMessage();
-			int pilcrowPos = -1;
-			if (trouble != null && (pilcrowPos = trouble.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-				trouble = trouble.substring(0, pilcrowPos);
-			}
+			// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+			//trouble = ex.getRawMessage();
+			//int pilcrowPos = -1;
+			//if ((pilcrowPos = trouble.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+			//	trouble = trouble.substring(0, pilcrowPos);
+			//}
+			trouble = getEvalErrorMessage(ex);
+			// END KGU#1058 2022-09-29
 			// END KGU#1024 2022-01-05
 		}
 		// START KGU#307 2016-12-12: Issue #307 - prepare warnings on loop variable manipulations
@@ -7500,11 +7544,14 @@ public class Executor implements Runnable
 		{
 			// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
 			//problem += "\n" + ex.getMessage();
-			String exMessage = ex.getRawMessage();
-			int pilcrowPos = -1;
-			if (exMessage != null && (pilcrowPos = exMessage.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-				exMessage = exMessage.substring(0, pilcrowPos);
-			}
+			// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+			//String exMessage = ex.getRawMessage();
+			//int pilcrowPos = -1;
+			//if ((pilcrowPos = exMessage.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+			//	exMessage = exMessage.substring(0, pilcrowPos);
+			//}
+			String exMessage = getEvalErrorMessage(ex);
+			// END KGU#1058 2022-09-29
 			problem += "\n" + exMessage;
 			// END KGU#1024 2022-01-05
 		}
@@ -7524,11 +7571,14 @@ public class Executor implements Runnable
 			{
 				// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
 				//problem += "\n" + ex.getMessage();
-				String exMessage = ex.getRawMessage();
-				int pilcrowPos = -1;
-				if (exMessage != null && (pilcrowPos = exMessage.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-					exMessage = exMessage.substring(0, pilcrowPos);
-				}
+				// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+				//String exMessage = ex.getRawMessage();
+				//int pilcrowPos = -1;
+				//if (exMessage != null && (pilcrowPos = exMessage.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+				//	exMessage = exMessage.substring(0, pilcrowPos);
+				//}
+				String exMessage = getEvalErrorMessage(ex);
+				// END KGU#1058 2022-09-29
 				problem += "\n" + exMessage;
 				// END KGU#1024 2022-01-05
 			}
@@ -7567,11 +7617,14 @@ public class Executor implements Runnable
 			{
 				// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
 				//problem += "\n" + ex.getMessage();
-				String exMessage = ex.getRawMessage();
-				int pilcrowPos = -1;
-				if (exMessage != null && (pilcrowPos = exMessage.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-					exMessage = exMessage.substring(0, pilcrowPos);
-				}
+				// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+				//String exMessage = ex.getRawMessage();
+				//int pilcrowPos = -1;
+				//if (exMessage != null && (pilcrowPos = exMessage.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+				//	exMessage = exMessage.substring(0, pilcrowPos);
+				//}
+				String exMessage = getEvalErrorMessage(ex);
+				// END KGU#1058 2022-09-29
 				problem += "\n" + exMessage;
 				// END KGU#1024 2022-01-05
 			}
@@ -7594,11 +7647,14 @@ public class Executor implements Runnable
 			{
 				// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
 				//problem += "\n" + ex.getMessage();
-				String exMessage = ex.getRawMessage();
-				int pilcrowPos = -1;
-				if (exMessage != null && (pilcrowPos = exMessage.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-					exMessage = exMessage.substring(0, pilcrowPos);
-				}
+				// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+				//String exMessage = ex.getRawMessage();
+				//int pilcrowPos = -1;
+				//if (exMessage != null && (pilcrowPos = exMessage.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+				//	exMessage = exMessage.substring(0, pilcrowPos);
+				//}
+				String exMessage = getEvalErrorMessage(ex);
+				// END KGU#1058 2022-09-29
 				problem += "\n" + exMessage;
 				// END KGU#1024 2022-01-05
 			}
@@ -7620,11 +7676,14 @@ public class Executor implements Runnable
 			{
 				// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
 				//problem += "\n" + ex.getMessage();
-				String exMessage = ex.getRawMessage();
-				int pilcrowPos = -1;
-				if (exMessage != null && (pilcrowPos = exMessage.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-					exMessage = exMessage.substring(0, pilcrowPos);
-				}
+				// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+				//String exMessage = ex.getRawMessage();
+				//int pilcrowPos = -1;
+				//if (exMessage != null && (pilcrowPos = exMessage.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+				//	exMessage = exMessage.substring(0, pilcrowPos);
+				//}
+				String exMessage = getEvalErrorMessage(ex);
+				// END KGU#1058 2022-09-29
 				problem += "\n" + exMessage;
 				// END KGU#1024 2022-01-05
 			}
@@ -7880,14 +7939,17 @@ public class Executor implements Runnable
 					// Obviously a rethrow, so restore the original error message
 					trouble = origTrouble;
 				}
-			} catch (EvalError e) {
+			} catch (EvalError ex) {
 				// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
-				//trouble = e.toString();
-				trouble = e.getRawMessage();
-				int pilcrowPos = -1;
-				if (trouble != null && (pilcrowPos = trouble.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-					trouble = trouble.substring(0, pilcrowPos);
-				}
+				//trouble = ex.toString();
+				// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+				//trouble = ex.getRawMessage();
+				//int pilcrowPos = -1;
+				//if ((pilcrowPos = trouble.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+				//	trouble = trouble.substring(0, pilcrowPos);
+				//}
+				trouble = getEvalErrorMessage(ex);
+				// END KGU#1058 2022-09-29
 				// END KGU#1024 2022-01-05
 			}
 			// FIXME: We should eliminate all variables introduced within the catch block!
@@ -7913,16 +7975,19 @@ public class Executor implements Runnable
 			//	trouble = ex.toString();
 			//}
 			if (!isExited) {
-				trouble = ex.getRawMessage();
-				if (trouble == null) {
-					trouble = ex.toString();
-				}
-				else {
-					int pilcrowPos = trouble.indexOf(EVAL_ERR_PREFIX_SEPA);
-					if (pilcrowPos > 0) {
-						trouble = trouble.substring(0, pilcrowPos);
-					}
-				}
+				// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+				//trouble = ex.getRawMessage();
+				//if (trouble == null) {
+				//	trouble = ex.toString();
+				//}
+				//else {
+				//	int pilcrowPos = trouble.indexOf(EVAL_ERR_PREFIX_SEPA);
+				//	if (pilcrowPos > 0) {
+				//		trouble = trouble.substring(0, pilcrowPos);
+				//	}
+				//}
+				trouble = getEvalErrorMessage(ex);
+				// END KGU#1058 2022-09-29
 			}
 			// END KGU#1024 2022-01-05
 		}
@@ -7938,10 +8003,11 @@ public class Executor implements Runnable
 	
 	// START KGU#117 2016-03-07: Enh. #77 - to track test coverage a consistent subqueue handling is necessary
 	/**
+	 * Steps through the given {@link Subqueue} {@code sq}
 	 * 
-	 * @param sq
-	 * @param checkLeave
-	 * @return
+	 * @param sq - the Subqueue to be executed and tracked
+	 * @param checkLeave - whether a triggered leave operation is to be considered
+	 * @return possibly an error description, en empty string otherwise.
 	 */
 	String stepSubqueue(Subqueue sq, boolean checkLeave)
 	{
@@ -8103,6 +8169,12 @@ public class Executor implements Runnable
 					// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
 					//String error423message = err.getMessage();
 					String error423message = err.getRawMessage();
+					// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+					if ((error423message == null || error423message.isBlank()) && (error423message = err.getMessage()).isEmpty()) {
+						// This will always yield a non-empty string
+						error423message = err.toString();
+					}
+					// END KGU#1058 2022-08-19
 					// END KGU#1024 2022-01-05
 					if (error423message.contains(ERROR423MESSAGE)) {
 						if (ERROR423MATCHER.reset(error423message).matches()) {
@@ -8207,6 +8279,32 @@ public class Executor implements Runnable
 	}
 	// END KGU#388 2017-09-16
 
+	// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+	/**
+	 * Extracts and prepares the relevant message from the given {@link EvalError}.
+	 * Tries several approaches if e.g. method getRawMessage() does not provide a
+	 * substantial content.
+	 * 
+	 * @param ex - the occurred {@link EvalError} exception
+	 * @return the extracted message
+	 */
+	private String getEvalErrorMessage(EvalError ex) {
+		// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
+		//String message = ex.getMessage();
+		String message = ex.getRawMessage();
+		if ((message == null || message.isBlank()) && (message = ex.getMessage()).isEmpty()) {
+			// This will always yield a non-empty string
+			message = ex.toString();
+		}
+		int pilcrowPos = -1;
+		if ((pilcrowPos = message.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+			message = message.substring(0, pilcrowPos);
+		}
+		// END KGU#1024 2022-01-05
+		return message;
+	}
+	// END KGU#1058 2022-08-19
+	
 	// START KGU#677 2019-03-09: Issue #527 (revision)
 	// START KGU#1024 2022-01-05: Workaround to upgrade bsh-2.0b6.jar to bsh-2.1.0.jar
 	///**
@@ -8397,8 +8495,14 @@ public class Executor implements Runnable
 		catch (EvalError e)
 		{
 			int pilcrowPos = -1;
-			if ((message = e.getRawMessage()) != null
-					&& (pilcrowPos = message.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+			// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+			message = e.getRawMessage();
+			if ((message == null || message.isBlank()) && (message = e.getMessage()).isEmpty()) {
+				// This will always yield a non-empty string
+				message = e.toString();
+			}
+			// END KGU#1058 2022-08-19
+			if ((pilcrowPos = message.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
 				message = message.substring(0, pilcrowPos);
 			}
 		}

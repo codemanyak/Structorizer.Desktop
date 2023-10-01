@@ -59,6 +59,7 @@ package lu.fisch.utils;
  *      Kay Gürtzig     2021-04-09      Renamed method replaceIfContains to replaceInElements
  *      Kay Gürtzig     2021-10-25      Results added for add(String), addOrdered(String), and addByLength()
  *      Kay Gürtzig     2021-12-05      New method removeBlanks() for convenience.
+ *      Kay Gürtzig     2022-08-24      Method toLinearPos() adopted from Unimozer and corrected.
  *
  ******************************************************************************************************
  *

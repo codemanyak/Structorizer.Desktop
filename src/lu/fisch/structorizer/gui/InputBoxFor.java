@@ -52,6 +52,7 @@ package lu.fisch.structorizer.gui;
  *      Kay Gürtzig     2020-08-12  Issue #800: CodeParser references replaced by Syntax
  *      Kay Gürtzig     2021-01-26  Issue #400: Some Components had not reacted to Esc and Shift/Ctrl-Enter
  *      Kay Gürtzig     2022-08-23  Enh. #1066: SuggestionDropDownDecorator attached to three form fields
+ *      Kay Gürtzig     2022-09-29  Bugfix #1072: Mechanism to avert "step" keyword in end value field
  *
  ******************************************************************************************************
  *
@@ -151,6 +152,9 @@ public class InputBoxFor extends InputBox implements ItemListener {
 	protected LangTextHolder msgDiscardData = new LangTextHolder("Changing the loop style means to discard most of the data!%Do you really want to discard the data?");
 	protected LangTextHolder msgAttention = new LangTextHolder("ATTENTION!");
 	// END KGU#247 2016-09-23
+	// START KGU#1064 2022-09-29: Bugfx #1072
+	protected LangTextHolder msgIllegalWordInField = new LangTextHolder("Field \"%1\" must not contain keyword «%2»!");
+	// END KGU#1064 2022-09-09
 	
 	// START KGU#61 2016-03-20: Enh. #84/#135 - FOR-IN loop support
 	protected String forInValueList = null;
@@ -569,7 +573,18 @@ public class InputBoxFor extends InputBox implements ItemListener {
 				txtIncr.setText(Integer.toString(this.prevTxtIncrContent));
 			}
 		}
-		txtText.setText(For.composeForClause(txtVariable.getText(), txtStartVal.getText(), txtEndVal.getText(), incr, false));
+		// START KGU#1064 2022-09-29: Bugfix #1072
+		//txtText.setText(For.composeForClause(txtVariable.getText(), txtStartVal.getText(), txtEndVal.getText(), incr, false));
+		String strEndVal = txtEndVal.getText();
+		StringList tokensEndVal = Syntax.splitLexically(strEndVal, true);
+		String stepFor = Syntax.getKeyword("stepFor");
+		if (tokensEndVal.contains(stepFor)) {
+			JOptionPane.showMessageDialog(this, this.msgIllegalWordInField.getText().
+					replace("%1", lblEndVal.getText()).replace("%2", stepFor));
+			strEndVal = tokensEndVal.concatenate("", 0, tokensEndVal.indexOf(stepFor)).trim();
+		}
+		txtText.setText(For.composeForClause(txtVariable.getText(), txtStartVal.getText(), strEndVal, incr, false));
+		// END KGU#1064 2022-09-29
 		// START KGU#61 2016-03-20: Enh. #84/#135 - FOR-IN loop support
 		forInValueList = null;
 		// END KGU#61 2016-03-20    	
