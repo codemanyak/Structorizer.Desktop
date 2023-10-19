@@ -542,7 +542,7 @@ public class Syntax {
 	 * suppressed by using {@link #splitLexically(String, boolean, boolean)} in the first place.
 	 * 
 	 * @param _text - String to be exploded into lexical units
-	 * @param _restoreLiterals - if {@code true} then accidently split numeric and string literals
+	 * @param _restoreStrings - if {@code true} then accidently split numeric and string literals
 	 *        will be reassembled 
 	 * @return StringList consisting of the separated lexemes (including contiguous whitespace
 	 *        sequences).
@@ -1309,7 +1309,7 @@ public class Syntax {
 				{
 					// START KGU#1061 2022-08-23: Bugfix #1068 an empty list generated a list with empty string
 					//expressionList.add(currExpr.trim();
-					if (!(currExpr = currExpr.trim()).isEmpty() || !expressionList.isEmpty()) {
+					if (!currExpr.trim().isEmpty() || !expressionList.isEmpty()) {
 						// There must have been at least one separator - so add even an empty term
 						expressionList.add(currExpr);
 					}
@@ -1328,8 +1328,102 @@ public class Syntax {
 		expressionList.add(tail);
 		return expressionList;
 	}
-	// END KGU#101 2015-12-11
 
+	// START KGU#101/KGU#790 2023-10-19: Issue #800
+	/**
+	 * Splits the token list {@code _tokens}, which is supposed to represent a sequence of
+	 * expressions separated by separators {@code _listSeparator}, into a list of
+	 * {@link TokenList}s, each comprising one of the listed expressions in tokenized form.<br/>
+	 * This is aware of string literals, argument lists of function calls etc. (These must
+	 * not be broken.)
+	 * The analysis stops as soon as there is a level underflow (i.e. an unmatched right
+	 * parenthesis, bracket, or the like).<br/>
+	 * The list of the remaining tokens from the unsatisfied right parenthesis, bracket, or
+	 * brace on will be added as last element to the result.
+	 * If the last result element is empty then the expression list was syntactically "clean".<br/>
+	 * FIXME If the expression was given without some parentheses as delimiters then a tail
+	 * won't be added.
+	 * 
+	 * @param _tokens - {@link StringList} containing one or more expressions in tokenized form
+	 * @param _listSeparator - a character sequence serving as separator among the expressions
+	 *     (default: ",") 
+	 * @return a list consisting of the separated tokenized expressions and the tail.
+	 */
+	public static ArrayList<TokenList> splitExpressionList(TokenList _tokens, String _listSeparator)
+	{
+
+		ArrayList<TokenList> expressionList = new ArrayList<TokenList>();
+		if (_listSeparator == null) _listSeparator = ",";
+		int parenthDepth = 0;
+		boolean isWellFormed = true;
+		Stack<String> enclosings = new Stack<String>();
+		int tokenCount = _tokens.size();
+		
+		TokenList currExpr = new TokenList();
+		TokenList tail = new TokenList();
+		for (int i = 0; isWellFormed && parenthDepth >= 0 && i < tokenCount; i++)
+		{
+			String token = _tokens.get(i);
+			if (token.equals(_listSeparator) && enclosings.isEmpty())
+			{
+				// store the current expression and start a new one
+				expressionList.add(currExpr);
+				currExpr = new TokenList();
+			}
+			else
+			{ 
+				if (token.equals("("))
+				{
+					enclosings.push(")");
+					parenthDepth++;
+				}
+				else if (token.equals("["))
+				{
+					enclosings.push("]");
+					parenthDepth++;
+				}
+				else if (token.equals("{"))
+				{
+					enclosings.push("}");
+					parenthDepth++;
+				}
+				else if ((token.equals(")") || token.equals("]") || token.equals("}")))
+				{
+					isWellFormed = parenthDepth > 0 && token.equals(enclosings.pop());
+					parenthDepth--;
+				}
+				
+				
+				if (isWellFormed)
+				{
+					currExpr.add(token);
+				}
+				else
+				{
+					// START KGU#1061 2022-08-23: Bugfix #1068 an empty list generated a list with empty string
+					//expressionList.add(currExpr.trim();
+					if (!currExpr.isBlank() || !expressionList.isEmpty()) {
+						// There must have been at least one separator - so add even an empty term
+						expressionList.add(currExpr);
+					}
+					// END KGU#1061 2022-08-23
+					currExpr = new TokenList();	// We must not clear() because it would be shared
+					tail = _tokens.subSequence(i, _tokens.size());
+					tail.trim();
+				}
+			}
+		}
+		// add the last expression if it's not empty
+		if (!currExpr.isBlank())
+		{
+			expressionList.add(currExpr);
+		}
+		// Add the tail. Empty if there is no bad tail
+		expressionList.add(tail);
+		return expressionList;
+	}
+	// END KGU#101/KGU#790 2023-10-19
+	
 	// START KGU#1057 2022-08-20: Enh. #1066 Interactive input assistent
 	/**
 	 * Analyses the token list {@code tokens} preceding a dot in backwards direction for
