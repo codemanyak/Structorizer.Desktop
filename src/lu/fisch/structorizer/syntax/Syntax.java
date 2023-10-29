@@ -206,7 +206,7 @@ public class Syntax {
 
 	// START KGU 2016-03-29: For keyword detection improvement
 	/** Like {@link #keywordMap} but holding the tokenized keywords (lazy initialisation) */
-	private static HashMap<String, StringList> splitKeywords = new HashMap<String, StringList>();
+	private static HashMap<String, TokenList> splitKeywords = new HashMap<String, TokenList>();
 	// END KGU 2016-03-29
 	
 	// START KGU 2021-10-25: More efficient implementation of ex Element.cutOutRedundantMarkers()
@@ -216,7 +216,7 @@ public class Syntax {
 			};
 	/** Holds the split redundant keywords (i.e. the mere "decorators") by growing length */
 	// Use lazy initialisation
-	private static ArrayList<StringList> splitDecorators = null;
+	private static ArrayList<TokenList> splitDecorators = null;
 	// END KGU 2021-10-25
 
 	// START KGU#466 2019-08-02: Issue #733 - Support selective preference export
@@ -337,13 +337,14 @@ public class Syntax {
 	/**
 	 * Returns a {@link Hashmap} mapping parser preference labels like "preAlt" to the
 	 * configured parser preference keywords.
-	 * @param includeAuxiliary - whether or not non-keyword settings (like "ignoreCase") are to be included
+	 * 
+	 * @param _includeAuxiliary - whether or not non-keyword settings (like "ignoreCase") are to be included
 	 * @return the hash table with the current settings
 	 */
-	public static final HashMap<String, String> getPropertyMap(boolean includeAuxiliary)
+	public static final HashMap<String, String> getPropertyMap(boolean _includeAuxiliary)
 	{
 		HashMap<String, String> keywords = keywordMap;
-		if (includeAuxiliary)
+		if (_includeAuxiliary)
 		{
 			keywords = new HashMap<String,String>(keywordMap);
 			// The following information may be important for a correct search
@@ -391,13 +392,13 @@ public class Syntax {
 	 * @param _key - a symbolic keyword name
 	 * @return either a token sequence or {@code null}.
 	 */
-	public static StringList getSplitKeyword(String _key)
+	public static TokenList getSplitKeyword(String _key)
 	{
-		StringList tokens = splitKeywords.get(_key);
+		TokenList tokens = splitKeywords.get(_key);
 		if (tokens == null) {
 			String keyword = getKeyword(_key);
 			if (keyword != null) {
-				tokens = splitLexically(keyword, false);
+				tokens = new TokenList(keyword, false);
 				splitKeywords.put(_key, tokens);
 			}
 		}
@@ -409,12 +410,8 @@ public class Syntax {
 	 * {@code _keyword} for this session.<br/>
 	 * Note:
 	 * <ol>
-	 * <li>
-	 * This does NOT influence the Ini file, not even the Ini properties!
-	 * </li>
-	 * <li>
-	 * Only for existing keys a new mapping may be set
-	 * </li>
+	 * <li>This does NOT influence the Ini file, not even the Ini properties!</li>
+	 * <li>Only for existing keys a new mapping may be set</li>
 	 * </ol>
 	 * @param _key - name of the parser preference
 	 * @param _keyword - new value of the parser preference or null
@@ -427,7 +424,7 @@ public class Syntax {
 		// Bugfix #281/#282
 		if (keywordMap.containsKey(_key)) {
 			keywordMap.put(_key, _keyword);
-			splitKeywords.put(_key, splitLexically(_keyword, false));
+			splitKeywords.put(_key, new TokenList(_keyword, false));
 			// START KGU#790 2021-10-25: Issue #800
 			splitDecorators = null;
 			// END KGU#790 2021-10-25
@@ -439,9 +436,10 @@ public class Syntax {
 	/**
 	 * Removes redundant decorator keywords from the passed-in token list.
 	 * (Undispensible part of {@link Element#transformIntermediate(String)}.)
+	 * 
 	 * @param _tokens - the token list to be cleansed.
 	 */
-	public static void removeDecorators(StringList _tokens)
+	public static void removeDecorators(TokenList _tokens)
 	{
 		// Collect redundant placemarkers to be deleted from the text
 		if (splitDecorators == null) {
@@ -454,7 +452,7 @@ public class Syntax {
 					keys.insert(key, ix);
 				}
 			}
-			splitDecorators = new ArrayList<StringList>();
+			splitDecorators = new ArrayList<TokenList>();
 			for (int ix = 0; ix < keys.count(); ix++) {
 				splitDecorators.add(Syntax.getSplitKeyword(keys.get(ix)));
 			}
@@ -462,12 +460,12 @@ public class Syntax {
 
 		for (int i = 0; i < splitDecorators.size(); i++)
 		{
-			StringList markerTokens = splitDecorators.get(i);
-			int markerLen = markerTokens.count();
+			TokenList markerTokens = splitDecorators.get(i);
+			int markerLen = markerTokens.size();
 			int pos = -1;
 			while ((pos = _tokens.indexOf(markerTokens, 0, !Syntax.ignoreCase)) >= 0)
 			{
-				_tokens.remove(pos, pos + markerLen);
+				_tokens.remove(pos, pos + markerLen, true);
 			}
 		}
 	}
@@ -1439,16 +1437,16 @@ public class Syntax {
 	 * @return either a list of component names or {@code null}
 	 */
 	public static ArrayList<String> retrieveComponentNames(
-			StringList tokens,
+			TokenList tokens,
 			HashMap<String, TypeMapEntry> typeMap,
 			int[] firstSeen) {
 		// FIXME: To be converted to new TypeRegistry system
 		ArrayList<String> proposals = null;
-		tokens.removeAll(" ");
+		//tokens.removeAll(" ");
 		// Go as far backward as we can go to find the base variable
 		// We will not go beyond a function call, so what may precede is an id or ']'
 		StringList path = new StringList();
-		int ix = tokens.count() -1;
+		int ix = tokens.size() -1;
 		while (path != null && ix >= 0) {
 			String prevToken = tokens.get(ix);
 			// There might be several index expressions
@@ -1475,7 +1473,7 @@ public class Syntax {
 				}
 				else {
 					// Now find out how many indices are given between the brackets
-					ArrayList<StringList> indexExprs = splitExpressionList(
+					ArrayList<TokenList> indexExprs = splitExpressionList(
 							tokens.subSequence(ix + 2, ixClose + 1), ",");
 					// Add as many bracket pairs to the path
 					for (int i = 0; i < indexExprs.size() - 1; i++) {
@@ -1617,6 +1615,37 @@ public class Syntax {
 	}
 	// END KGU#92 2015-12-01
 
+	// START KGU#92 2023-10-29: Bugfix #41 Okay now, here is the new approach (still a sketch)
+	/**
+	 * Replaces the operator symbols (and some literals) accepted by Structorizer in
+	 * the given token list {@code _tokens} with the following (mostly Java) operators:
+	 * <ul>
+	 * <li>Assignment:	"<-"</li>
+	 * <li>Comparison:	"==", "<", ">", "<=", ">=", "!="</li>
+	 * <li>Logic:		"&&", "||", "!", "^"</li>
+	 * <li>Arithmetics:	usual Java operators (e. g. "mod" -> "%") plus "div"</li>
+	 * <li>Literals:	"Infinity" (from "&infin;")
+	 * </ul>
+	 * 
+	 * @param _tokens - a tokenised line of an Element's text (in practically unknown
+	 *     syntax), <b>will be modified by the method</b>
+	 * @param _assignmentOnly - if {@code true} then only assignment operators will be unified
+	 * @return total number of replacements
+	 */
+	public static int unifyOperators(TokenList _tokens, boolean _assignmentOnly)
+	{
+		int count = 0;
+		for (int i = 0; i < _tokens.size(); i++) {
+			String subst = UNIFICATION_MAP.get(_tokens.get(i).toLowerCase());
+			if (subst != null && (!_assignmentOnly || subst.equals("<-"))) {
+				_tokens.set(i, subst);
+				count++;
+			}
+		}
+		return count;
+	}
+	// END KGU#92 2023-10-29
+	
 //	/**
 //	 * Removes redundant marker keywords (as configured in the Parser Preferences) from
 //	 * the given token list {@code _tokens}.

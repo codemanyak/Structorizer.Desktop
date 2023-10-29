@@ -275,6 +275,7 @@ import lu.fisch.structorizer.syntax.EnumType;
 import lu.fisch.structorizer.syntax.Expression;
 import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.structorizer.syntax.Line;
+import lu.fisch.structorizer.syntax.TokenList;
 
 /**
  * This class represents the "root" of a diagram or the program/sub itself.
@@ -1033,14 +1034,16 @@ public class Root extends Element {
 	@Override
 	public void setText(String _text)
 	{
-		text.setText(_text);
+		//text.setText(_text);
+		super.setText(_text);
 		parameterList = null;
 	}
 
 	@Override
 	public void setText(StringList _text)
 	{
-		text = _text;
+		//text = _text;
+		super.setText(_text);
 		parameterList = null;
 	}
 	// END KGU#371 2019-03-07
@@ -1143,7 +1146,8 @@ public class Root extends Element {
 	 */
 	public boolean isEmpty()
 	{
-		String txt = this.text.concatenate().trim();
+		//String txt = this.text.concatenate().trim();
+		String txt = getText().getLongString().trim();
 		boolean isEmpty = 
 				(txt.isEmpty() || txt.equals("???")) &&
 				this.comment.concatenate().trim().isEmpty() &&
@@ -1293,15 +1297,15 @@ public class Root extends Element {
 		// END KGU 2015-10-13
 
 		// FIXME: Drawing shouldn't modify the element
-		if (getText().isEmpty())
-		{
-			text.add("???");
-		}
-		else if ( ((String)getText().get(0)).trim().equals("") )
-		{
-			text.delete(0);
-			text.insert("???",0);
-		}
+//		if (getText().isEmpty())
+//		{
+//			text.add("???");
+//		}
+//		else if ( ((String)getText().get(0)).trim().equals("") )
+//		{
+//			text.delete(0);
+//			text.insert("???",0);
+//		}
 
 		Rect myRect = _top_left.copy();
 
@@ -2133,7 +2137,8 @@ public class Root extends Element {
 
 		Subqueue oldChildren = (Subqueue)children.copy(); 
 		// START KGU#120 2016-01-02: Bugfix #85 - park my StringList attributes on the stack top
-		oldChildren.setText(new StringList(this.text));
+		//oldChildren.setText(new StringList(this.text));
+		oldChildren.text = new ArrayList<TokenList>(this.text);
 		oldChildren.setComment(new StringList(this.comment));
 		// END KGU#120 2016-01-02
 		// START KGU#363 2017-05-21: Enh. #372: Care for the new attributes
@@ -2278,7 +2283,8 @@ public class Root extends Element {
             // END KGU#365 2017-03-19
                 redoList.add((Subqueue)children.copy());
                 // START KGU#120 2016-01-02: Bugfix #85 - park my StringList attributes in the stack top
-                redoList.peek().setText(new StringList(this.text));
+                //redoList.peek().setText(new StringList(this.text));
+                redoList.peek().setText(getText());
                 redoList.peek().setComment(new StringList(this.comment));
                 // END KGU#120 2016-01-02
                 // START KGU#507 2018-03-15: Bugfix #523
@@ -2373,7 +2379,8 @@ public class Root extends Element {
             // END KGU#137 2016-01-11
             undoList.add((Subqueue)children.copy());
             // START KGU#120 2016-01-02: Bugfix #85 - park my StringList attributes on the stack top
-            undoList.peek().setText(new StringList(this.text));
+            //undoList.peek().setText(new StringList(this.text));
+            undoList.peek().setText(getText());
             undoList.peek().setComment(new StringList(this.comment));
             // END KGU#120 2016-01-02
             // START KGU#507 2018-03-15: Bugfix #523
@@ -5587,6 +5594,7 @@ public class Root extends Element {
 		//	String line = _instr.getText().get(i);
 		StringList unbrText = _instr.getUnbrokenText();
 		for (int i = 0; i < unbrText.count(); i++) {
+			// FIXME Iterate over the TokenLists
 			String line = unbrText.get(i);
 		// END KGU#413 2017-09-17
 			// START KGU#388 2017-09-13: Enh. #423: Type checks
@@ -6214,9 +6222,9 @@ public class Root extends Element {
 	 * @see #analyse_24(Element, Vector, HashMap)
 	 */
 	private void analyse_24_tokens(Element _ele, Vector<DetectedError> _errors,
-			HashMap<String, TypeMapEntry> _types, StringList _tokens) {
-		_tokens.removeAll(" ");
-		int nTokens = _tokens.count();
+			HashMap<String, TypeMapEntry> _types, TokenList _tokens) {
+		//_tokens.removeAll(" ");
+		int nTokens = _tokens.size();
 		int posDot = -1;
 		int[] indexInform = new int[] {0};
 		//TypeMapEntry varType = null;
@@ -6281,7 +6289,7 @@ public class Root extends Element {
 			ArrayList<String> compNames = Syntax.retrieveComponentNames(
 					_tokens.subSequence(0, posDot), _types, indexInform);
 			if (compNames == null || !compNames.contains(after)) {
-				String path = _tokens.concatenate(null, indexInform[0], posDot).trim();
+				String path = _tokens.subSequence(indexInform[0], posDot).getString().trim();
 				addError(_errors, new DetectedError(errorMsg(Menu.error24_8, new String[]{path, after}), _ele), 24);
 			}
 			// END KGU#1059 2022-08-20
@@ -6724,7 +6732,7 @@ public class Root extends Element {
 	{
 		StringList unbrText = _ele.getUnbrokenText();
 		for (int i = 0; i < unbrText.count(); i++) {
-			StringList tokens = Syntax.splitLexically(unbrText.get(i), true);
+			TokenList tokens = new TokenList(unbrText.get(i), true);
 			// START KGU#790 2021-10-25: Issue #800
 			//Element.cutOutRedundantMarkers(tokens);
 			Syntax.removeDecorators(tokens);

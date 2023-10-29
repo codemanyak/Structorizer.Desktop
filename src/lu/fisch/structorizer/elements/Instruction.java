@@ -150,7 +150,7 @@ public class Instruction extends Element {
 	// START KGU#199 2016-07-07: Enh. #188 - also serves subclasses for "up-casting"
 	public Instruction(Instruction instr)
 	{
-		super(new StringList(instr.text));
+		super(instr.text);
 		instr.copyDetails(this, true, true);
 	}
 	// END KGU#199 2016-07-07

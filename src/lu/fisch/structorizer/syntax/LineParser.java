@@ -556,7 +556,7 @@ public class LineParser /*extends CodeParser*/
 	public String preprocessLine(String _line, Element _element, int _lineNo, boolean _unifyOprs)
 	{
 		String className = _element.getClass().getSimpleName();
-		StringList tokens = Syntax.splitLexically(_line, true);
+		TokenList tokens = new TokenList(_line, true);
 		//StringList tokens1 = Syntax.splitLexically(_line, true, false);
 		//if (tokens.indexOf(tokens1, 0, true) != 0) {
 		//	System.err.println("Splitting differs for: " + _line);
@@ -567,29 +567,30 @@ public class LineParser /*extends CodeParser*/
 				|| className.equals("While")
 				|| className.equals("Repeat")) {
 			Syntax.removeDecorators(tokens);
-			tokens.insert("§COND§ ", 0);
+			tokens.add(0, "§COND§");
 		}
 		else if (className.equals("Call")) {
-			tokens.insert("§CALL§ ", 0);
+			tokens.add(0, "§CALL§");
 		}
 		else if (className.equals("Case")) {
 			if (_lineNo == 0) {
 				Syntax.removeDecorators(tokens);
-				tokens.insert("§CASE§ ", 0);
+				tokens.add(0, "§CASE§");
 			}
 			else {
-				tokens.insert("§SELECT§ ", 0);
+				tokens.add(0, "§SELECT§");
 			}
 		}
 		else if (className.equals("Jump")) {
-			if (tokens.trim().isEmpty()) {
+			if (tokens.isBlank()) {
+				tokens.trim();
 				tokens.add("§LEAVE§");
 			}
 			else {
 				for (String key: JUMP_KEYS) {
-					StringList splitKey = Syntax.getSplitKeyword(key);
+					TokenList splitKey = Syntax.getSplitKeyword(key);
 					if (tokens.indexOf(splitKey, 0, !Syntax.ignoreCase) == 0) {
-						tokens.remove(1, splitKey.count());
+						tokens.remove(1, splitKey.size());
 						tokens.set(0, "§" + key.substring(3).toUpperCase() + "§");
 						break;
 					}
@@ -597,7 +598,7 @@ public class LineParser /*extends CodeParser*/
 			}
 		}
 		else if (className.equals("Try")) {
-			tokens.insert("§CATCH§", 0);
+			tokens.add(0, "§CATCH§");
 		}
 		else {
 			if (_element instanceof For) {
@@ -613,10 +614,10 @@ public class LineParser /*extends CodeParser*/
 				}
 				for (int i = 0; i < keys.length; i++) {
 					String keyWord = Syntax.getKeyword(keys[i]);
-					StringList splitKey = Syntax.splitLexically(keyWord, false);
+					TokenList splitKey = new TokenList(keyWord, false);
 					int posKey = tokens.indexOf(splitKey, 0, !Syntax.ignoreCase);
 					if (posKey >= 0) {
-						tokens.remove(posKey+1, posKey + splitKey.count());
+						tokens.remove(posKey+1, posKey + splitKey.size());
 						tokens.set(posKey, markers[i]);
 					}
 				}
@@ -626,16 +627,16 @@ public class LineParser /*extends CodeParser*/
 				if (Instruction.isTypeDefinition(_line)) {
 					_unifyOprs = false;
 				}
-				StringList splitKey = Syntax.getSplitKeyword("preReturn");
+				TokenList splitKey = Syntax.getSplitKeyword("preReturn");
 				if (tokens.indexOf(splitKey, 0, !Syntax.ignoreCase) == 0) {
-					tokens.remove(1, splitKey.count());
+					tokens.remove(1, splitKey.size());
 					tokens.set(0, "§RETURN§");
 				}
 				else {
 					for (String key: IO_KEYS) {
 						splitKey = Syntax.getSplitKeyword(key);
 						if (tokens.indexOf(splitKey, 0, !Syntax.ignoreCase) == 0) {
-							tokens.remove(1, splitKey.count());
+							tokens.remove(1, splitKey.size());
 							tokens.set(0, "§" + key.toUpperCase() + "§");
 							break;
 						}
@@ -648,9 +649,9 @@ public class LineParser /*extends CodeParser*/
 		}
 		else {
 			// Grammar does not cope with "not" tokens in front of identifiers
-			tokens.replaceAllCi("not", "!");
+			tokens.replaceAll(new TokenList("not"), new TokenList("!"), false);
 		}
-		_line = tokens.concatenate();
+		_line = tokens.getString();
 		return _line;
 	}
 	

@@ -229,6 +229,7 @@ import lu.fisch.structorizer.syntax.Line;
 import lu.fisch.structorizer.syntax.LineParser;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.structorizer.syntax.SyntaxException;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.structorizer.syntax.Type;
 import lu.fisch.structorizer.syntax.TypeRegistry;
 import lu.fisch.structorizer.executor.Executor;
@@ -241,6 +242,7 @@ import java.awt.Point;
 import java.awt.Polygon;
 import java.awt.Rectangle;
 import java.awt.font.TextAttribute;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
@@ -686,7 +688,7 @@ public abstract class Element {
 	// END KGU#365 2017-04-14
 	
 //	element attributes
-	protected StringList text = new StringList();
+	protected ArrayList<TokenList> text = new ArrayList<TokenList>();
 	public StringList comment = new StringList();
 
 	// START KGU#701 2019-03-29: Issue #718 Attempt to accelerate syntax highlighting by caching
@@ -809,6 +811,11 @@ public abstract class Element {
 	}
 	// END KGU#261 2017-01-19
 
+	public Element(ArrayList<TokenList> _tokenizedLines)
+	{
+		makeNewId();
+		text = new ArrayList<TokenList>(_tokenizedLines);
+	}
 
 	/**
 	 * Resets my cached drawing info
@@ -1081,10 +1088,17 @@ public abstract class Element {
 	 */
 	public void setText(String _text)
 	{
-		text.setText(_text);
-		// START KGU#790 2020-11-02: Issue #800 This is quite obvious but how to catch text alterations?
-		parsedLines = null;
-		// END KGU#790 2020-11-02
+		//text.setText(_text);
+		String[] lines = _text.split("\n");
+		synchronized (text) {
+			text.clear();
+			for (String line: lines) {
+				text.add(new TokenList(line));
+			}
+			// START KGU#790 2020-11-02: Issue #800 This is quite obvious but how to catch text alterations?
+			parsedLines = null;
+			// END KGU#790 2020-11-02
+		}
 	}
 
 	/**
@@ -1093,23 +1107,38 @@ public abstract class Element {
 	 */
 	public void setText(StringList _text)
 	{
-		text = _text;
-		// START KGU#790 2020-11-02: Issue #800 This is quite obvious but how to catch text alterations?
-		parsedLines = null;
-		// END KGU#790 2020-11-02
+		//text = _text
+		synchronized (text) {
+			text.clear();
+			for (int i = 0; i < _text.count(); i++) {
+				text.add(new TokenList(_text.get(i)));
+			}
+			// START KGU#790 2020-11-02: Issue #800 This is quite obvious but how to catch text alterations?
+			parsedLines = null;
+			// END KGU#790 2020-11-02
+		}
 	}
 
 	// START KGU#91 2015-12-01: We need a way to get the true value
 	/**
 	 * Returns the content of the text field no matter if mode isSwitchedTextAndComment
 	 * is active.<br/>
+	 * <b>NOTE:</b> This is no longer a reference to the internal text representation
+	 *     but a reconstructed copy!<br/>
 	 * Use {@code getText(false)} for a mode-sensitive effect.
 	 * @return the text StringList (in normal mode) the comment StringList otherwise
 	 * @see #getText(boolean)
 	 */
 	public StringList getText()
 	{
-		return text;
+		//return text;
+		StringList strList = new StringList();
+		synchronized (text) {
+			for (TokenList tokens: text) {
+				strList.add(tokens.getString());
+			}
+		}
+		return strList;
 	}
 	/**
 	 * Returns the content of the text field unless _alwaysTrueText is false and
@@ -1132,7 +1161,8 @@ public abstract class Element {
 		}
 		else
 		{
-			return text;
+			//return text;
+			return getText();
 		}
 	}
 
@@ -1151,13 +1181,21 @@ public abstract class Element {
 	 */
 	public StringList getCuteText()
 	{
-		StringList cute = new StringList();
-		for (int i = 0; i < text.count(); i++) {
-			String line = text.get(i);
+//		StringList cute = new StringList();
+//		for (int i = 0; i < text.count(); i++) {
+//			String line = text.get(i);
+//			if (line.endsWith("\\")) {
+//				line = line.substring(0, line.length() - 1);
+//			}
+//			cute.add(line);
+//		}
+		StringList cute = this.getText();
+		for (int i = 0; i < cute.count(); i++) {
+			String line = cute.get(i);
 			if (line.endsWith("\\")) {
 				line = line.substring(0, line.length() - 1);
 			}
-			cute.add(line);
+			cute.set(i, line);
 		}
 		return cute;
 	}
@@ -1199,8 +1237,8 @@ public abstract class Element {
 		//if(getText().count()>0) sl.add(getText().get(0));
 		// START KGU#480 2018-01-21: Enh. #490 - It might be that a controller routine call starts in the 1st line
 		//if (getText(false).count()>0) sl.add(getText(false).get(0));
-		if (getText(false).count() > 0) {
-			StringList myText = getText(false);
+		StringList myText = getText(false);
+		if (myText.count() > 0) {
 			if (Element.E_APPLY_ALIASES && !isSwitchTextCommentMode()) {
 				myText = StringList.explode(Element.replaceControllerAliases(myText.getText(), true, Element.E_VARHIGHLIGHT), "\n");
 			}
@@ -1242,10 +1280,10 @@ public abstract class Element {
 	protected StringList getBrokenText(String separator)
 	{
 		StringList sl = new StringList();
-		int nLines = text.count();
+		int nLines = text.size();
 		int i = 0;
 		while (i < nLines) {
-			String line = text.get(i).trim();
+			String line = text.get(i).getString().trim();
 			while (line.endsWith("\\") && (i + 1 < nLines)) {
 				line = line.substring(0, line.length()-1) + separator + text.get(++i).trim();
 			}
@@ -1255,6 +1293,59 @@ public abstract class Element {
 		return sl;
 	}
 	// END KGU#413 2017-06-09
+	/**
+	 * Returns the text of this element as a new ArrayList of TokenLists where each
+	 * broken set of lines (by means of trailing backslashes) will be glued together
+	 * to a single token list line.
+	 * 
+	 * @return a list of TokenLists
+	 * 
+	 * @see #getBrokenTokenText()
+	 */
+	protected ArrayList<TokenList> getUnbrokenTokenText()
+	{
+		ArrayList<TokenList> tt = new ArrayList<TokenList>();
+		int nLines = text.size();
+		int i = 0;
+		while (i < nLines) {
+			TokenList line = new TokenList(text.get(i));
+			while (!line.isBlank() && line.get(line.size()-1).equals("\\")
+					&& (i + 1 < nLines)) {
+				line.remove(line.size()-1);
+				line.addAll(text.get(++i));
+			}
+			tt.add(line);
+			i++;
+		}
+		return tt;
+	}
+	
+	/**
+	 * Returns the text of this element as a new ArrayList of TokenLists where each
+	 * broken set of lines (by means of trailing backslashes) will be glued together
+	 * to a single TokenList with a "\n" token where a trailing backslash had broken
+	 * the line.
+	 * 
+	 * @return a list of TokenLists possibly containing "\n" tokens.
+	 * 
+	 * @see #getUnbrokenTokenText()
+	 */
+	protected ArrayList<TokenList> getBrokenTokenText()
+	{
+		ArrayList<TokenList> tt = new ArrayList<TokenList>();
+		int nLines = text.size();
+		int i = 0;
+		while (i < nLines) {
+			TokenList line = new TokenList(text.get(i));
+			while (!line.isBlank() && line.get(line.size()-1).equals("\\") && (i + 1 < nLines)) {
+				line.set(line.size()-1, "\n");
+				line.addAll(text.get(++i));
+			}
+			tt.add(line);
+			i++;
+		}
+		return tt;
+	}
 	
 	// START KGU#790 2020-11-01: Issue #800 new syntax engine
 	/**
@@ -1306,58 +1397,43 @@ public abstract class Element {
 	/**
 	 * Breaks down all text lines longer than {@code maxLineLength} along the tokens
 	 * into continuated lines (i.e. broken lines end with backslash). Already placed
-	 * line breaks are preserved unless {@code rebreak} is true, in which case broken
-	 * lines are first concatenated in order to be broken according to {@code maxLineLength}.
-	 * If a token is longer than {@code maxLineLength} (might be a string literal) then
-	 * it will not be broken or decomposed in any way such that the line length limit
-	 * may not always hold.<br/>
-	 * If this method led to a different text layout then the drawing info is invalidated
-	 * up-tree.
+	 * line breaks are preserved unless {@code rebreak} is {@code true}, in which case
+	 * broken lines are first concatenated in order to be broken according to
+	 * {@code maxLineLength}.<br/>
+	 * If a token is longer than {@code maxLineLength} (it might be a string literal)
+	 * then it will not be broken or decomposed in any way such that the line length
+	 * limit may not always hold.<br/>
+	 * If this method leads to a different text layout then the drawing info is
+	 * invalidated up-tree.
+	 * 
 	 * @param maxLineLength - the number of characters a line should not exceed
-	 * @param rebreak - if true then existing line breaks (end-standing backslashes) or not preserved
-	 * @return true if the text was effectively modified, false otherwise
+	 * @param rebreak - if {@code true} then existing line breaks (trailing backslashes)
+	 *     will not be preserved.
+	 * @return {@code true} if the text was effectively modified, {@code false} otherwise
+	 * 
 	 * @see Root#breakElementTextLines(int, boolean)
 	 */
 	public boolean breakTextLines(int maxLineLength, boolean rebreak)
 	{
 		boolean modified = false;
-		if (rebreak) {
-			StringList unbroken = this.getUnbrokenText();
-			modified = unbroken.count() < this.text.count();
-			this.text = unbroken;
-		}
-		for (int i = this.text.count()-1; i >= 0; i--) {
-			int offset = 0;
-			String line = this.text.get(i);
-			if (line.isEmpty()) {
-				continue;
+		synchronized (text) {
+			if (rebreak) {
+				ArrayList<TokenList> unbroken = this.getUnbrokenTokenText();
+				modified = unbroken.size() < this.text.size();
+				this.text = unbroken;
 			}
-			if (line.length() > maxLineLength) {
-				String lineEnd = ""; 
-				if (line.endsWith("\\")) {
-					lineEnd = "\\";
-					line = line.substring(0, line.length()-1);
+			for (int i = this.text.size()-1; i >= 0; i--) {
+				TokenList line = this.text.get(i);
+				int length = line.length();
+				if (line.isEmpty()) {
+					continue;
 				}
-				this.text.remove(i);
-				StringList tokens = Syntax.splitLexically(line, true);
-				StringBuilder sb = new StringBuilder();
-				for (int j = 0; j < tokens.count(); j++) {
-					String token = tokens.get(j);
-					if (sb.length() == 0 || sb.length() + token.length() < maxLineLength) {
-						sb.append(token);
-					}
-					else {
-						this.text.insert(sb.toString() + "\\", i + offset++);
-						sb.setLength(0);
-						sb.append(token);
-					}
+				ArrayList<TokenList> broken = line.breakAtLength(maxLineLength);
+				if (broken.size() > 1 || broken.get(0).length() != length) {
+					this.text.remove(i);
+					this.text.addAll(i, broken);
+					modified = true;
 				}
-				if (sb.length() > 0) {
-					this.text.insert(sb.toString() + lineEnd, i + offset);					
-				}
-			}
-			if (offset > 0) {
-				modified = true;
 			}
 		}
 		if (modified) {
@@ -1368,7 +1444,10 @@ public abstract class Element {
 	
 	// START KGU#602 2018-10-25: Issue #419 - Mechanism to detect and handle long lines
 	/**
-	 * Detects the maximum text line length either on this very element 
+	 * Detects the maximum text line length either on this very element alone
+	 * ({@code _includeSubstructure = false}) or including all elements of the
+	 * substructure.
+	 * 
 	 * @param _includeSubstructure - whether (in case of a complex element) the substructure
 	 * is to be involved
 	 * @return the maximum line length
@@ -1376,7 +1455,7 @@ public abstract class Element {
 	public int getMaxLineLength(boolean _includeSubstructure)
 	{
 		int maxLen = 0;
-		for (int i = 0; i < this.text.count(); i++) {
+		for (int i = 0; i < this.text.size(); i++) {
 			maxLen = Math.max(maxLen, this.text.get(i).length());
 		}
 		return maxLen;
@@ -1386,17 +1465,23 @@ public abstract class Element {
 	// START KGU#480 2018-01-21: Enh. #490
 	/**
 	 * @return the text of this element, with {@link DiagramController} routine names
-	 * replaced by user-specific alias names if {@link #E_APPLY_ALIASES} is true
+	 * replaced by user-specific alias names if {@link #E_APPLY_ALIASES} is {@code true}
+	 * 
 	 * @see #setAliasText(StringList)
 	 * @see #getText()
 	 */
 	public StringList getAliasText()
 	{
 		if (!Element.E_APPLY_ALIASES) {
-			return text;
+			return this.getText();
 		}
-		String aliasText = replaceControllerAliases(text.getText(), true, false);
-		return StringList.explode(aliasText, "\n");
+		var sl = new StringList();
+		for (TokenList tokens: getBrokenTokenText()) 
+		{
+			TokenList aliasTokens = replaceControllerAliases(tokens, true, false);
+			sl.add(StringList.explode(aliasTokens.getString(), "\n"));
+		}
+		return sl;
 	}
 	
 	/**
@@ -1404,6 +1489,7 @@ public abstract class Element {
 	 * user-specific {@link DiagramController} routine aliases by the original
 	 * routine names.
 	 * @param aliasText - the intended element text, possibly containing aliases
+	 * 
 	 * @see #getAliasText()
 	 * @see #setAliasText(String)
 	 * @see #setText(StringList)
@@ -1489,6 +1575,51 @@ public abstract class Element {
 		}
 		return tokens.concatenate();
 	}
+
+	/**
+	 * If {@link #E_APPLY_ALIASES} is true then replaces the names of all routines
+	 * of {@link DiagramController} classes with registered alias names or vice versa,
+	 * depending on {@code names2aliases} and returns the modified text. The text may
+	 * contain newline characters as tokens.
+	 * 
+	 * @param tokens - an (Element) text line TokenList (may contain "\n" as tokens)
+	 * @param names2aliases - whether names are to be replaced by aliases (or vice versa)
+	 * @param withArity - whether the replacing alias (or original name) is to be combined
+	 *     with the number of the routine arguments (like this: "{@code <name>#<arity>}"). 
+	 * @return the resulting text.
+	 */
+	public static TokenList replaceControllerAliases(TokenList tokens, boolean names2aliases, boolean withArity)
+	{
+		if (!Element.E_APPLY_ALIASES) {
+			return tokens;
+		}
+		var tokens1 = new TokenList(tokens);
+		HashMap<String, String> substitutions = 
+				names2aliases ? controllerName2Alias : controllerAlias2Name;
+		for (int i = 0; i < tokens.size(); i++) {
+			String token = tokens.get(i);
+			if (!token.isBlank() && Syntax.isIdentifier(token, false, null)) {
+				// Skip all whitespace
+				int j = i;
+				String nextToken = null;
+				while (++j < tokens.size() && (nextToken = tokens.get(j)).isBlank());
+				// Now check for a beginning parameter list
+				if ("(".equals(nextToken)) {
+					int nArgs = Syntax.splitExpressionList(tokens.subSequence(j+1, tokens.size()), ",").size() - 1;
+					String key = token.toLowerCase() + "#" + nArgs;
+					String subst = substitutions.get(key);
+					if (subst != null) {
+						token = subst;
+						if (withArity) {
+							token += "#" + nArgs;
+						}
+						tokens1.set(i, token);
+					}
+				}
+			}
+		}
+		return tokens1;
+	}
 	// END KGU#480 2018-01-21
 
 	public void setComment(String _comment)
@@ -1515,7 +1646,8 @@ public abstract class Element {
 	/**
 	 * Returns the content of the comment field unless _alwaysTrueComment is false and
 	 * mode isSwitchedTextAndComment is active, in which case the text field
-	 * content is returned instead 
+	 * content is returned instead.
+	 * 
 	 * @param _alwaysTrueText - if true then mode isSwitchTextAndComment is ignored
 	 * @return either the text or the comment
 	 */
@@ -1524,7 +1656,7 @@ public abstract class Element {
 	{
 		if (!_alwaysTrueComment && isSwitchTextCommentMode())
 		{
-			return text;
+			return getText();
 		}
 		else
 		{
@@ -4384,13 +4516,46 @@ public abstract class Element {
      */
     public StringList getIntermediateText()
     {
-        StringList interSl = new StringList();
+        var interSl = new StringList();
         StringList lines = this.getUnbrokenText();
         for (int i = 0; i < lines.count(); i++)
         {
-            interSl.add(transformIntermediate(lines.get(i)));
+            interSl.add(transformIntermediate(lines.get(i)).getString());
         }
         return interSl;
+    }
+    
+    /**
+     * Returns a (hopefully) lossless representation of the stored text as a
+     * StringList in a common intermediate language (code generation phase 1).
+     * This allows the language-specific Generator subclasses to concentrate
+     * on the translation into their respective target languages (code generation
+     * phase 2).<br/>
+     * Conventions of the intermediate language:<br/>
+     * Operators (note the surrounding spaces - no double spaces will exist):
+     * <ul>
+     * <li>Assignment:	" <- "
+     * <li>Comparison:	" = ", " < ", " > ", " <= ", " >= ", " <> "
+     * <li>Logic:		" && ", " || ", " §NOT§ ", " ^ "
+     * <li>Arithmetics:	usual Java operators without padding
+     * <li>Control key words:<ul>
+     *   <li>If, Case:		none (wiped off)</li>
+     *   <li>While, Repeat:	none (wiped off)</li>
+     *   <li>For:			unchanged</li>
+     *   <li>Forever:		none (wiped off)</li>
+     * </ul></li>
+     * </ul>
+     * @return a padded intermediate language equivalent of the stored text
+     */
+    public ArrayList<TokenList> getIntermediateTokenText()
+    {
+        var interTt = new ArrayList<TokenList>();
+        ArrayList<TokenList> tokenLines = this.getUnbrokenTokenText();
+        for (int i = 0; i < tokenLines.size(); i++)
+        {
+            interTt.add(transformIntermediate(tokenLines.get(i)));
+        }
+        return interTt;
     }
     
     /**
@@ -4433,7 +4598,7 @@ public abstract class Element {
      */
     // START KGU#93 2015-12-21: Bugfix #41/#68/#69
     //public static String transformIntermediate(String _text)
-    public static StringList transformIntermediate(String _text)
+    public static TokenList transformIntermediate(String _text)
     {
         //final String regexMatchers = ".?*+[](){}\\^$";
         
@@ -4466,7 +4631,7 @@ public abstract class Element {
         //interm = interm.replace("  ", " ");	// By repetition we eliminate the remnants of odd-number space sequences
         //return interm/*.trim()*/;
 
-        StringList tokens = Syntax.splitLexically(interm, true);
+        TokenList tokens = new TokenList(interm, true);
         
         // START KGU#165 2016-03-26: Now keyword search with/without case
         // START KGU#790 2021-10-25: Delegated to Syntax
@@ -4482,6 +4647,80 @@ public abstract class Element {
 
     }
     // END KGU#18/KGU#23 2015-10-24
+
+	/**
+	 * Translates the Pascal procedure calls {@code inc(var), inc(var, offs), dec(var)},
+	 * and {@code dec(var, offs)} into simple assignments in Structorizer syntax.
+	 * 
+	 * @param code - the piece of text possibly containing {@code inc} or {@code dec} references
+	 * @return the transformed string.
+	 */
+	public static TokenList transform_inc_dec(TokenList code)
+	{
+		int pos = -1;
+		String[][] substPairs = new String[][] {
+			{"inc", " + "},
+			{"dec", " - "}
+		};
+		TokenList argListEnd = new TokenList(")");
+		TokenList transf = new TokenList(code);
+		for (String[] pair: substPairs) {
+			TokenList funcPattern = new TokenList(pair[0] + "(");
+			while ((pos = transf.indexOf(funcPattern, pos+1, false)) >= 0) {
+				ArrayList<TokenList> argExprs = Syntax.splitExpressionList(transf.subSequence(pos + 2, transf.size()), ",");
+				int nArgs = argExprs.size() - 1;
+				if (argExprs.get(nArgs).startsWith(argListEnd, true) &&
+						nArgs >= 1 && nArgs <= 2) {
+					transf.remove(pos, pos + argExprs.get(0).size() + 1);
+					if (nArgs == 1) {
+						transf.add(pos, "1");
+					}
+					else {
+						transf.addAll(pos, argExprs.get(1));
+					}
+					transf.add(pos, pair[1]);
+					transf.addAll(pos, argExprs.get(0));
+					transf.add(pos, " <- ");
+					transf.addAll(pos, argExprs.get(0));
+				}
+			}
+		}
+		return transf;
+	}
+
+    /**
+     * Creates a (hopefully) lossless representation of the {@code _text} String as a
+     * tokens list of a common intermediate language (code generation phase 1).
+     * This allows the language-specific Generator subclasses to concentrate
+     * on the translation into their target language (code generation phase 2).
+     * Conventions of the intermediate language:<br/>
+     * Operators (note the surrounding spaces - no double spaces will exist):
+     * <ul>
+     * <li>Assignment:		"<-"</li>
+     * <li>Comparison:		"=", "<", ">", "<=", ">=", "<>"</li>
+     * <li>Logic:			"&&", "||", "!", "^"</li>
+     * <li>Arithmetics:		usual Java operators</li>
+     * <li>Control key words:<ul>
+     *   <li>If, Case:		none (wiped off)</li>
+     *   <li>While, Repeat:	none (wiped off)</li>
+     *   <li>For:			unchanged</li>
+     *   <li>Forever:		none (wiped off)</li>
+     * </ul></li>
+     * </ul>
+     * @param _text - a line of the Structorizer element
+     * //@return a padded intermediate language equivalent of the stored text
+     * @return a StringList consisting of tokens translated into a unified intermediate language
+     */
+    
+    // START KGU#93 2023-10-29: Bugfix #41/#68/#69
+    public static TokenList transformIntermediate(TokenList tokens)
+    {
+        TokenList interm = transform_inc_dec(tokens);
+        Syntax.removeDecorators(interm);
+        Syntax.unifyOperators(interm, false);
+        return interm;
+    }
+    // END KGU#18/KGU#23 2023-10-29
     
     // START KGU#162 2016-03-31: Enh. #144 - undispensible part of transformIntermediate
     // START KGU#790 2021-10-25: Issue #800 replaced by Syntax.removeDecorators(StringList)
@@ -4541,26 +4780,26 @@ public abstract class Element {
 	 */
 	protected abstract String[] getRelevantParserKeys();
 
-	/**
-	 * Looks up the associated token sequence in _splitOldKeywords for any of the parser preference names
-	 * provided by getRelevantParserKeys(). If there is such a token sequence then it will be
-	 * replaced throughout my text by the associated current parser preference for the respective name
-	 * @param _oldKeywords - a map of tokenized former non-empty parser preference keywords to be replaced
-	 * @param _ignoreCase - whether case is to be ignored on comparison.
-	 */
-	public void refactorKeywords(HashMap<String, StringList> _splitOldKeywords, boolean _ignoreCase)
-	{
-		String[] relevantKeys = getRelevantParserKeys();
-		if (relevantKeys != null && !_splitOldKeywords.isEmpty())
-		{
-			StringList result = new StringList();
-			for (int i = 0; i < this.text.count(); i++)
-			{
-				result.add(refactorLine(text.get(i), _splitOldKeywords, relevantKeys, _ignoreCase));
-			}
-			this.text = result;
-		}
-	}
+//	/**
+//	 * Looks up the associated token sequence in _splitOldKeywords for any of the parser preference names
+//	 * provided by getRelevantParserKeys(). If there is such a token sequence then it will be
+//	 * replaced throughout my text by the associated current parser preference for the respective name
+//	 * @param _oldKeywords - a map of tokenized former non-empty parser preference keywords to be replaced
+//	 * @param _ignoreCase - whether case is to be ignored on comparison.
+//	 */
+//	public void refactorKeywords(HashMap<String, StringList> _splitOldKeywords, boolean _ignoreCase)
+//	{
+//		String[] relevantKeys = getRelevantParserKeys();
+//		if (relevantKeys != null && !_splitOldKeywords.isEmpty())
+//		{
+//			StringList result = new StringList();
+//			for (int i = 0; i < this.text.count(); i++)
+//			{
+//				result.add(refactorLine(text.get(i), _splitOldKeywords, relevantKeys, _ignoreCase));
+//			}
+//			this.text = result;
+//		}
+//	}
 	
 	/**
 	 * Looks up the associated token sequence in _splitOldKeys for any of the parser
@@ -4619,7 +4858,73 @@ public abstract class Element {
 		}
 		return _line;
 	}
-	// END KGU#258 2016-09-25
+	// END KGU#258 2016-09-26
+
+	// START KGU#258 2023-10-29: Enh. #253, TokenList version
+	/**
+	 * Looks up the associated token sequence in _splitOldKeywords for any of the parser preference names
+	 * provided by getRelevantParserKeys(). If there is such a token sequence then it will be
+	 * replaced throughout my text by the associated current parser preference for the respective name
+	 * 
+	 * @param _oldKeywords - a map of tokenized former non-empty parser preference keywords to be replaced
+	 * @param _ignoreCase - whether case is to be ignored on comparison.
+	 */
+	public void refactorKeywords(HashMap<String, TokenList> _splitOldKeywords, boolean _ignoreCase)
+	{
+		String[] relevantKeys = getRelevantParserKeys();
+		if (relevantKeys != null && !_splitOldKeywords.isEmpty())
+		{
+			var result = new ArrayList<TokenList>();
+			for (int i = 0; i < this.text.size(); i++)
+			{
+				result.add(refactorLine(text.get(i), _splitOldKeywords, relevantKeys, _ignoreCase));
+			}
+			this.text = result;
+		}
+	}
+	
+	/**
+	 * Looks up the associated token sequence in _splitOldKeys for any of the parser
+	 * preference names provided by _prefNames. If there is such a token sequence
+	 * then it will be replaced throughout {@code _line} by the associated current
+	 * parser preference for the respective name.
+	 * @param tokens - line of element text as TokenList
+	 * @param _splitOldKeys - a map of tokenized former non-empty parser preference
+	 *     keywords to be replaced
+	 * @param _prefNames - Array of parser preference names being relevant for this
+	 *     kind of element
+	 * @param _ignoreCase - whether case is to be ignored on comparison
+	 * @return refactored copy of TokenList {@code tokens}
+	 */
+	protected final TokenList refactorLine(TokenList tokens, HashMap<String, TokenList> _splitOldKeys, String[] _prefNames, boolean _ignoreCase)
+	{
+		boolean isModified = false;
+		// FIXME: We should order the keys by decreasing length first!
+		var newTokens = new TokenList(tokens);
+		for (int i = 0; i < _prefNames.length; i++)
+		{
+			TokenList splitKey = _splitOldKeys.get(_prefNames[i]);
+			if (splitKey != null)
+			{
+				TokenList subst = new TokenList(Syntax.getSplitKeyword(_prefNames[i]));
+				// line shouldn't be inflated ...
+				if (splitKey.getPadding(0)[0] == 0) {
+					subst.setPadding(0, 0, -1); 
+				}
+				if (splitKey.getPadding(splitKey.size()-1)[1] == 0) {
+					subst.setPadding(subst.size()-1, -1, 0);
+				}
+				// Now seek old keyword and replace it where found
+				isModified = tokens.replaceAll(splitKey, subst, !_ignoreCase) > 0;
+			}
+		}
+		if (isModified)
+		{
+			tokens = newTokens;
+		}
+		return tokens;
+	}
+	// END KGU#258 2023-10-29
 
 	// START KGU#301 2016-12-01: Bugfix #301
 	/**

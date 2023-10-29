@@ -83,6 +83,7 @@ import javax.swing.ImageIcon;
 import lu.fisch.graphics.*;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.*;
 
 /**
@@ -140,7 +141,7 @@ public class Case extends Element implements IFork
 		//return getComment();
         if (!_alwaysTrueComment && isSwitchTextCommentMode())
         {
-        	return StringList.getNew(text.get(0));
+        	return StringList.getNew(text.get(0).getString());
         }
         else
         {
@@ -155,9 +156,10 @@ public class Case extends Element implements IFork
     public void setText(String _text)
     {
 // START KGU#91 2015-12-01: D.R.Y. - just employ setText(StringList)
-    	text.setText(_text);	// Convert to a StringList
+    	//text.setText(_text);	// Convert to a StringList
+    	StringList sl = StringList.explode(_text, "\n");
     	// This call seems redundant but is essential since it is the overridden method 
-    	this.setText(text);
+    	this.setText(sl);
     	
 // END KGU#91 2015-12-01
 
@@ -168,9 +170,10 @@ public class Case extends Element implements IFork
     {
             Subqueue s = null;
 
-            text = _textList;
+            //text = _textList;
+            super.setText(_textList);
 
-            if (qs==null)
+            if (qs == null)
             {
                 qs = new Vector<Subqueue>();
             }
@@ -184,11 +187,11 @@ public class Case extends Element implements IFork
             while (this.getUnbrokenText().count() < 3)
             // END KGU#453 2017-11-02
             {
-                text.add("?");
+                text.add(new TokenList("?"));
             }
             if (text.get(0).isEmpty())
             {
-                text.set(0, "???");
+                text.set(0, new TokenList("???"));
             }
             // END KGU#91 2015-12-01
             // START KGU#453 2017-11-02: Issue #447
@@ -232,8 +235,8 @@ public class Case extends Element implements IFork
     // START KGU#227 2016-07-31: Apparently helpful method
     protected boolean hasDefaultBranch()
     {
-        int nLines = text.count();
-        return nLines > 1 && !text.get(nLines-1).trim().equals("%");
+        int nLines = text.size();
+        return nLines > 1 && !text.get(nLines-1).getString().trim().equals("%");
     }
     // END KGU#227 2016-07-31
     
@@ -1109,7 +1112,7 @@ public class Case extends Element implements IFork
 	 * @see lu.fisch.structorizer.elements.Element#refactorKeywords(java.util.HashMap, boolean)
 	 */
 	@Override
-	public void refactorKeywords(HashMap<String, StringList> _splitOldKeywords, boolean _ignoreCase)
+	public void refactorKeywords(HashMap<String, TokenList> _splitOldKeywords, boolean _ignoreCase)
 	{
 		String[] relevantKeywords = getRelevantParserKeys();
 		if (!text.isEmpty())
@@ -1119,12 +1122,12 @@ public class Case extends Element implements IFork
 			boolean isContinuation = text.get(0).endsWith("\\");
 			// END KGU#453 2017-11-02
 			relevantKeywords = new String[]{"postCase"};
-			for (int i = 1; i < text.count(); i++)
+			for (int i = 1; i < text.size(); i++)
 			{
-				String line = text.get(i).trim();
+				TokenList line = text.get(i);
 				// START KGU#453 2017-11-02: Issue #447
 				//if (!line.equals("%"))
-				if (!isContinuation && !line.equals("%"))
+				if (!isContinuation && (line.size() != 1 || !line.get(0).equals("%")))
 				// END KGU#453 2017-11-02
 				{
 					text.set(i, refactorLine(line, _splitOldKeywords, relevantKeywords, _ignoreCase));

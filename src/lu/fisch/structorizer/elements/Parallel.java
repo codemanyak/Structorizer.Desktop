@@ -73,6 +73,7 @@ import javax.swing.JOptionPane;
 import lu.fisch.graphics.*;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.*;
 
 
@@ -174,10 +175,11 @@ public class Parallel extends Element
     {
 
 // START KGU#91 2015-12-01: Bugfix #39, D.R.Y. - employ setText(StringList) for the rest
-    	text.setText(_text);
-    	this.setText(text);
-            
-// END KGU#91 2015-12-01            
+    	//text.setText(_text);
+    	//this.setText(text);
+    	StringList sl = StringList.explode(_text, "\n");
+    	this.setText(sl);
+// END KGU#91 2015-12-01
 
     }
 
@@ -187,9 +189,10 @@ public class Parallel extends Element
     	Subqueue s = null;
 
     	//setText(_textList);
-    	text=_textList;
+    	//text = _textList;
+    	super.setText(_textList);
 
-    	if(qs==null)
+    	if(qs == null)
     	{
     		qs = new Vector<Subqueue>();
     	}
@@ -210,7 +213,9 @@ public class Parallel extends Element
     					"Unknown number <" + text.get(0).trim() +
     					">.\nSetting number of tasks to " + count + "!",
     					"Error", JOptionPane.ERROR_MESSAGE);
-    			text = StringList.getNew(Integer.toString(count));
+    			//text = StringList.getNew(Integer.toString(count));
+    			text.clear();
+    			text.add(new TokenList(Integer.toString(count)));
     		}
 
     		// add subqueues
