@@ -121,6 +121,7 @@ import lu.fisch.structorizer.elements.TypeMapEntry;
 import lu.fisch.structorizer.elements.While;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.StringList;
 
 public class PerlGenerator extends Generator {
@@ -281,39 +282,40 @@ public class PerlGenerator extends Generator {
 
 	// START KGU#93 2015-12-21 Bugfix #41/#68/#69
 	/* (non-Javadoc)
-	 * @see lu.fisch.structorizer.generators.Generator#transformTokens(lu.fisch.utils.StringList)
+	 * @see lu.fisch.structorizer.generators.Generator#transformTokens(lu.fisch.structorizer.syntax.TokenList)
 	 */
 	@Override
-	protected String transformTokens(StringList tokens)
+	protected String transformTokens(TokenList tokens)
 	{
 		// START KGU#920 2021-02-03: Issue #920 Handle Infinity literal
-		tokens.replaceAll("Infinity", "\"inf\"");
+		tokens.replaceAll("Infinity", "\"inf\"", true);
 		// END KGU#920 2021-02-03
 		// START KGU#388/KGU#542 2019-11-19: Enh. #423, #739 transferred the stuff from transform(String) hitherto
 		// Manipulate a condensed token list copy simultaneously (makes it easier to locate neighbouring tokens)
-		StringList denseTokens = new StringList(tokens);
-		denseTokens.removeBlanks();	// Condense
+		//StringList denseTokens = new StringList(tokens);
+		//denseTokens.removeBlanks();	// Condense
 		// Now transform all array and record initializers
 		// To go from right to left should ensure we advance from the innermost to the outermost brace
 		int posBraceL = tokens.lastIndexOf("{");
-		int posBrace0L = denseTokens.lastIndexOf("{");
 		while (posBraceL > 0) {
-			int posBrace0R = denseTokens.indexOf("}", posBrace0L + 1);
 			int posBraceR = tokens.indexOf("}", posBraceL + 1);
 			TypeMapEntry type = null;
-			if ((type = this.typeMap.get(denseTokens.get(posBrace0L-1))) != null && type.isRecord()) {
+			if ((type = this.typeMap.get(tokens.get(posBraceL-1))) != null && type.isRecord()) {
 				// Transform the condensed record initializer
-				StringList rInit = this.transformRecordInit(denseTokens.concatenate(null, posBrace0L-1, posBrace0R+1), type);
+				StringList rInit = this.transformRecordInit(tokens.subSequence(posBraceL-1, posBraceR+1).getString(), type);
 				tokens.remove(posBraceL-1, posBraceR+1);
-				tokens.insert(rInit, posBraceL-1);
+				//tokens.insert(rInit, posBraceL-1);
+				for (int i = rInit.count() - 1; i >= 0; i--) {
+					tokens.add(posBraceL-1, rInit.get(i));
+				}
 				// Now do the analogous thing for the condensed token list
-				denseTokens.remove(posBrace0L-1, posBrace0R+1);
-				denseTokens.insert(rInit, posBrace0L-1);;
+				//denseTokens.remove(posBrace0L-1, posBrace0R+1);
+				//denseTokens.insert(rInit, posBrace0L-1);;
 			}
 			// The other case of '{' ... '}' (assumed to be a record initializer) can be ignored here,
 			// since it is sufficient to have the braces replaced by parentheses, which will be done below
 			posBraceL = tokens.lastIndexOf("{", posBraceL-1);
-			posBrace0L = denseTokens.lastIndexOf("{", posBrace0L + 1);
+			//posBrace0L = denseTokens.lastIndexOf("{", posBrace0L + 1);
 		}
 		// END KGU#388/KGU#542 2019-11-19
 		// START KGU#62/KGU#103 2015-12-12: Bugfix #57 - We must work based on a lexical analysis
@@ -336,14 +338,12 @@ public class PerlGenerator extends Generator {
 				String refPrefix = "";
 				String prefix = typeEntry.isArray() ? "@" : "$";
 				int pos = -1;
-				int pos0 = -1;
 				if (this.paramNames.contains(varName)) {
 					refPrefix = "$";	// dereference the variable
 				}
 				while ((pos = tokens.indexOf(varName)) >= 0) {
 					// Array element access?
-					pos0 = denseTokens.indexOf(varName, pos0+1);
-					if (pos0+3 < denseTokens.count() && denseTokens.get(pos0+1).equals("[")) {
+					if (pos+3 < tokens.size() && tokens.get(pos+1).equals("[")) {
 						tokens.set(pos, "$" + refPrefix + varName);
 					}
 					else if (this.isWithinCall && pos > posAsgn) {
@@ -361,8 +361,7 @@ public class PerlGenerator extends Generator {
 				//tokens.replaceAll(varName, "$"+varName);
 				int pos = -1, pos0 = -1;
 				while ((pos = tokens.indexOf(varName, pos+1)) >= 0) {
-					pos0 = denseTokens.indexOf(varName, pos0+1);
-					if (pos0 == 0 || !denseTokens.get(pos0-1).equals(".")) {
+					if (pos == 0 || !tokens.get(pos-1).equals(".")) {
 						tokens.set(pos, "$"+varName);
 					}
 				}
@@ -375,15 +374,15 @@ public class PerlGenerator extends Generator {
 		tokens.removeAll("const");
 		// END KGU#375 2019-11-28
 		// START KGU 2017-02-26
-		tokens.replaceAll("random", "rand");
+		tokens.replaceAll("random", "rand", true);
 		// END KGU 2017-02-26
-		tokens.replaceAll("div", "/");
-		tokens.replaceAll("<-", "=");
+		tokens.replaceAll("div", "/", false);
+		tokens.replaceAll("<-", "=", true);
 		// START KGU#61 2016-03-23: Enh. #84 - prepare array literals
-		tokens.replaceAll("{", "(");
-		tokens.replaceAll("}", ")");
+		tokens.replaceAll("{", "(", true);
+		tokens.replaceAll("}", ")", true);
 		// END KGU#61 2016-03-23
-		for (int i = 1; i < tokens.count()-1; i++) {
+		for (int i = 1; i < tokens.size()-1; i++) {
 			if (tokens.get(i).equals(".")) {
 				// Handle possible component access
 				int jL = i-1;
@@ -393,7 +392,7 @@ public class PerlGenerator extends Generator {
 				}
 				int jR = i+1;
 				String post = tokens.get(jR).trim();
-				while (post.isEmpty() && jR < tokens.count()-1) {
+				while (post.isEmpty() && jR < tokens.size()-1) {
 					post = tokens.get(++jR).trim();
 				}
 				// START KGU#388 2019-11-29: Issue #423 - there are a lot of combinable prefixes
@@ -408,7 +407,7 @@ public class PerlGenerator extends Generator {
 				}
 			}
 		}
-		return tokens.concatenate(null);
+		return tokens.getString();
 	}
 	// END KGU#93 2015-12-21
 	
@@ -524,7 +523,7 @@ public class PerlGenerator extends Generator {
 	{
 		StringList result = new StringList();
 		result.add(_typeEntry.typeName + "->new(\n");
-		HashMap<String, String> comps = Instruction.splitRecordInitializer(_recordValue, _typeEntry, false);
+		HashMap<String, String> comps = Instruction.splitRecordInitializer(_recordValue, _typeEntry);
 		// START KGU#1021 2021-12-05: Bugfix #1024 Instruction might be defective
 		if (comps == null) {
 			result.add("\t" + this.commentSymbolLeft() + "DEFECTIVE: " + _recordValue + "\n");

@@ -57,6 +57,7 @@ import lu.fisch.structorizer.elements.Root;
 import lu.fisch.structorizer.elements.Subqueue;
 import lu.fisch.structorizer.parsers.AuParser;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.StringList;
 
 /**
@@ -414,7 +415,7 @@ public class ArmLineParser implements GeneratorSyntaxChecker
 				line = "§LEAVE§";
 			}
 			else {
-				StringList tokens = Syntax.splitLexically(line, false);
+				TokenList tokens = new TokenList(line, false);
 				String[] keys = {"preReturn", "preLeave", "preExit", "preThrow"};
 				for (String key: keys) {
 					// START KGU#1017 2021-11-17: Issue #1020 Consider case and non-tokens
@@ -424,9 +425,9 @@ public class ArmLineParser implements GeneratorSyntaxChecker
 					//			+ line.substring(keyWord.length());
 					//	break;
 					//}
-					StringList splitKey = Syntax.getSplitKeyword(key);
+					TokenList splitKey = Syntax.getSplitKeyword(key);
 					if (tokens.indexOf(splitKey, 0, !Syntax.ignoreCase) == 0) {
-						tokens.remove(1, splitKey.count());
+						tokens.remove(1, splitKey.size());
 						tokens.set(0, "§" + key.substring(3).toUpperCase() + "§");
 						break;
 					}
@@ -438,7 +439,7 @@ public class ArmLineParser implements GeneratorSyntaxChecker
 			line = "§CATCH§" + line;
 		}
 		else {
-			StringList tokens = Syntax.splitLexically(line, false);
+			TokenList tokens = new TokenList(line, false);
 			if (owner instanceof For) {
 				String[] keys;
 				String[] markers;
@@ -451,10 +452,10 @@ public class ArmLineParser implements GeneratorSyntaxChecker
 					markers = new String[]{"§FOR§", "§TO§", "§STEP§"};
 				}
 				for (int i = 0; i < keys.length; i++) {
-					StringList splitKey = Syntax.getSplitKeyword(keys[i]);
+					TokenList splitKey = new TokenList(keys[i]);
 					int posKey = tokens.indexOf(splitKey, 0, !Syntax.ignoreCase);
 					if (posKey >= 0) {
-						tokens.remove(posKey+1, posKey + splitKey.count());
+						tokens.remove(posKey+1, posKey + splitKey.size());
 						tokens.set(posKey, markers[i]);
 					}
 				}
@@ -468,17 +469,17 @@ public class ArmLineParser implements GeneratorSyntaxChecker
 						&& (sq = (Subqueue)owner.parent).getElement(sq.getSize()-1) == owner
 						&& sq.parent instanceof Root
 						&& ((Root)sq.parent).isSubroutine()) {
-					StringList splitKey = Syntax.splitLexically(Syntax.getKeyword("preReturn"), false);
-					tokens.remove(1, splitKey.count());
+					TokenList splitKey = new TokenList(Syntax.getKeyword("preReturn"), false);
+					tokens.remove(1, splitKey.size());
 					tokens.set(0, "§RETURN§");
 				}
 				else {
 				// END KGU#1017 2021-11-17
 					String[] keys = {"input", "output"};
 					for (String key: keys) {
-						StringList splitKey = Syntax.splitLexically(Syntax.getKeyword(key), false);
+						TokenList splitKey = new TokenList(Syntax.getKeyword(key), false);
 						if (tokens.indexOf(splitKey, 0, !Syntax.ignoreCase) == 0) {
-							tokens.remove(1, splitKey.count());
+							tokens.remove(1, splitKey.size());
 							tokens.set(0, "§" + key.toUpperCase() + "§");
 							break;
 						}
@@ -487,7 +488,7 @@ public class ArmLineParser implements GeneratorSyntaxChecker
 				}
 				// END KGU#1017 2021-11-17
 			}
-			line = tokens.concatenate();
+			line = tokens.getString();
 		}
 		return line;
 	}

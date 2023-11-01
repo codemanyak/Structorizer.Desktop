@@ -19,6 +19,8 @@
  */
 package lu.fisch.structorizer.generators;
 
+import java.util.ArrayList;
+
 /******************************************************************************************************
  *
  *      Author:         Kay Gürtzig
@@ -66,6 +68,7 @@ import lu.fisch.structorizer.elements.Root;
 import lu.fisch.structorizer.elements.Try;
 import lu.fisch.structorizer.elements.TypeMapEntry;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.StringList;
 
 /**
@@ -207,30 +210,37 @@ public class JsGenerator extends CGenerator {
 	// END KGU#815 2020-04-03
 
 	@Override
-	protected String transformTokens(StringList tokens)
+	protected String transformTokens(TokenList tokens)
 	{
 		// START KGU#920 2021-02-03: Issue #920 Handle Infinity literal
 		// This is a little trick to hinder super from replacing Infinity.
-		tokens.replaceAll("Infinity", "Infinity ");
+		// FIXME Decompose generator hierarchy
+		//tokens.replaceAll("Infinity", "Infinity ", true);
+		int posInf = -1;
+		while ((posInf = tokens.indexOf("Infinity", posInf + 1)) >= 0) {
+			tokens.set(posInf, "Infnity ");
+		}
 		// END KGU#920 2021-02-03
 		// START KGU#1091 2023-10-16: Bugfix #1098
-		if (tokens.contains("{") && tokens.lastIndexOf("}") == tokens.count()-1) {
-			StringList pureExprTokens = tokens.copy();
-			pureExprTokens.removeAll(" ");
-			int posBrace = pureExprTokens.indexOf("{");
-			if (pureExprTokens.count() >= 3 && posBrace <= 1) {
-				if (posBrace == 1 && Syntax.isIdentifier(pureExprTokens.get(0), false, null)) {
+		if (tokens.contains("{") && tokens.lastIndexOf("}") == tokens.size()-1) {
+			int posBrace = tokens.indexOf("{");
+			if (tokens.size() >= 3 && posBrace <= 1) {
+				if (posBrace == 1 && Syntax.isIdentifier(tokens.get(0), false, null)) {
 					// Record initializer
-					String typeName = pureExprTokens.get(0);
+					String typeName = tokens.get(0);
 					TypeMapEntry recType = this.typeMap.get(":"+typeName);
 					if (recType != null) {
-						return this.transformRecordInit(tokens.concatenate(), recType);
+						return this.transformRecordInit(tokens.getString(), recType);
 					}
 				}
 				else if (posBrace == 0) {
 					// Array initializer
-					StringList items = Element.splitExpressionList(pureExprTokens.subSequence(1, pureExprTokens.count()-1), ",", true);
-					return this.transformOrGenerateArrayInit("", items.subSequence(0, items.count()-1), null, false, null, false);
+					ArrayList<TokenList> exprs = Syntax.splitExpressionList(tokens.subSequence(1, tokens.size()-1), ",");
+					StringList items = new StringList();
+					for (int i = 0; i < exprs.size() - 1; i++) {
+						items.add(exprs.get(i).getString());
+					}
+					return this.transformOrGenerateArrayInit("", items, null, false, null, false);
 				}
 			}
 		}
@@ -271,7 +281,7 @@ public class JsGenerator extends CGenerator {
 		//HashMap<String, String> comps = Instruction.splitRecordInitializer(constValue);
 		// START KGU#771 2019 11-24: Bugfix #783 - precaution against unknown type
 		//HashMap<String, String> comps = Instruction.splitRecordInitializer(constValue, typeInfo);
-		HashMap<String, String> comps = Instruction.splitRecordInitializer(constValue, typeInfo, true);
+		HashMap<String, String> comps = Instruction.splitRecordInitializer(constValue, typeInfo);
 		// END KGU#771 2019-11-24
 		// END KGU#559 2018-07-20
 		LinkedHashMap<String, TypeMapEntry> compInfo;

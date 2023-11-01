@@ -89,6 +89,7 @@ package lu.fisch.structorizer.generators;
 import lu.fisch.structorizer.elements.*;
 import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.StringList;
 
 import java.util.*;
@@ -778,7 +779,7 @@ public class ArmGenerator extends Generator {
         // FIXME The discriminator expression has to be compiled...
         // We are currently not supporting complex expressions
         //variable = variable.replace(")", "").replace("(", "").replace("!", "").replace(" ", "");
-        StringList tokens = Syntax.splitLexically(variable, true);
+        TokenList tokens = new TokenList(variable);
         // START KGU#884 2021-10-25: Issue #800
         //Element.cutOutRedundantMarkers(tokens);
         Syntax.removeDecorators(tokens);
@@ -786,7 +787,7 @@ public class ArmGenerator extends Generator {
         tokens.removeAll("(");
         tokens.removeAll(")");
         //tokens.removeAll("!");	// ???
-        variable = tokens.concatenate();
+        variable = tokens.getString();
         // The "variable" should be replaced by a register
         variable = variablesToRegisters(variable);
         // END KGU#968 2021-04-25
@@ -1856,14 +1857,14 @@ public class ArmGenerator extends Generator {
         // Extract the text in the block
         String condition = _ele.getUnbrokenText().getLongString().trim();
 
-        StringList tokens = Syntax.splitLexically(condition, true);
+        TokenList tokens = new TokenList(condition);
         // START KGU#884 2021-10-25: Issue #800
         //Element.cutOutRedundantMarkers(tokens);
         Syntax.removeDecorators(tokens);
         // END KGU#884 2021-10-25
-        tokens.removeBlanks();
+        tokens.removePaddings();
         Syntax.unifyOperators(tokens, false);
-        condition = tokens.concatenate(null);
+        condition = tokens.getString();
         if (!condition.startsWith("(") || !condition.endsWith(")")) {
             // To help the matching
             condition = "(" + condition + ")";

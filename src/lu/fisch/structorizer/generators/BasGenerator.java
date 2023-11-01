@@ -113,6 +113,7 @@ import lu.fisch.structorizer.elements.While;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
 import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.StringList;
 
 
@@ -306,31 +307,31 @@ public class BasGenerator extends Generator
 	 * @see lu.fisch.structorizer.generators.Generator#transformTokens(lu.fisch.utils.StringList)
 	 */
 	@Override
-	protected String transformTokens(StringList tokens)
+	protected String transformTokens(TokenList tokens)
 	{
-		tokens.replaceAll("==", "=");
-		tokens.replaceAll("!=", "<>");
-		tokens.replaceAll("&&", "AND");
-		tokens.replaceAll("||", "OR");
-		tokens.replaceAll("!", "NOT");
-		tokens.replaceAll("[", "(");
-		tokens.replaceAll("]", ")");
-		tokens.replaceAll("div", "/");
+		tokens.replaceAll("==", "=", true);
+		tokens.replaceAll("!=", "<>", true);
+		tokens.replaceAll("&&", "AND", true);
+		tokens.replaceAll("||", "OR", true);
+		tokens.replaceAll("!", "NOT", true);
+		tokens.replaceAll("[", "(", true);
+		tokens.replaceAll("]", ")", true);
+		tokens.replaceAll("div", "/", true);
 		// START KGU#920 2021-02-03: Issue #920 Handle Infinity literal
 		// FIXME: Will only work with VisualBasic, others might try with 1.0/0.0
 		if (!this.optionCodeLineNumbering())
 		{
-			tokens.replaceAll("Infinity", "Double.PositiveInfinity");
+			tokens.replaceAll("Infinity", "Double.PositiveInfinity", true);
 		}
 		// END KGU#920 2021-02-03
 		// START KGU#150 2016-04-04: Handle Pascal ord and chr function
 		int pos = - 1;
-		while ((pos = tokens.indexOf("ord", pos+1)) >= 0 && pos+1 < tokens.count() && tokens.get(pos+1).equals("("))
+		while ((pos = tokens.indexOf("ord", pos+1)) >= 0 && pos+1 < tokens.size() && tokens.get(pos+1).equals("("))
 		{
 			tokens.set(pos, "Asc");
 		}
 		pos = -1;
-		while ((pos = tokens.indexOf("chr", pos+1)) >= 0 && pos+1 < tokens.count() && tokens.get(pos+1).equals("("))
+		while ((pos = tokens.indexOf("chr", pos+1)) >= 0 && pos+1 < tokens.size() && tokens.get(pos+1).equals("("))
 		{
 			if (this.optionCodeLineNumbering())
 			{
@@ -350,18 +351,17 @@ public class BasGenerator extends Generator
 		if (tokens.contains("<-") && this.optionCodeLineNumbering())
 		{
 			// Insert a "LET" keyword but ensure a separating blank between it and the variable name
-			if (!tokens.get(0).equals(" "))	tokens.insert(" ", 0);
-			tokens.insert(transformKeyword("LET"), 0);
+			tokens.add(0, transformKeyword("LET"));
 		}
 		// START KGU#100 2016-01-22: Enh #84 - Array initialisation for Visual/modern BASIC
 		if (!this.optionCodeLineNumbering())
 		{
-			tokens.replaceAll("{", "Array(");
-			tokens.replaceAll("}", ")");
+			tokens.replaceAll("{", "Array(", true);
+			tokens.replaceAll("}", ")", true);
 		}
 		// END KGU#100 2016-01-22
-		tokens.replaceAll("<-", "=");
-		return tokens.concatenate();
+		tokens.replaceAll("<-", "=", true);
+		return tokens.getString();
 	}
 	// END KGU#93 2015-12-21
 	// END KGU#18/KGU#23 2015-11-01
@@ -791,7 +791,7 @@ public class BasGenerator extends Generator
 					_indent, false);
 			return;
 		}
-		HashMap<String, String> comps = Instruction.splitRecordInitializer(_recordValue, _typeEntry, false);
+		HashMap<String, String> comps = Instruction.splitRecordInitializer(_recordValue, _typeEntry);
 		// START KGU#1021 2021-12-05: Bugfix #1024 Instruction might be defective
 		if (comps == null) {
 			appendComment("ERROR: defective record initializer in diagram:", _indent);

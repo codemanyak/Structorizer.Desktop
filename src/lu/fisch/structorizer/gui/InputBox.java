@@ -103,6 +103,7 @@ import lu.fisch.structorizer.locales.LangDialog;
 import lu.fisch.structorizer.locales.LangTextHolder;
 import lu.fisch.structorizer.parsers.CodeParser;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.StringList;
 
 @SuppressWarnings("serial")
@@ -456,7 +457,7 @@ public class InputBox extends LangDialog implements ActionListener, KeyListener 
                         prevLine.substring(0, prevLine.length()-1) + lines.get(lines.count()-1));
                 lines.remove(lines.count()-1);
             }
-            StringList tokens = Syntax.splitLexically(lines.get(lines.count()-1), true);
+            TokenList tokens = new TokenList(lines.get(lines.count()-1), true);
             proposals = Syntax.retrieveComponentNames(tokens, typeMap, null);
             if (proposals != null) {
                 Collections.sort(proposals, String.CASE_INSENSITIVE_ORDER);

@@ -71,6 +71,7 @@ import java.util.LinkedList;
 import lu.fisch.structorizer.elements.*;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 
 public class TexGenerator extends Generator {
 	
@@ -201,11 +202,11 @@ public class TexGenerator extends Generator {
 	 * @see #transformOutput(String)
 	 * @see #transformType(String, String)
 	 * @see #suppressTransformation
-	 * @param _interm - a code line in intermediate syntax
+	 * @param tokens - a tokenized element line (in intermediate language?)
 	 * @return transformed string
 	 */
 	@Override
-	protected String transformTokens(StringList tokens)
+	protected String transformTokens(TokenList tokens)
 	{
 		// START KGU#920 2021-02-03: Issue #920 Handle Infinity literal
 		tokens.replaceAll("Infinity", "\\infty");
@@ -230,12 +231,12 @@ public class TexGenerator extends Generator {
 		for (String keyword: keywords) {
 			keys.add(keyword);
 		}
-		for (int i = 0; i < tokens.count(); i++) {
+		for (int i = 0; i < tokens.size(); i++) {
 			String token = tokens.get(i);
 			int len = token.length();
 			if (token.equals("<-") || token.equals(":=")) {
 				token = "\\gets";
-				if (i+1 < tokens.count() && !tokens.get(i+1).trim().isEmpty()) {
+				if (i+1 < tokens.size() && !tokens.get(i+1).trim().isEmpty()) {
 					token += " ";
 				}
 				tokens.set(i,  token);
@@ -265,7 +266,7 @@ public class TexGenerator extends Generator {
 				tokens.set(i, token.replace("^", "\\textasciicircum{}"));
 			}
 		}
-		return tokens.concatenate();
+		return tokens.getString();
 	}
 	// END KGU#483 2017-12-30
 	// END KGU#18/KGU#23 2015-11-01

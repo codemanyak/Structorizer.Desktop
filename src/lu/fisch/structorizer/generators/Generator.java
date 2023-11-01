@@ -176,6 +176,7 @@ import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
@@ -227,6 +228,7 @@ import lu.fisch.structorizer.syntax.Expression.Operator;
 import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.structorizer.syntax.Line;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.BString;
 import lu.fisch.utils.BTextfile;
 import lu.fisch.utils.StringList;
@@ -1826,11 +1828,11 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		
 		// START KGU#162 2016-03-31: Enh. #144
 		//StringList tokens = Element.transformIntermediate(_input);
-		StringList tokens = null;
+		TokenList tokens = null;
 		if (this.suppressTransformation)
 		{
 			// Suppress all syntax changes, just split to tokens.
-			tokens = Syntax.splitLexically(_input, true);
+			tokens = new TokenList(_input);
 			// START KGU#884 2021-10-25: Issue #800
 			//Element.cutOutRedundantMarkers(tokens);
 			Syntax.removeDecorators(tokens);
@@ -1853,8 +1855,8 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 			String key = keyEntry.getKey();
 			if (keyword.trim().length() > 0)
 			{
-				StringList keyTokens = Syntax.getSplitKeyword(key);
-				int keyLength = keyTokens.count();
+				TokenList keyTokens = Syntax.getSplitKeyword(key);
+				int keyLength = keyTokens.size();
 				int pos = -1;
 				while ((pos = tokens.indexOf(keyTokens, pos + 1, !Syntax.ignoreCase)) >= 0)
 				{
@@ -1863,7 +1865,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 					// Remove the remaining tokens of the split keyword
 					for (int j=1; j < keyLength; j++)
 					{
-						tokens.delete(pos+1);
+						tokens.remove(pos+1);
 					}
 				}
 			}
@@ -1874,7 +1876,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		String transformed = "";
 		if (this.suppressTransformation) {
 			// Just re-concatenate the tokens if no conversion is wanted
-			transformed = tokens.concatenate();
+			transformed = tokens.getString();
 		}
 		else {
 			transformed = transformTokens(tokens);
@@ -1921,9 +1923,9 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	 * @see #transformType(String, String)
 	 * @see #suppressTransformation
 	 */
-	protected String transformTokens(StringList tokens)
+	protected String transformTokens(TokenList tokens)
 	{
-		return tokens.concatenate();
+		return tokens.getString();
 	}
 	// END KGU#93 2015-12-21
 	
@@ -2033,31 +2035,31 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	 * 
 	 * @param tokens the split line (will be modified)
 	 */
-	protected void transformIndexLists(StringList tokens) {
-		StringList newTokens = new StringList();
+	protected void transformIndexLists(TokenList tokens) {
+		TokenList newTokens = new TokenList();
 		int posBr = -1;
 		while ((posBr = tokens.indexOf("[")) >= 0) {
-			newTokens.add(tokens.subSequence(0, posBr + 1));
+			newTokens.addAll(tokens.subSequence(0, posBr + 1));
 			tokens.remove(0, posBr+1);
-			StringList exprs = Element.splitExpressionList(tokens, ",", true);
-			int nExprs = exprs.count() - 1;
+			ArrayList<TokenList> exprs = Syntax.splitExpressionList(tokens, ",");
+			int nExprs = exprs.size() - 1;
 			for (int i = 0; i < nExprs; i++) {
 				if (i > 0) {
 					newTokens.add("]");
 					newTokens.add("[");
 				}
-				StringList toks = Syntax.splitLexically(exprs.get(i), true);
+				TokenList toks = exprs.get(i);
 				// We must apply this recursively
 				transformIndexLists(toks);
-				newTokens.add(toks);
+				newTokens.addAll(toks);
 			}
 			tokens.clear();
-			tokens.add(Syntax.splitLexically(exprs.get(nExprs), true));
+			tokens.addAll(exprs.get(nExprs));
 		}
 		// We must ensure that the argument variable contains all remaining tokens in the end
-		newTokens.add(tokens);
+		newTokens.addAll(tokens);
 		tokens.clear();
-		tokens.add(newTokens);
+		tokens.addAll(newTokens);
 		newTokens.clear();	// This is just to facilitate garbage collection
 	}
 	// END KGU#1061 2022-08-23

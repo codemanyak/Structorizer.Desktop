@@ -139,6 +139,7 @@ import java.util.regex.Pattern;
 
 import lu.fisch.utils.*;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.turtle.TurtleBox;
 import lu.fisch.diagrcontrol.DiagramController;
 import lu.fisch.structorizer.elements.*;
@@ -334,18 +335,18 @@ public class PythonGenerator extends Generator
 
 	// START KGU#93 2015-12-21: Bugfix #41/#68/#69
 	/* (non-Javadoc)
-	 * @see lu.fisch.structorizer.generators.Generator#transformTokens(lu.fisch.utils.StringList)
+	 * @see lu.fisch.structorizer.generators.Generator#transformTokens(lu.fisch.sructorizer.syntax.TokenList)
 	 */
 	@Override
-	protected String transformTokens(StringList tokens)
+	protected String transformTokens(TokenList tokens)
 	{
 		// START KGU#1061 2022-08-23: Issue #1068
 		transformIndexLists(tokens);
 		// END KGU#1061 2022-08-23
 		// START KGU#920 2021-02-03: Issue #920 Handle Infinity literal
-		tokens.replaceAll("Infinity", "float(\"inf\")");
+		tokens.replaceAll("Infinity", "float(\"inf\")", true);
 		// END KGU#920 2021-02-03
-		for (int i = 0; i < tokens.count(); i++) {
+		for (int i = 0; i < tokens.size(); i++) {
 			String token = tokens.get(i);
 			if (Syntax.isIdentifier(token, false, null)) {
 				// START KGU#795 2020-02-12: Issue #807 - we now use directories instead of recordtype lib
@@ -356,7 +357,7 @@ public class PythonGenerator extends Generator
 				// END KGU#795 2020-02-12
 				int j = i;
 				// Skip all whitespace
-				while (j+2 < tokens.count() && tokens.get(++j).trim().isEmpty());
+				while (j+2 < tokens.size() && tokens.get(++j).trim().isEmpty());
 				// Handle DiagramController (more specifically: Turtleizer) routine calls
 				// START KGU#480 2018-01-21: Enh. 490 - more precise detection
 				//String turtleMethod = null;
@@ -364,8 +365,8 @@ public class PythonGenerator extends Generator
 				//	tokens.set(i, turtleMethod);
 				//	this.usesTurtleizer = true;
 				//}
-				if (j+1 < tokens.count() && tokens.get(j).equals("(")) {
-					int nArgs = Element.splitExpressionList(tokens.subSequence(j+1, tokens.count()), ",", false).count();
+				if (j+1 < tokens.size() && tokens.get(j).equals("(")) {
+					int nArgs = Syntax.splitExpressionList(tokens.subSequence(j+1, tokens.size()), ",").size()-1;
 					for (Entry<DiagramController, String> entry: controllerMap.entrySet()) {
 						String name = entry.getKey().providedRoutine(token, nArgs);
 						if (name != null) {
@@ -387,7 +388,7 @@ public class PythonGenerator extends Generator
 				else if (isComponent) {
 					tokens.set(k++, "[");
 					tokens.set(i, "]");
-					tokens.insert("'" + token + "'", i);
+					tokens.add(i, "'" + token + "'");
 					tokens.remove(k, i);
 					i += (k - i) + 1;	// This corrects the current index w.r.t. insertions and deletions 
 				}
@@ -408,23 +409,23 @@ public class PythonGenerator extends Generator
 		//tokens.replaceAll("!="," <> ");
 		// END KGU#368 2017-03-10
 		// convert C logical operators
-		tokens.replaceAll("&&"," and ");
-		tokens.replaceAll("||"," or ");
-		tokens.replaceAll("!"," not ");
-		tokens.replaceAll("xor","^");            
+		tokens.replaceAll("&&"," and ", true);
+		tokens.replaceAll("||"," or ", true);
+		tokens.replaceAll("!"," not ", true);
+		tokens.replaceAll("xor","^", false);            
 		// END KGU 2014-11-16
 		// START KGU#708 2019-05-28: Issue #725 - special operator symbol for int division
-		tokens.replaceAll("div", "//");
+		tokens.replaceAll("div", "//", false);
 		// END KGU#708 2019-05-28
-		tokens.replaceAll("<-", "=");
+		tokens.replaceAll("<-", "=", true);
 		// START KGU#388 2017-10-02: Enh. #423 - convert Structorizer record initializers to Python
 		transformRecordInitializers(tokens);
 		// END KGU#388 2017-10-02
 		// START KGU#100 2016-01-14: Enh. #84 - convert C/Java initialisers to lists
-		tokens.replaceAll("{", "[");
-		tokens.replaceAll("}", "]");
+		tokens.replaceAll("{", "[", true);
+		tokens.replaceAll("}", "]", true);
 		// END KGU#100 2016-01-14
-		return tokens.concatenate();
+		return tokens.getString();
 	}
 	// END KGU#93 2015-12-21
 
@@ -435,7 +436,7 @@ public class PythonGenerator extends Generator
 	 * string element (which is hence immune against further token manipulations).<br/>
 	 * @param tokens - the token list of the split line, will be modified.
 	 */
-	private void transformRecordInitializers(StringList tokens) {
+	private void transformRecordInitializers(TokenList tokens) {
 		int posLBrace = -1;
 		while ((posLBrace = tokens.indexOf("{", posLBrace+1)) > 0) {
 			String prevToken = "";
@@ -452,8 +453,8 @@ public class PythonGenerator extends Generator
 				//HashMap<String, String> comps = Instruction.splitRecordInitializer(tokens.concatenate("", posLBrace));
 				// START KGU#1021 2021-12-05: Bugfix #1024 Instruction might be defective
 				//HashMap<String, String> comps = Instruction.splitRecordInitializer(tokens.concatenate("", posLBrace), typeEntry, false);
-				String tail = tokens.concatenate("", posLBrace);
-				HashMap<String, String> comps = Instruction.splitRecordInitializer(tail, typeEntry, false);
+				String tail = tokens.subSequence(posLBrace, tokens.size()).getString();
+				HashMap<String, String> comps = Instruction.splitRecordInitializer(tail, typeEntry);
 				// END KGU#1021 2021-12-05
 				// END KGU#559 2018-07-20
 				LinkedHashMap<String, TypeMapEntry> compDefs = typeEntry.getComponentInfo(true);
@@ -475,7 +476,7 @@ public class PythonGenerator extends Generator
 					// END KGU#1021 2021-12-05
 						// START KGU#795 2020-02-12: Issue #807 - we now use directories instead of recordtype lib
 						//prevToken += sepa + transformTokens(Element.splitLexically(comps.get(compName), true));
-						prevToken += sepa + "'" + compName + "': " + transformTokens(Syntax.splitLexically(comps.get(compName), true));
+						prevToken += sepa + "'" + compName + "': " + transformTokens(new TokenList(comps.get(compName)));
 						// END KGU#795 2020-02-12
 					}
 					// START KGU#795 2020-02-12: Issue #807 - we now use directories instead of recordtype lib
@@ -490,10 +491,10 @@ public class PythonGenerator extends Generator
 				prevToken += "}";
 				// END KGU#795 2020-02-12
 				tokens.set(pos, prevToken);
-				tokens.remove(pos+1, tokens.count());
+				tokens.remove(pos+1, tokens.size());
 				if (tail != null) {
 					// restore the tokens of the remaining text.
-					tokens.add(Syntax.splitLexically(tail, true));
+					tokens.add(tail);
 				}
 				posLBrace = pos;
 			}

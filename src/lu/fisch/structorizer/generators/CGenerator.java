@@ -201,6 +201,7 @@ import java.util.logging.Level;
 
 import lu.fisch.utils.*;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.structorizer.elements.*;
 import lu.fisch.structorizer.syntax.Function;
 
@@ -546,27 +547,27 @@ public class CGenerator extends Generator {
 
 	// START KGU#93 2015-12-21: Bugfix #41/#68/#69
 	/* (non-Javadoc)
-	 * @see lu.fisch.structorizer.generators.Generator#transformTokens(lu.fisch.utils.StringList)
+	 * @see lu.fisch.structorizer.generators.Generator#transformTokens(lu.fisch.utils.TokenList)
 	 */
 	@Override
-	protected String transformTokens(StringList tokens)
+	protected String transformTokens(TokenList tokens)
 	{
 		// START KGU#1061 2022-08-23: Issue #1068
 		transformIndexLists(tokens);
 		// END KGU#1061 2022-08-23
 		// START KGU#920 2021-02-03: Issue #920 Handle Infinity literal
-		tokens.replaceAll("Infinity", "INFINITY");
+		tokens.replaceAll("Infinity", "INFINITY", true);
 		// END KGU#920 2021-02-03
-		tokens.replaceAll("div", "/");
-		tokens.replaceAll("<-", "=");
+		tokens.replaceAll("div", "/", false);
+		tokens.replaceAll("<-", "=", true);
 		// START KGU#150 2016-04-03: Handle Pascal ord and chr function
 		int pos = - 1;
-		while ((pos = tokens.indexOf("ord", pos+1)) >= 0 && pos+1 < tokens.count() && tokens.get(pos+1).equals("("))
+		while ((pos = tokens.indexOf("ord", pos+1)) >= 0 && pos+1 < tokens.size() && tokens.get(pos+1).equals("("))
 		{
 			tokens.set(pos, "(int)");
 		}
 		pos = -1;
-		while ((pos = tokens.indexOf("chr", pos+1)) >= 0 && pos+1 < tokens.count() && tokens.get(pos+1).equals("("))
+		while ((pos = tokens.indexOf("chr", pos+1)) >= 0 && pos+1 < tokens.size() && tokens.get(pos+1).equals("("))
 		{
 			tokens.set(pos, "(char)");
 		}
@@ -578,7 +579,7 @@ public class CGenerator extends Generator {
 		//}
 		// END KGU#311 2016-12-22
 		// START KGU#342 2017-02-07: Bugfix #343
-		for (int i = 0; i < tokens.count(); i++) {
+		for (int i = 0; i < tokens.size(); i++) {
 			String token = tokens.get(i);
 			int tokenLen = token.length();
 			// START KGU#190 2017-03-15: Bugfix #181/#382 - String delimiter conversion had failed
@@ -602,7 +603,7 @@ public class CGenerator extends Generator {
 			}
 		}
 		// END KGU#342 2017-02-07
-		return tokens.concatenate().trim();
+		return tokens.getString().trim();
 	}
 	// END KGU#93 2015-12-21
 
@@ -615,12 +616,12 @@ public class CGenerator extends Generator {
 	 * (immediately before re-concatenation).
 	 * This does some C-specific stuff here prefixing fileRead with pointer operators and a dummy type casting,
 	 * so subclasses should better overwrite it.
-	 * @param tokens
+	 * @param tokens - the tokens of the current line or line section
 	 */
-	protected void transformFileAPITokens(StringList tokens)
+	protected void transformFileAPITokens(TokenList tokens)
 	{
 		int pos = -1;
-		while ((pos = tokens.indexOf("fileRead", pos+1)) >= 0 && pos+1 < tokens.count() && tokens.get(pos+1).equals("("))
+		while ((pos = tokens.indexOf("fileRead", pos+1)) >= 0 && pos+1 < tokens.size() && tokens.get(pos+1).equals("("))
 		{
 			tokens.set(pos, "*(/*type?*/*)fileRead");
 		}
@@ -863,7 +864,7 @@ public class CGenerator extends Generator {
 	protected String transformRecordInit(String constValue, TypeMapEntry typeInfo) {
 		// START KGU#559 2018-07-20: Enh. #563 - smarter initializer evaluation
 		//HashMap<String, String> comps = Instruction.splitRecordInitializer(constValue);
-		HashMap<String, String> comps = Instruction.splitRecordInitializer(constValue, typeInfo, false);
+		HashMap<String, String> comps = Instruction.splitRecordInitializer(constValue, typeInfo);
 		// END KGU#559 2018-07-20
 		LinkedHashMap<String, TypeMapEntry> compInfo = typeInfo.getComponentInfo(true);
 		StringBuilder recordInit = new StringBuilder("{");
@@ -2963,7 +2964,7 @@ public class CGenerator extends Generator {
 			return;
 		}
 		// END KGU#771 2019-11-24
-		HashMap<String, String> comps = Instruction.splitRecordInitializer(_recordValue, _typeEntry, false);
+		HashMap<String, String> comps = Instruction.splitRecordInitializer(_recordValue, _typeEntry);
 	// END KGU#559 2018-07-20
 		// START KGU#1021 2021-12-05: Bugfix #1024 Instruction might be defective
 		if (comps == null) {

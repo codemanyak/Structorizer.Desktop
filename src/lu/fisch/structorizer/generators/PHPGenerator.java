@@ -137,7 +137,9 @@ package lu.fisch.structorizer.generators;
 
 import lu.fisch.utils.*;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
@@ -306,23 +308,23 @@ public class PHPGenerator extends Generator
 
 	// START KGU#93 2015-12-21 Bugfix #41/#68/#69
 	/* (non-Javadoc)
-	 * @see lu.fisch.structorizer.generators.Generator#transformTokens(lu.fisch.utils.StringList)
+	 * @see lu.fisch.structorizer.generators.Generator#transformTokens(lu.fisch.structorizer.syntax.TokenList)
 	 */
 	@Override
-	protected String transformTokens(StringList tokens)
+	protected String transformTokens(TokenList tokens)
 	{
 		// START KGU#1061 2022-08-23: Issue #1068
 		transformIndexLists(tokens);
 		// END KGU#1061 2022-08-23
 		// START KGU#920 2021-02-03: Issue #920 Handle Infinity literal
-		tokens.replaceAll("Infinity", "INF");
+		tokens.replaceAll("Infinity", "INF", true);
 		// END KGU#920 2021-02-03
 		// START KGU#840 2020-04-06: Bugfix #844 array and record initializers had not been transformed at all
 		if (tokens.contains("{") && tokens.contains("}")) {
 			tokens = transformInitializers(tokens);
 		}
 		// Now convert all qualified names into array access via string key
-		for (int i = 0; i < tokens.count(); i++) {
+		for (int i = 0; i < tokens.size(); i++) {
 			String token = tokens.get(i);
 			if (Syntax.isIdentifier(token, false, null)) {
 				// Check for a preceding dot
@@ -332,7 +334,7 @@ public class PHPGenerator extends Generator
 				if (isComponent) {
 					tokens.set(k++, "[");
 					tokens.set(i, "]");
-					tokens.insert("'" + token + "'", i);
+					tokens.add(i, "'" + token + "'");
 					tokens.remove(k, i);
 					i += (k - i) + 1;	// This corrects the current index w.r.t. insertions and deletions 
 				}
@@ -340,22 +342,24 @@ public class PHPGenerator extends Generator
 				else {
 					// Check whether it looks like a function
 					k = i;	// Skip all following blanks
-					while (k+1 < tokens.count() && tokens.get(++k).trim().isEmpty());
-					if (k < tokens.count() && tokens.get(k).equals("(")) {
+					while (k+1 < tokens.size() && tokens.get(++k).trim().isEmpty());
+					if (k < tokens.size() && tokens.get(k).equals("(")) {
 						// It is a function or procedure call, k is the "(" index
 						if (token.equals("random")) {
-							StringList exprs = Element.splitExpressionList(tokens.subSequence(k+1, tokens.count()), ",", true);
-							if (exprs.count() == 2 && exprs.get(1).startsWith(")")) {
+							ArrayList<TokenList> exprs = Syntax.splitExpressionList(tokens.subSequence(k+1, tokens.size()), ",");
+							if (exprs.size() == 2 && exprs.get(1).startsWith(")")) {
 								// Syntax seems to be okay, so ...
 								tokens.set(i, "rand");	// Replace "random" by "rand", ...
-								tokens.remove(k+1, tokens.count());	// clear all that follows the "("
+								tokens.remove(k+1, tokens.size());	// clear all that follows the "("
 								tokens.add("0");		// ... insert a first argument 0,
 								tokens.add(",");		// ... the argument separator, and ...
 								tokens.add(" ");
 								// ... the argument of random, reduced by 1, ...
-								tokens.add(Syntax.splitLexically("(" + exprs.get(0) + ") - 1", true));
-								// ... and finally the re-tokenized tail
-								tokens.add(Syntax.splitLexically(exprs.get(1), true));
+								tokens.add("(");
+								tokens.addAll(exprs.get(0));
+								tokens.add(") - 1");
+								// ... and finally the tokenized tail
+								tokens.addAll(exprs.get(1));
 							}
 						}
 						else if (token.equals("randomize")) {
@@ -391,19 +395,19 @@ public class PHPGenerator extends Generator
 			// END KGU#1094 2023-10-18
 			//System.out.println("Looking for " + varName + "...");	// FIXME (KGU): Remove after Test!
 			//_input = _input.replaceAll("(.*?[^\\$])" + varName + "([\\W$].*?)", "$1" + "\\$" + varName + "$2");
-			tokens.replaceAll(varName, "$"+varName);
+			tokens.replaceAll(varName, "$"+varName, true);
 		}
 		// END KGU#62 2015-12-19
-		tokens.replaceAll("div", "/");
-		tokens.replaceAll("<-", "=");
+		tokens.replaceAll("div", "/", false);
+		tokens.replaceAll("<-", "=", true);
 		// START KGU#311 2017-01-03: Enh. #314 File API
 		//if (this.usesFileAPI) {	// KGU#832 2020-03-23: Issue #840 We should even transform disabled code
 		for (int i = 0; i < Executor.fileAPI_names.length; i++) {
-			tokens.replaceAll(Executor.fileAPI_names[i], "StructorizerFileAPI::" + Executor.fileAPI_names[i]);
+			tokens.replaceAll(Executor.fileAPI_names[i], "StructorizerFileAPI::" + Executor.fileAPI_names[i], true);
 		}
 		//}
 		// END KGU#311 2017-01-03
-		return tokens.concatenate(null);
+		return tokens.getString();
 	}
 	// END KGU#93 2015-12-21
 	
@@ -417,39 +421,43 @@ public class PHPGenerator extends Generator
 	 * @param tokens - the lexically split instruction line (may be partially transformed)
 	 * @return the tokens sequence with transformed initializer expressions
 	 */
-	private StringList transformInitializers(StringList tokens) {
-		StringList newTokens = new StringList();
+	private TokenList transformInitializers(TokenList tokens) {
+		TokenList newTokens = new TokenList();
 		int posBraceL = -1;
 		while ((posBraceL = tokens.indexOf("{")) >= 0 && tokens.indexOf("}", posBraceL+1) >= 0) {
 			int posPrev = posBraceL - 1;
 			String prevToken = "";
 			// Find the previous non-blank token in order to decide whether it is a record type name
 			while (posPrev >= 0 && (prevToken = tokens.get(posPrev--).trim()).isEmpty());
-			StringList exprs = Element.splitExpressionList(tokens.subSequence(posBraceL+1, tokens.count()), ",", true);
-			String tail = "";
-			if (exprs.count() > 0 && (tail = exprs.get(exprs.count()-1).trim()).startsWith("}")) {
-				exprs = exprs.subSequence(0, exprs.count()-1);
+			ArrayList<TokenList> exprs = Syntax.splitExpressionList(tokens.subSequence(posBraceL+1, tokens.size()), ",");
+			TokenList tail = exprs.get(exprs.size()-1);
+			if (exprs.size() > 0 && tail.startsWith("}")) {
 				// Syntax is principally okay, so decide whether it is a record or array initilaizer
 				TypeMapEntry type = this.typeMap.get(":" + prevToken);
 				if (!prevToken.isEmpty() && type != null && type.isRecord()) {
-					newTokens.add(tokens.subSequence(0, posPrev + 1));
-					newTokens.add(this.transformRecordInit(prevToken + "{" + exprs.concatenate(",") + "}", type));
+					newTokens.addAll(tokens.subSequence(0, posPrev + 1));
+					StringList exprSl = new StringList();
+					for (int i = 0; i < exprs.size(); i++) {
+						exprSl.add(exprs.get(i).getString());
+					}
+					newTokens.addAll(this.transformRecordInit(
+							prevToken + "{" + exprSl.concatenate(",") + "}", type));
 				}
 				else {
-					newTokens.add(tokens.subSequence(0, posBraceL));
-					newTokens.add(this.transformArrayInit(exprs));
+					newTokens.addAll(tokens.subSequence(0, posBraceL));
+					newTokens.addAll(this.transformArrayInit(exprs));
 				}
-				tokens = Syntax.splitLexically(tail.substring(1), true);
+				tokens = tail.subSequence(1, tail.size());
 			}
 			else {
 				// Pass all tokens upto and including the found closing brace
 				int posBraceR = tokens.indexOf("}", posBraceL+1);
-				newTokens.add(tokens.subSequence(0, posBraceR + 1));
+				newTokens.addAll(tokens.subSequence(0, posBraceR + 1));
 				tokens.remove(0, posBraceR + 1);
 			}
 		}
 		// No more braces found, so append the remaining tokens as are
-		newTokens.add(tokens);
+		newTokens.addAll(tokens);
 		return newTokens;
 	}
 
@@ -457,22 +465,23 @@ public class PHPGenerator extends Generator
 	 * Transforms the given list of array element expressions {@code exprs} into a
 	 * PHP array value, thereby recursively transforming further initializers possibly
 	 * contained in the elements of {@code exprs}
-	 * @param exprs a {@link StringList} with each element being a (partially transformed)
-	 * expression
+	 * 
+	 * @param exprs a {@link ArrayList<TokenList>>} with each element being a
+	 *      (partially transformed) tokenized expression
 	 * @return a token sequence representing the equivalent PHP array initializer
 	 */
-	private StringList transformArrayInit(StringList exprs) {
-		StringList result = new StringList();
+	private TokenList transformArrayInit(ArrayList<TokenList> exprs) {
+		TokenList result = new TokenList();
 		result.add("array(");
-		for (int i = 0; i < exprs.count(); i++) {
-			StringList tokens = Syntax.splitLexically(exprs.get(i), true);
+		for (int i = 0; i < exprs.size(); i++) {
+			TokenList tokens = exprs.get(i);
 			if (tokens.contains("{")) {
 				tokens = this.transformInitializers(tokens);
 			}
 			if (i > 0) {
 				result.add(",");
 			}
-			result.add(tokens);
+			result.addAll(tokens);
 		}
 		result.add(")");
 		return result;
@@ -482,14 +491,14 @@ public class PHPGenerator extends Generator
 	 * Transforms the record initializer into an adequate PHP code.
 	 * @param _recordValue - the record initializer according to Structorizer syntax
 	 * @param _typeEntry - used to interpret a simplified record initializer (may be null)
-	 * @return a string representing an adequate Perl code for the initialisation. May contain
+	 * @return a TokenList representing an adequate Perl code for the initialisation. May contain
 	 * indentation and newline characters
 	 */
-	protected StringList transformRecordInit(String _recordValue, TypeMapEntry _typeEntry)
+	protected TokenList transformRecordInit(String _recordValue, TypeMapEntry _typeEntry)
 	{
-		StringList result = new StringList();
+		TokenList result = new TokenList();
 		result.add("array(");
-		HashMap<String, String> comps = Instruction.splitRecordInitializer(_recordValue, _typeEntry, false);
+		HashMap<String, String> comps = Instruction.splitRecordInitializer(_recordValue, _typeEntry);
 		// START KGU#1021 2021-12-05: Bugfix #1024 Instruction might be defective
 		if (comps != null) {
 		// END KGU#1021 2021-12-05
@@ -499,16 +508,16 @@ public class PHPGenerator extends Generator
 				if (!compName.startsWith("§") && compVal != null) {
 					result.add("\"" + compName + "\"");
 					result.add(" "); result.add("=>"); result.add(" ");
-					StringList tokens = Syntax.splitLexically(compVal, true);
+					TokenList tokens = new TokenList(compVal);
 					if (tokens.contains("{")) {
 						tokens = transformInitializers(tokens);
 					}
-					result.add(tokens);
+					result.addAll(tokens);
 					result.add(",");
 				}
 			}
-			if (!result.isEmpty() && result.get(result.count()-1).equals(",")) {
-				result.remove(result.count()-1);
+			if (!result.isEmpty() && result.get(result.size()-1).equals(",")) {
+				result.remove(result.size()-1);
 			}
 		// START KGU#1021 2021-12-05: Bugfix #1024
 		}

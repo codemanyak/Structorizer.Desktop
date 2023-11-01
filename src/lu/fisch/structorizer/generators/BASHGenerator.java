@@ -203,6 +203,7 @@ import lu.fisch.structorizer.executor.Executor;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
 import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.StringList;
 
 
@@ -529,10 +530,10 @@ public class BASHGenerator extends Generator {
 	// END KGU#150/KGU#241 2016-09-01
 
 	/* (non-Javadoc)
-	 * @see lu.fisch.structorizer.generators.Generator#transformTokens(lu.fisch.utils.StringList)
+	 * @see lu.fisch.structorizer.generators.Generator#transformTokens(lu.fisch.utils.TokenList)
 	 */
 	@Override
-	protected String transformTokens(StringList tokens)
+	protected String transformTokens(TokenList tokens)
 	{
 		// START KGU#803 2020-02-18: Enh. #388 (constant handling)
 		boolean isConst = false;
@@ -545,10 +546,10 @@ public class BASHGenerator extends Generator {
 		// END KGU#1061 2022-08-23
 		// START KGU#920 2021-02-03: Issue #920 Handle Infinity literal
 		// https://unix.stackexchange.com/questions/24721/how-to-compare-to-floating-point-number-in-a-shell-script
-		tokens.replaceAll("Infinity", "INF");
+		tokens.replaceAll("Infinity", "INF", true);
 		// END KGU#920 2021-02-03
 		// Trim the tokens at both ends (just for sure)
-		tokens = tokens.trim();
+		tokens.trim();
 		// START KGU#129 2016-01-08: Bugfix #96 - variable name processing
 		// We must of course identify variable names and prefix them with $ unless being an lvalue
 		int posAsgnOpr = tokens.indexOf("<-");
@@ -618,14 +619,15 @@ public class BASHGenerator extends Generator {
 				}
 			}
 			// END KGU#388 2017-10-05
-			origExpr = tokens.concatenate(null, posAsgnOpr + 1).trim();
+			origExpr = tokens.subSequence(posAsgnOpr + 1, tokens.size()).getString();
+			origExpr.trim();
 		}
 		// END KGU#388 2017-10-24
 		// START KGU#161 2016-03-24: Bugfix #135/#92 - variables in read instructions must not be prefixed!
 		if (tokens.contains(Syntax.getKeyword("input")))
 		{
 			// Hide the text from the replacement, except for occurrences as index
-			posAsgnOpr = tokens.count();
+			posAsgnOpr = tokens.size();
 		}
 		// END KGU#161 2016-03-24
 		// START KGU#61 2016-03-21: Enh. #84/#135
@@ -641,7 +643,7 @@ public class BASHGenerator extends Generator {
 			//System.out.println("Looking for " + varName + "...");	// FIXME (KGU): Remove after Test!
 			//_input = _input.replaceAll("(.*?[^\\$])" + varName + "([\\W$].*?)", "$1" + "\\$" + varName + "$2");
 			// Transform the expression right of the assignment symbol
-			transformVariableAccess(var, tokens, posAsgnOpr+1, tokens.count());
+			transformVariableAccess(var, tokens, posAsgnOpr+1, tokens.size());
 			// Transform the index expression on the left side of the assignment symbol
 			transformVariableAccess(var, tokens, posBracket1+1, posBracket2+1);
 		}
@@ -650,18 +652,18 @@ public class BASHGenerator extends Generator {
 		posAsgnOpr = tokens.indexOf("<-");
 		// END KGU#96 2016-01-08
 		// FIXME (KGU): Function calls, math expressions etc. will have to be put into brackets etc. pp.
-		tokens.replaceAll("div", "/");
-		tokens.replaceAllCi("false", "0");
-		tokens.replaceAllCi("true", "1");
+		tokens.replaceAll("div", "/", false);
+		tokens.replaceAll("false", "0", false);
+		tokens.replaceAll("true", "1", false);
 		// START KGU#164 2016-03-29: Bugfix #138 - function calls weren't handled
 		//return tokens.concatenate();
 		String lval = "";
 		if (posAsgnOpr > 0)
 		{
 			// Separate lval and assignment operator from the expression tokens
-			varName = tokens.concatenate("", 0, posAsgnOpr).trim();
+			varName = tokens.subSequence(0, posAsgnOpr).getString().trim();
 			lval += varName + "=";
-			tokens = tokens.subSequence(posAsgnOpr+1, tokens.count());
+			tokens = tokens.subSequence(posAsgnOpr+1, tokens.size());
 			// START KGU#803 2020-02-18: Issues #388, #816
 			// We don't know whether we might process a call here, so better don't set handled entry
 			if (Syntax.isIdentifier(varName, false, null) && !this.wasDefHandled(root, varName, false)
@@ -670,7 +672,7 @@ public class BASHGenerator extends Generator {
 			}
 			// END KGU#803 2020-02-18
 		}
-		else if (tokens.count() > 0)
+		else if (!tokens.isEmpty())
 		{
 			// Since keywords have already been replaced by super.transform(String), this is quite fine
 			// 
@@ -682,15 +684,15 @@ public class BASHGenerator extends Generator {
 				if (firstToken.equals(keywords[kwi]))
 				{
 					lval = firstToken + " ";
-					tokens.delete(0);
+					tokens.remove(0);
 					startsWithKeyword = true;
 				}
 			}
 		}
 		// Trim the tokens (at front)
-		tokens = tokens.trim();
+		tokens.trim();
 		// Re-combine the rval expression to a string 
-		String expr = tokens.concatenate();
+		String expr = tokens.getString();
 		// If the expression is a function call, then convert it to shell syntax
 		// (i.e. drop the parentheses and dissolve the argument list)
 		Function fct = new Function(expr);
@@ -762,11 +764,11 @@ public class BASHGenerator extends Generator {
 			// END KGU#803 2020-02-20
 		}
 		// START KGU#388 2017-10-24: Enh. #423
-		else if (tokens.count() > 2 && Syntax.isIdentifier(tokens.get(0), false, null)
+		else if (tokens.size() > 2 && Syntax.isIdentifier(tokens.get(0), false, null)
 				&& tokens.get(1).equals("{") && expr.endsWith("}")
 				// START KGU#559 2018-07-20: Enh. #  Try to fetch sufficient type info
 				//&& (recordIni = Element.splitRecordInitializer(expr, null)) != null) {
-				&& (recordIni = Element.splitRecordInitializer(expr, this.typeMap.get(":"+tokens.get(0)), false)) != null) {
+				&& (recordIni = Element.splitRecordInitializer(expr, this.typeMap.get(":"+tokens.get(0)))) != null) {
 				// END KGU#559 2018-07-20
 			// Record initializer
 			// START KGU#388 2019-11-28: Bugfix #423 - record initializations must not be separated from the declaration
@@ -1008,7 +1010,7 @@ public class BASHGenerator extends Generator {
 	// END KGU#405 2017-05-10
 	
 	// START KGU#167 2016-03-30: Enh. #135 Array support
-	protected void transformVariableAccess(String _varName, StringList _tokens, int _start, int _end)
+	protected void transformVariableAccess(String _varName, TokenList _tokens, int _start, int _end)
 	{
 		int pos = _start-1;
 		while ((pos = _tokens.indexOf(_varName, pos+1)) >= 0 && pos < _end)
@@ -1022,7 +1024,7 @@ public class BASHGenerator extends Generator {
 				// index brackets follow, so remove the blanks
 				for (int i = 0; i < posNext - pos-1; i++)
 				{
-					_tokens.delete(pos+1);
+					_tokens.remove(pos+1);
 					_end--;
 				}
 				// find the corresponding closing bracket

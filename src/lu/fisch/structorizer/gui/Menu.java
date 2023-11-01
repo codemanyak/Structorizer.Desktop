@@ -172,6 +172,7 @@ import lu.fisch.structorizer.locales.Locales;
 import lu.fisch.structorizer.locales.Translator;
 import lu.fisch.structorizer.parsers.*;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.BString;
 import lu.fisch.utils.StringList;
 
@@ -1829,7 +1830,7 @@ public class Menu extends LangMenuBar implements NSDController, LangEventListene
 						Ini ini = Ini.getInstance();
 
 						// START KGU#258 2016-09-26: Enh. #253
-						HashMap<String, StringList> refactoringData = fetchRefactoringData();
+						HashMap<String, TokenList> refactoringData = fetchRefactoringData();
 						// END KGU#258 2016-09-26
 
 						// START KGU#721 2019-08-06: Enh. #740 produce a backup to keep safe
@@ -1874,7 +1875,7 @@ public class Menu extends LangMenuBar implements NSDController, LangEventListene
 				String trouble = null;
 				try {
 					Ini ini = Ini.getInstance();
-					HashMap<String, StringList> refactoringData = fetchRefactoringData();
+					HashMap<String, TokenList> refactoringData = fetchRefactoringData();
 					done = ini.restore();
 					ini.save();
 					NSDControl.loadFromINI();
@@ -2660,8 +2661,8 @@ public class Menu extends LangMenuBar implements NSDController, LangEventListene
 	 * with modified parser preferences
 	 * @return a {@link HashMap} associating parser tags with lexically split keywords
 	 */
-	private HashMap<String, StringList> fetchRefactoringData() {
-		HashMap<String, StringList> refactoringData = new LinkedHashMap<String, StringList>();
+	private HashMap<String, TokenList> fetchRefactoringData() {
+		HashMap<String, TokenList> refactoringData = new LinkedHashMap<String, TokenList>();
 		for (String key: Syntax.keywordSet())
 		{
 			// START KGU#288 2016-11-06: Issue #279 - getOrDefault() may not be available
@@ -2671,7 +2672,7 @@ public class Menu extends LangMenuBar implements NSDController, LangEventListene
 			if (!keyword.trim().isEmpty())
 			{
 				// Complete strings aren't likely to be found in a key, so don't bother
-				refactoringData.put(key, Syntax.splitLexically(keyword,  false));
+				refactoringData.put(key, new TokenList(keyword,  false));
 			}
 			// An empty preForIn keyword is a synonym for the preFor keyword
 			else if (key.equals("preForIn"))

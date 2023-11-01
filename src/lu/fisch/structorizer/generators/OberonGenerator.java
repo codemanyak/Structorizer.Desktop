@@ -129,6 +129,7 @@ import java.util.regex.Matcher;
 
 import lu.fisch.utils.*;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.structorizer.elements.*;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
 import lu.fisch.structorizer.syntax.Function;
@@ -427,39 +428,39 @@ public class OberonGenerator extends Generator {
 
 	// START KGU#93 2015-12-21: Bugfix #41/#68/#69
 	/* (non-Javadoc)
-	 * @see lu.fisch.structorizer.generators.Generator#transformTokens(lu.fisch.utils.StringList)
+	 * @see lu.fisch.structorizer.generators.Generator#transformTokens(lu.fisch.syntax.TokenList)
 	 */
 	@Override
-	protected String transformTokens(StringList tokens)
+	protected String transformTokens(TokenList tokens)
 	{
-		tokens.replaceAll("==", "=");
-		tokens.replaceAll("!=","#");
+		tokens.replaceAll("==", "=", true);
+		tokens.replaceAll("!=","#", true);
 		// C and Pascal division operators
-		tokens.replaceAll("div","DIV");
-		tokens.replaceAll("%"," MOD ");
+		tokens.replaceAll("div","DIV", false);
+		tokens.replaceAll("%"," MOD ", true);
 		// logical operators required transformation, too
-		tokens.replaceAll("&&","&");
-		tokens.replaceAll("||"," OR ");
-		tokens.replaceAll("!","~");
-		tokens.replaceAll("<-", ":=");
+		tokens.replaceAll("&&","&", true);
+		tokens.replaceAll("||"," OR ", true);
+		tokens.replaceAll("!","~", true);
+		tokens.replaceAll("<-", ":=", true);
 		// START KGU#150 2016-04-03: Support for ord and chr function and capitalization
 		String[] functionNames = {"abs", "inc", "dec", "chr", "ord", "uppercase"};
 		for (int i = 0; i < functionNames.length; i++)
 		{
 			int pos = -1;
 			while ((pos = tokens.indexOf(functionNames[i], pos+1)) >= 0 &&
-					pos+1 < tokens.count() &&
+					pos+1 < tokens.size() &&
 					tokens.get(pos+1).equals("("))
 			{
 				tokens.set(pos, functionNames[i].toUpperCase());
 			}
 		}
-		tokens.replaceAll("UPPERCASE", "CAP");
+		tokens.replaceAll("UPPERCASE", "CAP", true);
 		// END KGU#15ß 2016-04-03
-		String result = tokens.concatenate();
+		String result = tokens.getString();
 		// We now shrink superfluous padding - this may affect string literals, though!
-		result = result.replace("  ", " ");
-		result = result.replace("  ", " ");	// twice to catch odd-numbered space sequences, too
+		//result = result.replace("  ", " ");
+		//result = result.replace("  ", " ");	// twice to catch odd-numbered space sequences, too
 		return result;
 	}
 
@@ -924,7 +925,7 @@ public class OberonGenerator extends Generator {
 	{
 		// START KGU#559 2018-07-22: Enh. #563
 		//HashMap<String, String> components = Instruction.splitRecordInitializer(_expr);
-		HashMap<String, String> components = Instruction.splitRecordInitializer(_expr, _recType, false);
+		HashMap<String, String> components = Instruction.splitRecordInitializer(_expr, _recType);
 		// END KGU#559 2018-07-22
 		if (_forConstant) {
 			appendComment("Note: " + _varName + " was meant to be a record CONSTANT...", _indent);

@@ -91,6 +91,7 @@ import lu.fisch.structorizer.elements.While;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
 import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.StringList;
 
 /**
@@ -764,42 +765,43 @@ public class COBOLGenerator extends Generator {
 	 * @see lu.fisch.structorizer.generators.Generator#transformTokens(lu.fisch.utils.StringList)
 	 */
 	@Override
-	protected String transformTokens(StringList tokens)
+	protected String transformTokens(TokenList tokens)
 	{
 		// First get rid of superfluous spaces
 		int pos = -1;
-		StringList doubleBlank = StringList.explode(" \n ", "\n");
-		while ((pos = tokens.indexOf(doubleBlank, 0, true)) >= 0)
-		{
-			tokens.delete(pos);	// Get rid of one of the blanks
-		}
+		//StringList doubleBlank = StringList.explode(" \n ", "\n");
+		//while ((pos = tokens.indexOf(doubleBlank, 0, true)) >= 0)
+		//{
+		//	tokens.remove(pos);	// Get rid of one of the blanks
+		//}
+		tokens.removePaddings();
 		// On inserting operator keywords we better make sure them being padded
 		// (lest neighbouring identifiers be glued to them on concatenating)
 		// The correct way would of course be to add blank tokens where needed
 		// but this seemed too expensive here.
-		tokens.replaceAll("==", "=");
+		tokens.replaceAll("==", "=", true);
 		// TODO
-		tokens.replaceAll("!=", "<>");	// FIXME!!!!!
-		tokens.replaceAll("%", " mod ");	// FIXME
-		tokens.replaceAll("&&", " AND ");
-		tokens.replaceAll("||", " OR ");
-		tokens.replaceAll("!", " NOT ");
-		tokens.replaceAll("&", " and ");		// FIXME
-		tokens.replaceAll("|", " or ");		// FIXME
-		tokens.replaceAll("~", " not ");	// FIXME
-		tokens.replaceAll("<<", " shl ");	// FIXME
-		tokens.replaceAll(">>", " shr ");	// FIXME
-		tokens.replaceAll("<-", ":=");	// FIXME
+		tokens.replaceAll("!=", "<>", true);	// FIXME!!!!!
+		tokens.replaceAll("%", " mod ", true);	// FIXME
+		tokens.replaceAll("&&", " AND ", true);
+		tokens.replaceAll("||", " OR ", true);
+		tokens.replaceAll("!", " NOT ", true);
+		tokens.replaceAll("&", " and ", true);		// FIXME
+		tokens.replaceAll("|", " or ", true);		// FIXME
+		tokens.replaceAll("~", " not ", true);	// FIXME
+		tokens.replaceAll("<<", " shl ", true);	// FIXME
+		tokens.replaceAll(">>", " shr ", true);	// FIXME
+		tokens.replaceAll("<-", ":=", true);	// FIXME
 		// START KGU#311 2016-12-26: Enh. #314 - Support for File API
 		if (this.usesFileAPI) {
-			tokens.replaceAll("fileWrite", "write");
-			tokens.replaceAll("fileWriteLine", "writeln");
-			tokens.replaceAll("fileEOF", "eof");
-			tokens.replaceAll("fileClose", "closeFile");
+			tokens.replaceAll("fileWrite", "write", true);
+			tokens.replaceAll("fileWriteLine", "writeln", true);
+			tokens.replaceAll("fileEOF", "eof", true);
+			tokens.replaceAll("fileClose", "closeFile", true);
 		}
 		// END KGU#311 2016-12-26
 		// START KGU#190 2016-04-30: Bugfix #181 - String delimiters must be converted to '
-		for (int i = 0; i < tokens.count(); i++)
+		for (int i = 0; i < tokens.size(); i++)
 		{
 			String token = tokens.get(i);
 			if (token.length() > 1 && token.startsWith("\"") && token.endsWith("\""))
@@ -812,10 +814,10 @@ public class COBOLGenerator extends Generator {
 			}
 		}
 		// END KGU#190 2016-04-30
-		String result = tokens.concatenate();
+		String result = tokens.getString();
 		// We now shrink superfluous padding - this may affect string literals, though!
-		result = result.replace("  ", " ");
-		result = result.replace("  ", " ");	// twice to catch odd-numbered space sequences, too
+		//result = result.replace("  ", " ");
+		//result = result.replace("  ", " ");	// twice to catch odd-numbered space sequences, too
 		return result;
 	}
 

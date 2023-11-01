@@ -382,7 +382,7 @@ public class Root extends Element {
 	public String shadowFilepath = null;	// temp file path of an unzipped file
 	// END KGU#316 2016-12-28
 	// START KGU#362 2017-03-28: Issue #370 - retain original keywords if not refactored - makes Root readonly!
-	public HashMap<String, StringList> storedParserPrefs = null;
+	public HashMap<String, TokenList> storedParserPrefs = null;
 	// END KGU#362 2017-03-28
 	// START KGU#363 2017-03-10: Enh. #372
 	private String author = null;
@@ -781,7 +781,7 @@ public class Root extends Element {
 	// END KGU#261 2017-01-19
 	// START KGU#163 2016-03-25: Added to solve the complete detection of unknown/uninitialised identifiers
 	/** Pre-processed parser preference keywords to match them against tokenized strings */
-	private static Vector<StringList> splitKeywords = new Vector<StringList>();
+	private static Vector<TokenList> splitKeywords = new Vector<TokenList>();
 	// START KGU#920 2021-02-02: Issue #920 Infinity allowed as literal
 	/** Specific names not to be mistaken as uninitialized variables in unified texts */
 	//private String[] operatorsAndLiterals = {"false", "true", "div"};
@@ -2838,7 +2838,7 @@ public class Root extends Element {
 			splitKeywords.clear();
 			for (int k = 0; k < _keywords.length; k++)
 			{
-				splitKeywords.add(Syntax.splitLexically(_keywords[k], false));
+				splitKeywords.add(new TokenList(_keywords[k], false));
 			}
 		}
 		// END KGU#1087 2023-10-05
@@ -2857,7 +2857,7 @@ public class Root extends Element {
 		_line = transform_inc_dec(_line);
 		// END KGU#575 2018-09-17
 
-		StringList tokens = Syntax.splitLexically(_line.trim(), true);
+		TokenList tokens = new TokenList(_line.trim());
 
 		Syntax.unifyOperators(tokens, false);
 
@@ -2867,35 +2867,39 @@ public class Root extends Element {
 		{
 			if (_keywords[kw].trim().length() > 0)
 			{
-				StringList keyTokens = splitKeywords.elementAt(kw);
-				int keyLength = keyTokens.count();
+				TokenList keyTokens = splitKeywords.elementAt(kw);
+				int keyLength = keyTokens.size();
 				int pos = -1;
 				while ((pos = tokens.indexOf(keyTokens, pos + 1, !Syntax.ignoreCase)) >= 0)
 				{
+					// FIXME might compromise gaps
 					tokens.set(pos, _keywords[kw]);
 					for (int j=1; j < keyLength; j++)
 					{
-						tokens.delete(pos+1);
+						tokens.remove(pos+1);
 					}
 				}
 			}
 		}
 
 		// Unify FOR-IN loops and FOR loops for the purpose of variable analysis
-		if (!Syntax.getKeyword("postForIn").trim().isEmpty())
+		String postForIn = Syntax.getKeyword("postForIn");
+		if (!postForIn.trim().isEmpty())
 		{
-			tokens.replaceAll(Syntax.getKeyword("postForIn"), "<-");
+			//tokens.replaceAll(Syntax.getKeyword("postForIn"), "<-");
+			tokens.replaceAll(postForIn, "<-", true);
 		}
 		
 		// Here all the unification, alignment, reduction is done, now the actual analysis begins
 
 		String token0 = "";
-		if (tokens.count() > 0) token0 = tokens.get(0);
+		if (!tokens.isEmpty()) token0 = tokens.get(0);
 		int asgnPos = tokens.indexOf("<-");
 		if (asgnPos >= 0)
 		{
+			// FIXME: Do this with TokenList
 			// Look for indexed variable as assignment target, get the indices in this case
-			String s = tokens.subSequence(0, asgnPos).concatenate();
+			String s = tokens.subSequence(0, asgnPos).getString();
 			// START KGU#924 2021-02-03: Bugfix #924 component ids sometimes blamed
 			//if (s.indexOf("[") >= 0)
 			int posLBrack = s.indexOf("[");
@@ -2910,8 +2914,8 @@ public class Root extends Element {
 				s = INDEX_PATTERN.matcher(s).replaceAll("$2");
 			} else { s = ""; }
 
-			StringList indices = Syntax.splitLexically(s, true);
-			indices.add(tokens.subSequence(asgnPos+1, tokens.count()));
+			TokenList indices = new TokenList(s);
+			indices.addAll(tokens.subSequence(asgnPos+1, tokens.size()));
 			tokens = indices;
 		}
 		// START KGU#332/KGU#375 2017-01-17: Enh. #335 - ignore the content of uninitialized declarations
@@ -2926,7 +2930,7 @@ public class Root extends Element {
 		// cutoff output keyword
 		else if (token0.equals(Syntax.getKeyword("output")))	// Must be at the line's very beginning
 		{
-			tokens.delete(0);
+			tokens.remove(0);
 		}
 
 		// parse out array index
@@ -2936,7 +2940,7 @@ public class Root extends Element {
 			StringList items = Instruction.getInputItems(_line);
 			tokens.clear();
 			for (int j = 1; j < items.count(); j++) {
-				StringList itemTokens = Syntax.splitLexically(items.get(j), true);
+				TokenList itemTokens = new TokenList(items.get(j));
 				String s = "";
 				// START KGU#924 2021-02-03: Bugfix #924 component ids sometimes blamed
 				//if (itemTokens.indexOf("[", 1) >= 0)
@@ -2950,37 +2954,39 @@ public class Root extends Element {
 					// START KGU#924 2021-02-03: Bugfix #924 We must cut off the tail
 					//s = INDEX_PATTERN.matcher(itemTokens.subSequence(1, itemTokens.count()).concatenate()).replaceAll("$2");
 					s = INDEX_PATTERN.matcher(
-							itemTokens.concatenate(null, posLBrack, itemTokens.lastIndexOf("]")+1))
+							itemTokens.subSequence(posLBrack, itemTokens.lastIndexOf("]")+1).getString())
 							.replaceAll("$2");
 					// END KGU#924 2021-02-03
 					//System.out.println("\" to \"" + s + "\"");
 				}
 				// Only the indices are relevant here
-				itemTokens = Syntax.splitLexically(s, true);
-				tokens.addIfNew(itemTokens);
+				itemTokens = new TokenList(s);
+				if (tokens.indexOf(itemTokens, true) < 0) {
+					tokens.addAll(itemTokens);
+				}
 			}
 			// END KGU#653 2019-02-16
 		}
 
-		tokens.removeBlanks();
+		tokens.removePaddings();
 		// Eliminate all keywords
 		for (int kw = 0; kw < _keywords.length; kw++)
 		{
-			tokens.removeAll(_keywords[kw]);
+			while (tokens.remove(_keywords[kw])){}
 		}
 		for (int kw = 0; kw < this.operatorsAndLiterals.length; kw++)
 		{
 			int pos = -1;
 			while ((pos = tokens.indexOf(operatorsAndLiterals[kw], false)) >= 0)
 			{
-				tokens.delete(pos);
+				tokens.remove(pos);
 			}
 		}
 		// START KGU#388 2017-09-17: Enh. #423 Cut off all irrelevant stuff of record initializers
 		skimRecordInitializers(tokens);
 		// END KGU#388 2017-09-17
 		int i = 0;
-		while(i < tokens.count())
+		while (i < tokens.size())
 		{
 			String token = tokens.get(i);
 			// START KGU#588 2018-10-04: Bugfix #618 Function names shouldn't be gathered here
@@ -2988,7 +2994,7 @@ public class Root extends Element {
 			//		&& (i == tokens.count() - 1 || !tokens.get(i+1).equals("("))
 			//		|| this.variables.contains(token)))
 			if((Syntax.isIdentifier(token, false, null) || this.getCachedVarNames().contains(token))
-					&& (i == tokens.count() - 1 || !tokens.get(i+1).equals("(")))
+					&& (i == tokens.size() - 1 || !tokens.get(i+1).equals("(")))
 			// END KGU#588 2018-10-04
 			{
 				// keep the id
@@ -2996,7 +3002,7 @@ public class Root extends Element {
 				i++;
 			}
 			// START KGU#388 2017-09-17: Enh. #423 Record support - don't complain component names!
-			else if (token.equals(".") && i+1 < tokens.count() && Syntax.isIdentifier(tokens.get(i+1), false, null)) {
+			else if (token.equals(".") && i+1 < tokens.size() && Syntax.isIdentifier(tokens.get(i+1), false, null)) {
 				// Drop the dot together with the following component name
 				tokens.remove(i, i+2);
 			}
@@ -3006,35 +3012,40 @@ public class Root extends Element {
 				tokens.remove(i);
 			}
 		}
-		return tokens;
+		StringList varNames = new StringList();
+		for (int j = 0; j < tokens.size(); j++) {
+			varNames.add(tokens.get(j));
+		}
+		return varNames;
 	}
 	// END KGU#375 2017-04-04
 	// START KGU#388 2017-10-09: Enh. #423
 	/**
-	 * Recursively cuts off all irrelevant stuff of record initializers for {@link #getUsedVarNames(String, String[])}
-	 * @param tokens - the skimmed tokens
+	 * Recursively cuts off all irrelevant stuff of record initializers for
+	 *    {@link #getUsedVarNames(String, String[])}
+	 * @param tokens - the token list to be skimmed
 	 */
-	private void skimRecordInitializers(StringList tokens) {
+	private void skimRecordInitializers(TokenList tokens) {
 		int posBrace = 0;
 		while ((posBrace = tokens.indexOf("{", posBrace+1)) > 0) {
 			if (Syntax.isIdentifier(tokens.get(posBrace-1), false, null)) {
-				HashMap<String, String> components = Element.splitRecordInitializer(tokens.concatenate("", posBrace-1), null, false);
+				HashMap<String, String> components = Syntax.splitRecordInitializer(tokens.subSequence(posBrace-1, tokens.size()), null);
 				if (components != null) {
 					// Remove all tokens from the type name on (they are in the HashMap now)
-					tokens.remove(posBrace-1, tokens.count());
+					tokens.remove(posBrace-1, tokens.size());
 					// Append all the value strings for the components but not the component names
 					for (Entry<String, String> comp: components.entrySet()) {
 						if (!comp.getKey().startsWith("§")) {
-							StringList subTokens = Syntax.splitLexically(comp.getValue(), true);
+							TokenList subTokens = new TokenList(comp.getValue());
 							skimRecordInitializers(subTokens);
-							tokens.add(subTokens);
+							tokens.addAll(subTokens);
 						}
 					}
 					// If there was further text beyond the initializer then tokenize and append it
 					if (components.containsKey("§TAIL§")) {
-						StringList subTokens = Syntax.splitLexically(components.get("§TAIL§"), true);
+						TokenList subTokens = new TokenList(components.get("§TAIL§"));
 						skimRecordInitializers(subTokens);
-						tokens.add(subTokens);
+						tokens.addAll(subTokens);
 					}
 				}
 			}
@@ -3088,7 +3099,7 @@ public class Root extends Element {
         String[] keywords = Syntax.getAllProperties();
         for (int k = 0; k < keywords.length; k++)
         {
-            splitKeywords.add(Syntax.splitLexically(keywords[k], false));
+            splitKeywords.add(new TokenList(keywords[k], false));
         }
         // END KGU#163 2016-03-25
 
@@ -3105,7 +3116,7 @@ public class Root extends Element {
             allText = transform_inc_dec(allText);
             // END KGU#575 2018-09-17
 
-            StringList tokens = Syntax.splitLexically(allText, true);
+            TokenList tokens = new TokenList(allText);
 
             Syntax.unifyOperators(tokens, false);
 
@@ -3115,8 +3126,8 @@ public class Root extends Element {
             {
                 if (keywords[kw].trim().length() > 0)
                 {
-                    StringList keyTokens = splitKeywords.elementAt(kw);
-                    int keyLength = keyTokens.count();
+                    TokenList keyTokens = splitKeywords.elementAt(kw);
+                    int keyLength = keyTokens.size();
                     int pos = -1;
                     while ((pos = tokens.indexOf(keyTokens, pos + 1, !Syntax.ignoreCase)) >= 0)
                     {
@@ -3129,7 +3140,7 @@ public class Root extends Element {
             // Unify FOR-IN loops and FOR loops for the purpose of variable analysis
             if (!Syntax.getKeyword("postForIn").trim().isEmpty())
             {
-                tokens.replaceAll(Syntax.getKeyword("postForIn"), "<-");
+                tokens.replaceAll(Syntax.getKeyword("postForIn"), "<-", true);
             }
 
             // Here all the unification, alignment, reduction is done, now the actual analysis begins
@@ -3137,11 +3148,12 @@ public class Root extends Element {
             int asgnPos = tokens.indexOf("<-");
             if (asgnPos > 0)
             {
-                String s = tokens.concatenate(null, 0, asgnPos);
+                // FIXME: Necessary to go bak to strings?
+                String s = tokens.subSequence(0, asgnPos).getString();
 
                 // START KGU#1089 2023-10-14: Issue #980 Skip possible multi-var declarations
                 if (tokens.indexOf("var", false) == 0 || tokens.indexOf("dim", false) == 0) {
-                    tokens.removeAll(" ");
+                    //tokens.removeAll(" ");
                     asgnPos = tokens.indexOf("<-");
                     int posColon = tokens.indexOf(":");
                     if ((posColon > 2 && posColon < asgnPos
@@ -3149,7 +3161,7 @@ public class Root extends Element {
                         // More than one identifier or whatever between var/dim and :/as - skip
                         continue;
                     }
-                    s = tokens.concatenate(null, 1, posColon < 0 || posColon > asgnPos ? asgnPos : posColon);
+                    s = tokens.subSequence(1, posColon < 0 || posColon > asgnPos ? asgnPos : posColon).getString();
                 }
                 // END KGU#1089 2023-10-14
                 // (KGU#141 2016-01-16: type elimination moved to extractVarName())
@@ -3159,7 +3171,7 @@ public class Root extends Element {
                 // START KGU#375 2017-03-31: Enh. #388 collect constant definitions
                 // Register it as constant if marked as such and not having been declared before
                 if (tokens.get(0).equals("const") && wasNew && !constantDefs.containsKey(varName)) {
-                    constantDefs.put(varName, tokens.subSequence(asgnPos+1, tokens.count()).concatenate().trim());
+                    constantDefs.put(varName, tokens.subSequence(asgnPos+1, tokens.size()).getString().trim());
                 }
             }
 
@@ -3173,7 +3185,7 @@ public class Root extends Element {
                 inpPos++;
                 // START KGU#281 2016-12-23: Enh. #271 - allow comma between prompt and variable name
                 //while (inpPos < tokens.count() && (tokens.get(inpPos).trim().isEmpty() || tokens.get(inpPos).matches("^[\"\'].*[\"\']$")))
-                while (inpPos < tokens.count() && (tokens.get(inpPos).trim().isEmpty() || tokens.get(inpPos).trim().equals(",") || tokens.get(inpPos).matches("^[\"\'].*[\"\']$")))
+                while (inpPos < tokens.size() && (tokens.get(inpPos).trim().isEmpty() || tokens.get(inpPos).trim().equals(",") || tokens.get(inpPos).matches("^[\"\'].*[\"\']$")))
                 // END KGU#281 2016-12-23
                 {
                     inpPos++;
@@ -3181,10 +3193,10 @@ public class Root extends Element {
                 //String s = tokens.subSequence(inpPos, tokens.count()).concatenate().trim();
                 // END KGU#281 2016-10-12
                 // A mere splitting by comma would spoil function calls as indices etc.
-                StringList parts = Element.splitExpressionList(tokens.subSequence(inpPos, tokens.count()), ",", false);
-                for (int p = 0; p < parts.count(); p++)
+                ArrayList<TokenList> parts = Syntax.splitExpressionList(tokens.subSequence(inpPos, tokens.size()), ",");
+                for (int p = 0; p < parts.size()-1; p++)
                 {
-                    varNames.addOrderedIfNew(extractVarName(parts.get(p).trim()));
+                    varNames.addOrderedIfNew(extractVarName(parts.get(p).getString().trim()));
                 }
             }
 
@@ -5779,7 +5791,8 @@ public class Root extends Element {
 				// END KGU#1089 2023-10-13
 				// START KGU#388 2017-09-17: Enh. #423 Check the definition of type names and components
 				if (check(24)) {
-					StringList tokens = Syntax.splitLexically(line, true);
+					// FIXME Might be obtained directly from the Tokentext
+					TokenList tokens = new TokenList(line, true);
 					//int nTokens = tokens.count();
 					int posBrace = 0;
 					String typeName = "";
@@ -5792,7 +5805,7 @@ public class Root extends Element {
 						else {
 							// START KGU#559 2018-07-20: Enh. #563  more intelligent initializer evaluation
 							//HashMap<String, String> components = Element.splitRecordInitializer(tokens.concatenate("", posBrace));
-							HashMap<String, String> components = Element.splitRecordInitializer(tokens.concatenate("", posBrace), recType, false);
+							HashMap<String, String> components = Syntax.splitRecordInitializer(tokens.subSequence(posBrace, tokens.size()), recType);
 							// END KGU#559 2018-07-20
 							// START KGU#1021 2021-12-05: Bugfix #1024 components may be null!
 							if (components == null) {
@@ -6993,7 +7006,7 @@ public class Root extends Element {
 		Type discrType = line.getOrInferDataType(_dataTypes);
 		if (discrType != null && discrType.isStructured()) {
 			//error  = new DetectedError("The discriminator (%) is structured - which is unsuited for CASE!", _case);
-			addError(_errors, new DetectedError(errorMsg(Menu.error29, text.get(0)), _case), 29);
+			addError(_errors, new DetectedError(errorMsg(Menu.error29, text.get(0).getString()), _case), 29);
 		}
 	}
 	
@@ -8632,7 +8645,7 @@ public class Root extends Element {
 		StringList textToShow = super.getText(_alwaysTrueText);
 		if (textToShow.getText().trim().isEmpty())
 		{
-			textToShow = text;
+			textToShow = super.getText();
 		}
 		return textToShow;
 	}

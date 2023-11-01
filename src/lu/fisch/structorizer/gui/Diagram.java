@@ -321,6 +321,7 @@ import lu.fisch.utils.*;
 import lu.fisch.utils.Desktop;
 import lu.fisch.structorizer.parsers.*;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.structorizer.io.*;
 import lu.fisch.structorizer.locales.Locales;
 import lu.fisch.structorizer.generators.*;
@@ -2563,11 +2564,11 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 
 	// START KGU#362 2017-03-28: Issue #370
 	private boolean handleKeywordDifferences(boolean isChangeRequest) {
-		StringList ignoreCaseInfo = root.storedParserPrefs.get("ignoreCase");
-		boolean wasCaseIgnored = ignoreCaseInfo != null && ignoreCaseInfo.getText().equals("true");
-		StringList replacements = new StringList();
-		for (HashMap.Entry<String, StringList> entry : root.storedParserPrefs.entrySet()) {
-			String storedValue = entry.getValue().concatenate();
+		TokenList ignoreCaseInfo = root.storedParserPrefs.get("ignoreCase");
+		boolean wasCaseIgnored = ignoreCaseInfo != null && ignoreCaseInfo.getString().equals("true");
+		TokenList replacements = new TokenList();
+		for (HashMap.Entry<String, TokenList> entry : root.storedParserPrefs.entrySet()) {
+			String storedValue = entry.getValue().getString();
 			// START KGU#288 2016-11-06: Issue #279 - Method getOrDefault() missing in OpenJDK
 			//String newValue = CodeParser.getKeywordOrDefault(entry.getKey(), "");
 			String currentValue = (entry.getKey().equals("ignoreCase"))
@@ -2593,7 +2594,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 			menuText += (char) ('a' + i) + ") " + optionTexts[i] + (i + 1 < optionTexts.length ? "," : ".") + "\n";
 		}
 		int answer = JOptionPane.showOptionDialog(this.getFrame(),
-				Menu.msgKeywordsDiffer.getText().replace("%1", "\n" + replacements.getText() + "\n").replace("%2", menuText),
+				Menu.msgKeywordsDiffer.getText().replace("%1", "\n" + replacements.getString() + "\n").replace("%2", menuText),
 				Menu.msgTitleQuestion.getText(), JOptionPane.OK_CANCEL_OPTION,
 				JOptionPane.QUESTION_MESSAGE,
 				null,
@@ -2602,7 +2603,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		switch (answer) {
 		case 0: // Refactor the current diagram
 		{
-			HashMap<String, StringList> storedParserPrefs = root.storedParserPrefs;
+			HashMap<String, TokenList> storedParserPrefs = root.storedParserPrefs;
 			root.storedParserPrefs = null;
 			refactorDiagrams(storedParserPrefs, false, wasCaseIgnored);
 			goAhead = true;
@@ -2615,13 +2616,13 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 			} else {
 				// Refactor all the other diagrams
 				// Cache the current parser preferences
-				HashMap<String, StringList> splitPrefs = new HashMap<String, StringList>();
+				HashMap<String, TokenList> splitPrefs = new HashMap<String, TokenList>();
 				// and adopt the stored preferences of the diagram
 				for (String key: Syntax.keywordSet()) {
-					splitPrefs.put(key, Syntax.splitLexically(Syntax.getKeywordOrDefault(key, ""), false));
-					StringList stored = root.storedParserPrefs.get(key);
+					splitPrefs.put(key, new TokenList(Syntax.getKeywordOrDefault(key, ""), false));
+					TokenList stored = root.storedParserPrefs.get(key);
 					if (stored != null) {
-						Syntax.setKeyword(key, stored.concatenate());
+						Syntax.setKeyword(key, stored.getString());
 					}
 				}
 				boolean tmpIgnoreCase = Syntax.ignoreCase;
@@ -8251,19 +8252,19 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 
 		if (parserPreferences.OK) {
 			// START KGU#258 2016-09-26: Enh. #253 - prepare the old settings for a refactoring
-			HashMap<String, StringList> oldKeywordMap = null;
+			HashMap<String, TokenList> oldKeywordMap = null;
 			boolean wasCaseIgnored = Syntax.ignoreCase;
 			boolean considerRefactoring = root.children.getSize() > 0
 					|| isArrangerOpen() && Arranger.getInstance().getAllRoots().size() > 0;
 			//if (considerRefactoring)
 			//{
-				oldKeywordMap = new LinkedHashMap<String, StringList>();
+				oldKeywordMap = new LinkedHashMap<String, TokenList>();
 				for (String key : Syntax.keywordSet()) {
 					String keyword = Syntax.getKeyword(key);
 					if (keyword != null && !keyword.trim().isEmpty())
 					{
 						// Complete strings aren't likely to be found in a key, so don't bother
-						oldKeywordMap.put(key, Syntax.splitLexically(keyword, false));
+						oldKeywordMap.put(key, new TokenList(keyword, false));
 					}
 				}
 			//}
@@ -8351,7 +8352,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 	 * @param refactoringData - tokenized previous non-empty parser preferences
 	 * @return true if a refactoring makes sense, false otherwise
 	 */
-	public boolean offerRefactoring(HashMap<String, StringList> refactoringData) {
+	public boolean offerRefactoring(HashMap<String, TokenList> refactoringData) {
 		// Since this method is always called after a preference file has been loaded,
 		// we update the preferred export code for the doButtons() call, though it
 		// has nothing to do with refactoring
@@ -8367,8 +8368,8 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		//StringList replacements = new StringList();
 		List<String[]> replacements = new LinkedList<String[]>();
 		// END KGU#719 2019-08-1
-		for (HashMap.Entry<String, StringList> entry : refactoringData.entrySet()) {
-			String oldValue = entry.getValue().concatenate();
+		for (HashMap.Entry<String, TokenList> entry : refactoringData.entrySet()) {
+			String oldValue = entry.getValue().getString();
 			// START KGU#288 2016-11-06: Issue #279 - Method getOrDefault() missing in OpenJDK
 			//String newValue = CodeParser.getKeywordOrDefault(entry.getKey(), "");
 			String newValue = Syntax.getKeywordOrDefault(entry.getKey(), "");
@@ -8437,8 +8438,8 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 				if (answer == JOptionPane.CLOSED_OPTION && JOptionPane.showConfirmDialog(this.getFrame(),
 						Menu.msgDiscardParserPrefs.getText()) == JOptionPane.OK_OPTION) {
 					// Revert the changes
-					for (Map.Entry<String, StringList> refEntry : refactoringData.entrySet()) {
-						Syntax.setKeyword(refEntry.getKey(), refEntry.getValue().concatenate());
+					for (Map.Entry<String, TokenList> refEntry : refactoringData.entrySet()) {
+						Syntax.setKeyword(refEntry.getKey(), refEntry.getValue().getString());
 					}
 					answer = 2;
 				}
@@ -8447,10 +8448,10 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 			// END KGU#362 2017-03-28
 			{
 				if (Syntax.ignoreCase) {
-					refactoringData.put("ignoreCase", StringList.getNew("true"));
+					refactoringData.put("ignoreCase", new TokenList("true"));
 				}
 				if (answer == 2) {
-					refactoringData.put("refactorAll", StringList.getNew("true"));
+					refactoringData.put("refactorAll", new TokenList("true"));
 				}
 				return true;
 			}
@@ -8459,7 +8460,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 	}
 
 	// START KGU#362 2017-03-28: Issue #370 - helper methods for preference consistency 
-	private void offerStructPrefAdaptation(HashMap<String, StringList> refactoringData) {
+	private void offerStructPrefAdaptation(HashMap<String, TokenList> refactoringData) {
 		// START KGU#735 2019-09-29: Issue #753 - first do a check to avoid puzzling questions
 		//if (JOptionPane.showConfirmDialog(this.NSDControl.getFrame(),
 		//		Menu.msgAdaptStructPrefs.getText(), Menu.msgTitleQuestion.getText(),
@@ -8487,12 +8488,12 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		}
 	}
 
-	private String replacePref(String structPref, HashMap<String, StringList> refactoringData,
+	private String replacePref(String structPref, HashMap<String, TokenList> refactoringData,
 			String prefixKey, String postfixKey) {
-		StringList old = refactoringData.get(prefixKey);
+		TokenList old = refactoringData.get(prefixKey);
 		int startPos = 0;
 		if (old != null) {
-			String oldPrefix = old.concatenate();
+			String oldPrefix = old.getString();
 			String newPrefix = Syntax.getKeywordOrDefault(prefixKey, "");
 			if (!oldPrefix.trim().isEmpty() && structPref.startsWith(oldPrefix)) {
 				structPref = newPrefix + structPref.substring(oldPrefix.length());
@@ -8501,7 +8502,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		}
 		old = refactoringData.get(postfixKey);
 		if (old != null) {
-			String oldPostfix = old.concatenate();
+			String oldPostfix = old.getString();
 			String newPostfix = Syntax.getKeywordOrDefault(postfixKey, "");
 			if (!oldPostfix.trim().isEmpty() && structPref.substring(startPos).endsWith(oldPostfix)) {
 				structPref = structPref.substring(0, structPref.length() - oldPostfix.length()) + newPostfix;
@@ -8510,19 +8511,19 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		return structPref;
 	}
 
-	private String replacePrefCase(String preCase, HashMap<String, StringList> refactoringData) {
+	private String replacePrefCase(String preCase, HashMap<String, TokenList> refactoringData) {
 		StringList structPrefLines = StringList.explode(preCase, "\n");
 		String oldPrefix = "";
 		String oldPostfix = "";
 		String newPrefix = Syntax.getKeywordOrDefault("preCase", "");
 		String newPostfix = Syntax.getKeywordOrDefault("postCase", "");
-		StringList old = refactoringData.get("preCase");
+		TokenList old = refactoringData.get("preCase");
 		if (old != null) {
-			oldPrefix = old.concatenate();
+			oldPrefix = old.getString();
 		}
 		old = refactoringData.get("postCase");
 		if (old != null) {
-			oldPostfix = old.concatenate();
+			oldPostfix = old.getString();
 		}
 		for (int i = 0; i < structPrefLines.count() - 1; i++) {
 			String structPref = structPrefLines.get(i);
@@ -8537,7 +8538,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		return structPrefLines.getText();
 	}
 
-	private String replacePrefFor(String structPref, HashMap<String, StringList> refactoringData) {
+	private String replacePrefFor(String structPref, HashMap<String, TokenList> refactoringData) {
 		String oldPrefix1 = "";
 		String oldPrefix2 = "";
 		String oldInfix1 = "";
@@ -8548,21 +8549,21 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		String newInfix1 = Syntax.getKeywordOrDefault("postFor", "");
 		String newInfix1a = Syntax.getKeywordOrDefault("stepFor", "");
 		String newInfix2 = Syntax.getKeywordOrDefault("postForIn", "");
-		StringList old = null;
+		TokenList old = null;
 		if ((old = refactoringData.get("preFor")) != null) {
-			oldPrefix1 = old.concatenate();
+			oldPrefix1 = old.getString();
 		}
 		if ((old = refactoringData.get("preForIn")) != null) {
-			oldPrefix2 = old.concatenate();
+			oldPrefix2 = old.getString();
 		}
 		if ((old = refactoringData.get("postFor")) != null) {
-			oldInfix1 = old.concatenate();
+			oldInfix1 = old.getString();
 		}
 		if ((old = refactoringData.get("stepFor")) != null) {
-			oldInfix1a = old.concatenate();
+			oldInfix1a = old.getString();
 		}
 		if ((old = refactoringData.get("postForIn")) != null) {
-			oldInfix2 = old.concatenate();
+			oldInfix2 = old.getString();
 		}
 		String tail = "";
 		if (!oldPrefix1.trim().isEmpty() && !oldInfix1.trim().isEmpty()
@@ -8591,7 +8592,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 	// END KGU#362 2017-03-28
 
 	// START KGU#735 2019-09-29: Issue #753 - check methods for preference consistency 
-	private String checkPref(String structPref, HashMap<String, StringList> refactoringData,
+	private String checkPref(String structPref, HashMap<String, TokenList> refactoringData,
 			String prefixKey, String postfixKey) {
 		String newPref = replacePref(structPref, refactoringData, prefixKey, postfixKey);
 		if (!newPref.equals(structPref)) {
@@ -8600,7 +8601,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		return null;
 	}
 
-	private String checkPrefCase(String structPref, HashMap<String, StringList> refactoringData) {
+	private String checkPrefCase(String structPref, HashMap<String, TokenList> refactoringData) {
 		String newPref = replacePrefCase(structPref, refactoringData);
 		if (!newPref.equals(structPref)) {
 			return structPref + " --> " + newPref;
@@ -8608,7 +8609,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		return null;
 	}
 
-	private String checkPrefFor(String structPref, HashMap<String, StringList> refactoringData) {
+	private String checkPrefFor(String structPref, HashMap<String, TokenList> refactoringData) {
 		String newPref = replacePrefFor(structPref, refactoringData);
 		if (!newPref.equals(structPref)) {
 			return structPref + " --> " + newPref;
@@ -8626,7 +8627,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 	 * @param refactoringData - maps old keywords to new keywords and may
 	 * contain keys "refactorAll" and "ignoreCase" as mere flags.
 	 */
-	public void refactorNSD(HashMap<String, StringList> refactoringData) {
+	public void refactorNSD(HashMap<String, TokenList> refactoringData) {
 		if (refactoringData != null) {
 			refactorDiagrams(refactoringData,
 					refactoringData.containsKey("refactorAll"),
@@ -8635,12 +8636,12 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		}
 	}
 
-	private boolean refactorDiagrams(HashMap<String, StringList> oldKeywordMap, boolean refactorAll, boolean wasCaseIgnored) {
+	private boolean refactorDiagrams(HashMap<String, TokenList> oldKeywordMap, boolean refactorAll, boolean wasCaseIgnored) {
 		boolean redrawn = false;
 		if (oldKeywordMap != null && !oldKeywordMap.isEmpty()) {
 			final class Refactorer implements IElementVisitor {
 
-				public HashMap<String, StringList> oldMap = null;
+				public HashMap<String, TokenList> oldMap = null;
 				boolean ignoreCase = false;
 
 				@Override
@@ -8654,7 +8655,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 					return true;
 				}
 
-				Refactorer(HashMap<String, StringList> _keyMap, boolean _caseIndifferent) {
+				Refactorer(HashMap<String, TokenList> _keyMap, boolean _caseIndifferent) {
 					oldMap = _keyMap;
 					ignoreCase = _caseIndifferent;
 				}

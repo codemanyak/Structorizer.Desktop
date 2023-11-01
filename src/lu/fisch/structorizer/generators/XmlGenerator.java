@@ -456,7 +456,7 @@ public class XmlGenerator extends Generator
 			//}
 			String value = entry.getValue();
 			if (_root.storedParserPrefs != null && _root.storedParserPrefs.containsKey(entry.getKey())) {
-				value = _root.storedParserPrefs.get(entry.getKey()).concatenate();
+				value = _root.storedParserPrefs.get(entry.getKey()).getString();
 			}
 			if (!value.isEmpty())
 			{

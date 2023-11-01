@@ -149,6 +149,7 @@ package lu.fisch.structorizer.generators;
 
 import lu.fisch.utils.*;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.structorizer.syntax.Expression.Operator;
 
 import java.util.HashMap;
@@ -589,41 +590,41 @@ public class PasGenerator extends Generator
 	 * @see lu.fisch.structorizer.generators.Generator#transformTokens(lu.fisch.utils.StringList)
 	 */
 	@Override
-	protected String transformTokens(StringList tokens)
+	protected String transformTokens(TokenList tokens)
 	{
 		// First get rid of superfluous spaces
 		int pos = -1;
-		StringList doubleBlank = StringList.explode(" \n ", "\n");
-		while ((pos = tokens.indexOf(doubleBlank, 0, true)) >= 0)
-		{
-			tokens.delete(pos);	// Get rid of one of the blanks
-		}
+		//StringList doubleBlank = StringList.explode(" \n ", "\n");
+		//while ((pos = tokens.indexOf(doubleBlank, 0, true)) >= 0)
+		//{
+		//	tokens.delete(pos);	// Get rid of one of the blanks
+		//}
 		// On inserting operator keywords we better make sure them being padded
 		// (lest neighbouring identifiers be glued to them on concatenating)
 		// The correct way would of course be to add blank tokens where needed
 		// but this seemed too expensive here.
-		tokens.replaceAll("==", "=");
-		tokens.replaceAll("!=","<>");
-		tokens.replaceAll("%"," mod ");
-		tokens.replaceAll("&&"," and ");
-		tokens.replaceAll("||"," or ");
-		tokens.replaceAll("!"," not ");
-		tokens.replaceAll("&"," and ");
-		tokens.replaceAll("|"," or ");
-		tokens.replaceAll("~"," not ");
-		tokens.replaceAll("<<"," shl ");
-		tokens.replaceAll(">>"," shr ");
-		tokens.replaceAll("<-", ":=");
+		tokens.replaceAll("==", "=", true);
+		tokens.replaceAll("!=","<>", true);
+		tokens.replaceAll("%"," mod ", true);
+		tokens.replaceAll("&&"," and ", true);
+		tokens.replaceAll("||"," or ", true);
+		tokens.replaceAll("!"," not ", true);
+		tokens.replaceAll("&"," and ", true);
+		tokens.replaceAll("|"," or ", true);
+		tokens.replaceAll("~"," not ", true);
+		tokens.replaceAll("<<"," shl ", true);
+		tokens.replaceAll(">>"," shr ", true);
+		tokens.replaceAll("<-", ":=", true);
 		// START KGU#311 2016-12-26: Enh. #314 - Support for File API
 		//if (this.usesFileAPI) {	// KGU#832 2020-03-23: Bugfix #840 transform even for disabled elements
-			tokens.replaceAll("fileWrite", "write");
-			tokens.replaceAll("fileWriteLine", "writeln");
-			tokens.replaceAll("fileEOF", "eof");
-			tokens.replaceAll("fileClose", "closeFile");
+			tokens.replaceAll("fileWrite", "write", true);
+			tokens.replaceAll("fileWriteLine", "writeln", true);
+			tokens.replaceAll("fileEOF", "eof", true);
+			tokens.replaceAll("fileClose", "closeFile", true);
 		//}
 		// END KGU#311 2016-12-26
 		// START KGU#190 2016-04-30: Bugfix #181 - String delimiters must be converted to '
-		for (int i = 0; i < tokens.count(); i++)
+		for (int i = 0; i < tokens.size(); i++)
 		{
 			String token = tokens.get(i);
 			if (token.length() > 1 && token.startsWith("\"") && token.endsWith("\""))
@@ -636,10 +637,10 @@ public class PasGenerator extends Generator
 			}
 		}
 		// END KGU#190 2016-04-30
-		String result = tokens.concatenate();
+		String result = tokens.getString();
 		// We now shrink superfluous padding - this may affect string literals, though!
-		result = result.replace("  ", " ");
-		result = result.replace("  ", " ");	// twice to catch odd-numbered space sequences, too
+		//result = result.replace("  ", " ");
+		//result = result.replace("  ", " ");	// twice to catch odd-numbered space sequences, too
 		return result;
 	}
 	// END KGU#93 2015-12-21
@@ -975,7 +976,7 @@ public class PasGenerator extends Generator
 	//	HashMap<String, String> components = Instruction.splitRecordInitializer(_expr);
 	private void generateRecordInit(String _varName, String _expr, String _indent, boolean _forConstant, boolean _isDisabled, TypeMapEntry _typeEntry)
 	{
-		HashMap<String, String> components = Instruction.splitRecordInitializer(_expr, _typeEntry, false);
+		HashMap<String, String> components = Instruction.splitRecordInitializer(_expr, _typeEntry);
 	// END KGU#559 2018-07-20
 		// START KGU#1021 2021-12-05: Bugfix #1024 Instruction might be defective
 		if (components == null) {

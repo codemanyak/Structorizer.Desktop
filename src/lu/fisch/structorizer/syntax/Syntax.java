@@ -547,6 +547,7 @@ public class Syntax {
 	 * 
 	 * @see #splitLexically(String, boolean, boolean)
 	 * @see StringList#removeBlanks()
+	 * @deprecated Use {@link TokenList#TokenList(String)} instead
 	 */
 	public static StringList splitLexically(String _text, boolean _restoreStrings)
 	{
@@ -878,6 +879,8 @@ public class Syntax {
 	 * @param _noWhiteSpace - if {@code true} then inter-lexeme whitespace will be eliminated,
 	 *        otherwise it will be left in contiguous chunks of whitespace characters.
 	 * @return StringList consisting of the separated lexemes including isolated spaces etc.
+	 * 
+	 * @deprecated Use {@link TokenList#TokenList(String)} instead
 	 */
 	public static StringList splitLexically(String _text, boolean _preserveStrings, boolean _noWhiteSpace)
 	{
@@ -1422,6 +1425,114 @@ public class Syntax {
 	}
 	// END KGU#101/KGU#790 2023-10-19
 	
+	/**
+	 * Decomposes the interior of a record initializer of the form<br/>
+	 * {@code [typename]}{{@code compname1: value1, compname2: value2, ...}}<br/>
+	 * into a hash table mapping the component names to the corresponding value
+	 * strings.<br/>
+	 * If there is text following the closing brace it will be mapped to key "§TAIL§".<br/>
+	 * If the {@code typename} is given then it will be provided mapped to key
+	 * "§TYPENAME§".
+	 * If {@code _typeInfo} is given and either {@code typename} was omitted or matches
+	 * the name of {@code _typeInfo} then unprefixed component values will be associated
+	 * to the component names of the type in order of occurrence unless an explicit
+	 * component name prefix occurs.<br/>
+	 * If {@code _typeInfo} is {@code null} then generic component names of form
+	 * {@code "FIXME_<typename>_<i>"} will be provided for components with missing
+	 * names in the {@code _text}.
+	 * 
+	 * @param _text - the initializer expression with or without preceding
+	 *     {@code typename} but with braces.
+	 * @param _typeInfo - the type map entry for the corresponding record type if
+	 *     available, otherwise {@code null}
+	 * 
+	 * @return the component map (or null if there are no braces).
+	 */
+	public static HashMap<String, String> splitRecordInitializer(String _text, TypeMapEntry _typeInfo, boolean _generateDummyCompNames)
+	{
+		return splitRecordInitializer(new TokenList(_text), _typeInfo);
+	}
+	// END KGU#388 2017-09-13
+
+	/**
+	 * Decomposes the interior of a record initializer of the form<br/>
+	 * {@code [typename]}{{@code compname1: value1, compname2: value2, ...}}<br/>
+	 * into a hash table mapping the component names to the corresponding value
+	 * strings.<br/>
+	 * If there is text following the closing brace it will be mapped to key "§TAIL§".<br/>
+	 * If the {@code typename} is given then it will be provided mapped to key
+	 * "§TYPENAME§".
+	 * If {@code _typeInfo} is given and either {@code typename} was omitted or matches
+	 * the name of {@code _typeInfo} then unprefixed component values will be associated
+	 * to the component names of the type in order of occurrence unless an explicit
+	 * component name prefix occurs.<br/>
+	 * If {@code _typeInfo} is {@code null} then generic component names of form
+	 * {@code "FIXME_<typename>_<i>"} will be provided for components with missing
+	 * names in the {@link TokenList} {@code _tokens}.
+	 * 
+	 * @param _tokens - tokenized initializer expression with or without preceding
+	 *    {@code typename} but with braces.
+	 * @param _typeInfo - the type map entry for the corresponding record type if
+	 *    available, otherwise {@code null}
+	 * @return {@code true} if {@code _components} could be filled consistently,
+	 *    {@code false} otherwise (because of some trouble)
+	 */
+	public static HashMap<String, String> splitRecordInitializer(TokenList _tokens, TypeMapEntry _typeInfo) {
+		// START KGU#526 2018-08-01: Enh. #423 - effort to make the component order more stable (at higher costs, though)
+		//HashMap<String, String> components = new HashMap<String, String>();
+		HashMap<String, String> components = new LinkedHashMap<String, String>();
+		// END KGU#526 2018-08-01
+			int posBrace = _tokens.indexOf("{");
+		if (posBrace != 1) {
+			return null;
+		}
+		String typename = _tokens.get(0);
+		components.put("§TYPENAME§", typename);
+		ArrayList<TokenList> parts = splitExpressionList(_tokens.subSequence(posBrace+1, _tokens.size()), ",");
+		TokenList tail = parts.get(parts.size()-1);
+		if (!tail.startsWith("}")) {
+			return null;
+		}
+		else if (!(tail = tail.subSequence(1, tail.size())).isEmpty()) {
+			components.put("§TAIL§", tail.getString());
+		}
+		// START KGU#559 2018-07-20: Enh. #563 In case of a given type, we may guess the target fields
+		boolean guessComponents = _typeInfo != null && _typeInfo.isRecord()
+				&& (typename.isEmpty() || typename.equals(_typeInfo.typeName));
+		String[] compNames = null;
+		if (guessComponents) {
+			Set<String> keys = _typeInfo.getComponentInfo(true).keySet();
+			compNames = keys.toArray(new String[keys.size()]);
+		}
+		// END KGU#559 2018-07-20
+		for (int i = 0; i < parts.size()-1; i++) {
+			TokenList part = parts.get(i);
+			part.trim();
+			int posColon = part.indexOf(":");
+			if (posColon >= 0) { // should be 1, actually
+				String name = part.subSequence(0, posColon).getString().trim();
+				String expr = part.subSequence(posColon + 1, part.size()).getString().trim();
+				if (Syntax.isIdentifier(name, false, null)) {
+					components.put(name, expr);
+					// START KGU#559 2018-07-20: Enh. #563 Stop associating from type as soon as an explicit name is given
+					guessComponents = false;
+					// END KGU#559 2018-07-20
+				}
+			}
+			// START KGU#559 2018-07-20: Enh. #563
+			else if (guessComponents && i < compNames.length) {
+				components.put(compNames[i], parts.get(i).getString());
+			}
+			// END KGU#559 2018-07-20
+			// START KGU#711 2019-11-24: Bugfix #783 workaround for missing type info
+			else if (compNames == null && !typename.isEmpty()) {
+				components.put("FIXME_" + typename + "_" + i, parts.get(i).getString());
+			}
+			// END KGU#711 2019-11-24
+		}
+		return components;
+	}
+
 	// START KGU#1057 2022-08-20: Enh. #1066 Interactive input assistent
 	/**
 	 * Analyses the token list {@code tokens} preceding a dot in backwards direction for

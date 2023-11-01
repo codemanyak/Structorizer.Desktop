@@ -76,6 +76,7 @@ import lu.fisch.structorizer.elements.Try;
 import lu.fisch.structorizer.elements.While;
 import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.BString;
 import lu.fisch.utils.StringList;
 
@@ -200,13 +201,13 @@ public class PapGenerator extends Generator {
 	private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy.MM.dd hh:mm:ss");
 	
 	/* (non-Javadoc)
-	 * @see lu.fisch.structorizer.generators.Generator#transformTokens(lu.fisch.utils.StringList)
+	 * @see lu.fisch.structorizer.generators.Generator#transformTokens(lu.fisch.structorizer.syntax.TokenList)
 	 */
 	@Override
-	protected String transformTokens(StringList tokens)
+	protected String transformTokens(TokenList tokens)
 	{
-		tokens.replaceAll("<-", ":=");
-		return tokens.concatenate();
+		tokens.replaceAll("<-", ":=", true);
+		return tokens.getString();
 	}
 	
 	// ============= Internal Classes for PAP element representation ===============

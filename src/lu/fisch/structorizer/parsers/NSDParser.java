@@ -86,6 +86,7 @@ import lu.fisch.utils.*;
 import lu.fisch.structorizer.elements.*;
 import lu.fisch.structorizer.io.Ini;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 
 public class NSDParser extends DefaultHandler {
 	
@@ -116,7 +117,7 @@ public class NSDParser extends DefaultHandler {
 	private String fileVersion = "";
 	
 	// START KGU#258 2016-09-25: Enh. #253 holds the parser preferences saved with the file (3.25-01)
-	private HashMap<String, StringList> savedParserPrefs = new HashMap<String, StringList>();
+	private HashMap<String, TokenList> savedParserPrefs = new HashMap<String, TokenList>();
 	private boolean ignoreCase = false;
 	// START KGU#362 2017-03-28: Issue #370 - default value flipped
 	//private boolean refactorKeywords = false;
@@ -186,7 +187,7 @@ public class NSDParser extends DefaultHandler {
 					if (attributes.getIndex(key) != -1)
 					{
 						String keyword = attributes.getValue(key);
-						savedParserPrefs.put(key, Syntax.splitLexically(keyword, false));
+						savedParserPrefs.put(key, new TokenList(keyword, false));
 					}
 				}
 				if (!savedParserPrefs.containsKey("preForIn") && savedParserPrefs.containsKey("preFor")) {
@@ -206,11 +207,11 @@ public class NSDParser extends DefaultHandler {
 			if (!refactorKeywords && !savedParserPrefs.isEmpty()) {
 				for (String key: Syntax.keywordSet()) {
 					String current = Syntax.getKeyword(key);
-					StringList loaded = savedParserPrefs.get(key);
+					TokenList loaded = savedParserPrefs.get(key);
 					if (loaded != null) {
-						String loadedStr = loaded.concatenate();
+						String loadedStr = loaded.getString();
 						if (!(Syntax.ignoreCase && loadedStr.equalsIgnoreCase(current) || loadedStr.equals(current))) {
-							savedParserPrefs.put("ignoreCase", StringList.getNew(Boolean.toString(ignoreCase)));
+							savedParserPrefs.put("ignoreCase", new TokenList(Boolean.toString(ignoreCase)));
 							root.storedParserPrefs = savedParserPrefs;
 							break;
 						}

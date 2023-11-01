@@ -69,6 +69,7 @@ import lu.fisch.structorizer.elements.While;
 import lu.fisch.structorizer.parsers.CodeParser;
 import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.StringList;
 
 /**
@@ -652,15 +653,15 @@ public class TexAlgGenerator extends Generator {
 	 * @return transformed string
 	 */
 	@Override
-	protected String transformTokens(StringList tokens)
+	protected String transformTokens(TokenList tokens)
 	{
 		tokens.replaceAll("Infinity", "\\infty");
 		tokens.replaceAll("{", "\\{");
 		tokens.replaceAll("}", "\\}");
 		tokens.replaceAll("%", "\\bmod");
-		tokens.replaceAll("div", "\\oprdiv");
-		tokens.replaceAll("shl", "\\oprshl");
-		tokens.replaceAll("shr", "\\oprshr");
+		tokens.replaceAll("div", "\\oprdiv", false);
+		tokens.replaceAll("shl", "\\oprshl", false);
+		tokens.replaceAll("shr", "\\oprshr", false);
 		if (packageIndex == 1 /* algorithmic */ || packageIndex == 3 /* pseudocode */) {
 			tokens.replaceAll("true", "\\TRUE");
 			tokens.replaceAll("false", "\\FALSE");
@@ -690,7 +691,7 @@ public class TexAlgGenerator extends Generator {
 		for (String keyword: keywords) {
 			keys.add(keyword);
 		}
-		for (int i = 0; i < tokens.count(); i++) {
+		for (int i = 0; i < tokens.size(); i++) {
 			String token = tokens.get(i);
 			int len = token.length();
 			if (token.equals("<-") || token.equals(":=")) {
@@ -704,7 +705,7 @@ public class TexAlgGenerator extends Generator {
 					token = "\\leftarrow{}";
 					break;
 				}
-				if (i+1 < tokens.count() && !tokens.get(i+1).trim().isEmpty()) {
+				if (i+1 < tokens.size() && !tokens.get(i+1).trim().isEmpty()) {
 					token += " ";
 				}
 				tokens.set(i, token);
@@ -728,8 +729,8 @@ public class TexAlgGenerator extends Generator {
 				tokens.set(i, token.replace("^", "\\textasciicircum{}"));
 			}
 		}
-		tokens.removeBlanks();
-		return tokens.concatenate(null);
+		tokens.removePaddings();
+		return tokens.getString();
 	}
 
 	@Override

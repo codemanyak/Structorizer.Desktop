@@ -87,6 +87,7 @@ import lu.fisch.structorizer.io.LicFilter;
 import lu.fisch.structorizer.locales.LangDialog;
 import lu.fisch.structorizer.locales.LangTextHolder;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.StringList;
 
 /**
@@ -751,9 +752,9 @@ public class AttributeInspector extends LangDialog implements WindowListener {
 		if (root.storedParserPrefs != null) {
 			// The keys to retrieve the reserved words are defined in CodeParser.keywordMap.
 			for (Entry<String, JTextField> entry: keyFieldMap.entrySet()) {
-				StringList keyTokens = root.storedParserPrefs.get(entry.getKey());
+				TokenList keyTokens = root.storedParserPrefs.get(entry.getKey());
 				String text = "";
-				if (keyTokens != null) { text = keyTokens.concatenate(); }
+				if (keyTokens != null) { text = keyTokens.getString(); }
 				entry.getValue().setText(text);
 				if (!Syntax.getKeywordOrDefault(entry.getKey(), "").equals(text)) {
 					entry.getValue().setForeground(Color.RED);

@@ -91,6 +91,7 @@ import lu.fisch.structorizer.elements.TypeMapEntry;
 import lu.fisch.structorizer.executor.Executor;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.BString;
 import lu.fisch.utils.StringList;
 
@@ -312,10 +313,10 @@ public class CPlusPlusGenerator extends CGenerator {
 	 * @see lu.fisch.structorizer.generators.CGenerator#transformFileAPITokens(lu.fisch.utils.StringList)
 	 */
 	@Override
-	protected void transformFileAPITokens(StringList tokens)
+	protected void transformFileAPITokens(TokenList tokens)
 	{
 		for (int i = 0; i < Executor.fileAPI_names.length; i++) {
-			tokens.replaceAll(Executor.fileAPI_names[i], FILE_API_CLASS_NAME + "::" + Executor.fileAPI_names[i]);
+			tokens.replaceAll(Executor.fileAPI_names[i], FILE_API_CLASS_NAME + "::" + Executor.fileAPI_names[i], true);
 		}
 	}
 	// END KGU#311 2016-12-25/2017-01-05

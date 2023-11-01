@@ -1130,7 +1130,7 @@ public class TokenList implements Comparable<TokenList>{
 	 * Removes the first token equal to the specified string from this list. Shifts
 	 * any subsequent elements to the left (subtracts one from their indices).
 	 * 
-	 * @param index - the index of the token to be removed
+	 * @param token - the token to be removed
 	 * @return the element that was removed from the list
 	 */
 	public boolean remove(String token) {
@@ -1140,6 +1140,25 @@ public class TokenList implements Comparable<TokenList>{
 			return true;
 		}
 		return false;
+	}
+
+	/**
+	 * Removes all tokens equal to the specified string from this list. Shifts
+	 * any subsequent elements to the left (subtracts one from their indices).
+	 * 
+	 * @param token - the token to be removed
+	 * @return the number of tokens removed from the list
+	 */
+	public int removeAll(String token) {
+		int count = 0;
+		for (int i = tokens.size()-1; i >= 0; i--)
+		{
+			if (tokens.get(i).equals(token)) {
+				this.remove(i);
+				count++;
+			}
+		}
+		return count;
 	}
 
 	/**
@@ -1256,6 +1275,44 @@ public class TokenList implements Comparable<TokenList>{
 		return done;
 	}
 	
+	/**
+	 * Replaces all occurrences of string {@code toFind} as token by String
+	 * {@code subst} and returns the number of replacements. Performs a case-
+	 * sensitive search.
+	 * 
+	 * @param toFind - an assumed token to be replaced by {@code subst}
+	 * @param subst - a string to replace in tokenized form all occurrences
+	 *     of {@code toFind}
+	 * @return the number of substitutions
+	 */
+	public int replaceAll(String toFind, String subst) {
+		return replaceAll(toFind, subst, true);
+	}
+	
+	/**
+	 * Replaces all occurrences of string {@code toFind} as token by String
+	 * {@code subst} and returns the number of replacements.
+	 * 
+	 * @param toFind - an assumed token to be replaced by {@code subst}
+	 * @param subst - a string to replace in tokenized form all occurrences
+	 *     of {@code toFind}
+	 * @param matchCase - if {@code true} then case will make a difference
+	 *    in the comparison, otherwise it won't.
+	 * @return the number of substitutions
+	 */
+	public int replaceAll(String toFind, String subst, boolean matchCase) {
+		int found = -1;
+		int replaced = 0;
+		while ((found = indexOf(toFind, found+1, matchCase)) >= 0) {
+			this.remove(found);
+			int oldSize = tokens.size();
+			this.add(found, subst);
+			found += tokens.size() - oldSize;	// Avoid recursive replacement
+			replaced++;
+		}
+		return replaced;
+	}
+
 	/**
 	 * Replaces all occurrences of sub-Tokenlist {@code toFind} by {@link
 	 * TokenList} {@code subst} and returns the number of replacements.

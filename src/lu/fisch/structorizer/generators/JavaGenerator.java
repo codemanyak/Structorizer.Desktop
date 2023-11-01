@@ -127,6 +127,7 @@ package lu.fisch.structorizer.generators;
 
 import lu.fisch.utils.*;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.turtle.TurtleBox;
 
 import java.util.HashMap;
@@ -394,12 +395,12 @@ public class JavaGenerator extends CGenerator
 	 * @see lu.fisch.structorizer.generators.Generator#transformTokens(lu.fisch.utils.StringList)
 	 */
 	@Override
-	protected String transformTokens(StringList tokens)
+	protected String transformTokens(TokenList tokens)
 	{
 		// START KGU#920 2021-02-03: Issue #920 Handle Infinity literal
-		tokens.replaceAll("Infinity", "Double.POSITIVE_INFINITY");
+		tokens.replaceAll("Infinity", "Double.POSITIVE_INFINITY", true);
 		// END KGU#920 2021-02-03
-		for (int i = 0; i < tokens.count(); i++) {
+		for (int i = 0; i < tokens.size(); i++) {
 			String token = tokens.get(i);
 			if (Syntax.isIdentifier(token, false, null)) {
 				// START KGU#542 2019-11-30: Enh. #739 - support for enum types
@@ -407,15 +408,15 @@ public class JavaGenerator extends CGenerator
 				// END KGU#542 2019-11-30
 				int j = i;
 				// Skip all whitespace
-				while (j+2 < tokens.count() && tokens.get(++j).trim().isEmpty());
+				while (j+2 < tokens.size() && tokens.get(++j).trim().isEmpty());
 				// START KGU#480 2018-01-21: Enh. 490 - more precise detection
 				//String turtleMethod = null;
 				//if (j+1 < tokens.count() && tokens.get(j).equals("(") && (turtleMethod = Turtleizer.checkRoutine(token)) != null) {
 				//	tokens.set(i, turtleMethod);
 				//	this.usesTurtleizer = true;
 				//}
-				if (j+1 < tokens.count() && tokens.get(j).equals("(")) {
-					int nArgs = Element.splitExpressionList(tokens.subSequence(j+1, tokens.count()), ",", false).count();
+				if (j+1 < tokens.size() && tokens.get(j).equals("(")) {
+					int nArgs = Syntax.splitExpressionList(tokens.subSequence(j+1, tokens.size()), ",").size() - 1;
 					for (Entry<DiagramController, String> entry: controllerMap.entrySet()) {
 						String name = entry.getKey().providedRoutine(token, nArgs);
 						if (name != null) {
@@ -452,12 +453,13 @@ public class JavaGenerator extends CGenerator
 	 * @see lu.fisch.structorizer.generators.CGenerator#transformFileAPITokens(lu.fisch.utils.StringList)
 	 */
 	@Override
-	protected void transformFileAPITokens(StringList tokens)
+	protected void transformFileAPITokens(TokenList tokens)
 	{
 		// START KGU#815 2020-04-03: Enh. #828 group export
 		if (generatorIncludes.contains("lu.fisch.structorizer.generators." + FILE_API_CLASS_NAME)) {
 			for (int i = 0; i < Executor.fileAPI_names.length; i++) {
-				tokens.replaceAll(Executor.fileAPI_names[i], FILE_API_CLASS_NAME + "." + Executor.fileAPI_names[i]);
+				tokens.replaceAll(Executor.fileAPI_names[i],
+						FILE_API_CLASS_NAME + "." + Executor.fileAPI_names[i], true);
 			}
 		}
 		// END KGU#815 2020-04-03
@@ -598,7 +600,7 @@ public class JavaGenerator extends CGenerator
 		// This is practically identical to C#
 		// START KGU#559 2018-07-20: Enh. #563 - smarter record initialization
 		//HashMap<String, String> comps = Instruction.splitRecordInitializer(constValue);
-		HashMap<String, String> comps = Instruction.splitRecordInitializer(constValue, typeInfo, false);
+		HashMap<String, String> comps = Instruction.splitRecordInitializer(constValue, typeInfo);
 		// END KGU#559 2018-07-20
 		LinkedHashMap<String, TypeMapEntry> compInfo = typeInfo.getComponentInfo(true);
 		String recordInit = "new " + typeInfo.typeName + "(";

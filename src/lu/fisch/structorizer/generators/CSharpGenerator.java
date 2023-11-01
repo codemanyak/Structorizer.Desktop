@@ -147,6 +147,7 @@ import lu.fisch.structorizer.elements.*;
 import lu.fisch.structorizer.executor.Executor;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 
 
 public class CSharpGenerator extends CGenerator 
@@ -362,10 +363,10 @@ public class CSharpGenerator extends CGenerator
 
 	// START KGU#311 2017-01-05: Enh. #314 Don't do what the parent does.
 	@Override
-	protected void transformFileAPITokens(StringList tokens)
+	protected void transformFileAPITokens(TokenList tokens)
 	{
 		for (int i = 0; i < Executor.fileAPI_names.length; i++) {
-			tokens.replaceAll(Executor.fileAPI_names[i], FILE_API_CLASS_NAME + "." + Executor.fileAPI_names[i]);
+			tokens.replaceAll(Executor.fileAPI_names[i], FILE_API_CLASS_NAME + "." + Executor.fileAPI_names[i], true);
 		}
 	}
 	// END KGU#311 2017-01-05
@@ -437,9 +438,9 @@ public class CSharpGenerator extends CGenerator
 	
 	// START KGU#920 2021-02-03: Issue #920 Handle Infinity literal
 	@Override
-	protected String transformTokens(StringList tokens)
+	protected String transformTokens(TokenList tokens)
 	{
-		tokens.replaceAll("Infinity", "double.PositiveInfinity");
+		tokens.replaceAll("Infinity", "double.PositiveInfinity", true);
 		return super.transformTokens(tokens);
 	}
 	// END KGU#920 2021-02-03
@@ -465,7 +466,7 @@ public class CSharpGenerator extends CGenerator
 		// This is practically identical to Java
 		// START KGU#559 2018-07-20: Enh. #563 - smarter record initialization
 		//HashMap<String, String> comps = Instruction.splitRecordInitializer(constValue);
-		HashMap<String, String> comps = Instruction.splitRecordInitializer(constValue, typeInfo, false);
+		HashMap<String, String> comps = Instruction.splitRecordInitializer(constValue, typeInfo);
 		// END KGU#559 2018-07-20
 		LinkedHashMap<String, TypeMapEntry> compInfo = typeInfo.getComponentInfo(true);
 		String recordInit = "new " + typeInfo.typeName + "(";
