@@ -4696,11 +4696,11 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	 * Simply check whether it starts with "(" and ends with ")" is NOT sufficient because the expression
 	 * might look like this: {@code (4 + 8) * sqrt(3.5)}, which starts and ends with a parenthesis without
 	 * being parenthesized.  
-	 * @param tokens - the tokenized expression to be analysed as StringList
+	 * @param tokens - the tokenized expression to be analysed as TokenList
 	 * @return true if the expression is properly parenthesized. (Which is to be ensured e.g for conditions
 	 * in C and derived languages.
 	 */
-	protected static boolean isParenthesized(StringList tokens)
+	protected static boolean isParenthesized(TokenList tokens)
 	{
 		return Element.isParenthesized(tokens);
 	}

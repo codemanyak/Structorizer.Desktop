@@ -1493,7 +1493,7 @@ public class Syntax {
 		if (!tail.startsWith("}")) {
 			return null;
 		}
-		else if (!(tail = tail.subSequence(1, tail.size())).isEmpty()) {
+		else if (!(tail = tail.subSequence(1, tail.size())).isBlank()) {
 			components.put("§TAIL§", tail.getString());
 		}
 		// START KGU#559 2018-07-20: Enh. #563 In case of a given type, we may guess the target fields

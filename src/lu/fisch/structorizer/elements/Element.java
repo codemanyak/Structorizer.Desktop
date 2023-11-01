@@ -314,7 +314,7 @@ public abstract class Element {
 	public static final long E_HELP_FILE_SIZE = 12300000;
 	public static final String E_DOWNLOAD_PAGE = "https://www.fisch.lu/Php/download.php";
 	// END KGU#791 2020-01-20
-	public static final String E_VERSION = "3.32-13";
+	public static final String E_VERSION = "3.32-14";
 	public static final String E_THANKS =
 	"Developed and maintained by\n"+
 	" - Robert Fisch <robert.fisch@education.lu>\n"+
@@ -1285,7 +1285,7 @@ public abstract class Element {
 		while (i < nLines) {
 			String line = text.get(i).getString().trim();
 			while (line.endsWith("\\") && (i + 1 < nLines)) {
-				line = line.substring(0, line.length()-1) + separator + text.get(++i).trim();
+				line = line.substring(0, line.length()-1) + separator + text.get(++i).getString().trim();
 			}
 			sl.add(line);
 			i++;
@@ -4524,7 +4524,7 @@ public abstract class Element {
     
     /**
      * Returns a (hopefully) lossless representation of the stored text as a
-     * StringList in a common intermediate language (code generation phase 1).
+     * list of TokenLists in a common intermediate language (code generation phase 1).
      * This allows the language-specific Generator subclasses to concentrate
      * on the translation into their respective target languages (code generation
      * phase 2).<br/>
@@ -4809,49 +4809,47 @@ public abstract class Element {
 	 * @param _ignoreCase - whether case is to be ignored on comparison
 	 * @return refactored line
 	 */
-	protected final String refactorLine(String _line, HashMap<String, StringList> _splitOldKeys, String[] _prefNames, boolean _ignoreCase)
+	protected final String refactorLine(String _line, HashMap<String, TokenList> _splitOldKeys, String[] _prefNames, boolean _ignoreCase)
 	{
-		StringList tokens = Syntax.splitLexically(_line, true);
+		TokenList tokens = new TokenList(_line);
 		boolean isModified = false;
 		// FIXME: We should order the keys by decreasing length first!
 		for (int i = 0; i < _prefNames.length; i++)
 		{
-			StringList splitKey = _splitOldKeys.get(_prefNames[i]);
+			TokenList splitKey = _splitOldKeys.get(_prefNames[i]);
 			if (splitKey != null)
 			{
 				String subst = Syntax.getKeyword(_prefNames[i]);
 				// line shouldn't be inflated ...
-				if (!splitKey.get(0).equals(" ")) {
-					while (subst.startsWith(" ")) subst = subst.substring(1); 
-				}
-				if (!splitKey.get(splitKey.count()-1).equals(" ")) {
-					while (subst.endsWith(" ")) subst = subst.substring(0, subst.length()-1);
-				}
+				//if (!splitKey.get(0).equals(" ")) {
+				//	while (subst.startsWith(" ")) subst = subst.substring(1); 
+				//}
+				//if (!splitKey.get(splitKey.size()-1).equals(" ")) {
+				//	while (subst.endsWith(" ")) subst = subst.substring(0, subst.length()-1);
+				//}
 				// ... but spaces must not get lost either!
-				if (splitKey.get(0).equals(" ") && !subst.startsWith(" ")) {
-					subst = " " + subst;
-				}
-				if (splitKey.count() > 1 && splitKey.get(splitKey.count()-1).equals(" ") && !subst.endsWith(" ")) {
-					subst += " ";
-				}
+				//if (splitKey.get(0).equals(" ") && !subst.startsWith(" ")) {
+				//	subst = " " + subst;
+				//}
+				//if (splitKey.size() > 1 && splitKey.get(splitKey.size()-1).equals(" ") && !subst.endsWith(" ")) {
+				//	subst += " ";
+				//}
 				// Now seek old keyword and replace it where found
 				int pos = -1;
 				while ((pos = tokens.indexOf(splitKey, pos+1, !_ignoreCase)) >= 0)
 				{
 					// Replace the first part of the saved keyword by the entire current keyword... 
 					tokens.set(pos, subst);
+					tokens.setPadding(pos, 1, 1);
 					// ... and remove the remaining parts of the saved key
-					for (int j = 1; j < splitKey.count(); j++)
-					{
-						tokens.delete(pos+1);
-					}
+					tokens.remove(pos+1, pos+splitKey.size());
 					isModified = true;
 				}
 			}
 		}
 		if (isModified)
 		{
-			_line = tokens.concatenate().trim();
+			_line = tokens.getString().trim();
 		}
 		return _line;
 	}
@@ -4903,16 +4901,17 @@ public abstract class Element {
 			TokenList splitKey = _splitOldKeys.get(_prefNames[i]);
 			if (splitKey != null)
 			{
-				TokenList subst = new TokenList(Syntax.getSplitKeyword(_prefNames[i]));
+				//TokenList subst = new TokenList(Syntax.getSplitKeyword(_prefNames[i]));
+				TokenList subst = Syntax.getSplitKeyword(_prefNames[i]);
 				// line shouldn't be inflated ...
-				if (splitKey.getPadding(0)[0] == 0) {
-					subst.setPadding(0, 0, -1); 
-				}
-				if (splitKey.getPadding(splitKey.size()-1)[1] == 0) {
-					subst.setPadding(subst.size()-1, -1, 0);
-				}
+				//if (splitKey.getPadding(0)[0] == 0) {
+				//	subst.setPadding(0, 0, -1); 
+				//}
+				//if (splitKey.getPadding(splitKey.size()-1)[1] == 0) {
+				//	subst.setPadding(subst.size()-1, -1, 0);
+				//}
 				// Now seek old keyword and replace it where found
-				isModified = tokens.replaceAll(splitKey, subst, !_ignoreCase) > 0;
+				isModified = newTokens.replaceAll(splitKey, subst, !_ignoreCase) > 0 || isModified;
 			}
 		}
 		if (isModified)
@@ -4937,7 +4936,7 @@ public abstract class Element {
 	{
 		boolean isEnclosed = expression.startsWith("(") && expression.endsWith(")");
 		if (isEnclosed) {
-			StringList tokens = Syntax.splitLexically(expression, true);
+			TokenList tokens = new TokenList(expression);
 			isEnclosed = isParenthesized0(tokens);
 		}
 		return isEnclosed;
@@ -4955,17 +4954,17 @@ public abstract class Element {
 	 * @return true if the expression is properly parenthesized. (Which is to be ensured e.g for conditions
 	 * in C and derived languages.
 	 */
-	public static boolean isParenthesized(StringList tokens)
+	public static boolean isParenthesized(TokenList tokens)
 	{
-		return tokens.count() > 1 && tokens.get(0).equals("(") && tokens.get(tokens.count()-1).equals(")")
+		return tokens.size() > 1 && tokens.get(0).equals("(") && tokens.get(tokens.size()-1).equals(")")
 				&& isParenthesized0(tokens);
 	}
 	
 	// Internal check for both public isParenthesized() methods
-	private static boolean isParenthesized0(StringList tokens) {
+	private static boolean isParenthesized0(TokenList tokens) {
 		boolean isEnclosed;
 		int level = 0;
-		for (int i = 1; level >= 0 && i < tokens.count()-1; i++) {
+		for (int i = 1; level >= 0 && i < tokens.size()-1; i++) {
 			String token = tokens.get(i);
 			if (token.equals("(")) {
 				level++;
@@ -5249,7 +5248,7 @@ public abstract class Element {
 	public static String negateCondition(String condition)
 	{
 		String negCondition = null;
-		StringList condTokens = Syntax.splitLexically(condition, true);
+		TokenList condTokens = new TokenList(condition, true);
 		// START KGU#790 2020-11-01: Issue #800 Replaced by new syntax stuff
 		//int length = condTokens.count();
 		//String first = condTokens.get(0);

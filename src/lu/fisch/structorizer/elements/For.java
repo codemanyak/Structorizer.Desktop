@@ -91,6 +91,7 @@ import lu.fisch.graphics.*;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.*;
 
 /**
@@ -398,7 +399,8 @@ public class For extends Element implements ILoop {
 		return sel;
 	}
 	// END KGU#183 2016-04-24
-	    
+
+	@Override
 	public Element copy()
 	{
 		For ele = new For(new StringList(this.getText()));
@@ -448,6 +450,7 @@ public class For extends Element implements ILoop {
 	// END KGU#117 2016-03-07
 
 	// START KGU#156 2016-03-13: Enh. #124
+	@Override
 	protected String getRuntimeInfoString()
 	{
 		String info = this.getExecCount() + " / ";
@@ -472,6 +475,7 @@ public class For extends Element implements ILoop {
 	/* (non-Javadoc)
 	 * @see lu.fisch.structorizer.elements.Element#isTestCovered(boolean)
 	 */
+	@Override
 	public boolean isTestCovered(boolean _deeply)
 	{
 		return this.getBody().isTestCovered(_deeply);
@@ -728,11 +732,11 @@ public class For extends Element implements ILoop {
 	// END KGU#61 2016-03-22
 
 	// START KGU#3 2015-11-04: We need a transformation to a common intermediate language
-	private static StringList disambiguateForClause(String _text)
+	private static TokenList disambiguateForClause(String _text)
 	{
 		// Pad the string to ease the key word detection
 		//String interm = " " + _text + " ";
-		StringList tokens = Syntax.splitLexically(_text, true);
+		TokenList tokens = new TokenList(_text);
 
 		// START KGU#61 2016-03-20: Enh. #84/#135
 		// First collect the placemarkers of the for loop header ...
@@ -767,8 +771,8 @@ public class For extends Element implements ILoop {
 			String marker = forMarkers[i];
 			if (!marker.isEmpty())
 			{
-				StringList markerTokens = Syntax.splitLexically(marker, false);
-				int markerLen = markerTokens.count();
+				TokenList markerTokens = new TokenList(marker, false);
+				int markerLen = markerTokens.size();
 				int pos = -1;
 				while ((pos = tokens.indexOf(markerTokens, pos+1, !Syntax.ignoreCase)) >= 0)
 				{
@@ -777,7 +781,7 @@ public class For extends Element implements ILoop {
 					// ... and remove the remaining ones (they will all pass through pos+1)
 					for (int d = 1; d < markerLen; d++)
 					{
-						tokens.delete(pos+1);
+						tokens.remove(pos+1);
 					}
 				}
 			}
@@ -832,7 +836,7 @@ public class For extends Element implements ILoop {
 		// END KGU#61 2016-03-20
 		
 		// Do some pre-processing to disambiguate the key words
-		StringList tokens = disambiguateForClause(_text);		
+		TokenList tokens = disambiguateForClause(_text);		
 		//System.out.println("Disambiguated For clause: \"" + _intermediate + "\"");
 		
 		tokens.replaceAll("\n", " "); // Concatenate the lines
@@ -868,23 +872,23 @@ public class For extends Element implements ILoop {
 	}
 	
 	// START KGU#61 2016-03-20: Enh. #84/#135 - outsourced from splitForClause(String)
-	private static String[] splitForCounter(StringList _tokens, int _posFor, int _posTo, int _posBy)
+	private static String[] splitForCounter(TokenList _tokens, int _posFor, int _posTo, int _posBy)
 	{
 		String[] forParts = { "dummy_counter", "1", null, "1", "", null};
-		int endInit = (_posTo >= 0) ? _posTo : _tokens.count();
+		int endInit = (_posTo >= 0) ? _posTo : _tokens.size();
 		if (_posBy >= 0 && _posBy < _posTo) endInit = _posBy;
-		StringList init = _tokens.subSequence(_posFor+1, endInit);
+		TokenList init = _tokens.subSequence(_posFor+1, endInit);
 		//System.out.println("FOR --> \"" + init + "\"");
 		if (_posTo >= 0)
 		{
-			int endTo = (_posBy > _posTo) ? _posBy : _tokens.count();
-			forParts[2] = _tokens.subSequence(_posTo + 1, endTo).concatenate().trim();
+			int endTo = (_posBy > _posTo) ? _posBy : _tokens.size();
+			forParts[2] = _tokens.subSequence(_posTo + 1, endTo).getString().trim();
 			//System.out.println("TO --> \"" + forParts[2] + "\"");
 		}
 		if (_posBy >= 0)
 		{
-			int endBy = (_posTo > _posBy) ? _posTo : _tokens.count();
-			forParts[4] = _tokens.subSequence(_posBy + 1, endBy).concatenate().trim();
+			int endBy = (_posTo > _posBy) ? _posTo : _tokens.size();
+			forParts[4] = _tokens.subSequence(_posBy + 1, endBy).getString().trim();
 			//System.out.println("BY --> \"" + forParts[4] + "\"");
 		}
 		if (forParts[4].isEmpty())
@@ -906,16 +910,16 @@ public class For extends Element implements ILoop {
 		int posAsgnOpr = init.indexOf("<-");
 		if (posAsgnOpr > 0)
 		{
-			forParts[0] = init.subSequence(0, posAsgnOpr).concatenate().trim();
+			forParts[0] = init.subSequence(0, posAsgnOpr).getString().trim();
 		}
-		forParts[1] = init.subSequence(posAsgnOpr + 1, init.count()).concatenate().trim();
+		forParts[1] = init.subSequence(posAsgnOpr + 1, init.size()).getString().trim();
 		
 		return forParts;		
 	}
 
 	// START KGU#61 2016-09-23: Enh, #250 - Signature reduced by one parameter
 	//private static String[] splitForTraversal(StringList _tokens, int _posFor, int _posForIn, int _posIn)
-	private static String[] splitForTraversal(StringList _tokens, int _posForIn, int _posIn)
+	private static String[] splitForTraversal(TokenList _tokens, int _posForIn, int _posIn)
 	// END KGU#61 2016-09-23
 	{
 		String[] forParts = { "dummy_iterator", "", null, "", "", "{}"};
@@ -925,8 +929,8 @@ public class For extends Element implements ILoop {
 		//	_posForIn = _posFor;
 		//}
 		// END KGU#61 2016-09-23
-		forParts[0] = _tokens.subSequence(_posForIn + 1, _posIn).concatenate().trim();
-		forParts[5] = _tokens.subSequence(_posIn + 1, _tokens.count()).concatenate().trim();
+		forParts[0] = _tokens.subSequence(_posForIn + 1, _posIn).getString().trim();
+		forParts[5] = _tokens.subSequence(_posIn + 1, _tokens.size()).getString().trim();
 		return forParts;
 		
 	}

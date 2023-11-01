@@ -2893,7 +2893,7 @@ public class Root extends Element {
 		// Here all the unification, alignment, reduction is done, now the actual analysis begins
 
 		String token0 = "";
-		if (!tokens.isEmpty()) token0 = tokens.get(0);
+		if (!tokens.isBlank()) token0 = tokens.get(0);
 		int asgnPos = tokens.indexOf("<-");
 		if (asgnPos >= 0)
 		{
@@ -3148,7 +3148,7 @@ public class Root extends Element {
             int asgnPos = tokens.indexOf("<-");
             if (asgnPos > 0)
             {
-                // FIXME: Necessary to go bak to strings?
+                // FIXME: Necessary to go back to strings?
                 String s = tokens.subSequence(0, asgnPos).getString();
 
                 // START KGU#1089 2023-10-14: Issue #980 Skip possible multi-var declarations

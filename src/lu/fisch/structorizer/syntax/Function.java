@@ -313,7 +313,7 @@ public class Function
 //            // END KGU#341 2017-02-06
 //		}
 //		// END KGU#56 2015-10-27
-		StringList tokens = Syntax.splitLexically(exprStr, true);
+		TokenList tokens = new TokenList(exprStr, true);
 		try {
 			LinkedList<Expression> exprs = Expression.parse(tokens, null, (short)0);
 			if (exprs.size() == 1) {
@@ -464,7 +464,7 @@ public class Function
 //			}
 //		}
 //		return isFunc;
-		StringList tokens = Syntax.splitLexically(expr, true);
+		TokenList tokens = new TokenList(expr, true);
 		LinkedList<Expression> exprs = null;
 		try {
 			exprs = Expression.parse(tokens, null, (short)0);

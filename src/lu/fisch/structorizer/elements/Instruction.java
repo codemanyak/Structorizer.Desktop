@@ -135,16 +135,16 @@ public class Instruction extends Element {
 		super();
 	}
 	
-	public Instruction(String _strings)
+	public Instruction(String _string)
 	{
-		super(_strings);
-		setText(_strings);	// FIXME (KGU 2015-10-13): What is this good for? This has already been done by the super constructor!
+		super(_string);
+		//setText(_string);	// FIXME (KGU 2015-10-13): What is this good for? This has already been done by the super constructor!
 	}
 	
 	public Instruction(StringList _strings)
 	{
 		super(_strings);
-		setText(_strings);
+		//setText(_strings);
 	}
 	
 	// START KGU#199 2016-07-07: Enh. #188 - also serves subclasses for "up-casting"

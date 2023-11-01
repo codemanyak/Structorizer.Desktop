@@ -572,7 +572,7 @@ public class Line {
 			try {
 				System.out.println("===== " + test + " =====");
 				long startTime = System.currentTimeMillis();
-				StringList tokens = Syntax.splitLexically(test, true);
+				TokenList tokens = new TokenList(test, true);
 				List<Expression> exprs = Expression.parse(tokens, /*sepas/**/ /**/null/**/, (short)0);
 				long endTime = System.currentTimeMillis();
 				int i = 1;
@@ -651,7 +651,7 @@ public class Line {
 		for (String test: negationTests) {
 			System.out.println("===== " + test + " =====");
 			long startTime = System.currentTimeMillis();
-			StringList tokens = Syntax.splitLexically(test, true);
+			TokenList tokens = new TokenList(test, true);
 			try {
 				List<Expression> exprs = Expression.parse(tokens, null, (short)0);
 				long endTime = System.currentTimeMillis();

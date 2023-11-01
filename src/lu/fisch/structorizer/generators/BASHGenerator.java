@@ -672,7 +672,7 @@ public class BASHGenerator extends Generator {
 			}
 			// END KGU#803 2020-02-18
 		}
-		else if (!tokens.isEmpty())
+		else if (!tokens.isBlank())
 		{
 			// Since keywords have already been replaced by super.transform(String), this is quite fine
 			// 

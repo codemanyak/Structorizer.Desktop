@@ -516,7 +516,7 @@ public class PHPGenerator extends Generator
 					result.add(",");
 				}
 			}
-			if (!result.isEmpty() && result.get(result.size()-1).equals(",")) {
+			if (!result.isBlank() && result.get(result.size()-1).equals(",")) {
 				result.remove(result.size()-1);
 			}
 		// START KGU#1021 2021-12-05: Bugfix #1024

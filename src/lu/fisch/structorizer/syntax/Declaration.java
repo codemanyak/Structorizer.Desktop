@@ -210,7 +210,7 @@ public class Declaration {
 	 *        ought to be expected)
 	 * @throws SyntaxException in case of syntactical errors
 	 */
-	public static Type parse(StringList tokens, DeclarationRule expectedRule,
+	public static Type parse(TokenList tokens, DeclarationRule expectedRule,
 			short tokenNo, TypeRegistry typeMap, ArrayList<Expression> declaredIds) throws SyntaxException
 	{
 		/*
@@ -237,7 +237,7 @@ public class Declaration {
 		int acceptedRules = 1 << expectedRule.ordinal();
 		
 		// First level splitting approach (groups) - no need to use Syntax.splitExpressionList() here
-		ArrayList<StringList> listItems = new ArrayList<StringList>();
+		ArrayList<TokenList> listItems = new ArrayList<TokenList>();
 		int posSemi = tokens.indexOf(";");
 		// At least two items - should be either PAR_GROUP_LIST or REC_GROUP_LIST
 		if (posSemi >= 0 && (acceptedRules &= (PAR_GROUP_LIST_MASK | REC_GROUP_LIST_MASK | TYPE_DEF_MASK)) == 0) {
@@ -249,7 +249,7 @@ public class Declaration {
 			listItems.add(tokens.subSequence(posStart, posSemi));
 			posSemi = tokens.indexOf(";", posStart = posSemi + 1);
 		}
-		listItems.add(tokens.subSequence(posStart, tokens.count()));
+		listItems.add(tokens.subSequence(posStart, tokens.size()));
 		DeclarationRule thisRule = expectedRule;
 		if (thisRule == DeclarationRule.PAR_GROUP_LIST) {
 			expectedRule = DeclarationRule.PAR_GROUP;
@@ -261,7 +261,7 @@ public class Declaration {
 			// TODO
 			// Should be either PAR_GROUP_LIST or REC_GROUP_LIST now
 			// Parse each group
-			for (StringList listItem: listItems) {
+			for (TokenList listItem: listItems) {
 //				declarations.add(Declaration.parse(listItem, expectedRule,
 //						(short)(tokenNo + tokenPos), typeMap));
 //				tokenPos += listItem.count() + 1; // list item length and semicolon
@@ -317,7 +317,7 @@ public class Declaration {
 //						DeclarationRule.VDECL, tokenNo, typeMap));
 				// Parse the right-hand side (the default value, an expression)
 				LinkedList<Expression> exprs = 
-						Expression.parse(tokens.subSequence(posDef+1, tokens.count()), null, (short)(tokenNo + posDef+1));
+						Expression.parse(tokens.subSequence(posDef+1, tokens.size()), null, (short)(tokenNo + posDef+1));
 				if (exprs == null || exprs.size() != 1) {
 					// Actually, method Expression.parse is likely to have thrown a more expressive exception itself
 					throw new SyntaxException("Defective default value expression", tokenNo + posDef + 1);
@@ -327,8 +327,8 @@ public class Declaration {
 			}
 			// No default value, hence a REC_GROUP
 			Type type = null;
-			StringList typeDescr = tokens.subSequence(posColon+1, tokens.count());
-			if (typeDescr.count() == 1 && typeMap != null) {
+			TokenList typeDescr = tokens.subSequence(posColon+1, tokens.size());
+			if (typeDescr.size() == 1 && typeMap != null) {
 				type = typeMap.getType(typeDescr.get(0));	// This may fail, of course
 				if (type == null) {
 					throw new SyntaxException("Unknown type \"" + typeDescr.get(0) +"\"",
@@ -373,16 +373,16 @@ public class Declaration {
 					| ENUM_LIST_MASK | ID_LIST_MASK)) == 0) {
 				throw new SyntaxException("Unexpected ','", tokenNo + tokens.indexOf(","));
 			}
-			StringList typeDescr = null;
+			TokenList typeDescr = null;
 			Type type = null;
 			boolean isConst = false;
-			StringList listItem0 = listItems.get(0);
+			TokenList listItem0 = listItems.get(0);
 			int posBrack1 = listItem0.indexOf("[");
 			int posBrack2 = listItem0.lastIndexOf("]");
 			switch (expectedRule) {
 			case ENUM_LIST:
 				// TODO ?
-				for (StringList listItem: listItems) {
+				for (TokenList listItem: listItems) {
 //					declarations.add(Declaration.parse(listItem,
 //							DeclarationRule.ENUM_ITEM, (short)(tokenNo + tokenPos), typeMap));
 //					tokenPos += listItem.count() + 1;	// length of listItem plus comma
@@ -391,13 +391,13 @@ public class Declaration {
 				break;
 			case ID_LIST:
 				// TODO ?
-				for (StringList listItem: listItems) {
-					if (listItem.count() != 1 || !Syntax.isIdentifier(listItem.get(0), false, null)) {
+				for (TokenList listItem: listItems) {
+					if (listItem.size() != 1 || !Syntax.isIdentifier(listItem.get(0), false, null)) {
 						throw new SyntaxException("Not a valid identifier", tokenNo + tokenPos);
 					}
 //					declarations.add(new Expression(NodeType.IDENTIFIER, listItem.get(0),
 //							(short)(tokenNo + tokenPos)));
-					tokenPos += listItem.count() + 1;	// length of listItem plus comma
+					tokenPos += listItem.size() + 1;	// length of listItem plus comma
 				}
 //				return new Declaration(expectedRule, declarations, tokenNo, false);
 				break;
@@ -408,10 +408,10 @@ public class Declaration {
 					listItems.get(0).remove(0);
 					tokenPos++;
 				}
-				for (StringList listItem: listItems) {
+				for (TokenList listItem: listItems) {
 //					declarations.add(Declaration.parse(listItem,
 //							DeclarationRule.PAR_DECL, (short)(tokenNo + tokenPos), typeMap));
-					tokenPos += listItem.count() + 1;	// length of listItem plus comma
+					tokenPos += listItem.size() + 1;	// length of listItem plus comma
 				}
 //				return new Declaration(expectedRule, declarations, tokenNo, isConst);
 				break;
@@ -428,40 +428,40 @@ public class Declaration {
 			case CDECL_LIST:
 				// TODO ?
 				// Check whether there is a common type specification
-				if (listItem0.count() > 1 && (posBrack1 < 0 || posBrack2 == listItem0.count()-1)) {
+				if (listItem0.size() > 1 && (posBrack1 < 0 || posBrack2 == listItem0.size()-1)) {
 					// We must extract the type information from the first list item
 					if (posBrack1 < 0) {
 						/* No C array declaration, hence it is all before the last token,
 						 * which is expected to be an id
 						 */
-						posBrack1 = listItem0.count();
+						posBrack1 = listItem0.size();
 					} // posBrack2 must be listItem0.count()-1, so it is an array
 					typeDescr = listItem0.subSequence(0, posBrack1 - 1);
 				}
-				for (StringList listItem: listItems) {
+				for (TokenList listItem: listItems) {
 					/* FIXME This is a dirty trick because we cannot simply assign the type
 					 * to all subdeclarations as some of them might be arrays of it
 					 */
 					int offset = 0;
 					if (typeDescr != null) {
 						if (listItem != listItem0) {
-							listItem.insert(typeDescr, 0);
-							offset -= typeDescr.count();
+							listItem.addAll(0, typeDescr);
+							offset -= typeDescr.size();
 						}
 					}
 //					Declaration decl = Declaration.parse(listItem,
 //							DeclarationRule.CDECL, (short)(tokenNo + tokenPos + offset), typeMap);
 //					decl.isConstant = isConst;
 //					declarations.add(decl);
-					tokenPos += offset + listItem.count() + 1;	// length of the orig. listItem plus comma
+					tokenPos += offset + listItem.size() + 1;	// length of the orig. listItem plus comma
 				}
 //				return new Declaration(expectedRule, declarations, tokenNo, isConst);
 				break;
 			case CARRAY_LIST:
 				// TODO ?
-				for (StringList listItem: listItems) {
+				for (TokenList listItem: listItems) {
 					int posBrack = listItem.indexOf("[");
-					if (posBrack < 0 && listItem.count() == 1
+					if (posBrack < 0 && listItem.size() == 1
 							&& Syntax.isIdentifier(listItem.get(0), false, null)) {
 //						declarations.add(new Expression(NodeType.IDENTIFIER,
 //								listItem.get(0), (short)(tokenNo + tokenPos)));
@@ -472,12 +472,12 @@ public class Declaration {
 //						declarations.add(Declaration.parse(listItem,
 //								DeclarationRule.CARRAY, (short)(tokenNo + tokenPos), typeMap));
 					}
-					tokenPos += listItem.count() + 1;
+					tokenPos += listItem.size() + 1;
 				}
 //				return new Declaration(expectedRule, declarations, tokenNo, false);
 				break;
 			default:
-				throw new SyntaxException("Unexpected ','", listItems.get(0).count());
+				throw new SyntaxException("Unexpected ','", listItems.get(0).size());
 			}
 			return type;
 		}
@@ -548,7 +548,7 @@ public class Declaration {
 //				}
 //			}
 //		}
-		for (int i = 0; i < tokens.count(); i++) {
+		for (int i = 0; i < tokens.size(); i++) {
 			String token = tokens.get(i);
 			if (token.equals("const")) {
 				

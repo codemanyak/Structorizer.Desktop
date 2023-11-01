@@ -1237,14 +1237,14 @@ public class Expression {
 	 * @see {@link #parseList(StringList, String, String, StringList)}
 	 */
 	// FIXME: We might add a string parameter containing additional identifier characters
-	public static LinkedList<Expression> parse(StringList tokens, StringList stopTokens, short tokenNo) throws SyntaxException
+	public static LinkedList<Expression> parse(TokenList tokens, StringList stopTokens, short tokenNo) throws SyntaxException
 	{
 		/* FIXME: Handling of stopTokens is inconsistent with specification above
 		 * (which is inconsistent in itself, by the way)
 		 */
 		// Basically, this follows Dijkstra's shunting yard algorithm
 		Expression expr = null;
-		tokens.removeBlanks();	// Just in case...
+		//tokens.removeBlanks();	// Just in case...
 		LinkedList<Expression> stack = new LinkedList<Expression>();
 		LinkedList<Expression> output = new LinkedList<Expression>();
 		short position = 0;
@@ -1254,7 +1254,7 @@ public class Expression {
 		boolean wasOpd = false;	// true if the previous token was an operand
 		boolean signPos = true;	// true if a following '+' or '-' must be a sign
 		//while (!unifiedTokens.isEmpty() && (stopTokens == null || !stopTokens.contains(unifiedTokens.get(0)) || !stack.isEmpty())) {
-		while (!tokens.isEmpty() && !stopped) {
+		while (!tokens.isBlank() && !stopped) {
 			String token = tokens.get(0);
 			if (OPERATOR_PRECEDENCE.containsKey(token.toLowerCase())
 					|| token.equals("[") || token.equals("?")) {
@@ -1295,7 +1295,7 @@ public class Expression {
 					stack.removeLast();
 				}
 				if (token.equals(".")) {
-					if (tokens.count() < 2 || !Syntax.isIdentifier(tokens.get(1), false, null)) {
+					if (tokens.size() < 2 || !Syntax.isIdentifier(tokens.get(1), false, null)) {
 						throw new SyntaxException("An operator '.' must be followed by an identifier!", tokenNo + position);
 					}
 					if (output.isEmpty()) {
@@ -1305,7 +1305,7 @@ public class Expression {
 					wasOpd = false;
 				}
 				else if (token.equals("?")) {
-					if (tokens.count() < 4 || !tokens.contains(":")) {
+					if (tokens.size() < 4 || !tokens.contains(":")) {
 						throw new SyntaxException("An operator '?' must be followed by an ':'!", tokenNo + position);
 					}
 					expr = new Expression(NodeType.TERNARY, "?", (short)(tokenNo + position));
@@ -1319,7 +1319,7 @@ public class Expression {
 					if (token.equals("[]")) {
 						expr = new Expression(NodeType.PARENTH, "[", (short)(tokenNo + position));
 						expr.children.addLast(null);		// one operand is the array
-						if (tokens.count() > 2 && !tokens.get(1).equals("]")) {
+						if (tokens.size() > 2 && !tokens.get(1).equals("]")) {
 							expr.children.addLast(null);	// expect at least one index
 						}
 						stack.addLast(expr);
@@ -1340,7 +1340,7 @@ public class Expression {
 			else if (Syntax.isIdentifier(token, false, null)
 					&& (stopTokens == null || !stopTokens.contains(token))) {
 				String nextToken = null;
-				if (tokens.count() > 2) {
+				if (tokens.size() > 2) {
 					nextToken = tokens.get(1);
 				}
 				if (BOOL_LITERALS.contains(token)) {
@@ -1486,7 +1486,7 @@ public class Expression {
 				expr = new Expression(NodeType.PARENTH, token, (short)(tokenNo + position));
 				stack.addLast(expr);
 				nestingLevel++;
-				if (tokens.count() > 1 && !tokens.get(1).equals(")")) {
+				if (tokens.size() > 1 && !tokens.get(1).equals(")")) {
 					expr.children.add(null);	// Expect an element
 				}
 				signPos = true;
@@ -1500,7 +1500,7 @@ public class Expression {
 				}
 				stack.addLast(expr = new Expression(NodeType.PARENTH, token, (short)(tokenNo + position)));
 				nestingLevel++;
-				if (tokens.count() > 1 && !tokens.get(1).equals("}")) {
+				if (tokens.size() > 1 && !tokens.get(1).equals("}")) {
 					expr.children.add(null);	// Expect an element
 				}
 				signPos = true;
