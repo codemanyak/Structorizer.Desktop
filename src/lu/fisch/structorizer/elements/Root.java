@@ -7155,8 +7155,8 @@ public class Root extends Element {
 			}
 			else {
 				// Let's check the index lists now
-				var defective = new StringList();
-				var badSizes = new StringList();
+				StringList defective = new StringList();
+				StringList badSizes = new StringList();
 				Syntax.unifyOperators(tokens, true);
 				tokens.remove(tokens.indexOf("<-"), tokens.count());
 				tokens = Element.coagulateSubexpressions(tokens);
@@ -8234,8 +8234,8 @@ public class Root extends Element {
         // Warn in case of switched text/comments as first report
         if (isSwitchTextCommentMode())
         {
-            String[] menuPath = {"menuDiagram", "menuDiagramSwitchComments"};
-            String[] defaultNames = {"Diagram", "Switch text/comments?"};
+            String[] menuPath = {"menuView", "menuViewSwitchComments"};
+            String[] defaultNames = {"View", "Switch text/comments?"};
             // This is a general warning without associated element - put at top
             error = new DetectedError(errorMsg(Menu.warning_1, Menu.getLocalizedMenuPath(menuPath, defaultNames)), null);
             // Category 0 is not restricted to configuration (cannot be switched off)
