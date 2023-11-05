@@ -1499,6 +1499,15 @@ public class Executor implements Runnable
 				//String[] eqOps = {"==", "!="};
 				//for (int op = 0; op < eqOps.length; op++)
 				TokenList tokens = exprs.get(i);
+				// Context info for the case of a syntax error
+				String leftOpr = "";
+				String rightOpr = "";
+				if (i > 0) {
+					leftOpr = "..." + exprs.get(i-1).getString() + " ";
+				}
+				if (i+1 < exprs.size()) {
+					rightOpr = " " + exprs.get(i+1).getString() + "...";
+				}
 				for (int op = 0; op < compOps.length; op++)
 				// END KGU#76 2016-04-25
 				{
@@ -1637,12 +1646,13 @@ public class Executor implements Runnable
 							//}
 							String msg = getEvalErrorMessage(ex);
 							// END KGU#1058 2022-09-29
-							logger.log(Level.WARNING, "convertStringComparison(\"{0}\"): {1}", new Object[]{tokens.getString(), msg});
+							logger.log(Level.WARNING, "convertStringComparison(\"{0}\"): {1}", new Object[]{leftOpr + tokens.getString() + rightOpr, msg});
 							// END KGU#1024 2022-01-05
 						}
 						catch (Exception ex)
 						{
-							logger.log(Level.WARNING, "convertStringComparison(\"{0}\"): {1}", new Object[]{tokens.getString(), ex.getMessage()});
+							String msg = ex.getMessage();
+							logger.log(Level.WARNING, "convertStringComparison(\"{0}\"): {1}", new Object[]{leftOpr + tokens.getString() + rightOpr, msg});
 						}
 					} // if (!s.equals(" " + eqOps[op] + " ") && (s.indexOf(eqOps[op]) >= 0))
 				} // for (int op = 0; op < eqOps.length; op++)
