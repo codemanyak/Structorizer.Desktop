@@ -152,6 +152,7 @@ import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.structorizer.syntax.Expression.Operator;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -727,24 +728,24 @@ public class PasGenerator extends Generator
 
 			String preReturn = Syntax.getKeywordOrDefault("preReturn", "return");
 			Pattern preReturnMatch = Pattern.compile(getKeywordPattern(preReturn)+"([\\W].*|$)");
-			StringList lines = _inst.getUnbrokenText();
+			ArrayList<TokenList> lines = _inst.getUnbrokenTokenText();
 			// START KGU#424 2017-09-25: Put the comment if the element doesn't contain anything else
-			if (lines.getLongString().trim().isEmpty()) {
+			if (lines.isEmpty() || TokenList.concatenate(lines, null).isBlank()) {
 				appendComment(_inst, _indent);
 				commentInserted = true;
 			}
 			// END KGU#424 2017-09-25
-			for (int i=0; i<lines.count(); i++)
+			for (int i = 0; i < lines.size(); i++)
 			{
 				// START KGU#1089 2023-10-17: Issue #980  Ensure line-specific suppression is lifted
 				isDisabled = _inst.isDisabled(false);
 				// END KGU#1089 2023-10-17
 				// START KGU#74 2015-12-20: Bug #22 There might be a return outside of a Jump element, handle it!
 				//code.add(_indent+transform(_inst.getText().get(i))+";");
-				String line = lines.get(i).trim();
-				if (preReturnMatch.matcher(line).matches())
+				TokenList tokens = lines.get(i);
+				if (Jump.isReturn(tokens))
 				{
-					String argument = line.substring(preReturn.length()).trim();
+					String argument = tokens.getString().trim().substring(preReturn.length()).trim();
 					if (!argument.isEmpty())
 					{
 						// START KGU#424 2017-09-25: Put the comment on substantial content
@@ -758,7 +759,7 @@ public class PasGenerator extends Generator
 					}
 					Subqueue sq = (_inst.parent == null) ? null : (Subqueue)_inst.parent;
 					if (sq == null || !(sq.parent instanceof Root) || sq.getIndexOf(_inst) != sq.getSize()-1 ||
-							i+1 < lines.count())
+							i+1 < lines.size())
 					{
 						// START KGU#424 2017-09-25: Put the comment on substantial content
 						if (!commentInserted) {
@@ -776,7 +777,8 @@ public class PasGenerator extends Generator
 				//else	// no return
 				// START KGU#504 2018-03-13: Bugfix #520, #521 - consider transformation suppression
 				//if (!Instruction.isTypeDefinition(line, null) && !line.toLowerCase().startsWith("const "))
-				if (this.suppressTransformation || !Instruction.isTypeDefinition(line) && !line.toLowerCase().startsWith("const "))
+				if (this.suppressTransformation
+						|| !Instruction.isTypeDefinition(tokens, null) && !tokens.isBlank() && !tokens.get(0).equalsIgnoreCase("const"))
 				// END KGU#504 2018-03-13
 				// END KGU#375 2017-09-21
 				{
@@ -784,11 +786,13 @@ public class PasGenerator extends Generator
 					// The crux is: we don't know the index range!
 					// So we'll invent an index base variable easy to be modified in code
 					//code.add(_indent + transform(line) + ";");
-					String transline = transform(line);
-					int asgnPos = transline.indexOf(":=");
+					// FIXME Shouldn't we first do the structural stuff and transform then?
+					String transline = transform(tokens.getString());
+					TokenList transTokens = new TokenList(transline);
+					int asgnPos = transTokens.indexOf(":=");
 					// START KGU#1089 2023-10-17: Issue #980 Suppress defective declarations
-					StringList tokens = Syntax.splitLexically(line, true);
-					tokens.removeBlanks();
+					//StringList tokens = Syntax.splitLexically(line, true);
+					//tokens.removeBlanks();
 					if (asgnPos > 0 && Instruction.getAssignedVarname(tokens, false) == null) {
 						isDisabled = true;
 					}
@@ -796,8 +800,8 @@ public class PasGenerator extends Generator
 					boolean isArrayOrRecordInit = false;
 					if (asgnPos > 0 && transline.contains("{") && transline.contains("}"))
 					{
-						String varName = transline.substring(0, asgnPos).trim();
-						String expr = transline.substring(asgnPos+2).trim();
+						TokenList varName = transTokens.subSequence(0, asgnPos);
+						TokenList expr = transTokens.subSequenceToEnd(asgnPos+1);
 						int posBrace = expr.indexOf("{");
 						// START KGU#424 2017-09-25: Put the comment on substantial content
 						if (!commentInserted) {
@@ -808,17 +812,17 @@ public class PasGenerator extends Generator
 						// START KGU#504 2018-03-13 A: Bugfix #520, #521
 						if (!this.suppressTransformation) {
 						// END KGU#504 2018-03-13 A
-							String potTypeName = expr.substring(0, posBrace);
-							isArrayOrRecordInit = posBrace == 0 && expr.endsWith("}");	// only true at this moment on array init
+							String potTypeName = expr.subSequence(0, posBrace).getString();
+							isArrayOrRecordInit = posBrace == 0 && expr.getLast().equals("}");	// only true at this moment on array init
 							if (isArrayOrRecordInit)
 							{
 								// START KGU#560 2018-07-22: Bugfix #564 - with C-like declarations, the index range must be wiped off
-								if (varName.contains("[") && Instruction.isDeclaration(line)) {
-									varName = varName.substring(0, varName.indexOf('['));
+								if (varName.contains("[") && Instruction.isDeclaration(tokens)) {
+									varName = varName.subSequence(0, varName.indexOf("["));
 								}
 								// END KGU#560 2018-07-22
 								// START KGU#1098 2023-10-17: Issue #980
-								generateArrayInit(varName, expr, _indent, null, isDisabled);
+								generateArrayInit(varName.getString(), expr, _indent, null, isDisabled);
 								// END KGU#1098 2023-10-17
 							}
 							else if (posBrace > 0 && Syntax.isIdentifier(potTypeName, false, ".") && expr.endsWith("}"))
@@ -826,7 +830,7 @@ public class PasGenerator extends Generator
 								// START KGU#559 2018-07-20: Enh. #563 - smarter record initializer interpretation
 								//generateRecordInit(varName, expr, _indent, false, isDisabled, null);
 								TypeMapEntry recType = typeMap.get(":" + potTypeName);
-								generateRecordInit(varName, expr, _indent, false, isDisabled, recType);
+								generateRecordInit(varName.getString(), expr, _indent, false, isDisabled, recType);
 								// END KGU#559 2018-07-20
 								isArrayOrRecordInit = true;
 							}
@@ -843,20 +847,21 @@ public class PasGenerator extends Generator
 						if (asgnPos > 0) {
 						// END KGU#832 202-03-23
 							boolean doneFileAPI = false;
-							String expr = transline.substring(asgnPos+1).trim();
-							String var = transline.substring(0, asgnPos).trim();
+							TokenList expr = transTokens.subSequenceToEnd(asgnPos+1);
+							TokenList var = transTokens.subSequence(0, asgnPos);
 							int posBracket = var.indexOf("[");
 							for (int k = 0; !doneFileAPI && k < openAPINames.length; k++) {
-								int posOpen = expr.indexOf(openAPINames[k] + "(");
+								int posOpen = expr.indexOf(new TokenList(openAPINames[k] + "("), true);
 								if (posOpen >= 0) {
-									if (posBracket > 0) {
-										fileVarNames.addIfNew(var.substring(0, posBracket));
+									if (posBracket > 0) {	// Should be exactly 1, shouldn't it?
+										fileVarNames.addIfNew(var.subSequence(0, posBracket).getString());
 									}
 									else {
-										fileVarNames.addIfNew(var);
+										fileVarNames.addIfNew(var.getString());
 									}
-									StringList args = Element.splitExpressionList(expr.substring(posOpen + openAPINames[k].length()+1), ",");
-									transline = "assign(" + var + ", " + args.get(0) + "); " + openProcNames[k] + "(" + var + ")";
+									ArrayList<TokenList> args = Syntax.splitExpressionList(expr.subSequenceToEnd(posOpen + 1), ",");
+									transline = "assign(" + var + ", " + args.get(0).getString() + "); "
+											+ openProcNames[k] + "(" + var.getString() + ")";
 									doneFileAPI = true;
 								}
 							}
@@ -865,19 +870,20 @@ public class PasGenerator extends Generator
 						// START KGU#277/KGU#284 2016-10-13/16: Enh. #270 + Enh. #274
 						//code.add(_indent + transline + ";");
 						transline += ";";
-						if (Instruction.isTurtleizerMove(line)) {
+						if (Instruction.isTurtleizerMove(tokens)) {
 							transline += " " + this.commentSymbolLeft() + " color = " + _inst.getHexColor() + " " + this.commentSymbolRight();
 						}
 						// START KGU#261 2017-01-26: Enh. #259/#335
 						//addCode(transline, _indent, isDisabled);
-						if (!this.suppressTransformation && transline.matches("^(var|dim) .*")) {
+						if (!this.suppressTransformation && !transTokens.isBlank()
+								&& (transTokens.get(0).equalsIgnoreCase("var") || transTokens.get(0).equalsIgnoreCase("dim"))) {
 							if (asgnPos > 0) {
 								// First remove the "var" or "dim" key word
-								String separator = transline.startsWith("var") ? ":" : " as ";
-								transline = transline.substring(4);
-								int posColon = transline.substring(0, asgnPos).indexOf(separator);
+								String separator = transTokens.get(0).equalsIgnoreCase("var") ? ":" : " as ";
+								int posColon = transTokens.subSequence(1, asgnPos).indexOf(separator, false) + 1;
 								if (posColon > 0) {
-									transline = transline.substring(0, posColon) + transline.substring(asgnPos);
+									transline = transTokens.subSequence(1, posColon).getString()
+											+ transTokens.subSequenceToEnd(asgnPos).getString();
 								}
 							}
 							else {
@@ -910,16 +916,17 @@ public class PasGenerator extends Generator
 	 * Appends the code for an array initialisation of variable {@code _varName} from
 	 * the pre-transformed expression {@code _expr}.
 	 * @param _varName - name of the variable to be initialized
-	 * @param _expr - transformed initializer
+	 * @param _expr - tokenized transformed initializer
 	 * @param _indent - current indentation string
 	 * @param _constType - in case of a constant the array type description (otherwise null)
 	 * @param _isDisabled - whether the source element is disabled (means to comment out the code)
 	 */
-	private void generateArrayInit(String _varName, String _expr, String _indent, String _constType, boolean _isDisabled) {
-		StringList elements = Element.splitExpressionList(
-				_expr.substring(1, _expr.length()-1), ",");
+	private void generateArrayInit(String _varName, TokenList _expr, String _indent, String _constType, boolean _isDisabled) {
+		ArrayList<TokenList> elements = Syntax.splitExpressionList(
+				_expr.subSequence(1, _expr.size()-1), ",");
 		if (_constType != null) {
-			addCode(_varName + ": " + _constType + " = (" + elements.concatenate(", ") + ");", _indent, _isDisabled);
+			addCode(_varName + ": " + _constType +
+					" = (" + TokenList.concatenate(elements, ", ").getString() + ");", _indent, _isDisabled);
 		}
 		else {
 			// In order to be consistent with possible index access
@@ -948,7 +955,7 @@ public class PasGenerator extends Generator
 			}
 			//insertDeclaration("const", "indexBase_" + baseName + " = 0;",
 			//		_indent.length());
-			for (int ix = 0; ix < elements.count(); ix++)
+			for (int ix = 0; ix < elements.size()-1; ix++)
 			{
 				// START KGU#560 2018-07-22: Bugfix #564 - initializers must be handled recursively!
 				//addCode(_varName /*+ "indexBase_" + baseName + " + "*/ + ix + "] := " + 
@@ -964,7 +971,7 @@ public class PasGenerator extends Generator
 	 * Appends the code for a record initialisation of variable {@code _varName} from
 	 * the pre-transformed expression {@code _expr}.
 	 * @param _varName - name of the variable to be initialized
-	 * @param _expr - transformed initializer
+	 * @param _exprTokens - tokenized transformed initializer
 	 * @param _indent - current indentation string
 	 * @param _forConstant - whether this initializer is needed for a constant (a variable otherwise)
 	 * @param _isDisabled - whether the source element is disabled (means to comment out the code)
@@ -974,14 +981,14 @@ public class PasGenerator extends Generator
 	//private void generateRecordInit(String _varName, String _expr, String _indent, boolean _forConstant, boolean _isDisabled)
 	//{
 	//	HashMap<String, String> components = Instruction.splitRecordInitializer(_expr);
-	private void generateRecordInit(String _varName, String _expr, String _indent, boolean _forConstant, boolean _isDisabled, TypeMapEntry _typeEntry)
+	private void generateRecordInit(String _varName, TokenList _exprTokens, String _indent, boolean _forConstant, boolean _isDisabled, TypeMapEntry _typeEntry)
 	{
-		HashMap<String, String> components = Instruction.splitRecordInitializer(_expr, _typeEntry);
+		HashMap<String, String> components = Instruction.splitRecordInitializer(_exprTokens, _typeEntry);
 	// END KGU#559 2018-07-20
 		// START KGU#1021 2021-12-05: Bugfix #1024 Instruction might be defective
 		if (components == null) {
 			appendComment("ERROR: defective record initializer for " + _varName + " in diagram:", _indent);
-			appendComment(_expr, _indent);
+			appendComment(_exprTokens.getString(), _indent);
 			return;
 		}
 		// END KGU#1021 2021-12-05
@@ -1008,7 +1015,7 @@ public class PasGenerator extends Generator
 					// START KGU#560 2018-07-22: Enh. #564 - on occasion of #563, we fix recursive initializers, too
 					//addCode(_varName + "." + compName + " := " + comp.getValue() + ";",
 					//		_indent, _isDisabled);
-					generateAssignment(_varName + "." + compName, comp.getValue(), _indent, _isDisabled);
+					generateAssignment(_varName + "." + compName, new TokenList(comp.getValue()), _indent, _isDisabled);
 					// END KGU#560 2018-07-22
 				}
 			}
@@ -1021,32 +1028,31 @@ public class PasGenerator extends Generator
 	 * Generates code that decomposes possible initializers into a series of separate assignments if
 	 * there is no compact translation, otherwise just adds appropriate transformed code.
 	 * @param _target - the left side of the assignment (without modifiers!)
-	 * @param _expr - the expression in Structorizer syntax
+	 * @param _exprTokens - the tokenized expression in partially transformed Structorizer syntax
 	 * @param _indent - current indentation level (as String)
 	 * @param _isDisabled - indicates whether the code is o be commented out
 	 */
-	private void generateAssignment(String _target, String _expr, String _indent, boolean _isDisabled) {
-		if (_expr.contains("{") && _expr.endsWith("}")) {
-			StringList pureExprTokens = Syntax.splitLexically(_expr, true, true);
-			int posBrace = pureExprTokens.indexOf("{");
-			if (pureExprTokens.count() >= 3 && posBrace <= 1) {
-				if (posBrace == 1 && Syntax.isIdentifier(pureExprTokens.get(0), false, null)) {
+	private void generateAssignment(String _target, TokenList _exprTokens, String _indent, boolean _isDisabled) {
+		if (_exprTokens.contains("{") && _exprTokens.getLast().equals("}")) {
+			int posBrace = _exprTokens.indexOf("{");
+			if (_exprTokens.size() >= 3 && posBrace <= 1) {
+				if (posBrace == 1 && Syntax.isIdentifier(_exprTokens.get(0), false, null)) {
 					// Record initializer
-					String typeName = pureExprTokens.get(0);
+					String typeName = _exprTokens.get(0);
 					TypeMapEntry recType = this.typeMap.get(":"+typeName);
-					this.generateRecordInit(_target, _expr, _indent, false, _isDisabled, recType);
+					this.generateRecordInit(_target, _exprTokens, _indent, false, _isDisabled, recType);
 				}
 				else {
 					// Array initializer
-					this.generateArrayInit(_target, _expr, _indent, null, _isDisabled);
+					this.generateArrayInit(_target, _exprTokens, _indent, null, _isDisabled);
 				}
 			}
 			else {
-				addCode(_target + " := " + transform(_expr) + ";", _indent, _isDisabled);
+				addCode(_target + " := " + transform(_exprTokens.getString()) + ";", _indent, _isDisabled);
 			}
 		}
 		else {
-			addCode(_target + " := " + transform(_expr) + ";", _indent, _isDisabled);
+			addCode(_target + " := " + transform(_exprTokens.getString()) + ";", _indent, _isDisabled);
 		}
 	}
 	// END KGU#560 2018-07-22
@@ -1060,19 +1066,19 @@ public class PasGenerator extends Generator
 		appendComment(_alt, _indent);
 		// END KGU 2014-11-16
 
-    	//String condition = BString.replace(transform(_alt.getText().getText()),"\n","").trim();
-    	String condition = transform(_alt.getUnbrokenText().getLongString()).trim();
-    	// START KGU#311 2016-12-26: Enh. #314 File API support
-    	if (this.usesFileAPI) {
-    		StringList tokens = Syntax.splitLexically(condition, true);
-    		for (int i = 0; i < this.fileVarNames.count(); i++) {
-    			if (tokens.contains(this.fileVarNames.get(i))) {
-    				this.appendComment("TODO: Consider replacing this file test using IOResult!", _indent);
-    			}
-    		}
-    	}
-    	// END KGU#311 2016-12-26
-    	if(!condition.startsWith("(") && !condition.endsWith(")")) condition="("+condition+")";
+		//String condition = BString.replace(transform(_alt.getText().getText()),"\n","").trim();
+		String condition = transform(TokenList.concatenate(_alt.getUnbrokenTokenText(), null).getString()).trim();
+		// START KGU#311 2016-12-26: Enh. #314 File API support
+		if (this.usesFileAPI) {
+			TokenList tokens = new TokenList(condition, true);
+			for (int i = 0; i < this.fileVarNames.count(); i++) {
+				if (tokens.contains(this.fileVarNames.get(i))) {
+					this.appendComment("TODO: Consider replacing this file test using IOResult!", _indent);
+				}
+			}
+		}
+		// END KGU#311 2016-12-26
+		if(!condition.startsWith("(") && !condition.endsWith(")")) condition="("+condition+")";
 
 		addCode("if "+condition+" then", _indent, isDisabled);
 		addCode("begin", _indent, isDisabled);
@@ -1120,7 +1126,7 @@ public class PasGenerator extends Generator
 
 		// START KGU#453 2017-11-02: Issue #447
 		//if(!_case.getText().get(_case.qs.size()).trim().equals("%"))
-		if(!unbrokenText.get(_case.qs.size()).trim().equals("%"))
+		if (!unbrokenText.get(_case.qs.size()).trim().equals("%"))
 			// END KGU#453 2017-11-02
 		{
 			addCode("else", _indent+this.getIndent(), isDisabled);
@@ -1201,14 +1207,15 @@ public class PasGenerator extends Generator
 		boolean done = false;
 		boolean isDisabled = _for.isDisabled(false);
 		String var = _for.getCounterVar();
-		StringList items = this.extractForInListItems(_for);
+		//StringList items = this.extractForInListItems(_for);
+		ArrayList<TokenList> items = _for.getValueListItems();
 		if (items != null)
 		{
 			// Good question is: how do we guess the element type and what do we
 			// do if items are heterogenous? We will just try five types: boolean,
 			// common enum type, integer, real and string, where we can only test literals.
 			// If none of them match then we add a TODO comment.
-			int nItems = items.count();
+			int nItems = items.size();
 			// START KGU#542 2019-11-21: Enh. #739
 			String allEnum = "";
 			// END KGU#542 2019-11-21
@@ -1218,7 +1225,7 @@ public class PasGenerator extends Generator
 			boolean allString = true;
 			for (int i = 0; i < nItems; i++)
 			{
-				String item = items.get(i);
+				String item = items.get(i).getString();
 				// START KGU#542 2019-11-21: Enh. #739
 				TypeMapEntry tme = this.typeMap.get(item);
 				// END KGU#542 2019-11-21
@@ -1298,7 +1305,7 @@ public class PasGenerator extends Generator
 			}
 
 			// Insert the array and index declarations
-			String range = "1.." + items.count();
+			String range = "1.." + items.size();
 			insertDeclaration("var", arrayName + ": " + "array [" + 
 					range + "] of " + itemType + ";", _indent.length());
 			insertDeclaration("var", indexName + ": " + range + ";",
@@ -1309,7 +1316,7 @@ public class PasGenerator extends Generator
 			{
 				// START KGU#369 2017-03-15: Bugfix #382 item transformation had been missing
 				//addCode(arrayName + "[" + (i+1) + "] := " + items.get(i) + ";",
-				addCode(arrayName + "[" + (i+1) + "] := " + transform(items.get(i)) + ";",
+				addCode(arrayName + "[" + (i+1) + "] := " + transform(items.get(i).getString()) + ";",
 				// END KGU#369 2017-03-15
 						_indent, isDisabled);
 			}
@@ -2085,10 +2092,12 @@ public class PasGenerator extends Generator
 						appendDeclComment(_root, "", constName);
 						// END KGU#424 2017-09-25
 						if (constType.isArray()) {
-							generateArrayInit(constEntry.getKey(), expr, "", transformTypeFromEntry(constType, null, true), false);
+							generateArrayInit(constEntry.getKey(), new TokenList(expr), "",
+									transformTypeFromEntry(constType, null, true), false);
 						}
 						else {
-							generateRecordInit(constEntry.getKey(), expr, "", true, false, constType);
+							generateRecordInit(constEntry.getKey(), new TokenList(expr), "",
+									true, false, constType);
 						}
 						generatedInit = code.subSequence(lineNo, code.count());
 						code.remove(lineNo, code.count());

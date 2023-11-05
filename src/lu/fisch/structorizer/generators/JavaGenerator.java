@@ -130,6 +130,7 @@ import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.turtle.TurtleBox;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -416,7 +417,7 @@ public class JavaGenerator extends CGenerator
 				//	this.usesTurtleizer = true;
 				//}
 				if (j+1 < tokens.size() && tokens.get(j).equals("(")) {
-					int nArgs = Syntax.splitExpressionList(tokens.subSequence(j+1, tokens.size()), ",").size() - 1;
+					int nArgs = Syntax.splitExpressionList(tokens.subSequenceToEnd(j+1), ",").size() - 1;
 					for (Entry<DiagramController, String> entry: controllerMap.entrySet()) {
 						String name = entry.getKey().providedRoutine(token, nArgs);
 						if (name != null) {
@@ -475,7 +476,7 @@ public class JavaGenerator extends CGenerator
 			if (_input.matches("^" + getKeywordPattern(outputKey) + "[ ](.*?)"))
 			{
 				StringList expressions = 
-						Element.splitExpressionList(_input.substring(outputKey.length()), ",");
+						Syntax.splitExpressionList(_input.substring(outputKey.length()), ",");
 				// Some of the expressions might be sums, so better put parentheses around them
 				if (expressions.count() > 1) {
 					_input = outputKey + " (" + expressions.concatenate(") + (") + ")";
@@ -596,7 +597,7 @@ public class JavaGenerator extends CGenerator
 	 * @see lu.fisch.structorizer.generators.CGenerator#transformRecordInit(java.lang.String, lu.fisch.structorizer.elements.TypeMapEntry)
 	 */
 	@Override
-	protected String transformRecordInit(String constValue, TypeMapEntry typeInfo) {
+	protected String transformRecordInit(TokenList constValue, TypeMapEntry typeInfo) {
 		// This is practically identical to C#
 		// START KGU#559 2018-07-20: Enh. #563 - smarter record initialization
 		//HashMap<String, String> comps = Instruction.splitRecordInitializer(constValue);
@@ -626,7 +627,7 @@ public class JavaGenerator extends CGenerator
 					recordInit += "null";
 				}
 				else if (compType != null && compType.isRecord()) {
-					recordInit += transformRecordInit(compVal, compType);
+					recordInit += transformRecordInit(new TokenList(compVal), compType);
 				}
 				// START KGU#561 2018-07-21: Bugfix #564
 				else if (compType != null && compType.isArray() && compVal.startsWith("{") && compVal.endsWith("}")) {
@@ -646,13 +647,16 @@ public class JavaGenerator extends CGenerator
 	/**
 	 * Generates code that either allows direct assignment or decomposes the record
 	 * initializer into separate component assignments
+	 * 
 	 * @param _lValue - the left side of the assignment (without modifiers!)
-	 * @param _recordValue - the record initializer according to Structorizer syntax
+	 * @param _recordValue - the tokenized record initializer according to Structorizer syntax
 	 * @param _indent - current indentation level (as String)
 	 * @param _isDisabled - indicates whether the code is to be commented out
 	 * @param _typeEntry - an existing {@link TyeMapEntry} for the assumed record type (or null)
 	 */
-	protected void generateRecordInit(String _lValue, String _recordValue, String _indent, boolean _isDisabled, TypeMapEntry _typeEntry)
+	@Override
+	protected void generateRecordInit(String _lValue, TokenList _recordValue, String _indent,
+			boolean _isDisabled, TypeMapEntry _typeEntry)
 	{
 		// START KGU#559/KGU#560 2018-07-21: Enh. #563, bugfix #564 - radically revised
 		// This is practically identical to C#
@@ -679,7 +683,8 @@ public class JavaGenerator extends CGenerator
 	 * @param _elemType - the {@link TypeMapEntry} of the element type if available (null otherwise)
 	 * @param _isDecl - if this is part of a declaration (i.e. a true initialization)
 	 */
-	protected String transformOrGenerateArrayInit(String _lValue, StringList _arrayItems, String _indent, boolean _isDisabled, String _elemType, boolean _isDecl)
+	@Override
+	protected String transformOrGenerateArrayInit(String _lValue, ArrayList<TokenList> _arrayItems, String _indent, boolean _isDisabled, String _elemType, boolean _isDecl)
 	{
 		// START KGU#732 2019-10-03: Bugfix #755 - The new operator is always to be used.
 		//if (_isDecl) {
@@ -842,7 +847,8 @@ public class JavaGenerator extends CGenerator
 		// We simply use the range-based loop of Java (as far as possible)
 		String var = _for.getCounterVar();
 		String valueList = _for.getValueList();
-		StringList items = this.extractForInListItems(_for);
+		//StringList items = this.extractForInListItems(_for);
+		ArrayList<TokenList> items = _for.getValueListItems();
 		String indent = _indent;
 		String itemType = null;
 		if (items != null)
@@ -851,7 +857,7 @@ public class JavaGenerator extends CGenerator
 			// do if items are heterogeneous? We will just try four ways: int,
 			// double, String, and derived type name. If none of them match we use
 			// Object and add a TODO comment.
-			int nItems = items.count();
+			int nItems = items.size();
 			boolean allInt = true;
 			boolean allDouble = true;
 			boolean allString = true;
@@ -861,11 +867,12 @@ public class JavaGenerator extends CGenerator
 			// END KGU#388 2017-09-28
 			for (int i = 0; i < nItems; i++)
 			{
-				String item = items.get(i);
+				TokenList item = items.get(i);
+				String itemStr = item.getString();
 				if (allInt)
 				{
 					try {
-						Integer.parseInt(item);
+						Integer.parseInt(itemStr);
 					}
 					catch (NumberFormatException ex)
 					{
@@ -875,7 +882,7 @@ public class JavaGenerator extends CGenerator
 				if (allDouble)
 				{
 					try {
-						Double.parseDouble(item);
+						Double.parseDouble(itemStr);
 					}
 					catch (NumberFormatException ex)
 					{
@@ -884,13 +891,14 @@ public class JavaGenerator extends CGenerator
 				}
 				if (allString)
 				{
-					allString = item.startsWith("\"") && item.endsWith("\"") &&
-							!item.substring(1, item.length()-1).contains("\"");
+					allString = item.size() == 1
+							&& (itemStr.startsWith("\"") && itemStr.endsWith("\"")
+									|| itemStr.startsWith("'") && itemStr.endsWith("'") && itemStr.length() > 3);
 				}
 				// START KGU#388 2017-09-28: Enh. #423
 				if (allCommon)
 				{
-					String itType = Element.identifyExprType(this.typeMap, item, true);
+					String itType = Syntax.identifyExprType(this.typeMap, item, true);
 					if (i == 0) {
 						commonType = itType;
 					}
@@ -900,10 +908,11 @@ public class JavaGenerator extends CGenerator
 				}
 				// END KGU#388 2017-09-28
 				// START KGU#732 2019-10-02: Bugfix #755 - transformation of the items is necessary
-				items.set(i, transform(item));
+				// FIXME Don't descend to strng level
+				items.set(i, new TokenList(transform(itemStr)));
 				// END KGU#732 2019-10-02
 			}
-			valueList = "{" + items.concatenate(", ") + "}";
+			valueList = "{" + TokenList.concatenate(items, ", ").getString() + "}";
 			// START KGU#388 2017-09-28: Enh. #423
 			//if (allInt) itemType = "int";
 			if (allCommon) itemType = commonType;

@@ -509,14 +509,14 @@ public class BASHGenerator extends Generator {
 	@Override
 	protected boolean checkElementInformation(Element _ele)
 	{
-		StringList tokens = Syntax.splitLexically(_ele.getText().getText(), true);
+		TokenList tokens = new TokenList(_ele.getText().getText(), true);
 		String[] functionNames = {"ord", "chr"};
 		for (int i = 0; i < functionNames.length; i++)
 		{
 			if (!occurringFunctions.contains(functionNames[i])) {
 				int pos = -1;
 				while ((pos = tokens.indexOf(functionNames[i], pos+1)) >= 0 &&
-						pos+1 < tokens.count() &&
+						pos+1 < tokens.size() &&
 						tokens.get(pos+1).equals("("))
 				{
 					occurringFunctions.add(functionNames[i]);
@@ -619,7 +619,7 @@ public class BASHGenerator extends Generator {
 				}
 			}
 			// END KGU#388 2017-10-05
-			origExpr = tokens.subSequence(posAsgnOpr + 1, tokens.size()).getString();
+			origExpr = tokens.subSequenceToEnd(posAsgnOpr + 1).getString();
 			origExpr.trim();
 		}
 		// END KGU#388 2017-10-24
@@ -663,7 +663,7 @@ public class BASHGenerator extends Generator {
 			// Separate lval and assignment operator from the expression tokens
 			varName = tokens.subSequence(0, posAsgnOpr).getString().trim();
 			lval += varName + "=";
-			tokens = tokens.subSequence(posAsgnOpr+1, tokens.size());
+			tokens = tokens.subSequenceToEnd(posAsgnOpr+1);
 			// START KGU#803 2020-02-18: Issues #388, #816
 			// We don't know whether we might process a call here, so better don't set handled entry
 			if (Syntax.isIdentifier(varName, false, null) && !this.wasDefHandled(root, varName, false)
@@ -749,7 +749,7 @@ public class BASHGenerator extends Generator {
 			if (isAssignment) {
 				lval = lval.substring(0, lval.length()-1) + this.getArrayInitOperator();
 			}
-			StringList items = Element.splitExpressionList(expr.substring(1, expr.length()-1), ",");
+			StringList items = Syntax.splitExpressionList(expr.substring(1, expr.length()-1), ",");
 			// START KGU#405 2017-05-19: Bugfix #237 - was too simple an analysis
 			for (int i = 0; i < items.count(); i++) {
 				items.set(i, transformExpression(items.get(i), true, false));
@@ -860,7 +860,7 @@ public class BASHGenerator extends Generator {
 	 * @param asArgument - if the expression is an argument for a routine CALL
 	 * @return the transformed expression
 	 */
-	protected String transformExpression(StringList exprTokens, boolean isAssigned, boolean asArgument)
+	protected String transformExpression(TokenList exprTokens, boolean isAssigned, boolean asArgument)
 	{
 		// FIXME: Check the operands - they must be literals (type detectable),
 		// variables (consult typeMap), built-in functions (type known), or
@@ -875,7 +875,7 @@ public class BASHGenerator extends Generator {
 				exprTokens.contains("%");
 		// Avoid recursive enclosing in $(...)
 		if (isArithm) {
-			exprTokens.insert(((isAssigned || asArgument) ? "$(( " : "(( "), 0);
+			exprTokens.add(0, ((isAssigned || asArgument) ? "$(( " : "(( "));
 			exprTokens.add(" ))");
 		}
 		// START KGU#772 2019-11-24: Bugfix #784 - avoid redundant enclosing with $(...)
@@ -889,12 +889,12 @@ public class BASHGenerator extends Generator {
 		// END KGU#807 2020-02-20
 			String varName = null;
 			boolean isVarAccess =
-					exprTokens.count() == 4 &&
+					exprTokens.size() == 4 &&
 					exprTokens.get(0).equals("$") &&
 					exprTokens.get(1).equals("{") &&
 					this.varNames.contains(varName = exprTokens.get(2)) &&
 					exprTokens.get(3).equals("}") ||
-					exprTokens.count() == 1 &&
+					exprTokens.size() == 1 &&
 					VAR_ACCESS_MATCHER.reset(exprTokens.get(0)).matches() &&
 					this.varNames.contains(varName = exprTokens.get(0).substring(2, exprTokens.get(0).length()-1));
 			if (isVarAccess) {
@@ -913,12 +913,12 @@ public class BASHGenerator extends Generator {
 						 * original variable name, which is a rather poor idea
 						 */
 						exprTokens.add(")\"");
-						exprTokens.insert("\"$(typeset -p ", 0);
+						exprTokens.add(0, "\"$(typeset -p ");
 					}
 					// END KGU#807 2020-02-20
 				}
 				else {
-					exprTokens.insert("\"", 0);
+					exprTokens.add(0, "\"");
 					exprTokens.add("\"");
 				}
 				// END KGU#803 2020-02-19
@@ -931,7 +931,7 @@ public class BASHGenerator extends Generator {
 			// KGU#807 2020-02-20
 		}
 		// END KGU#772 2019-11-24
-		return exprTokens.concatenate();
+		return exprTokens.getString();
 	}
 	protected String transformExpression(String expr, boolean isAssigned, boolean asArgument)
 	{
@@ -943,7 +943,7 @@ public class BASHGenerator extends Generator {
 			}
 		}
 		else {
-			expr = transformExpression(Syntax.splitLexically(expr, true), isAssigned, asArgument);
+			expr = transformExpression(new TokenList(expr, true), isAssigned, asArgument);
 		}
 		return expr;
 	}
@@ -968,9 +968,9 @@ public class BASHGenerator extends Generator {
 		// KGU#811 2020-02-21: Bugfix #824 - many absurd bugs found and fixed
 		if (!this.suppressTransformation && !(condition.trim().matches("^\\(\\(.*?\\)\\)$")))
 		{
-			StringList condTokens = Syntax.splitLexically(condition, true, true);
+			TokenList condTokens = new TokenList(condition, true);
 			boolean isNumber = false;
-			for (int i = 1; !isNumber && i < condTokens.count()-1; i++) {
+			for (int i = 1; !isNumber && i < condTokens.size()-1; i++) {
 				String token = condTokens.get(i);
 				// Check for comparison operator
 				if (compOprs.contains(token)) {
@@ -986,11 +986,11 @@ public class BASHGenerator extends Generator {
 					k = i+1;
 					String rightOpnd = condTokens.get(k);
 					while ((rightOpnd.isEmpty() || rightOpnd.equals("$") || rightOpnd.equals("(") || rightOpnd.equals("{"))
-							&& k < condTokens.count()-1) {
+							&& k < condTokens.size()-1) {
 						rightOpnd = condTokens.get(++k);
 					}
-					String typeLeft = Element.identifyExprType(typeMap, leftOpnd, true);
-					String typeRight = Element.identifyExprType(typeMap, rightOpnd, true);
+					String typeLeft = Syntax.identifyExprType(typeMap, new TokenList(leftOpnd), true);
+					String typeRight = Syntax.identifyExprType(typeMap, new TokenList(rightOpnd), true);
 					if (!(typeLeft.isEmpty() && typeRight.isEmpty())
 							&& (typeLeft.equals("int") || typeLeft.equals("double") || typeLeft.isEmpty())
 							&& (typeRight.equals("int") || typeRight.equals("double") || typeRight.isEmpty())) {
@@ -1016,8 +1016,11 @@ public class BASHGenerator extends Generator {
 		while ((pos = _tokens.indexOf(_varName, pos+1)) >= 0 && pos < _end)
 		{
 			int posNext = pos+1;
-			while (posNext < _end && _tokens.get(posNext).trim().isEmpty()) posNext++;
-			String nextToken = _tokens.get(posNext); 
+			//while (posNext < _end && _tokens.get(posNext).trim().isEmpty()) posNext++;
+			String nextToken = "";
+			if (posNext < _end) {
+				nextToken = _tokens.get(posNext); 
+			}
 			if (nextToken.equals("["))
 			{
 				_tokens.set(pos, "${" + _varName);
@@ -1074,7 +1077,7 @@ public class BASHGenerator extends Generator {
 		if (_interm.matches("^" + output + "[ ](.*?)"))
 		{
 			StringList expressions = 
-					Element.splitExpressionList(_interm.substring(output.length()), ",");
+					Syntax.splitExpressionList(_interm.substring(output.length()), ",");
 			expressions.removeBlanks();
 			_interm = output + " " + expressions.getLongString();
 		}
@@ -1383,7 +1386,7 @@ public class BASHGenerator extends Generator {
 			//addCode(this.getIndent() + _case.getText().get(i+1).trim().replace(",", "|") + ")", _indent, disabled);
 			// START KGU#755 2019-11-08: Bugfix #769 - more precise splitting necessary
 			//addCode(this.getIndent() + unbrokenText.get(i+1).trim().replace(",", "|") + ")", _indent, disabled);
-			StringList items = Element.splitExpressionList(unbrokenText.get(i+1).trim(), ",");
+			StringList items = Syntax.splitExpressionList(unbrokenText.get(i+1).trim(), ",");
 			addCode(this.getIndent() + items.concatenate("|") + ")", _indent, disabled);
 			// END KGU#755 2019-11-08
 			// END KGU#453 2017-11-02
@@ -1431,13 +1434,13 @@ public class BASHGenerator extends Generator {
 				if (valueList.startsWith("{") && valueList.endsWith("}") &&
 						!valueList.contains(".."))	// Preserve ranges like {3..18} or {1..200..2}
 				{
-					items = Element.splitExpressionList(
+					items = Syntax.splitExpressionList(
 							valueList.substring(1, valueList.length()-1), ",");
 				}
 				// Convert a comma-separated list to a space-separated sequence
 				else if (valueList.contains(","))
 				{
-					items = Element.splitExpressionList(valueList, ",");				
+					items = Syntax.splitExpressionList(valueList, ",");				
 				}
 				if (items != null)
 				{
@@ -1648,7 +1651,7 @@ public class BASHGenerator extends Generator {
 							String routineId = Integer.toHexString(routine.hashCode());
 							String resultName = "result" + routineId;
 							String source = "${" + resultName + "}";
-							StringList tokens = Syntax.splitLexically(line, true, true);
+							TokenList tokens = new TokenList(line, true);
 							Syntax.unifyOperators(tokens, true);
 							String target = Instruction.getAssignedVarname(tokens, true);
 							boolean done = false;
@@ -1685,7 +1688,7 @@ public class BASHGenerator extends Generator {
 								}
 							}
 							if (!done) {
-								addCode(transform(tokens.concatenate(null, 0, tokens.indexOf("<-")+1) + source),
+								addCode(transform(tokens.subSequence(0, tokens.indexOf("<-")+1) + source),
 										_indent, disabled);
 							}
 						}

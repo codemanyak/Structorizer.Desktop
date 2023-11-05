@@ -26,6 +26,8 @@
 
 package lu.fisch.structorizer.generators;
 
+import java.util.ArrayList;
+
 /******************************************************************************************************
  *
  *      Author:         Jan Peter Klippel
@@ -557,14 +559,14 @@ public class PerlGenerator extends Generator {
 			appendComment(_inst, _indent);
 			Root root = Element.getRoot(_inst);
 
-			StringList lines = _inst.getUnbrokenText();
-			for (int i = 0; i < lines.count(); i++)
+			ArrayList<TokenList> lines = _inst.getUnbrokenTokenText();
+			for (int i = 0; i < lines.size(); i++)
 			{
-				String line = lines.get(i);
-				boolean isAsgn = Instruction.isAssignment(line);
-				boolean isDecl = Instruction.isDeclaration(line);
+				TokenList tokens = lines.get(i);
+				boolean isAsgn = Instruction.isAssignment(tokens);
+				boolean isDecl = Instruction.isDeclaration(tokens);
 				// START KGU#653 2019-02-15: Enh. #680 - input with several items...
-				StringList inputItems = Instruction.getInputItems(line);
+				StringList inputItems = Instruction.getInputItems(tokens);
 				if (inputItems != null && inputItems.count() > 2) {
 					String inputKey = Syntax.getKeyword("input");
 					String prompt = inputItems.get(0);
@@ -581,8 +583,8 @@ public class PerlGenerator extends Generator {
 				}
 				// END KGU#653 219-02-15
 				// START KGU#388/KGU#542 2019-11-19: Enh. #423, #739
-				else if (Instruction.isTypeDefinition(line)) {
-					String typeName = line.substring(line.indexOf("type")+4, line.indexOf("=")).trim();
+				else if (Instruction.isTypeDefinition(tokens, null)) {
+					String typeName = tokens.subSequence(1, tokens.indexOf("=")).getString().trim();
 					TypeMapEntry type = this.typeMap.get(":" + typeName);
 					this.generateTypeDef(root, typeName, type, _indent, isDisabled);
 					continue;
@@ -590,7 +592,7 @@ public class PerlGenerator extends Generator {
 				else if (isDecl && !isAsgn) {
 					// Declarations will have been handled in the preamble
 					if (!_inst.getComment().trim().isEmpty()) {
-						appendComment(line, _indent);
+						appendComment(tokens.getString(), _indent);
 					}
 					continue;
 				}
@@ -598,23 +600,25 @@ public class PerlGenerator extends Generator {
 
 				String text = null;
 				if (isAsgn) {
-					StringList tokens = Syntax.splitLexically(line, true, true);
 					Syntax.unifyOperators(tokens, true);
 					int posAsgn = tokens.indexOf("<-");
 					String var = Instruction.getAssignedVarname(tokens.subSequence(0, posAsgn), true);
-					StringList expr = tokens.subSequence(posAsgn+1, tokens.count());
-					if (Syntax.isIdentifier(var, false, null) && expr.get(0).equals("{") && expr.get(expr.count()-1).equals("}")) {
-						text = "@" + var + " = " + transform(expr.concatenate(null));
+					TokenList expr = tokens.subSequenceToEnd(posAsgn+1);
+					if (Syntax.isIdentifier(var, false, null) && expr.get(0).equals("{") && expr.getLast().equals("}")) {
+						text = "@" + var + " = " + transform(expr.getString());
 					}
 					// START KGU#787 2019-12-03: Bugfix #793 - variable declaration parts remained
 					else if (isDecl) {
 						// Wipe off all declaratory parts
-						line = var + " <- " + expr.concatenate(null);
+						tokens.clear();
+						tokens.add("var");
+						tokens.add("<-");
+						tokens.addAll(expr);
 					}
 					// END KGU#787 2019-12-03
 				}
 				if (text == null) {
-					text = transform(line);
+					text = transform(tokens.getString());
 				}
 				if (!text.endsWith(";")) { text += ";"; }
 				// START KGU#311 2017-01-04: Enh. #314 - steer the user through the File API implications
@@ -703,7 +707,7 @@ public class PerlGenerator extends Generator {
 				
 				// START KGU#277/KGU#284 2016-10-13/16: Enh. #270 + Enh. #274
 				//code.add(_indent + text);
-				if (Instruction.isTurtleizerMove(line)) {
+				if (Instruction.isTurtleizerMove(tokens)) {
 					text += " " + this.commentSymbolLeft() + " color = " + _inst.getHexColor();
 				}
 				addCode(text.replace("\t", this.getIndent()), _indent, isDisabled);
@@ -796,7 +800,7 @@ public class PerlGenerator extends Generator {
 			//String selectors = _case.getText().get(i+1).trim();
 			String selectors = unbrokenText.get(i+1).trim();
 			// END KGU#453 2017-11-02
-			if (Element.splitExpressionList(selectors, ",").count() > 1)	// Is it an enumeration of values? 
+			if (Syntax.splitExpressionList(selectors, ",").count() > 1)	// Is it an enumeration of values? 
 			{
 				selectors = "[" + selectors + "]";
 			}

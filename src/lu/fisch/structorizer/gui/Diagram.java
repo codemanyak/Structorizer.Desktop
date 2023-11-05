@@ -4803,7 +4803,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 				}
 				// END KGU#864 2020-04-28
 			} else {
-				typeName = Element.identifyExprType(parentTypes, varName, true);
+				typeName = Syntax.identifyExprType(parentTypes, new TokenList(varName), true);
 				if (!typeName.isEmpty()) {
 					varType = parentTypes.get(":" + typeName);
 				}
@@ -5064,7 +5064,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 				// END KGU#744 2019-10-05
 				String result = "";
 				if (((Call) selected).isFunctionCall(false)) {
-					StringList lineTokens = Syntax.splitLexically(call.getUnbrokenText().get(0), true, true);
+					TokenList lineTokens = call.getUnbrokenTokenText().get(0);
 					String var = Call.getAssignedVarname(lineTokens, true);
 					if (Syntax.isIdentifier(var, false, null)) {
 						TypeMapEntry typeEntry = root.getTypeInfo().get(var);
@@ -5551,21 +5551,21 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		// Possibly preceding assignment of the selection expression value
 		Instruction asgnmt = null;
 		// tokenized selection expression
-		StringList selTokens = Syntax.splitLexically(caseElem.getText().get(0), true);
+		TokenList selTokens = caseElem.getUnbrokenTokenText().get(0);
 		// Eliminate parser preference keywords
 		String[] redundantKeywords = {Syntax.getKeyword("preCase"), Syntax.getKeyword("postCase")};
 		for (String keyword : redundantKeywords) {
 			if (!keyword.trim().isEmpty()) {
-				StringList tokenizedKey = Syntax.splitLexically(keyword, false);
+				TokenList tokenizedKey = new TokenList(keyword, false);
 				int pos = -1;
 				while ((pos = selTokens.indexOf(tokenizedKey, pos + 1, !Syntax.ignoreCase)) >= 0) {
-					for (int i = 0; i < tokenizedKey.count(); i++) {
-						selTokens.delete(pos);
+					for (int i = 0; i < tokenizedKey.size(); i++) {
+						selTokens.remove(pos);
 					}
 				}
 			}
 		}
-		String discriminator = selTokens.concatenate().trim();
+		String discriminator = selTokens.getString().trim();
 		// If the discriminating expression isn't just a variable then assign its value to an
 		// artificial variable first and use this as discriminator further on.
 		if (!Syntax.isIdentifier(discriminator, false, "")) {

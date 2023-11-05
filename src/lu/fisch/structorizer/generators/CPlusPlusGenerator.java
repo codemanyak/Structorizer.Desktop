@@ -287,7 +287,7 @@ public class CPlusPlusGenerator extends CGenerator {
 		if (_input.matches("^" + getKeywordPattern(outputKey) + "[ ](.*?)"))
 		{
 			StringList expressions = 
-					Element.splitExpressionList(_input.substring(outputKey.length()), ",");
+					Syntax.splitExpressionList(_input.substring(outputKey.length()), ",");
 			_input = outputKey + " " + expressions.concatenate(" << ");
 		}
 		// END KGU#101 2015-12-11

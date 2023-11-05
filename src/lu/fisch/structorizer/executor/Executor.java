@@ -228,6 +228,15 @@ package lu.fisch.structorizer.executor;
  *
  *      Comment:
  *
+ *      2023-11-04 Issue #800 (Kay Gürtzig)
+ *      - First fundamental step of revision: consistent use of TokenLists instead of repetitive conversions
+ *        between strings and StringLists lists.
+ *      - IMPORTANT DECISION: Shall we cut out decorators (redundant markers) only at their expected positions
+ *        (e.g. preWhile only at the very start of a While condition, postWhile only at its end)? Postponed.
+ *      - PLAN: In a later step, Line and Expression objects should play a more important role. The Element
+ *        texts (i.e. TokenLists should no longer contain user-defined keywords but internal tokens, e.g.
+ *        "§preWhile§" - only for display ad editing theuser-specified key words should appear. This way, no
+ *        refactoring would ever be necessary again.
  *      2021-01-10 Issue #910 (Kay Gürtzig)
  *      - It seemed to be sensible to hold special Includables for additionally enabled DiagramController
  *        classes in Arranger (i.e. for all DiagramControllers except Turtleizer)
@@ -397,6 +406,7 @@ import lu.fisch.structorizer.gui.IconLoader;
 import lu.fisch.structorizer.gui.Menu;
 import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 //import lu.fisch.structorizer.syntax.ExprParser;
 import lu.fisch.utils.BString;
 import lu.fisch.utils.StringList;
@@ -984,15 +994,18 @@ public class Executor implements Runnable
 	//private static final Regex RPLC_INC1_PROC = new Regex(BString.breakup("inc")+"[(](.*?)[)](.*?)", "$1 <- $1 + 1");
 	//private static final Regex RPLC_DEC2_PROC = new Regex(BString.breakup("dec")+"[(](.*?)[,](.*?)[)](.*?)", "$1 <- $1 - $2");
 	//private static final Regex RPLC_DEC1_PROC = new Regex(BString.breakup("dec")+"[(](.*?)[)](.*?)", "$1 <- $1 - 1");
-	private static final Matcher DELETE_PROC_MATCHER = 
-			java.util.regex.Pattern.compile("delete\\((.*),(.*),(.*)\\)").matcher("");
-	private static final Matcher INSERT_PROC_MATCHER = 
-			java.util.regex.Pattern.compile("insert\\((.*),(.*),(.*)\\)").matcher("");
-	private static final String DELETE_PROC_SUBST = "$1 <- delete($1,$2,$3)";
-	private static final String INSERT_PROC_SUBST = "$2 <- insert($1,$2,$3)";
+	//private static final Matcher DELETE_PROC_MATCHER = 
+	//		java.util.regex.Pattern.compile("delete\\((.*),(.*),(.*)\\)").matcher("");
+	//private static final Matcher INSERT_PROC_MATCHER = 
+	//		java.util.regex.Pattern.compile("insert\\((.*),(.*),(.*)\\)").matcher("");
+	//private static final String DELETE_PROC_SUBST = "$1 <- delete($1,$2,$3)";
+	//private static final String INSERT_PROC_SUBST = "$2 <- insert($1,$2,$3)";
 	// END KGU#575 2018-09-17
 	
-	private static final StringList OBJECT_ARRAY = StringList.explode("Object,[,]", ",");
+	private static final TokenList MATH_MATH_TOKENS = new TokenList("Math.Math.");
+	private static final TokenList MATH_TOKENS = new TokenList("Math.");
+	
+	private static final TokenList OBJECT_ARRAY = new TokenList("Object[]");
 	
 	// START KGU#388 2017-10-29: Enh. #423 This EvalError message indicates that the record qualifier conversion may have overdone  
 	private static final String ERROR423MESSAGE = 
@@ -1080,16 +1093,38 @@ public class Executor implements Runnable
 	 * NOTE: This method should NOT be called if {@code s} contains an entire instruction line
 	 * rather than just an expression - use {@code convert(s, false)} in such cases instead
 	 * and make sure the {@link #convertStringComparison(String)} is called for the mere
-	 * expression part later on. 
+	 * expression part later on.
+	 * 
 	 * @param s - the expression or instruction line to be pre-processed
 	 * @param convertComparisons - whether string comparisons are to be detected and rewritten
 	 * @return the converted string
+	 * 
 	 * @see #convert(String, boolean)
 	 * @see #convertStringComparison(String)
+	 * 
+	 * @deprecated use {@link #convert(TokenList)}
 	 */
-	private String convert(String s)
+//	private String convert(String s)
+//	{
+//		return convert(new TokenList(s), true);
+//	}
+	/**
+	 * Unifies the operators, replaces math functions and certain built-in routines and
+	 * converts string comparisons.<br/>
+	 * NOTE: This method should NOT be called if {@code tokens} contains an entire instruction line
+	 * rather than just an expression - use {@code convert(s, false)} in such cases instead
+	 * and make sure the {@link #convertStringComparison(String)} is called for the mere
+	 * expression part later on 
+	 * 
+	 * @param tokens - the tokenized expression or instruction line to be pre-processed
+	 * @param convertComparisons - whether string comparisons are to be detected and rewritten
+	 * @return the converted string
+	 * @see #convertExpression(String, boolean)
+	 * @see #convertStringComparison(String)
+	 */
+	private TokenList convertExpression(TokenList tokens)
 	{
-		return convert(s, true);
+		return convertExpression(tokens, true);
 	}
 	
 	/**
@@ -1097,21 +1132,21 @@ public class Executor implements Runnable
 	 * converts string comparisons if {@code convertComparisons} is {@code true}.<br/>
 	 * <b>NOTE:</b> Argument {@code convertComparisons} should not be {@code true} if
 	 * {@code s} contains an entire instruction line rather than just an expression!
-	 * @param s - the expression or instruction line to be pre-processed
+	 * 
+	 * @param tokens - the tokenized expression or instruction line to be pre-processed
 	 * @param convertComparisons - whether string comparisons are to be detected and rewritten
-	 * @return the converted string
+	 * @return the converted token list
 	 */
-	private String convert(String s, boolean convertComparisons)
+	private TokenList convertExpression(TokenList tokens, boolean convertComparisons)
 	{
 		// START KGU#128 2016-01-07: Bugfix #92 - Effort via tokens to avoid replacements within string literals
-		StringList tokens = Syntax.splitLexically(s, true);
 		Syntax.unifyOperators(tokens, false);
 		// START KGU#130 2015-01-08: Bugfix #95 - Conversion of div operator had been forgotten...
 		tokens.replaceAll("div", "/");		// FIXME: Operands should better be coerced to integer...
 		// END KGU#130 2015-01-08
 		// START KGU#285 2016-10-16: Bugfix #276
 		// pascal: quotes
-		for (int i = 0; i < tokens.count(); i++)
+		for (int i = 0; i < tokens.size(); i++)
 		{
 			String token = tokens.get(i);
 			// START KGU#342 2017-01-08: Issue #343 We must also escape all internal quotes
@@ -1172,9 +1207,7 @@ public class Executor implements Runnable
 				"cos", "sin", "tan", "acos", "asin", "atan", "toRadians", "toDegrees",
 				"abs", "round", "min", "max", "ceil", "floor", "exp", "log", "sqrt", "pow"
 				};
-		StringList fn = new StringList();
-		fn.add("DUMMY");
-		fn.add("(");
+		TokenList fn = new TokenList("DUMMY(");
 		for (int f = 0; f < mathFunctions.length; f++)
 		{
 			int pos = 0;
@@ -1184,7 +1217,7 @@ public class Executor implements Runnable
 				tokens.set(pos, "Math." + mathFunctions[f]);
 			}
 		}
-		s = tokens.concatenate();
+		//String s = tokens.getString();
 		// END KGU#128 2016-01-07
 
 		// pascal notation to access a character inside a string
@@ -1197,9 +1230,10 @@ public class Executor implements Runnable
 		//s = RPLC_DELETE_PROC.replaceAll(s);
 		//s = RPLC_INSERT_PROC.replaceAll(s);
 		// pascal: delete
-		s = DELETE_PROC_MATCHER.reset(s).replaceAll(DELETE_PROC_SUBST);
+		//s = DELETE_PROC_MATCHER.reset(s).replaceAll(DELETE_PROC_SUBST);
 		// pascal: insert
-		s = INSERT_PROC_MATCHER.reset(s).replaceAll(INSERT_PROC_SUBST);
+		//s = INSERT_PROC_MATCHER.reset(s).replaceAll(INSERT_PROC_SUBST);
+		tokens = Element.transform_insert_delete(tokens);
 		// END KGU#575 2018-09-17
 		// START KGU#285 2016-10-16: Bugfix #276 - this spoiled apostrophes because misplaced here
 //		// pascal: quotes
@@ -1213,41 +1247,226 @@ public class Executor implements Runnable
 		//s = RPLC_INC1_PROC.replaceAll(s);
 		//s = RPLC_DEC2_PROC.replaceAll(s);
 		//s = RPLC_DEC1_PROC.replaceAll(s);
-		s = Element.transform_inc_dec(s);
+		//s = Element.transform_inc_dec(s);
+		tokens = Element.transform_inc_dec(tokens);
 		// END KGU 2015-11-29
 		
 		// START KGU 2017-04-22: now done above in the string token conversion
 		//s = s.replace("''", "'");	// (KGU 2015-11-29): Looks like an unwanted relic!
 		// END KGU 2017-04-22
 		// pascal: randomize
-		s = s.replace("randomize()", "randomize");
-		s = s.replace("randomize", "randomize()");
+		//s = s.replace("randomize()", "randomize");
+		//s = s.replace("randomize", "randomize()");
+		int posRand = -1;
+		while ((posRand = tokens.indexOf("randomize", posRand + 1, false)) >= 0) {
+			if (posRand > tokens.size() - 3 || !tokens.get(posRand+1).equals("(")) {
+				tokens.add(posRand, "()");
+				posRand += 2;
+			}
+		}
 
 		// clean up ... if needed
-		s = s.replace("Math.Math.", "Math.");
+		//s = s.replace("Math.Math.", "Math.");
+		tokens.replaceAll(MATH_MATH_TOKENS, MATH_TOKENS, true);
 
 		if (convertComparisons)
 		{
 			// This should only be applied to an expression in s, not to an entire instruction line!
 			// KGU#490 / bugfix #503: this is now to be ensured by the caller of convert()
-			s = convertStringComparison(s);
+			tokens = convertStringComparison(tokens);
 		}
 
 		// System.out.println(s);
-		return s;
+		return tokens;
 	}
 	
 	// START KGU#57 2015-11-07
 	private String convertStringComparison(String str)
 	{
+//		// Is there any equality test at all?
+//		// START KGU#76 2016-04-25: Issue #30 - convert all string comparisons
+//		//if (str.indexOf(" == ") >= 0 || str.indexOf(" != ") >= 0)
+//		String[] compOps = {"==", "!=", "<=", ">=", "<", ">"};
+//		boolean containsComparison = false;
+//		for (int op = 0; !containsComparison && op < compOps.length; op++)
+//		{
+//			containsComparison = str.indexOf(compOps[op]) >= 0;
+//		}
+//		if (containsComparison)
+//		// END KGU#76 2016-04-25
+//		{
+//			// START KGU#612 2018-12-12: Bugfix #642 - operator symbols weren't reliably detected
+//			//// We are looking for || operators and split the expression by them (if present)
+//			//// START KGU#490 2018-02-07: Bugfix #503 - the regex precaution was wrong here
+//			////StringList exprs = StringList.explodeWithDelimiter(str, " \\|\\| ");
+//			//StringList exprs = StringList.explodeWithDelimiter(str, " || ");
+//			//// END KGU#490 2018-02-07
+//			//// Now we do the same with && operators
+//			//exprs = StringList.explodeWithDelimiter(exprs, " && ");
+//			TokenList allTokens = new TokenList(str, true);
+//			StringList exprs = new StringList();
+//			int lastI = 0;
+//			for (int i = 0; i < allTokens.size(); i++) {
+//				String token = allTokens.get(i);
+//				if (token.equals("||") || token.equals("&&")) {
+//					exprs.add(allTokens.subSequence(lastI, i).getString());
+//					exprs.add(token);
+//					lastI = i+1;
+//				}
+//			}
+//			exprs.add(allTokens.subSequenceToEnd(lastI).getString());
+//			// END KGU#612 2018-12-12
+//			// Now we should have some "atomic" assertions, among them comparisons
+//			boolean replaced = false;
+//			for (int i = 0; i < exprs.count(); i++)
+//			{
+//				// START KGU#76 2016-04-25: Issue #30 - convert all string comparisons
+//				//String[] eqOps = {"==", "!="};
+//				//for (int op = 0; op < eqOps.length; op++)
+//				TokenList tokens = new TokenList(exprs.get(i).trim(), true);
+//				for (int op = 0; op < compOps.length; op++)
+//				// END KGU#76 2016-04-25
+//				{
+//					// START KGU#76 2016-04-25: Issue #30
+//					//Regex r = null;
+//					// We can no longer expect operators to be padded, better use tokens
+//					//if (!s.equals(" " + eqOps[op] + " ") && s.indexOf(eqOps[op]) >= 0)
+//					int opPos = -1;		// Operator position
+//					if ((opPos = tokens.indexOf(compOps[op])) >= 0)
+//					{
+//						String leftParenth = "";
+//						String rightParenth = "";
+//						// Get the left operand expression
+//						// START KGU#76 2016-04-25: Issue #30
+//						//r = new Regex("(.*)"+eqOps[op]+"(.*)", "$1");
+//						//String left = r.replaceAll(s).trim();	// All? Really? What's the result supposed to be then?
+//						String left = tokens.subSequence(0, opPos).getString().trim();
+//						// END KGU#76 2016-04-25
+//						// Re-balance parentheses
+//						while (BString.countChar(left, '(') > BString.countChar(left, ')') &&
+//								left.startsWith("("))
+//						{
+//							leftParenth = leftParenth + "(";
+//							left = left.substring(1).trim();
+//						}
+//						// Get the right operand expression
+//						// START KGU#76 2016-04-25: Issue #30
+//						//r = new Regex("(.*)"+eqOps[op]+"(.*)", "$2");
+//						//String right = r.replaceAll(s).trim();
+//						String right = tokens.subSequenceToEnd(opPos+1).getString().trim();
+//						// END KGU#76 2016-04-25
+//						// Re-balance parentheses
+//						while (BString.countChar(right, ')') > BString.countChar(right, '(') &&
+//								right.endsWith(")"))
+//						{
+//							rightParenth = rightParenth + ")";
+//							right = right.substring(0, right.length()-1).trim();
+//						}
+//						// ---- thanks to autoboxing, we can always use the "equals" method
+//						// ---- to compare things ...
+//						// addendum: sorry, doesn't always work.
+//						try
+//						{
+//							int pos = -1;	// some character position
+//							Object leftO = this.evaluateExpression(left, false, false);
+//							Object rightO = this.evaluateExpression(right, false, false);
+//							String neg = (op > 0) ? "!" : "";
+//							// First the obvious case: two String expressions
+//							if ((leftO instanceof String) && (rightO instanceof String))
+//							{
+//								// START KGU#76 2016-04-25: Issue #30 support all string comparison
+//								//exprs.set(i, leftParenth + neg + left + ".equals(" + right + ")" + rightParenth);
+//								exprs.set(i, leftParenth + left + ".compareTo(" + right + ") "
+//										+ compOps[op] + " 0" + rightParenth);
+//								// END KGU#76 2016-04-25
+//								replaced = true;
+//							}
+//							// We must make single-char strings comparable with characters, since it
+//							// doesn't work automatically and several conversions have been performed 
+//							else if ((leftO instanceof String) && (rightO instanceof Character))
+//							{
+//								// START KGU#76 2016-04-25: Issue #30 support all string comparison
+//								//exprs.set(i, leftParenth + neg + left + ".equals(\"" + (Character)rightO + "\")" + rightParenth);
+//								// START KGU#342 2017-02-09: Bugfix #343 - be aware of characters to be escaped
+//								//exprs.set(i, leftParenth + left + ".compareTo(\"" + (Character)rightO + "\") " + compOps[op] + " 0" + rightParenth);
+//								exprs.set(i, leftParenth + left
+//										+ ".compareTo(\"" + this.literalFromChar((Character)rightO) + "\") "
+//										+ compOps[op] + " 0" + rightParenth);
+//								// END KGU#342 2017-02-09
+//								// END KGU#76 2016-04-25
+//								replaced = true;
+//							}
+//							else if ((leftO instanceof Character) && (rightO instanceof String))
+//							{
+//								// START KGU#76 2016-04-25: Issue #30 support all string comparison
+//								//exprs.set(i, leftParenth + neg + right + ".equals(\"" + (Character)leftO + "\")" + rightParenth);
+//								// START KGU#342 2017-02-09: Bugfix #343 - be aware of characters to be escaped
+//								//exprs.set(i, leftParenth + "\"" + (Character)leftO + "\".compareTo(" + right + ") " + compOps[op] + " 0" + rightParenth);
+//								exprs.set(i, leftParenth + "\"" + this.literalFromChar((Character)leftO)
+//										+ "\".compareTo(" + right + ") " + compOps[op] + " 0" + rightParenth);
+//								// END KGU#342 2017-02-09
+//								// END KGU#76 2016-04-25
+//								replaced = true;								
+//							}
+//							// START KGU#99 2015-12-10: Bugfix #49 (also replace if both operands are array elements (objects!)
+//							// START KGU#76 2016-04-25: Issue #30 - this makes only sense for "==" and "!="
+//							//else if ((pos = left.indexOf('[')) > -1 && left.indexOf(']', pos) > -1 && 
+//							else if (op < 2 &&
+//									(pos = left.indexOf('[')) > -1 && left.indexOf(']', pos) > -1 && 
+//							// END KGU#76 2016-04-25
+//									(pos = right.indexOf('[')) > -1 && right.indexOf(']', pos) > -1)
+//							{
+//								exprs.set(i, leftParenth + neg + left + ".equals(" + right + ")" + rightParenth);
+//								replaced = true;								
+//							}
+//							// END KGU#99 2015-12-10
+//						}
+//						catch (EvalError ex)
+//						{
+//							// START KGU#1024 2022-01-05: Upgrade bsh-2.0b6.jar to bsh-2.1.0.jar
+//							//logger.log(Level.WARNING, "convertStringComparison(\"{0}\"): {1}", new Object[]{str, ex.getMessage()});
+//							// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+//							//String msg = ex.getRawMessage();
+//							//int pilcrowPos = -1;
+//							//if ((pilcrowPos = msg.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+//							//	msg = msg.substring(0, pilcrowPos);
+//							//}
+//							String msg = getEvalErrorMessage(ex);
+//							// END KGU#1058 2022-09-29
+//							logger.log(Level.WARNING, "convertStringComparison(\"{0}\"): {1}", new Object[]{str, msg});
+//							// END KGU#1024 2022-01-05
+//						}
+//						catch (Exception ex)
+//						{
+//							logger.log(Level.WARNING, "convertStringComparison(\"{0}\"): {1}", new Object[]{str, ex.getMessage()});
+//						}
+//					} // if (!s.equals(" " + eqOps[op] + " ") && (s.indexOf(eqOps[op]) >= 0))
+//				} // for (int op = 0; op < eqOps.length; op++)
+//				if (replaced)
+//				{
+//					// START KGU#490 2018-02-07: Bugfix #503 - the regex escaping was wrong (see above)
+//					//// Compose the partial expressions and undo the regex escaping for the initial split
+//					//str = exprs.getLongString().replace(" \\|\\| ", " || ");
+//					str = exprs.getLongString();
+//					// END KGU#490 2018-02-07
+//					str.replace("  ", " ");	// Get rid of multiple spaces
+//				}
+//			}
+//		}
+//		return str;
+		return convertStringComparison(new TokenList(str)).getString();
+	}
+	
+	private TokenList convertStringComparison(TokenList allTokens)
+	{
 		// Is there any equality test at all?
 		// START KGU#76 2016-04-25: Issue #30 - convert all string comparisons
 		//if (str.indexOf(" == ") >= 0 || str.indexOf(" != ") >= 0)
-		String[] compOps = {"==", "!=", "<=", ">=", "<", ">"};
+		final String[] compOps = {"==", "!=", "<=", ">=", "<", ">"};
 		boolean containsComparison = false;
 		for (int op = 0; !containsComparison && op < compOps.length; op++)
 		{
-			containsComparison = str.indexOf(compOps[op]) >= 0;
+			containsComparison = allTokens.indexOf(compOps[op]) >= 0;
 		}
 		if (containsComparison)
 		// END KGU#76 2016-04-25
@@ -1260,28 +1479,26 @@ public class Executor implements Runnable
 			//// END KGU#490 2018-02-07
 			//// Now we do the same with && operators
 			//exprs = StringList.explodeWithDelimiter(exprs, " && ");
-			StringList allTokens = Syntax.splitLexically(str, true);
-			StringList exprs = new StringList();
+			ArrayList<TokenList> exprs = new ArrayList<TokenList>();
 			int lastI = 0;
-			for (int i = 0; i < allTokens.count(); i++) {
+			for (int i = 0; i < allTokens.size(); i++) {
 				String token = allTokens.get(i);
 				if (token.equals("||") || token.equals("&&")) {
-					exprs.add(allTokens.subSequence(lastI, i).concatenate());
-					exprs.add(token);
+					exprs.add(allTokens.subSequence(lastI, i));
+					exprs.add(new TokenList(token));
 					lastI = i+1;
 				}
 			}
-			exprs.add(allTokens.subSequence(lastI, allTokens.count()).concatenate());
+			exprs.add(allTokens.subSequenceToEnd(lastI));
 			// END KGU#612 2018-12-12
 			// Now we should have some "atomic" assertions, among them comparisons
 			boolean replaced = false;
-			for (int i = 0; i < exprs.count(); i++)
+			for (int i = 0; i < exprs.size(); i++)
 			{
-				String s = exprs.get(i);
 				// START KGU#76 2016-04-25: Issue #30 - convert all string comparisons
 				//String[] eqOps = {"==", "!="};
 				//for (int op = 0; op < eqOps.length; op++)
-				StringList tokens = Syntax.splitLexically(s.trim(), true);
+				TokenList tokens = exprs.get(i);
 				for (int op = 0; op < compOps.length; op++)
 				// END KGU#76 2016-04-25
 				{
@@ -1298,34 +1515,43 @@ public class Executor implements Runnable
 						// START KGU#76 2016-04-25: Issue #30
 						//r = new Regex("(.*)"+eqOps[op]+"(.*)", "$1");
 						//String left = r.replaceAll(s).trim();	// All? Really? What's the result supposed to be then?
-						String left = tokens.concatenate("", 0, opPos).trim();
+						TokenList left = tokens.subSequence(0, opPos);
 						// END KGU#76 2016-04-25
 						// Re-balance parentheses
-						while (BString.countChar(left, '(') > BString.countChar(left, ')') &&
-								left.startsWith("("))
+						int nPars0 = left.count("(");
+						int nPars1 = left.count(")");
+						while (nPars0 > nPars1 &&
+								left.get(0).equals("("))
 						{
 							leftParenth = leftParenth + "(";
-							left = left.substring(1).trim();
+							left.remove(0);
+							nPars0--;
 						}
+						left.trim();
 						// Get the right operand expression
 						// START KGU#76 2016-04-25: Issue #30
 						//r = new Regex("(.*)"+eqOps[op]+"(.*)", "$2");
 						//String right = r.replaceAll(s).trim();
-						String right = tokens.concatenate("", opPos+1).trim();
+						TokenList right = tokens.subSequenceToEnd(opPos+1);
 						// END KGU#76 2016-04-25
 						// Re-balance parentheses
-						while (BString.countChar(right, ')') > BString.countChar(right, '(') &&
-								right.endsWith(")"))
+						nPars0 = right.count("(");
+						nPars1 = right.count(")");
+						while (nPars1 > nPars0 &&
+								right.getLast().equals(")"))
 						{
 							rightParenth = rightParenth + ")";
-							right = right.substring(0, right.length()-1).trim();
+							right.remove(right.size() - 1);
+							nPars1--;
 						}
+						right.trim();
 						// ---- thanks to autoboxing, we can always use the "equals" method
 						// ---- to compare things ...
 						// addendum: sorry, doesn't always work.
 						try
 						{
 							int pos = -1;	// some character position
+							// FIXME: Beware of side effects!
 							Object leftO = this.evaluateExpression(left, false, false);
 							Object rightO = this.evaluateExpression(right, false, false);
 							String neg = (op > 0) ? "!" : "";
@@ -1334,8 +1560,12 @@ public class Executor implements Runnable
 							{
 								// START KGU#76 2016-04-25: Issue #30 support all string comparison
 								//exprs.set(i, leftParenth + neg + left + ".equals(" + right + ")" + rightParenth);
-								exprs.set(i, leftParenth + left + ".compareTo(" + right + ") "
-										+ compOps[op] + " 0" + rightParenth);
+								TokenList subst = new TokenList(leftParenth);
+								subst.addAll(left);
+								subst.add(".compareTo(");
+								subst.addAll(right);
+								subst.add(") " + compOps[op] + " 0" + rightParenth);
+								exprs.set(i, subst);
 								// END KGU#76 2016-04-25
 								replaced = true;
 							}
@@ -1347,9 +1577,14 @@ public class Executor implements Runnable
 								//exprs.set(i, leftParenth + neg + left + ".equals(\"" + (Character)rightO + "\")" + rightParenth);
 								// START KGU#342 2017-02-09: Bugfix #343 - be aware of characters to be escaped
 								//exprs.set(i, leftParenth + left + ".compareTo(\"" + (Character)rightO + "\") " + compOps[op] + " 0" + rightParenth);
-								exprs.set(i, leftParenth + left
-										+ ".compareTo(\"" + this.literalFromChar((Character)rightO) + "\") "
-										+ compOps[op] + " 0" + rightParenth);
+								//exprs.set(i, leftParenth + left
+								//		+ ".compareTo(\"" + this.literalFromChar((Character)rightO) + "\") "
+								//		+ compOps[op] + " 0" + rightParenth);
+								TokenList subst = new TokenList(leftParenth);
+								subst.addAll(left);
+								subst.add(".compareTo(\"" + this.literalFromChar((Character)rightO) + "\") ");
+								subst.add(compOps[op] + " 0" + rightParenth);
+								exprs.set(i, subst);
 								// END KGU#342 2017-02-09
 								// END KGU#76 2016-04-25
 								replaced = true;
@@ -1360,22 +1595,33 @@ public class Executor implements Runnable
 								//exprs.set(i, leftParenth + neg + right + ".equals(\"" + (Character)leftO + "\")" + rightParenth);
 								// START KGU#342 2017-02-09: Bugfix #343 - be aware of characters to be escaped
 								//exprs.set(i, leftParenth + "\"" + (Character)leftO + "\".compareTo(" + right + ") " + compOps[op] + " 0" + rightParenth);
-								exprs.set(i, leftParenth + "\"" + this.literalFromChar((Character)leftO)
-										+ "\".compareTo(" + right + ") " + compOps[op] + " 0" + rightParenth);
+								//exprs.set(i, leftParenth + "\"" + this.literalFromChar((Character)leftO)
+								//		+ "\".compareTo(" + right + ") " + compOps[op] + " 0" + rightParenth);
+								TokenList subst = new TokenList(leftParenth);
+								subst.add("\"" + this.literalFromChar((Character)leftO) + "\".compareTo(");
+								subst.addAll(right);
+								subst.add(") " + compOps[op] + " 0" + rightParenth);
+								exprs.set(i, subst);
 								// END KGU#342 2017-02-09
 								// END KGU#76 2016-04-25
-								replaced = true;								
+								replaced = true;
 							}
 							// START KGU#99 2015-12-10: Bugfix #49 (also replace if both operands are array elements (objects!)
 							// START KGU#76 2016-04-25: Issue #30 - this makes only sense for "==" and "!="
 							//else if ((pos = left.indexOf('[')) > -1 && left.indexOf(']', pos) > -1 && 
 							else if (op < 2 &&
-									(pos = left.indexOf('[')) > -1 && left.indexOf(']', pos) > -1 && 
+									(pos = left.indexOf("[")) >= 0 && left.indexOf("]", pos) >= 0 && 
 							// END KGU#76 2016-04-25
-									(pos = right.indexOf('[')) > -1 && right.indexOf(']', pos) > -1)
+									(pos = right.indexOf("[")) >= 0 && right.indexOf("]", pos) >= 0)
 							{
-								exprs.set(i, leftParenth + neg + left + ".equals(" + right + ")" + rightParenth);
-								replaced = true;								
+								//exprs.set(i, leftParenth + neg + left + ".equals(" + right + ")" + rightParenth);
+								TokenList subst = new TokenList(leftParenth + neg);
+								subst.addAll(left);
+								subst.add(".equals(");
+								subst.addAll(right);
+								subst.add(")"+rightParenth);
+								exprs.set(i, subst);
+								replaced = true;
 							}
 							// END KGU#99 2015-12-10
 						}
@@ -1391,27 +1637,30 @@ public class Executor implements Runnable
 							//}
 							String msg = getEvalErrorMessage(ex);
 							// END KGU#1058 2022-09-29
-							logger.log(Level.WARNING, "convertStringComparison(\"{0}\"): {1}", new Object[]{str, msg});
+							logger.log(Level.WARNING, "convertStringComparison(\"{0}\"): {1}", new Object[]{tokens.getString(), msg});
 							// END KGU#1024 2022-01-05
 						}
 						catch (Exception ex)
 						{
-							logger.log(Level.WARNING, "convertStringComparison(\"{0}\"): {1}", new Object[]{str, ex.getMessage()});
+							logger.log(Level.WARNING, "convertStringComparison(\"{0}\"): {1}", new Object[]{tokens.getString(), ex.getMessage()});
 						}
 					} // if (!s.equals(" " + eqOps[op] + " ") && (s.indexOf(eqOps[op]) >= 0))
 				} // for (int op = 0; op < eqOps.length; op++)
-				if (replaced)
-				{
-					// START KGU#490 2018-02-07: Bugfix #503 - the regex escaping was wrong (see above)
-					//// Compose the partial expressions and undo the regex escaping for the initial split
-					//str = exprs.getLongString().replace(" \\|\\| ", " || ");
-					str = exprs.getLongString();
-					// END KGU#490 2018-02-07
-					str.replace("  ", " ");	// Get rid of multiple spaces
-				}
+				//if (replaced)
+				//{
+				//	// START KGU#490 2018-02-07: Bugfix #503 - the regex escaping was wrong (see above)
+				//	//// Compose the partial expressions and undo the regex escaping for the initial split
+				//	//str = exprs.getLongString().replace(" \\|\\| ", " || ");
+				//	str = exprs.getLongString();
+				//	// END KGU#490 2018-02-07
+				//	str.replace("  ", " ");	// Get rid of multiple spaces
+				//}
+			} // for (int i = 0; i < exprs.size(); i++)
+			if (replaced) {
+				allTokens = TokenList.concatenate(exprs, null);
 			}
 		}
-		return str;
+		return allTokens;
 	}
 	// END KGU#57 2015-11-07
 	
@@ -1690,12 +1939,12 @@ public class Executor implements Runnable
 				// END KGU#375 2017-03-30
 				// START KGU#388 2017-09-18: Enh. #423 Track at least record types
 				if (type != null) {
-					StringList typeTokens = Syntax.splitLexically(type, true);
+					TokenList typeTokens = new TokenList(type, true);
 					typeTokens.removeAll(" ");
 					if (isConstant) {
 						typeTokens.remove(0);
 					}
-					if (typeTokens.count() == 1 && context.dynTypeMap.containsKey(
+					if (typeTokens.size() == 1 && context.dynTypeMap.containsKey(
 							":" + (type = typeTokens.get(0)))) {
 						context.dynTypeMap.put(in, context.dynTypeMap.get(":" + type));
 					}
@@ -3560,7 +3809,64 @@ public class Executor implements Runnable
 	// END KGU#910 2021-01-10
 	// START KGU#307 2016-12-12: Enh. #307 - check FOR loop variable manipulation
 	{
-		return setVar(target, content, context.forLoopVars.count()-1, displayNow);
+		return setVar(new TokenList(target), content, context.forLoopVars.count()-1, displayNow);
+	}
+	/**
+	 * Assigns the computed value {@code content} to the given variable extracted from the
+	 * lexically split "lvalue" {@code targetTokens}. Analyses and handles possibly given
+	 * extra information in order to register and declare the target variable or constant.<br/>
+	 * Also ensures that no loop variable manipulation is performed (the entire loop stack
+	 * is checked, so use {@link #setVar(TokenList, Object, int, boolean)} for a regular loop
+	 * variable update).<br/>
+	 * There are the following sensible cases w.r.t. {@code target} here (unquoted brackets
+	 * enclose optional parts):<br/>
+	 * a) {@code [const] <id>}<br/>
+	 * b) {@code <id>'['<expr>']'}<br/>
+	 * c) {@code [const] <typespec1> <id>}<br/>
+	 * d) {@code [const] <typespec1> <id>'['[<expr>]']'}  - implicit C-style array declaration (questionable)<br/>
+	 * e) {@code [const|var] <id> : <typespec2>}<br/>
+	 * f) {@code [const|dim] <id> as <typespec2>}<br/>
+	 * // g) {@code <id>(.<id>['['<expr>']'])+} - one variant of i)<br/> 
+	 * // h) {@code <id>'['<expr>']'(.<id>)+} - another variant of i)<br/>
+	 * i) {@code <id>('['<expr>']'|.<id>)*}<br/>
+	 * j) {@code <id>(.<id>)*('['']')* <id>} - Java [array] declaration<br/>
+	 * ILLEGAL (NOT supported here):<br/>
+	 * w) {@code const <id>'['<expr>']'} - single elements can't be const<br/>
+	 * x) {@code [const] <id>'['']'}  - C-style array declaration: redundant if array value is assigned, wrong otherwise<br/>
+	 * y) {@code <id>'['<expr>']'('['<expr>']')}+<br/>
+	 * Meta symbol legend (as far as not obvious):<br/>
+	 * {@code <typespec1> ::=}<br/>
+	 * &nbsp;&nbsp;&nbsp;&nbsp;<code>{modifier} &lt;typeid&gt; |</code><br/>
+	 * &nbsp;&nbsp;&nbsp;&nbsp;<code>{modifier} &lt;typeid&gt; ('['']')+</code> - Java-style array type (questionable)<br/>
+	 * {@code <typespec2> ::=}<br/>
+	 * &nbsp;&nbsp;&nbsp;&nbsp;{@code <typeid> |}<br/>
+	 * &nbsp;&nbsp;&nbsp;&nbsp;{@code array ['['<range>']'] of <typespec>}<br/>
+	 * {@code <range> ::= <id> | <intliteral> .. <intliteral>}<br/>
+	 * <b>Note</b>: setVar definitively not copes with complicated mixes of C and Java array declarations
+	 * like {@code <typeid>'['[<expr>(,<expr>)*]']' <id> '['[<expr>(,<expr>)*]']'}, but these cases
+	 * should now already have been addressed by tryAssignment().
+	 * 
+	 * @param targetTokens - a tokenized assignment lvalue, may contain modifiers, type info
+	 *     and access specifiers
+	 * @param content - the value to be assigned
+	 * @param displayNow - if {@ true} then a variable display update will immediately be
+	 *                     forced, otherwise it will be postponed (e.g. to gather more
+	 *                     anticipated changes)
+	 * @return base name of the assigned variable (or constant)
+	 * 
+	 * @throws EvalError if the {@code target} or the {@code content} is inappropriate or if both aren't compatible
+	 * or if a loop variable violation is detected.
+	 * 
+	 * @see #setVarRaw(String, Object)
+	 * @see #setVar(String, Object, int, boolean) 
+	 */
+	// START KGU#910 2021-01-10: Bugfix #909 In certain cases we must postpone the variable display
+	//private String setVar(String target, Object content) throws EvalError
+	private String setVar(TokenList targetTokens, Object content, boolean displayNow) throws EvalError
+	// END KGU#910 2021-01-10
+	// START KGU#307 2016-12-12: Enh. #307 - check FOR loop variable manipulation
+	{
+		return setVar(targetTokens, content, context.forLoopVars.count()-1, displayNow);
 	}
 
 	/**
@@ -3584,45 +3890,76 @@ public class Executor implements Runnable
 	@SuppressWarnings("unchecked")
 	// START KGU#910 2021-01-10: Bugfix #909 - we must be able to postpone the display
 	//private String setVar(String target, Object content, int ignoreLoopStackLevel) throws EvalError
-	private String setVar(String target, Object content, int ignoreLoopStackLevel, boolean displayNow) throws EvalError
+	private String setVar(String target, Object content, int ignoreLoopStackLevel, boolean displayNow)
+			throws EvalError
 	// END KGU#910 2021-01-10
 	// END KGU#307 2016-12-12
 	{
+		return setVar(new TokenList(target, true), content, ignoreLoopStackLevel, displayNow);
+	}
+	/**
+	 * Assigns the computed value {@code content} to the given variable extracted from the
+	 * "lvalue" {@code targetTokens}. Analyses and handles possibly given extra information
+	 * in order to register and declare the target variable or constant.<br/>
+	 * Also ensures that no loop variable manipulation is performed.
+	 * 
+	 * @param targetTokens - a tokenized assignment lvalue, may contain modifiers, type info
+	 *     and access specifiers
+	 * @param content - the value to be assigned
+	 * @param ignoreLoopStackLevel - the loop nesting level beyond which loop variables aren't
+	 *     critical.
+	 * @param displayNow - use {@code false} to postpone the display of all variables
+	 * @return base name of the assigned variable (or constant)
+	 * 
+	 * @throws EvalError if the {@code target} or the {@code content} is inappropriate or if both don't
+	 *    match or if a loop variable violation is detected.
+	 * 
+	 * @see #setVarRaw(String, Object)
+	 * @see #setVar(String, Object, boolean)
+	 */
+	@SuppressWarnings("unchecked")
+	// START KGU#910 2021-01-10: Bugfix #909 - we must be able to postpone the display
+	//private String setVar(String target, Object content, int ignoreLoopStackLevel) throws EvalError
+	private String setVar(TokenList targetTokens, Object content, int ignoreLoopStackLevel,
+			boolean displayNow) throws EvalError
+	// END KGU#910 2021-01-10
+	// END KGU#307 2016-12-12
+	{
+		String target = targetTokens.getString();
 		// START KGU#375 2017-03-30: Enh. #388 - Perform a clear case analysis instead of some heuristic poking
 		// We refer to the cases listed in the javadoc of method setVar(target, content).
 		boolean isConstant = false;
-		StringList typeDescr = null;
+		TokenList typeDescr = null;
 		String indexStr = null;
 
 		// ======== PHASE 1: Analysis of the target structure ===========
 
-		StringList tokens = Syntax.splitLexically(target, true, true);
-		int nTokens = tokens.count();
-		String token0 = tokens.get(0).toLowerCase();
+		int nTokens = targetTokens.size();
+		String token0 = targetTokens.get(0).toLowerCase();
 		String token1;
 		StringList accessPath = null;	// Qualifier path (for the case of record access)
 		boolean isDecl = false;
 		if ((isConstant = token0.equals("const")) || token0.equals("var") || token0.equals("dim")) {
 			// a), c), d), e), f) ?
-			tokens.remove(0);	// get rid of the modifier
+			targetTokens.remove(0);	// get rid of the modifier
 			nTokens--;
 			// Extract type information
-			int posColon = tokens.indexOf(":");
-			if (posColon < 0 && !token0.equals("var")) posColon = tokens.indexOf("as", false);
+			int posColon = targetTokens.indexOf(":");
+			if (posColon < 0 && !token0.equals("var")) posColon = targetTokens.indexOf("as", false);
 			if (posColon >= 0) {
 				isDecl = true;
-				typeDescr = tokens.subSequence(posColon+1, nTokens);
-				tokens = tokens.subSequence(0, posColon);
-				nTokens = tokens.count();
+				typeDescr = targetTokens.subSequence(posColon+1, nTokens);
+				targetTokens = targetTokens.subSequence(0, posColon);
+				nTokens = targetTokens.size();
 				/* In case of an explicit and Pascal- or BASIC-style variable declaration
 				 * the target must be an unqualified identifier
 				 */
-				if (tokens.contains(".")) {
+				if (targetTokens.contains(".")) {
 					throw new EvalError(control.msgConstantRecordComponent.getText()
 							.replace("%", target), null, null);
 	// <=======================================================
 				}
-				if (tokens.contains("[")) {
+				if (targetTokens.contains("[")) {
 					throw new EvalError(control.msgConstantArrayElement.getText()
 							.replace("%", target), null, null);
 	// <=======================================================
@@ -3634,7 +3971,7 @@ public class Executor implements Runnable
 						.replace("%", token0), null, null);
 	// <=======================================================
 			}
-			target = tokens.get(nTokens-1);
+			target = targetTokens.get(nTokens-1);
 			// START KGU#388 2017-09-18: Enh. #423 - Register the declared type
 			associateType(target, typeDescr);	// NOP if typeDescr == null
 			// END KGU#388 2017-09-18
@@ -3716,7 +4053,7 @@ public class Executor implements Runnable
 //			// END KGU#388 2017-09-18
 //			target = tokens.get(nTokens-1);
 //		}
-		if (!isDecl && (Syntax.isIdentifier(token0 = tokens.get(0), false, null))) {
+		if (!isDecl && (Syntax.isIdentifier(token0 = targetTokens.get(0), false, null))) {
 			/* Now it must be some C or Java declaration or just a plain variable
 			 * (possibly indexed or qualified or both).
 			 * A Java type may be qualified itself (package + member class).
@@ -3742,8 +4079,8 @@ public class Executor implements Runnable
 			 */
 			int posDot = 1;
 			String token2 = "";
-			while (posDot+1 < nTokens && tokens.get(posDot).equals(".")
-					&& Syntax.isIdentifier(token2 = tokens.get(posDot+1), false, null)) {
+			while (posDot+1 < nTokens && targetTokens.get(posDot).equals(".")
+					&& Syntax.isIdentifier(token2 = targetTokens.get(posDot+1), false, null)) {
 				// START KGU#1008 2021-11-01: Bugfx #1013 trouble with case c)
 				mayBeUnknownType = false;
 				// END KGU#1008 2021-11-01
@@ -3754,7 +4091,7 @@ public class Executor implements Runnable
 				}
 				else {
 					try {
-						Class.forName(tokens.concatenate("", 0, posDot));
+						Class.forName(targetTokens.subSequence(0, posDot).getString().trim());
 						isJavaType = true;
 					} catch (ClassNotFoundException exc) {
 						isJavaType = false;
@@ -3773,7 +4110,7 @@ public class Executor implements Runnable
 			if ((declType != null || isJavaType || isStandardType || mayBeUnknownType)
 					&& posDot < nTokens
 			// END KGU#1008 2021-11-01
-					&& Syntax.isIdentifier(token1 = tokens.get(posDot), false, "")) {
+					&& Syntax.isIdentifier(token1 = targetTokens.get(posDot), false, "")) {
 				/* it is a either a non-array Java declaration or a C declaration
 				 * with a possible array specification still to come
 				 * i.e. cases b) or d)
@@ -3781,16 +4118,16 @@ public class Executor implements Runnable
 				isDecl = true;
 				accessPath.clear();
 				target = token1;	// Now the target is the declared identifier
-				typeDescr = tokens.subSequence(0, posDot);
+				typeDescr = targetTokens.subSequence(0, posDot);
 				// Only index ranges may follow, which would make it a C declaration
 				if (++posDot < nTokens) {
 					// A Java declaration should end here
 					boolean atPosDot = false;
-					if ((atPosDot = !tokens.get(posDot).equals("["))
-							|| !tokens.get(nTokens-1).equals("]")) {
-						tokens.insert("►", atPosDot ? posDot : nTokens-1);
+					if ((atPosDot = !targetTokens.get(posDot).equals("["))
+							|| !targetTokens.get(nTokens-1).equals("]")) {
+						targetTokens.add(atPosDot ? posDot : nTokens-1, "►");
 						throw new EvalError(control.msgInvalidExpr.getText()
-								.replace("%1", tokens.concatenate(null)), null, null);
+								.replace("%1", targetTokens.getString()), null, null);
 	// <================================================================
 					}
 					/* It is a C array declaration.
@@ -3799,9 +4136,9 @@ public class Executor implements Runnable
 					 * we may only check whether the dimensions are okay.
 					 * The following check may throw an EvalError
 					 */
-					checkDimensionsC(target, typeDescr, tokens.subSequence(posDot+1, nTokens), content);
+					checkDimensionsC(target, typeDescr, targetTokens.subSequence(posDot+1, nTokens), content);
 	// <= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-					typeDescr.add(tokens.subSequence(posDot, nTokens));
+					typeDescr.add(targetTokens.subSequence(posDot, nTokens).getString());
 				}
 				associateType(target, typeDescr);
 				// We are done with cases b), d). isDecl will prevent further parsing
@@ -3809,14 +4146,14 @@ public class Executor implements Runnable
 			// START KGU#1060 2022-08-21: Bugfix #1068 unwrapping of types was incorrect
 			String typeStr = null;
 			// END KGU#1060 2022-08-21
-			while (!isDecl && posDot+1 < nTokens && ".[".contains(token1 = tokens.get(posDot))) {
+			while (!isDecl && posDot+1 < nTokens && ".[".contains(token1 = targetTokens.get(posDot))) {
 				// Now it is either an access path or still a Java declaration
 				if (token1.equals("[")) {
 					/* It cannot be a C array initialisation, otherwise a type
 					 * specification AND an id (possibly with non-empty brackets)
 					 * should have preceded - but then we would not have come here!
 					 */
-					if (tokens.get(posDot+1).equals("]")) {
+					if (targetTokens.get(posDot+1).equals("]")) {
 						/* This must be a Java array declaration: a (new!?)
 						 * identifier must follow, possibly after further bracket
 						 * pairs.
@@ -3831,22 +4168,22 @@ public class Executor implements Runnable
 						if ((isJavaType || declType != null || mayBeUnknownType) /*&& !isVariable*/) {
 						// END KGU#1008 2021-11-01
 							// check for what is coming
-							typeDescr = tokens.subSequence(0, posDot);
+							typeDescr = targetTokens.subSequence(0, posDot);
 							/* The following "dimension counting" routine
 							 * may throw an EvalError if syntax is corrupted,
 							 * otherwise assigns the type and returns the
 							 * variable name
 							 */
-							target = getJavaDimensions(tokens.subSequence(posDot, nTokens), typeDescr);
+							target = getJavaDimensions(targetTokens.subSequence(posDot, nTokens), typeDescr);
 	// <= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 							isDecl = true;
 							accessPath.clear();
 							// We are done here with case j)
 							break;
 						}
-						tokens.insert("►", 0);
+						targetTokens.add(0, "►");
 						throw new EvalError(control.msgInvalidExpr.getText()
-								.replace("%1", tokens.concatenate(null)), null, null);
+								.replace("%1", targetTokens.getString()), null, null);
 					}
 					// Okay, some index expression is expected, no Java or C declaration
 					else if (targetType == null || targetType.isArray() || isVariable
@@ -3854,17 +4191,17 @@ public class Executor implements Runnable
 							|| typeStr != null && typeStr.startsWith("@")) {
 						// END KGU#1060 2022-08-21
 						// Variable may not exist. For a simple path we can create it.
-						StringList indexExprs = Element.splitExpressionList(
-								tokens.subSequence(posDot + 1, nTokens), ",", true);
-						int nExprs = indexExprs.count()-1;
+						ArrayList<TokenList> indexExprs = Syntax.splitExpressionList(
+								targetTokens.subSequence(posDot + 1, nTokens), ",");
+						int nExprs = indexExprs.size()-1;
 						
 						if (!indexExprs.get(nExprs).startsWith("]")) {
-							tokens.remove(posDot +1, nTokens);
-							tokens.add(indexExprs.subSequence(0, nExprs).concatenate(","));
-							tokens.add("►");
-							tokens.add(indexExprs.get(nExprs));
+							targetTokens.remove(posDot +1, nTokens);
+							targetTokens.addAll(TokenList.concatenate(indexExprs.subList(0, nExprs), ","));
+							targetTokens.add("►");
+							targetTokens.addAll(indexExprs.get(nExprs));
 							throw new EvalError(control.msgInvalidExpr.getText()
-									.replace("%", tokens.concatenate(null)), null, null);
+									.replace("%", targetTokens.getString()), null, null);
 						}
 						// Try to determine the array element type
 						// START KGU#1060 2022-08-21: Bugfix #1068 unwrapping of types was incorrect
@@ -3873,18 +4210,18 @@ public class Executor implements Runnable
 						if (targetType != null && targetType.isArray()) {
 							typeStr = targetType.getCanonicalType(true, false);
 						}
-						tokens.remove(posDot, nTokens);
+						targetTokens.remove(posDot, nTokens);
 						// Decompose a multiple index, retain the last index expression
 						for (int i = 0; i < nExprs; i++) {
-							indexStr = this.convertStringComparison(indexExprs.get(i));
+							indexStr = this.convertStringComparison(indexExprs.get(i).getString());
 							if (typeStr != null) {
 								if (!typeStr.startsWith("@")) {
-									tokens.add("► [");
-									tokens.add(indexExprs.subSequence(i, nExprs).concatenate("]["));
+									targetTokens.add("► [");
+									targetTokens.addAll(TokenList.concatenate(indexExprs.subList(i, nExprs), "]["));
 									//tokens.add("]"); // Is part of indexExprs.get(nExprs)
-									tokens.add(indexExprs.get(nExprs));
+									targetTokens.addAll(indexExprs.get(nExprs));
 									throw new EvalError(control.msgInvalidArrayAccess.getText()
-											.replace("%1", tokens.concatenate(null)).replace("%2", typeStr),
+											.replace("%1", targetTokens.getString()).replace("%2", typeStr),
 											null, null);
 	// <================================================
 								}
@@ -3898,7 +4235,7 @@ public class Executor implements Runnable
 							if (index != null && index instanceof Integer) {
 								if ((int)index < 0) {
 									throw new EvalError(control.msgIndexOutOfBounds.getText()
-											.replace("%3", tokens.concatenate(null))
+											.replace("%3", targetTokens.getString())
 											.replace("%1", indexStr)
 											.replace("%2", String.valueOf(index)),
 											null, null);
@@ -3907,32 +4244,32 @@ public class Executor implements Runnable
 								indexStr = Integer.toString((int)index);
 							}
 							else {
-								tokens.add("[ ►");
-								tokens.add(indexStr);
-								tokens.add("]...");
+								targetTokens.add("[ ►");
+								targetTokens.add(indexStr);
+								targetTokens.add("]...");
 								throw new EvalError(control.msgInvalidExpr.getText()
-										.replace("%1", tokens.concatenate(null)),
+										.replace("%1", targetTokens.getString()),
 										null, null);
 	// <=============================================
 							}
 							// For the access path a prefix character is sufficient
 							accessPath.add("[" + indexStr);
 							// For the token agglomeration, a full index expression is necessary
-							tokens.add("[");
-							tokens.add(indexStr);
-							tokens.add("]");
+							targetTokens.add("[");
+							targetTokens.add(indexStr);
+							targetTokens.add("]");
 							posDot += 3;
 						}
 						//target = tokens.concatenate(null);
-						tokens.add(Syntax.splitLexically(indexExprs.get(nExprs), true));
-						tokens.remove(posDot);	// drop the leading "]"
-						nTokens = tokens.count();
+						targetTokens.addAll(indexExprs.get(nExprs));
+						targetTokens.remove(posDot);	// drop the leading "]"
+						nTokens = targetTokens.size();
 					}
 					// START KGU#1008 2021-11-01: Bugfix #1013: Avoid an eternal loop here!
 					else {
-						tokens.insert("►", posDot);
+						targetTokens.add(posDot, "►");
 						throw new EvalError(control.msgInvalidArrayAccess.getText()
-								.replace("%1", tokens.concatenate(null))
+								.replace("%1", targetTokens.getString())
 								.replace("%2", "???"),
 								null, null);
 // <========================================
@@ -3942,7 +4279,7 @@ public class Executor implements Runnable
 				/* Because of the prerequisites only a "." is to be expected,
 				 * but at least one index access must have been in the path
 				 */
-				else if (Syntax.isIdentifier(token2 = tokens.get(posDot + 1), false, null)) {
+				else if (Syntax.isIdentifier(token2 = targetTokens.get(posDot + 1), false, null)) {
 					// Record component access again
 					if (targetType != null && targetType.isRecord()) {
 						targetType = targetType.getComponentInfo(false).get(token2);
@@ -3952,9 +4289,9 @@ public class Executor implements Runnable
 				}
 				else {
 					// Something defective
-					tokens.insert("►", posDot + 1);
+					targetTokens.add(posDot+1, "►");
 					throw new EvalError(control.msgInvalidExpr.getText()
-							.replace("%", tokens.concatenate(null)), null, null);
+							.replace("%", targetTokens.getString()), null, null);
 	// <================================================================
 				}
 			}
@@ -3964,7 +4301,7 @@ public class Executor implements Runnable
 		else if (!isDecl) {
 			// Certainly a syntax error
 			throw new EvalError(control.msgInvalidExpr.getText()
-					.replace("%", "►" + tokens.get(0)), null, null);
+					.replace("%", "►" + targetTokens.get(0)), null, null);
 		}
 		// END KGU#922 2021-01-31
 		
@@ -4491,8 +4828,8 @@ public class Executor implements Runnable
 	 * @throws EvalError if there is an obvious incompatibility (e.g. record vs. no
 	 *     record or different record types)
 	 */
-	private void checkTypeCompatibility(String target, TypeMapEntry targetType, Object content, StringList typeDescr)
-			throws EvalError {
+	private void checkTypeCompatibility(String target, TypeMapEntry targetType,
+			Object content, TokenList typeDescr) throws EvalError {
 		if (content instanceof HashMap<?,?>) {
 			String typeName = String.valueOf(((HashMap<?, ?>)content).get("§TYPENAME§"));
 			if ((targetType != null || typeDescr != null)
@@ -4509,7 +4846,7 @@ public class Executor implements Runnable
 			}
 		}
 		else if (content != null && (targetType != null
-			|| typeDescr != null && typeDescr.count() == 1 && (targetType = context.dynTypeMap.get("%" + typeDescr.get(0))) != null)
+			|| typeDescr != null && typeDescr.size() == 1 && (targetType = context.dynTypeMap.get("%" + typeDescr.get(0))) != null)
 				&& targetType.isRecord() ) {
 			throw new EvalError(control.msgTypeMismatch.getText().
 					replace("%1", content.toString()).
@@ -4558,15 +4895,15 @@ public class Executor implements Runnable
 	 * @param content - the value of the expression to be assigned - expected to be
 	 *     an {@link ArrayList}
 	 */
-	private int checkDimensionsC(String target, StringList typeDescr, StringList dimensionSpecs, Object content)
+	private int checkDimensionsC(String target, TokenList typeDescr, TokenList dimensionSpecs, Object content)
 			throws EvalError
 	{
-		String decl = typeDescr + " " + target + " " + dimensionSpecs.concatenate(null);
+		String decl = typeDescr + " " + target + " " + dimensionSpecs.getString();
 		// TODO Is this too rigid
 		int nDims = 0;
-		int nTokens = dimensionSpecs.count();
+		int nTokens = dimensionSpecs.size();
 		while (nTokens > 0 && dimensionSpecs.get(0).equals("[")) {
-			ArrayList<StringList> exprs = Syntax.splitExpressionList(dimensionSpecs, ",");
+			ArrayList<TokenList> exprs = Syntax.splitExpressionList(dimensionSpecs, ",");
 			if (exprs.size() != 2 || !exprs.get(2).get(0).equals("]")) {
 				throw new EvalError(control.msgInvalidExpr.getText()
 						.replace("%", decl), null, null);
@@ -4574,9 +4911,9 @@ public class Executor implements Runnable
 			nDims++;
 			dimensionSpecs = exprs.get(1);
 			dimensionSpecs.remove(0); // This was the "]".
-			nTokens = dimensionSpecs.count();
+			nTokens = dimensionSpecs.size();
 			typeDescr.add("[");
-			if (exprs.get(0).trim().isEmpty()) {
+			if (exprs.get(0).isBlank()) {
 				if (nTokens != 0) {
 					/* Was not the last dimension - so there must be a size
 					 * (at least in C this is mandatory). Otherwise error
@@ -4586,7 +4923,7 @@ public class Executor implements Runnable
 				}
 			}
 			else {
-				Object size = this.evaluateExpression(exprs.get(0).concatenate(null), false, false);
+				Object size = this.evaluateExpression(exprs.get(0).getString(), false, false);
 				if (size != null && size instanceof Integer) {
 					typeDescr.add(((Integer)size).toString());
 				}
@@ -4599,7 +4936,7 @@ public class Executor implements Runnable
 				valStr = content.getClass().toGenericString();
 			}
 			throw new EvalError(control.msgTypeMismatch.getText()
-					.replace("%1", typeDescr.concatenate(null))
+					.replace("%1", typeDescr.getString())
 					.replace("%2", valStr)
 					.replace("%3", target), null, null);
 		}
@@ -4612,16 +4949,16 @@ public class Executor implements Runnable
 	 * 
 	 * @param tokens - part of the lexically split declaration, starting with a bracket
 	 *     pair - will not be modified here!
-	 * @param typeDescr - a {@link StringList} containing the element type description so far
+	 * @param typeDescr - a {@link TokenList} containing the element type description so far
 	 * @return the name of the declared target variable
 	 * 
 	 * @throws EvalError
 	 */
-	private String getJavaDimensions(StringList tokens, StringList typeDescr)
+	private String getJavaDimensions(TokenList tokens, TokenList typeDescr)
 			throws EvalError
 	{
 		String target = null;
-		int nTokens = tokens.count();
+		int nTokens = tokens.size();
 		int nDims = 1;
 		// START KGU#1008 2021-11-01: Bugfix #1013 Wrong index calculations
 		//while (nDims * 2 + 2 < nTokens
@@ -4642,13 +4979,12 @@ public class Executor implements Runnable
 		if (nDims * 2 + 1 != nTokens ||
 				!Syntax.isIdentifier(target = tokens.get(nDims*2), false, null)) {
 			throw new EvalError(control.msgInvalidExpr.getText()
-					.replace("%1", tokens.concatenate(null)), null, null);
+					.replace("%1", tokens.getString()), null, null);
 		}
 		// END KGU#1008 2021-11-01
 		// FIXME
 		for (int d = 0; d < nDims; d++) {
-			typeDescr.insert("of", 0);
-			typeDescr.insert("array", 0);
+			typeDescr.addAll(0, new TokenList("array of"));
 		}
 		associateType(target, typeDescr);
 		return target;
@@ -4664,11 +5000,11 @@ public class Executor implements Runnable
 	 * @param typeDescr - a {@link StringList} comprising a found type description
 	 * @return {@code true} if a new type was created.
 	 */
-	private boolean associateType(String target, StringList typeDescr) {
+	private boolean associateType(String target, TokenList typeDescr) {
 		boolean newType = false;
 		String typeName = null;
 		boolean isId = false;
-		if (typeDescr != null && typeDescr.count() == 1
+		if (typeDescr != null && typeDescr.size() == 1
 				// START KGU#922 2021-01-31: Bugfix #922
 				//&& Function.testIdentifier(typeName = typeDescr.get(0), false, null)
 				&& (isId = Syntax.isIdentifier(typeName = typeDescr.get(0), false, "."))
@@ -4681,7 +5017,7 @@ public class Executor implements Runnable
 		// So it is up to the calling method...
 		// START KGU#922 2021-01-31: Bugfix #922
 		else if (typeDescr != null && !typeDescr.isEmpty()) {
-			TypeMapEntry type = new TypeMapEntry(typeDescr.concatenate(null),
+			TypeMapEntry type = new TypeMapEntry(typeDescr.getString(),
 					isId ? typeName : null,
 					context.dynTypeMap,
 					// START KGU#1060 2022-08-22: Bugfix #1068 avoid duplicate entries
@@ -5062,9 +5398,9 @@ public class Executor implements Runnable
 	 */
 	public TypeMapEntry getTypeForVariable(String varName)
 	{
-		StringList tokens = Syntax.splitLexically(varName, true);
+		TokenList tokens = new TokenList(varName, true);
 		tokens.removeAll(" ");
-		int nTokens = tokens.count();
+		int nTokens = tokens.size();
 		int pos = 1;
 		if (nTokens == 0) {
 			return null;
@@ -5329,7 +5665,7 @@ public class Executor implements Runnable
 
 		// START KGU#413 2017-06-09: Enh. #416 allow user-defined line concatenation
 		//StringList sl = element.getText();
-		StringList sl = element.getUnbrokenText();
+		ArrayList<TokenList> sl = element.getUnbrokenTokenText();
 		// END KGU#413 2017-06-09
 		// START KGU#477 2017-12-10: Enh. #487 - special treatment for declaration sequences
 		int initialStepCount = element.getExecStepCount(false);
@@ -5341,11 +5677,11 @@ public class Executor implements Runnable
 		// END KGU#569 2018-08-06
 		// START KGU#77/KGU#78 2015-11-25: Leave if some kind of leave statement has been executed
 		//while ((i < sl.count()) && trouble.equals("") && (stop == false))
-		while ((i < sl.count()) && trouble.equals("") && (stop == false) &&
+		while ((i < sl.size()) && trouble.equals("") && (stop == false) &&
 				!context.returned && leave == 0)
 		// END KGU#77/KGU#78 2015-11-25
 		{
-			String cmd = sl.get(i).trim();
+			TokenList tokens = sl.get(i);
 			// START KGU#388 2017-09-13: Enh. #423 We shouldn't do this for type definitions
 			//cmd = convert(cmd).trim();
 			// END KGU#388 2017-09-13
@@ -5360,7 +5696,7 @@ public class Executor implements Runnable
 				// END KGU#508 2018-03-19
 				
 				// START KGU#809 2020-02-20: Issue #822 (derived from #819) Just skip empty lines
-				if (cmd.trim().isEmpty()) {
+				if (tokens.isBlank()) {
 					i++;
 					continue;
 				}
@@ -5370,19 +5706,17 @@ public class Executor implements Runnable
 				//if (!Instruction.isTypeDefinition(cmd, context.dynTypeMap)) {
 				//	cmd = convert(cmd).trim();
 				// Input (keyword should only trigger this if positioned at line start)
-				if (cmd.matches(
-						this.getKeywordPattern(Syntax.getKeyword("input")) + "([\\W].*|$)"))
+				if (Instruction.isInput(tokens))
 				{
-					trouble = tryInput(cmd);
+					trouble = tryInput(tokens);
 				}
 				// output (keyword should only trigger this if positioned at line start)
-				else if (cmd.matches(
-						this.getKeywordPattern(Syntax.getKeyword("output")) + "([\\W].*|$)"))
+				else if (Instruction.isOutput(tokens))
 				{
 					// START KGU#569 2018-08-06: Issue #577 - circumvent GUI trouble on window output
 					isOutput = true;
 					// END KGU#569 2018-08-06
-					trouble = tryOutput(cmd);
+					trouble = tryOutput(tokens);
 					// START KGU#569 2018-08-06: Issue #577 - circumvent GUI trouble on window output
 					outputDone = true;
 					// END KGU#569 2018-08-06
@@ -5391,40 +5725,44 @@ public class Executor implements Runnable
 				// The "return" keyword ought to be the first word of the instruction,
 				// comparison should not be case-sensitive while Syntax.preReturn isn't fully configurable,
 				// but a separator would be fine...
-				else if (cmd.matches(
-						this.getKeywordPattern(Syntax.getKeywordOrDefault("preReturn", "return")) + "([\\W].*|$)"))
+				else if (Jump.isReturn(tokens))
 				{		 
-					trouble = tryReturn(cmd.trim());
+					trouble = tryReturn(tokens);
 				}
 				else 
 				// START KGU#388 2017-09-13: Enh. #423 We shouldn't do this for type definitions
-				if (!Instruction.isTypeDefinition(cmd, context.dynTypeMap)) {
-					cmd = convert(cmd, false).trim();	// Do the string comparison analysis after decomposition!
+				if (!Instruction.isTypeDefinition(tokens, context.dynTypeMap)) {
+					//String cmd = convert(tokens, false).trim();	// Do the string comparison analysis after decomposition!
+					tokens = convertExpression(tokens, false);
 				// END KGU#388 2017-09-13
 				// END KGU#490 2018-02-07
 
 					// START KGU#417 2017-06-30: Enh. #424 (Turtleizer functions introduced)
 					// FIXME (KGU#490): Is this too early?
-					cmd = this.evaluateDiagramControllerFunctions(cmd);
+					tokens = this.evaluateDiagramControllerFunctions(tokens);
 					// END KGU#417 2017-06-30
 
 					// assignment?
 					boolean isBasic = false;
 					// START KGU#377 2017-03-30: Bugfix
 					//if (cmd.indexOf("<-") >= 0)
-					if (Syntax.splitLexically(cmd, true).contains("<-"))
+					//tokens = new TokenList(cmd);
+					if (tokens.contains("<-"))
 					// END KGU#377 2017-03-30: Bugfix
 					{
-						trouble = tryAssignment(cmd, element, i);
+						trouble = tryAssignment(tokens, element, i);
 					}
 					// START KGU#332 2017-01-17/19: Enh. #335 - tolerate a Pascal variable declaration
-					else if (cmd.matches("^var\\s.+?:.*") || (isBasic = cmd.matches("^dim\\s.+? as .*"))) {
+					//else if (cmd.matches("^var\\s.+?:.*") || (isBasic = cmd.matches("^dim\\s.+? as .*"))) {
+					else if (!tokens.isBlank()
+							&& (tokens.get(0).equalsIgnoreCase("var") && tokens.contains(":")
+									|| (isBasic = tokens.get(0).equalsIgnoreCase("dim") && tokens.contains("as", false)))) {
 						// START KGU#388 2017-09-14: Enh. #423
-						element.updateTypeMapFromLine(this.context.dynTypeMap, cmd, i);
+						element.updateTypeMapFromLine(this.context.dynTypeMap, tokens, i);
 						// END KGU#388 2017-09-14
 						String delim1 = isBasic ? "dim" : "var";
 						String delim2 = isBasic ? " as " : ":";
-						StringList varNames = StringList.explode(cmd.substring(delim1.length(), cmd.indexOf(delim2)), ",");
+						StringList varNames = StringList.explode(tokens.subSequence(1, tokens.indexOf(delim2)).getString(), ",");
 						for (int j = 0; j < varNames.count(); j++) {
 							// START KGU#910 2021-01-10: Bugfix #909 For performance reasons postpone display
 							//setVar(varNames.get(j), null);
@@ -5441,9 +5779,9 @@ public class Executor implements Runnable
 					else
 					{
 						// START KGU#490 2018-02-08: Bugfix #503 - we haven't converted string comp any longer before
-						cmd = this.convertStringComparison(cmd);
+						tokens = this.convertStringComparison(tokens);
 						// END KGU#490 2018-02-08
-						trouble = trySubroutine(cmd, element);
+						trouble = trySubroutine(tokens, element);
 					}
 				// START KGU#388 2017-09-13: Enh. #423
 				}
@@ -5452,12 +5790,13 @@ public class Executor implements Runnable
 					// We don't increment the total execution count here - this is regarded as a non-operation
 					isTypeDef = true;
 					// END KGU#508 2018-03-19
-					element.updateTypeMapFromLine(this.context.dynTypeMap, cmd, i);
+					element.updateTypeMapFromLine(this.context.dynTypeMap, tokens, i);
 					// START KGU#542 2019-11-17: Enh. #739 - In case of an enum type definition we have to assign the constants
-					String typeDescr = cmd.substring(cmd.indexOf('=')+1).trim();
+					String typeDescr = tokens.subSequenceToEnd(tokens.indexOf("=")+1).getString();
 					if (TypeMapEntry.MATCHER_ENUM.reset(typeDescr).matches()) {
 						isTypeDef = false;	// Is to be counted as an ordinary instruction (costs even more)
-						HashMap<String, String> enumItems = context.root.extractEnumerationConstants(cmd);
+						HashMap<String, String> enumItems = 
+								context.root.extractEnumerationConstants(tokens);
 						if (enumItems == null) {
 							trouble = Control.msgInvalidEnumDefinition.getText().replace("%", typeDescr);
 						}
@@ -5503,7 +5842,7 @@ public class Executor implements Runnable
 				}
 				// END KGU#156/KGU#508 2018-03-19
 				// START KGU#271: 2016-10-06: Bugfix #261: Allow to step and stop within an instruction block (but no breakpoint here!) 
-				if ((i+1 < sl.count()) && trouble.equals("") && (stop == false)
+				if ((i+1 < sl.size()) && trouble.equals("") && (stop == false)
 						&& !context.returned && leave == 0)
 				{
 					delay();
@@ -5545,7 +5884,7 @@ public class Executor implements Runnable
 				//if (trouble == null || trouble.length() < 5) trouble = ex.toString();
 				logger.log(Level.WARNING, "Unspecific error during execution of " + element.toString(), ex);
 				if (trouble.isEmpty() && isOutput && !repeated && JOptionPane.showConfirmDialog(
-						this.control, Control.msgGUISyncFault.getText().replace("%", cmd),
+						this.control, Control.msgGUISyncFault.getText().replace("%", tokens.getString()),
 						control.msgTitleError.getText(),
 						JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) {
 					if (!outputDone) {
@@ -5584,7 +5923,7 @@ public class Executor implements Runnable
 
 		// START KGU#413 2017-06-09: Enh. #416 allow user-defined line concatenation
 		//StringList sl = element.getText();
-		StringList sl = element.getUnbrokenText();
+		ArrayList<TokenList> sl = element.getUnbrokenTokenText();
 		// END KGU#413 2017-06-09
 		int i = 0;
 
@@ -5596,12 +5935,12 @@ public class Executor implements Runnable
 
 		// START KGU#77 2015-11-11: Leave if a return statement has been executed
 		//while ((i < sl.count()) && trouble.equals("") && (stop == false))
-		while ((i < sl.count()) && trouble.equals("") && (stop == false) && !context.returned)
+		while ((i < sl.size()) && trouble.equals("") && (stop == false) && !context.returned)
 		// END KGU#77 2015-11-11
 		{
-			String cmd = sl.get(i);
+			TokenList tokens = sl.get(i);
 			// START KGU#809 2020-04-28: Issue #822 Sensible error messages on empty lines
-			if (cmd.trim().isEmpty()) {
+			if (tokens.isBlank()) {
 				trouble = Control.msgIllegalEmptyLine.getText();
 				break;
 			}
@@ -5609,7 +5948,7 @@ public class Executor implements Runnable
 			// cmd=cmd.replace(":=", "<-");
 			// START KGU#490 2018-02-08: Bugfix #503 - postpone string comparison conversion 
 			//cmd = convert(cmd);
-			cmd = convert(cmd, !Instruction.isAssignment(cmd));
+			tokens = convertExpression(tokens, !Instruction.isAssignment(tokens));
 			// END KGU#490 2018-02-08
 
 			try
@@ -5631,20 +5970,20 @@ public class Executor implements Runnable
 				// END KGU 2015-10-12
 
 				// START KGU#417 2017-06-30: Enh. #424
-				cmd = this.evaluateDiagramControllerFunctions(cmd);
+				tokens = this.evaluateDiagramControllerFunctions(tokens);
 				// END KGU#417 2017-06-30
 
 				// assignment?
 				// START KGU#377 2017-03-30: Bugfix
 				//if (cmd.indexOf("<-") >= 0)
-				if (Syntax.splitLexically(cmd, true).contains("<-"))
+				if (tokens.contains("<-"))
 				// END KGU#377 2017-03-30: Bugfix
 				{
-					trouble = tryAssignment(cmd, element, i);
+					trouble = tryAssignment(tokens, element, i);
 				}
 				else
 				{
-					trouble = trySubroutine(cmd, element);
+					trouble = trySubroutine(tokens, element);
 				}
 				
 				// START KGU#117 2016-03-08: Enh. #77
@@ -5699,7 +6038,7 @@ public class Executor implements Runnable
 
 		// START KGU#413 2017-06-09: Enh. #416 allow user-defined line concatenation
 		//StringList sl = element.getText();
-		StringList sl = element.getUnbrokenText();
+		ArrayList<TokenList> sl = element.getUnbrokenTokenText();
 		// END KGU#413 2017-06-09
 		boolean done = false;
 
@@ -5708,8 +6047,8 @@ public class Executor implements Runnable
 		if (element.isLeave()) {
 			int nLevels = element.getLevelsUp();
 			if (nLevels < 1) {
-				String argument = sl.get(0).trim().substring(Syntax.getKeyword("preLeave").length()).trim();
-				trouble = control.msgIllegalLeave.getText().replace("%1", argument);				
+				String argument = sl.get(0).getString().substring(Syntax.getKeyword("preLeave").length()).trim();
+				trouble = control.msgIllegalLeave.getText().replace("%1", argument);
 			}
 			else {
 				this.leave += nLevels;
@@ -5721,9 +6060,9 @@ public class Executor implements Runnable
 			try {
 				// START KGU#417 2017-06-30: Enh. #424
 				//trouble = tryReturn(convert(sl.get(0)));
-				String cmd = convert(sl.get(0));
-				cmd = this.evaluateDiagramControllerFunctions(cmd);
-				trouble = tryReturn(cmd);
+				TokenList tokens = convertExpression(sl.get(0));
+				tokens = this.evaluateDiagramControllerFunctions(tokens);
+				trouble = tryReturn(tokens);
 				// END KGU#417 2017-06-30
 				done = true;			
 			}
@@ -5735,20 +6074,19 @@ public class Executor implements Runnable
 		}
 		// Exit from entire program?
 		else if (element.isExit()) {
-			StringList tokens = Syntax.splitLexically(sl.get(0).trim(), true);
+			TokenList tokens = sl.get(0);
 			// START KGU#365/KGU#380 2017-04-14: Issues #380, #394 Allow arbitrary integer expressions now
 			//tokens.removeAll("");
-			tokens.remove(0);	// Get rid of the keyword...
-			String expr = tokens.concatenate().trim();
+			tokens.remove(0, Syntax.getSplitKeyword("preExit").size());	// Get rid of the keyword...
 			// END KGU#380 2017-04-14
 			// Get exit value
 			int exitValue = 0;
-			if (!expr.isEmpty()) {	// KGU 2020-02-20 issue #   we tolerate omitted exit value (defaults to 0)
+			if (!tokens.isBlank()) {	// KGU 2020-02-20 issue #   we tolerate omitted exit value (defaults to 0)
 				try {
 					// START KGU 2017-04-14: #394 Allow arbitrary integer expressions now
 					//Object n = interpreter.eval(tokens.get(1));
 					// START KGU#417 2017-06-30: Enh. #424
-					expr = this.evaluateDiagramControllerFunctions(expr);
+					String expr = this.evaluateDiagramControllerFunctions(tokens.getString());
 					// END KGU#417 2017-06-30
 					Object n = this.evaluateExpression(expr, false, false);
 					// END KGU 2017-04-14
@@ -5806,22 +6144,24 @@ public class Executor implements Runnable
 		// START KGU#686 2019-03-18: Enh. #56 throw instructions introduced
 		else if (element.isThrow()) {
 			try {
-				String expr = sl.get(0).trim().substring(Syntax.getKeyword("preThrow").length()).trim();
-				if (expr.isEmpty()) {
+				TokenList tokens = sl.get(0).subSequenceToEnd(Syntax.getSplitKeyword("preThrow").size());
+				if (tokens.isBlank()) {
 					trouble = RETHROW_MESSAGE;
 				}
 				else {
 					Object argVal = null;
 					try {
-						String temp = this.evaluateDiagramControllerFunctions(convert(expr));
+						TokenList temp = this.evaluateDiagramControllerFunctions(convertExpression(tokens));
 						argVal = this.evaluateExpression(temp, temp.contains("{"), false);
 					}
 					catch (Exception ex) {}
 					if (argVal != null) {
+						// The argument of throw IS the trouble to be reported
 						trouble = argVal.toString();
 					}
 					else {
-						trouble = expr;
+						// If the evaluation failed then the expression itself stands for the trouble
+						trouble = tokens.getString();
 					}
 				}
 				if (console.logMeta()) {
@@ -5844,7 +6184,7 @@ public class Executor implements Runnable
 		{
 			// START KGU#197 2016-07-27: More localization support
 			//trouble = "Illegal content of a Jump (i.e. exit) instruction: <" + cmd + ">!";
-			trouble = control.msgIllegalJump.getText().replace("%1", sl.concatenate(" <nl> "));
+			trouble = control.msgIllegalJump.getText().replace("%1", TokenList.concatenate(sl, " <nl> ").getString());
 			// END KGU#197 2016-07-27
 		}
 		// END KGU#380 2017-04-14
@@ -5872,6 +6212,10 @@ public class Executor implements Runnable
 	// START KGU#417 2017-06-29: Enh. #424 New mechanism to pre-evaluate Turtleizer functions
 	private String evaluateDiagramControllerFunctions(String expression) throws EvalError
 	{
+		return evaluateDiagramControllerFunctions(new TokenList(expression)).getString();
+	}
+	private TokenList evaluateDiagramControllerFunctions(TokenList tokens) throws EvalError
+	{
 		if (diagramControllers != null) {
 			// Now, several ones of the functions offered by diagramController might
 			// occur at different nesting depths in the expression. So we must find
@@ -5879,9 +6223,8 @@ public class Executor implements Runnable
 			// We advance from right to left, this way we will evaluate deeper nested
 			// functions first.
 			// Begin with collecting all possible occurrence positions
-			StringList tokens = Syntax.splitLexically(expression, true);
 			LinkedList<Integer> positions = new LinkedList<Integer>();
-			int pos = tokens.count();
+			int pos = tokens.size();
 			while ((pos = tokens.lastIndexOf("(", pos-1)) >= 0) {
 				String token = null;
 				while (pos > 0 && (token = tokens.get(--pos).trim()).isEmpty());
@@ -5893,13 +6236,14 @@ public class Executor implements Runnable
 				}
 			}
 			Iterator<Integer> iter = positions.iterator();
+			tokens = new TokenList(tokens);	// copy the argument to avoid backfeeding side effects
 			try {
 				while (iter.hasNext()) {
 					pos = iter.next();
 					String fName = tokens.get(pos).toLowerCase();
-					StringList exprTail = tokens.subSequence(tokens.indexOf("(", pos+1)+1, tokens.count());
-					StringList args = Element.splitExpressionList(exprTail, ",", false);
-					int nArgs = args.count();
+					TokenList exprTail = tokens.subSequenceToEnd(tokens.indexOf("(", pos+1)+1);
+					ArrayList<TokenList> args = Syntax.splitExpressionList(exprTail, ",");
+					int nArgs = args.size() - 1;
 					String fSign = fName + "#" + nArgs;
 					DiagramController controller = this.controllerFunctions.get(fSign);
 					// START KGU#592 2018-10-04 - Bugfix #617 If the signature doesn't match exactly then skip
@@ -5910,10 +6254,10 @@ public class Executor implements Runnable
 					// END KGU#592 2018-10-04
 						//Method function = controller.getFunctionMap().get(fSign);
 						// Now we must know what is beyond the function call (the tail)
-						String tail = "";
-						StringList parts = Element.splitExpressionList(exprTail, ",", true);
-						if (parts.count() > nArgs) {
-							tail = parts.get(parts.count()-1).trim();
+						TokenList tail = new TokenList();
+						ArrayList<TokenList> parts = Syntax.splitExpressionList(exprTail, ",");
+						if (parts.size() > nArgs) {
+							tail = parts.get(parts.size()-1);
 						}
 						Object argVals[] = new Object[nArgs];
 						for (int i = 0; i < nArgs; i++) {
@@ -5922,7 +6266,7 @@ public class Executor implements Runnable
 						}
 						// Passed till here, we try to execute the function - this may throw a FunctionException
 						Object result = controller.execute(fName, argVals);
-						tokens.remove(pos, tokens.count());
+						tokens.remove(pos, tokens.size());
 						//tokens.add(controller.castArgument(result, function.getReturnType()).toString());
 						// START KGU#898 2020-12-25: Bugfix #898 - we must put the results in parentheses
 						//tokens.add(result.toString());
@@ -5934,7 +6278,7 @@ public class Executor implements Runnable
 						tokens.add(")");
 						// END KGU#898 2020-12-25
 						if (!tail.isEmpty()) {
-							tokens.add(Syntax.splitLexically(tail.substring(1), true));
+							tokens.addAll(tail.subSequenceToEnd(1));
 						}
 					// START KGU#592 2018-10-04 - Bugfix #617 (continued)
 					}
@@ -5951,9 +6295,9 @@ public class Executor implements Runnable
 				throw err;
 			}
 
-			expression = tokens.concatenate();
 		}
-		return expression;
+		// FIXME: It seems to be wiser to return the token list
+		return tokens;
 	}
 	// END KGU#417 2017-06-29
 	
@@ -5962,17 +6306,20 @@ public class Executor implements Runnable
 	 * Submethod of {@link #stepInstruction(Instruction)}, handling an assignment.
 	 * Also updates the dynamic type map.
 	 * 
-	 * @param cmd - the (assignment) instruction line, may also contain declarative parts
+	 * @param tokens - the tokenized (assignment) instruction line, may also contain
+	 *     declarative parts
 	 * @param instr - the Instruction element
-	 * @param lineNo - the line number of the current assignment (for the type resgistration)
+	 * @param lineNo - the line number of the current assignment (for the type
+	 *     resgistration)
 	 * @return a possible error message (for errors not thrown as EvalError)
 	 * 
 	 * @throws EvalError
 	 */
-	private String tryAssignment(String cmd, Instruction instr, int lineNo) throws EvalError
+	private String tryAssignment(TokenList tokens, Instruction instr, int lineNo) throws EvalError
 	{
 		String trouble = "";
 		Object value = null;
+		tokens = new TokenList(tokens); // Make sure this call hasn't side effects
 		// KGU#2: In case of a Call element, we allow an assignment with just the subroutine call on the
 		// right-hand side. This makes it relatively easy to detect and prepare the very subroutine call,
 		// in contrast to possible occurrences of such foreign function calls at arbitrary expression depths,
@@ -5981,42 +6328,42 @@ public class Executor implements Runnable
 //		String varName = cmd.substring(0, cmd.indexOf("<-")).trim();
 //		String expression = cmd.substring(
 //				cmd.indexOf("<-") + 2, cmd.length()).trim();
-		StringList tokens = Syntax.splitLexically(cmd, true);
 		int posAsgnOpr = tokens.indexOf("<-");
-		String leftSide = tokens.subSequence(0, posAsgnOpr).concatenate().trim();
+		TokenList leftTokens = tokens.subSequence(0, posAsgnOpr);
 		tokens.remove(0, posAsgnOpr+1);
 		// START KGU#490 2018-02-08: Bugfix #503 - we must apply string comparison conversion after decomposition#
 		// FIXME: this repeated tokenization is pretty ugly - we need a syntax tree...
 		// DEBUG
 		//StringBuilder problems = new StringBuilder();
 		//ExprParser.getInstance().parse(tokens.concatenate(), problems);
-		tokens = Syntax.splitLexically(this.convertStringComparison(tokens.concatenate().trim()), true, true);
+		tokens = this.convertStringComparison(tokens);
 		// END KGU#490 2018-02-08
 		// Watch out for constant arrays or records
-		for (int i = 0; i < tokens.count(); i++) {
+		for (int i = tokens.size()-1; i >= 0; i--) {
 			String token = tokens.get(i);
 			Object constVal = context.constants.get(token);
 			if (constVal instanceof ArrayList<?>) {
 				// Let a constant array be replaced by its clone, so we avoid structure
 				// sharing, which would break the assurance of constancy.
-				tokens.set(i, "copyArray(" + token + ")");
+				tokens.add(i+1, ")");
+				tokens.add(i, "copyArray(");
 			}
 			// START KGU#388 2017-09-13: Enh. #423 support records, too
 			else if (constVal instanceof HashMap<?, ?>) {
 				// Let a constant record be replaced by its clone, so we avoid structure
 				// sharing, which would break the assurance of constancy.
-				tokens.set(i, "copyRecord(" + token + ")");
+				tokens.add(i+1, ")");
+				tokens.add(i, "copyRecord(");
 			}
 			// END KGU#388 2017-09-13
 		}
 		// START KGU#810 2020-02-20 Bugfix #823 - necessary gaps could vanish here
 		//String expression = tokens.concatenate().trim();
-		String expression = tokens.concatenate(null).trim();
 		// END KGU#81ß0 2020-02-20
 		// END KGU#375 2017-03-30
 		if (instr instanceof Call)
 		{
-			Function f = new Function(expression);
+			Function f = new Function(tokens);
 			if (f.isFunction())
 			{
 				//System.out.println("Looking for SUBROUTINE NSD:");
@@ -6041,7 +6388,7 @@ public class Executor implements Runnable
 					{
 						// START KGU#615 2018-12-16: Bugfix #644 - initializers as arguments caused errors
 						//args[p] = this.evaluateExpression(f.getParam(p), false, false);
-						args[p] = this.evaluateExpression(f.getParam(p), true, false);
+						args[p] = this.evaluateExpression(new TokenList(f.getParam(p)), true, false);
 						// END KGU#615 2018-12-16
 					}
 					value = executeCall(sub, args, (Call)instr);
@@ -6075,7 +6422,7 @@ public class Executor implements Runnable
 			{
 				// START KGU#197 2016-07-27: Now translatable
 				//trouble = "<" + expression + "> is not a correct function!";
-				trouble = control.msgIllFunction.getText().replace("%1", expression);
+				trouble = control.msgIllFunction.getText().replace("%1", tokens.getString().trim());
 				// END KGU#197 2016-07-27
 			}
 		}
@@ -6084,41 +6431,42 @@ public class Executor implements Runnable
 		// START KGU#426 2017-09-30: Enh. #48, #423, bugfix #429 we need this code e.g in tryReturn, too
 		else
 		{
-			value = this.evaluateExpression(expression, true, false);
+			value = this.evaluateExpression(tokens, true, false);
 		}
 		// END KGU#426 2017-09-30
 		
 		if (value != null)
 		{
 			// START KGU#1089/KGU#1090 2023-10-16: Bugfix #980, #1096
-			StringList leftTokens = Syntax.splitLexically(leftSide, true);
-			leftTokens.removeAll(" ");
 		// Simplify the task for setVar
-			if (Instruction.isDeclaration(cmd)) {
+			if (Instruction.isDeclaration(tokens)) {
 				// Can only be an initialisation, so the variable name is easier to obtain
-				instr.updateTypeMapFromLine(this.context.dynTypeMap, cmd, lineNo);
-				leftSide = Instruction.getAssignedVarname(leftTokens, false);
+				instr.updateTypeMapFromLine(this.context.dynTypeMap, tokens, lineNo);
+				String leftSide = Instruction.getAssignedVarname(leftTokens, false);
 				if (leftSide == null) {
-					return Control.msgInvalidInitialization.getText().replace("%", leftTokens.concatenate(null));
+					return Control.msgInvalidInitialization.getText().replace("%", leftTokens.getString());
+				}
+				else {
+					leftTokens = new TokenList(leftSide);
 				}
 			}
 			// END KGU#1089/KGU#1090 2023-10-16
 			// Assign the value and handle provided declaration
 			// START KGU#910 2021-01-10: Bugfix #909 We must postpone the display until we fixed the type
 			//setVar(leftSide, value);
-			setVar(leftSide, value, false);
+			setVar(leftTokens, value, false);
 			// END KGU#910 2021-01-10
 			// START KGU#388 2017-09-14. Enh. #423
 			// FIXME: This is poorly done, particularly we must handle cases of record assignment 
 			//instr.updateTypeMapFromLine(context.dynTypeMap, cmd, lineNo);
-			if (!leftSide.contains(".") && !leftSide.contains("[")) {
+			if (!leftTokens.contains(".") && !leftTokens.contains("[")) {
 				TypeMapEntry oldEntry = null;
 				// START KGU#1089/KGU#1090 2023-10-16: Bugfix #980, #1096 Couldn't work
 				//String target = Instruction.getAssignedVarname(Element.splitLexically(leftSide, true), false) + "";
 				String target = Instruction.getAssignedVarname(leftTokens, false) + "";
 				// END KGU#1089/KGU#1090 2023-10-16
 				if (!context.dynTypeMap.containsKey(target) || !(oldEntry = context.dynTypeMap.get(target)).isDeclared) {
-					String typeDescr = Instruction.identifyExprType(context.dynTypeMap, expression, true);
+					String typeDescr = Syntax.identifyExprType(context.dynTypeMap, tokens, true);
 					if (oldEntry == null) {
 						TypeMapEntry typeEntry = null;
 						if (typeDescr != null && (typeEntry = context.dynTypeMap.get(":" + typeDescr)) == null) {
@@ -6148,7 +6496,7 @@ public class Executor implements Runnable
 			//trouble = "<"
 			//		+ expression
 			//		+ "> is not a correct or existing expression.";
-			trouble = control.msgInvalidExpr.getText().replace("%1", expression);
+			trouble = control.msgInvalidExpr.getText().replace("%1", tokens.getString().trim());
 			// END KGU#197 2016-07-27
 		}
 
@@ -6164,7 +6512,7 @@ public class Executor implements Runnable
 	 * 
 	 * @throws EvalError
 	 */
-	private String tryInput(String cmd) throws EvalError
+	private String tryInput(TokenList cmd) throws EvalError
 	{
 		String trouble = "";
 		// START KGU#356 2019-03-02: Issue #366
@@ -6244,18 +6592,22 @@ public class Executor implements Runnable
 		else
 		{
 		// END KGU#107 2015-12-13
-			inputItems.remove(0);
+			inputItems.remove(0);	// Was the prompt string or nothing
 			for (int i = 0; i < inputItems.count() && trouble.equals("") && (stop == false); i++) {
-				String var = inputItems.get(i).trim();
+				TokenList varTokens = new TokenList(inputItems.get(i).trim());
 				// START KGU#141 2016-01-16: Bugfix #112 - setVar won't eliminate enclosing parantheses anymore
-				while (var.startsWith("(") && var.endsWith(")"))
+				while (!varTokens.isBlank()
+						&& varTokens.get(0).equals("(") && varTokens.getLast().equals(")"))
 				{
-					var = var.substring(1, var.length()-1).trim();
+					//var = var.substring(1, var.length()-1).trim();
+					varTokens.remove(0);
+					varTokens.remove(varTokens.size()-1);
+					varTokens.trim();
 				}
 				// END KGU#141 2016-01-16
 				// START KGU#33 2014-12-05: We ought to show the index value
 				// if the variable is indeed an array element
-				if (var.contains("[") && var.contains("]")) {
+				if (varTokens.contains("[") && varTokens.contains("]")) {
 					// This is a problem: What about an expression a[i].comp1[j]?
 					try {
 						// START KGU#1060 2022-08-21: Bugfix #1068					
@@ -6263,17 +6615,21 @@ public class Executor implements Runnable
 						//int index = getIndexValue(var);
 						//var = var.substring(0, var.indexOf('[')+1) + index
 						//		+ var.substring(var.indexOf(']'));
-						int posBr = var.indexOf('[');
+						int posBr = varTokens.indexOf("[");
 						while (posBr >= 0) {
-							StringList exprs = Element.splitExpressionList(var.substring(posBr+1), ",", true);
-							int nExprs = exprs.count() - 1;
-							var = var.substring(0, posBr+1);
+							ArrayList<TokenList> exprs = Syntax.splitExpressionList(
+									varTokens.subSequenceToEnd(posBr+1), ",");
+							int nExprs = exprs.size() - 1;
+							varTokens.remove(posBr+1, varTokens.size());
 							for (int j = 0; j < nExprs; j++) {
 								int index = getIndexValue(exprs.get(j));
-								var += (j > 0 ? "," : "") + Integer.toString(index);
+								if (j > 0) {
+									varTokens.add(",");
+								}
+								varTokens.add(Integer.toString(index));
 							}
-							var += exprs.get(nExprs);
-							posBr = var.indexOf('[', posBr + 1);
+							varTokens.addAll(exprs.get(nExprs));
+							posBr = varTokens.indexOf("[", posBr + 1);
 						}
 						// END KGU#1060 2022-08-21
 					}
@@ -6289,8 +6645,8 @@ public class Executor implements Runnable
 				// START KGU#375 2017-03-30: Enh. #388 - support of constants
 				/* This test is too simple for more complex access paths but setVar() will
 				 * find out the more complex cases anyway */
-				if (this.isConstant(var)) {
-					trouble = control.msgConstantRedefinition.getText().replaceAll("%", var);
+				if (varTokens.size() == 1 && this.isConstant(varTokens.get(0))) {
+					trouble = control.msgConstantRedefinition.getText().replaceAll("%", varTokens.get(0));
 				}
 				// END KGU#375 2017-03-30
 				// START KGU#141 2016-01-16: Bugfix #112 - nothing more to do than exiting
@@ -6299,7 +6655,7 @@ public class Executor implements Runnable
 					return trouble;
 				}
 				// END KGU#141 2016-01-16
-				inputItems.set(i, var);
+				inputItems.set(i, varTokens.getString());
 			}
 			// START KGU#89 2016-03-18: More language support 
 			//String str = JOptionPane.showInputDialog(null,
@@ -6458,35 +6814,34 @@ public class Executor implements Runnable
 	 * 
 	 * @throws EvalError
 	 */
-	private String tryOutput(String cmd) throws EvalError
+	private String tryOutput(TokenList cmd) throws EvalError
 	{
 		String trouble = "";
 		// KGU 2015-12-11: Instruction is supposed to start with the output keyword!
-		String out = cmd.substring(/*cmd.indexOf(CodeParser.output) +*/
-						Syntax.getKeyword("output").trim().length()).trim();
+		cmd = cmd.subSequenceToEnd(/*cmd.indexOf(CodeParser.output) +*/
+						Syntax.getSplitKeyword("output").size());
 		// START KGU#490 2018-02-07: Bugfix #503 
-		out = this.evaluateDiagramControllerFunctions(convert(out).trim());
+		cmd = this.evaluateDiagramControllerFunctions(convertExpression(cmd));
 		// END KGU#490 2018-02-07
 		String str = "";
 		// START KGU#107 2015-12-13: Enh-/bug #51: Handle empty output instruction
-		if (!out.isEmpty())
+		if (!cmd.isBlank())
 		{
 		// END KGU#107 2015-12-13
 		// START KGU#101 2015-12-11: Fix #54 - Allow several expressions to be output in a line
-			StringList outExpressions = Element.splitExpressionList(out, ",");
-			for (int i = 0; i < outExpressions.count() && trouble.isEmpty(); i++)
+			ArrayList<TokenList> outExpressions = Syntax.splitExpressionList(cmd, ",");
+			for (int i = 0; i < outExpressions.size()-1 && trouble.isEmpty(); i++)
 			{
-				out = outExpressions.get(i);
+				TokenList out = outExpressions.get(i);
 		// END KGU#101 2015-12-11
-				Object n = this.evaluateExpression(out, false, false);
-				if (n == null)
-				{
-					trouble = control.msgInvalidExpr.getText().replace("%1", out);
-				} else
-				{
+				Object obj = this.evaluateExpression(out, false, false);
+				if (obj == null) {
+					trouble = control.msgInvalidExpr.getText().replace("%1", out.getString());
+				}
+				else {
 		// START KGU#101 2015-12-11: Fix #54 (continued)
 					//	String s = unconvert(n.toString());
-					str += n.toString();
+					str += obj.toString();
 				}
 			}
 		// START KGU#107 2015-12-13: Enh-/bug #51: Handle empty output instruction
@@ -6499,7 +6854,7 @@ public class Executor implements Runnable
 		{
 			// START KGU#616 2018-12-17: Bugfix #646 Undue trimming and obsolete "unconverting"
 			//String s = unconvert(str.trim());	// FIXME (KGU): What the heck is this good for?
-			String s = str;
+			//String s = str;
 			// END KGU#616 2018-12-17
 		// END KGU#101 2015-12-11
 			// START KGU#84 2015-11-23: Enhancement #36 to give a chance to pause
@@ -6510,11 +6865,11 @@ public class Executor implements Runnable
 
 			// START KGU#160 2016-04-12: Enh. #137 - Checkbox for text window output
 			//if (step)
-			this.console.writeln(s);
+			this.console.writeln(str);
 			// START KGU#107 2016-05-05: For the message dialog we must show something
-			if (s.isEmpty())
+			if (str.isEmpty())
 			{
-				s = "(" + control.lbEmptyLine.getText() + ")";
+				str = "(" + control.lbEmptyLine.getText() + ")";
 			}
 			// END KGU#107 2016-05-05
 			if (isConsoleEnabled)
@@ -6526,7 +6881,7 @@ public class Executor implements Runnable
 			{
 				// In step mode, there is no use to offer pausing
 				// diagram is a bad anchor component since its extension is the Root rectangle (may be huge!)
-				JOptionPane.showMessageDialog(diagram.getParent(), s, control.lbOutput.getText(),
+				JOptionPane.showMessageDialog(diagram.getParent(), str, control.lbOutput.getText(),
 						JOptionPane.INFORMATION_MESSAGE);
 			}
 			else
@@ -6537,7 +6892,7 @@ public class Executor implements Runnable
 						Control.lbPause.getText()
 				};
 				// diagram is a bad anchor component since its extension is the Root rectangle (may be huge!)
-				int pressed = JOptionPane.showOptionDialog(diagram.getParent(), s, control.lbOutput.getText(),
+				int pressed = JOptionPane.showOptionDialog(diagram.getParent(), str, control.lbOutput.getText(),
 						JOptionPane.OK_CANCEL_OPTION, JOptionPane.INFORMATION_MESSAGE, null, options, null);
 				if (pressed == 1)
 				{
@@ -6558,11 +6913,11 @@ public class Executor implements Runnable
 	}
 
 	// Submethod of stepInstruction(Instruction element), handling a return instruction
-	private String tryReturn(String cmd) throws EvalError
+	private String tryReturn(TokenList cmd) throws EvalError
 	{
 		String trouble = "";
 		String header = control.lbReturnedResult.getText();
-		String out = cmd.substring(Syntax.getKeywordOrDefault("preReturn", "return").length()).trim();
+		cmd = cmd.subSequenceToEnd(Syntax.getSplitKeyword("preReturn").size());
 		// START KGU#77 (#21) 2015-11-13: We ought to allow an empty return
 		//Object n = interpreter.eval(out);
 		//if (n == null)
@@ -6577,20 +6932,20 @@ public class Executor implements Runnable
 		//			"Returned trouble", 0);
 		//}
 		// START KGU#490 2018-02-07: Bugfix #503 
-		out = this.evaluateDiagramControllerFunctions(convert(out).trim());
+		cmd = this.evaluateDiagramControllerFunctions(convertExpression(cmd));
 		// END KGU#490 2018-02-07
 		Object resObj = null;
-		if (!out.isEmpty())
+		if (!cmd.isBlank())
 		{
 			// START KGU#426 2017-09-30: Bugfix #429
 			//resObj = this.evaluateExpression(out);
-			resObj = this.evaluateExpression(out, true, false);
+			resObj = this.evaluateExpression(cmd, true, false);
 			// END KGU#426 2017-09-30
 			// If this diagram is executed at top level then show the return value
 			if (this.callers.empty())
 			{
 				if (resObj == null)	{
-					trouble = control.msgInvalidExpr.getText().replace("%1", out);
+					trouble = control.msgInvalidExpr.getText().replace("%1", cmd.getString());
 				} 
 				// START KGU#133 2016-01-29: Arrays should be presented as scrollable list
 				// START KGU#439 2017-10-13: Issue 436 - Structorizer arrays now implemented as ArrayLists rather than Object[] 
@@ -6652,10 +7007,10 @@ public class Executor implements Runnable
 	}
 
 	// Submethod of stepInstruction(Instruction element), handling a function call
-	private String trySubroutine(String cmd, Instruction element) throws EvalError
+	private String trySubroutine(TokenList tokens, Instruction element) throws EvalError
 	{
 		String trouble = "";
-		Function f = new Function(cmd);
+		Function f = new Function(tokens);
 		if (f.isFunction())
 		{
 			String procName = f.getName();
@@ -6809,14 +7164,14 @@ public class Executor implements Runnable
 				else	
 				{
 					// Try as built-in subroutine as is
-					this.evaluateExpression(cmd, false, false);
+					this.evaluateExpression(tokens, false, false);
 				}
 			}
 		}
 		else {
 			// START KGU#197 2017-06-06: Now localizable
 			//trouble = "<" + cmd + "> is not a correct function!";
-			trouble = control.msgIllFunction.getText().replace("%1", cmd);
+			trouble = control.msgIllFunction.getText().replace("%1", tokens.getString());
 			// END KGU#197 2017-06-06
 		}
 		return trouble;
@@ -6841,9 +7196,9 @@ public class Executor implements Runnable
 	private String stepCase(Case element)
 	{
 		// START KGU 2016-09-25: Bugfix #254
-		String[] parserKeys = new String[]{
-				Syntax.getKeyword("preCase"),
-				Syntax.getKeyword("postCase")
+		TokenList[] parserKeys = new TokenList[]{
+				Syntax.getSplitKeyword("preCase"),
+				Syntax.getSplitKeyword("postCase")
 				};
 		// END KGU 2016-09-25
 		String trouble = new String();
@@ -6851,26 +7206,28 @@ public class Executor implements Runnable
 		{
 			// START KGU#453 2017-11-02: Issue #447 - face line continuation
 			//StringList text = element.getText();
-			StringList text = element.getUnbrokenText();
+			ArrayList<TokenList> text = element.getUnbrokenTokenText();
 			// START KGU#453 2017-11-02
 			// START KGU#259 2016-09-25: Bugfix #254
 			//String expression = text.get(0) + " = ";
-			StringList tokens = Syntax.splitLexically(text.get(0), true);
-			for (String key : parserKeys)
+			TokenList tokens = text.get(0);
+			// FIXME: Should decorators only be removed at their expected positions (start/end)?
+			for (TokenList key : parserKeys)
 			{
-				if (!key.trim().isEmpty())
+				if (!key.isBlank() && tokens.indexOf(key, !Syntax.ignoreCase) == 0)
 				{
-					tokens.removeAll(Syntax.splitLexically(key, false), !Syntax.ignoreCase);
+					tokens.remove(0, key.size());
 				}		
 			}
 			// START KGU#417 2017-06-30: Enh. #424
 			//String expression = tokens.concatenate() + " = ";
-			String expression = this.evaluateDiagramControllerFunctions(tokens.concatenate()) + " = ";
+			TokenList expression = this.evaluateDiagramControllerFunctions(tokens);
+			expression.add("=");
 			// END KGU#417 2017-06-30
 			// END KGU#259 2016-09-25
 			boolean done = false;
-			int last = text.count() - 1;
-			boolean hasDefaultBranch = !text.get(last).trim().equals("%");
+			int last = text.size() - 1;
+			boolean hasDefaultBranch = !text.get(last).getString().trim().equals("%");
 			if (!hasDefaultBranch)
 			{
 				last--;
@@ -6885,7 +7242,7 @@ public class Executor implements Runnable
 				//String test = convert(expression + text.get(q));
 				// START KGU#755 2019-11-08: Bugfix #769 - string literals might contain commas
 				//String[] constants = text.get(q).split(",");
-				String[] constants = Element.splitExpressionList(text.get(q), ",").toArray();
+				TokenList[] constants = Syntax.splitExpressionList(text.get(q), ",").toArray(new TokenList[]{});
 				// END KGU#755 2019-11-08
 				// END KGU#15 2015-10-21
 				boolean go = false;
@@ -6903,18 +7260,26 @@ public class Executor implements Runnable
 					{
 						// START KGU#259 2016-09-25: Bugfix #254
 						//String test = convert(expression + constants[c]);
-						tokens = Syntax.splitLexically(constants[c], true);
-						for (String key : parserKeys)
+						tokens = constants[c];
+						// FIXME: Should decorators only be removed at their expected positions (start/end)?
+						for (TokenList key : parserKeys)
 						{
-							if (!key.trim().isEmpty())
+							if (!key.isBlank())
 							{
-								tokens.removeAll(Syntax.splitLexically(key, false), !Syntax.ignoreCase);
+								int keySize = key.size();
+								int posKey = tokens.size() - key.size();
+								while (posKey >= 0 && (posKey = tokens.lastIndexOf(key, posKey, !Syntax.ignoreCase)) >= 0) {
+									tokens.remove(posKey, posKey + keySize);
+									posKey -= keySize;
+								}
 							}		
 						}
-						String test = convert(expression + tokens.concatenate());
+						TokenList test = new TokenList(expression);
+						test.addAll(tokens);
+						test = convertExpression(test);
 						// END KGU#259 2016-09-25
-						Object n = this.evaluateExpression(test, false, false);
-						go = n.toString().equals("true");
+						Object obj = this.evaluateExpression(test, false, false);
+						go = obj.toString().equals("true");
 					}
 					// END KGU#15 2015-10-21
 				}
@@ -6970,7 +7335,7 @@ public class Executor implements Runnable
 		{
 			// START KGU#453 2017-11-01: Bugfix #447 - get rid of possible line continuator backslashes
 			//String s = element.getText().getText();
-			String s = element.getUnbrokenText().getLongString();
+			TokenList condTokens = TokenList.concatenate(element.getUnbrokenTokenText(), null);
 			// END KGU#453 2017-11-01
 			// START KGU#150 2016-04-03: More precise processing
 //			if (!CodeParser.preAlt.equals(""))
@@ -6985,33 +7350,38 @@ public class Executor implements Runnable
 //			}
 //
 //			s = convert(s);
-			StringList tokens = Syntax.splitLexically(s, true);
-			for (String key : new String[]{
-					Syntax.getKeyword("preAlt"),
-					Syntax.getKeyword("postAlt")})
+			// FIXME: Should decorators only be removed at their expected positions (start/end)?
+			for (TokenList key : new TokenList[]{
+					Syntax.getSplitKeyword("preAlt"),
+					Syntax.getSplitKeyword("postAlt")})
 			{
-				if (!key.trim().isEmpty())
+				if (!key.isBlank())
 				{
-					tokens.removeAll(Syntax.splitLexically(key, false), !Syntax.ignoreCase);
+					int keySize = key.size();
+					int posKey = condTokens.size() - keySize;
+					while (posKey >= 0 && (posKey = condTokens.lastIndexOf(key, posKey, !Syntax.ignoreCase)) >= 0) {
+						condTokens.remove(posKey, posKey + keySize);
+						posKey -= keySize;
+					}
 				}		
 			}
-			s = convert(tokens.concatenate());
+			TokenList tempTokens = convertExpression(condTokens);
 			// END KGU#150 2016-04-03
 
 			// START KGU#417 2017-06-30: Enh. #424
-			s = this.evaluateDiagramControllerFunctions(s);
+			tempTokens = this.evaluateDiagramControllerFunctions(tempTokens);
 			// END KGU#417 2017-06-30
 
 			//System.out.println("C=  " + interpreter.get("C"));
 			//System.out.println("IF: " + s);
-			Object cond = this.evaluateExpression(s, false, false);
+			Object condVal = this.evaluateExpression(tempTokens, false, false);
 			//System.out.println("Res= " + n);
-			if (cond == null || !(cond instanceof Boolean))
+			if (condVal == null || !(condVal instanceof Boolean))
 			{
 				// START KGU#197 2016-07-27: Localization support
 				//trouble = "<" + s
 				//		+ "> is not a correct or existing expression.";
-				trouble = control.msgInvalidBool.getText().replace("%1", s);
+				trouble = control.msgInvalidBool.getText().replace("%1", condTokens.getString());
 				// END KGU#197 2016-07-27
 			}
 			// if(getExec(s).equals("OK"))
@@ -7022,7 +7392,7 @@ public class Executor implements Runnable
 				//END KGU#156 2016-03-11
 				
 				Subqueue branch;
-				if (cond.toString().equals("true"))
+				if (condVal.toString().equals("true"))
 				{
 					branch = element.qTrue;
 				}
@@ -7084,11 +7454,13 @@ public class Executor implements Runnable
 		String trouble = new String();
 		try
 		{
-			String condStr = "true";	// Condition expression
+			Object condVal = true;
+			TokenList condTokens = new TokenList("true");
 			if (!eternal) {
 				// START KGU#413 2017-06-09: Enh. #416: Cope with user-inserted line breaks
 				//condStr = element.getText().getText();
-				condStr = element.getUnbrokenText().getLongString();
+				//condStr = element.getUnbrokenText().getLongString();
+				condTokens = TokenList.concatenate(element.getUnbrokenTokenText(), null);
 				// END KGU#413 2017-06-09
 				// START KGU#150 2016-04-03: More precise processing
 //				if (!CodeParser.preWhile.equals(""))
@@ -7106,36 +7478,45 @@ public class Executor implements Runnable
 //				condStr = convert(condStr, false);
 //				// END KGU#79 2015-11-12
 //				// System.out.println("WHILE: "+condStr);
-				StringList tokens = Syntax.splitLexically(condStr, true);
-				for (String key : new String[]{
-						Syntax.getKeyword("preWhile"),
-						Syntax.getKeyword("postWhile")})
+				//StringList tokens = Syntax.splitLexically(condStr, true);
+				// FIXME: Should decorators only be removed at their expected positions (start/end)?
+				for (TokenList key : new TokenList[]{
+						Syntax.getSplitKeyword("preWhile"),
+						Syntax.getSplitKeyword("postWhile")})
 				{
-					if (!key.trim().isEmpty())
+					if (key != null && !key.isBlank())
 					{
-						tokens.removeAll(Syntax.splitLexically(key, false), !Syntax.ignoreCase);
+						//condTokens.removeAll(Syntax.splitLexically(key, false), !Syntax.ignoreCase);
+						int keySize = key.size();
+						int posKey = condTokens.size() - keySize;
+						while (posKey >= 0
+								&& (posKey = condTokens.lastIndexOf(key, posKey, !Syntax.ignoreCase)) >= 0) {
+							condTokens.remove(posKey, posKey + keySize);
+							posKey -= keySize;
+						}
 					}		
 				}
 				// START KGU#433 2017-10-11: Bugfix #434 Don't try to be too clever here - variables might change type within the loop..
 				//condStr = convert(tokens.concatenate());
-				condStr = convert(tokens.concatenate(), false);
+				//condStr = convert(tokens.concatenate(), false);
+				condTokens = this.convertExpression(condTokens, false);
 				// END KGU#433 2017-10-11
 				// END KGU#150 2016-04-03
+
+				//int cw = 0;
+				// START KGU#417 2017-06-30: Enh. #424 - Turtleizer functions must be evaluated each time
+				//Object cond = context.interpreter.eval(convertStringComparison(condStr));
+				TokenList tempTokens = this.evaluateDiagramControllerFunctions(condTokens);
+				condVal = this.evaluateExpression(convertStringComparison(tempTokens), false, false);
+				// END KGU#417 2017-06-30
 			}
 
-			//int cw = 0;
-			// START KGU#417 2017-06-30: Enh. #424 - Turtleizer functions must be evaluated each time
-			//Object cond = context.interpreter.eval(convertStringComparison(condStr));
-			String tempCondStr = this.evaluateDiagramControllerFunctions(condStr);
-			Object cond = this.evaluateExpression(convertStringComparison(tempCondStr), false, false);
-			// END KGU#417 2017-06-30
-
-			if (cond == null || !(cond instanceof Boolean))
+			if (condVal == null || !(condVal instanceof Boolean))
 			{
 				// START KGU#197 2016-07-27: Localization support
 				//trouble = "<" + condStr
 				//		+ "> is not a correct or existing expression.";
-				trouble = control.msgInvalidBool.getText().replace("%1", condStr);
+				trouble = control.msgInvalidBool.getText().replace("%1", condTokens.getString());
 				// END KGU#197 2016-07-27
 			} else
 			{
@@ -7147,7 +7528,7 @@ public class Executor implements Runnable
 				//while (cond.toString().equals("true") && trouble.equals("")
 				//		&& (stop == false))
 				context.loopDepth++;
-				while (cond.toString().equals("true") && trouble.equals("")
+				while (condVal.toString().equals("true") && trouble.equals("")
 						&& (stop == false) && !context.returned && leave == 0)
 				// END KGU#77/KGU#78 2015-11-25
 				{
@@ -7180,16 +7561,16 @@ public class Executor implements Runnable
 					}
 					// START KGU#417 2017-06-30: Enh. #424 - Turtleizer functions must be evaluated each time
 					//cond = context.interpreter.eval(convertStringComparison(condStr));
-					tempCondStr = this.evaluateDiagramControllerFunctions(condStr);
-					cond = this.evaluateExpression(convertStringComparison(tempCondStr), false, false);
+					TokenList tempTokens = this.evaluateDiagramControllerFunctions(condTokens);
+					condVal = this.evaluateExpression(convertStringComparison(tempTokens), false, false);
 					// END KGU#417 2017-06-30
-					if (cond == null)
+					if (condVal == null || !(condVal instanceof Boolean))
 					{
 						// START KGU#197 2016-07-27: Localization support
 						//trouble = "<"
 						//		+ condStr
 						//		+ "> is not a correct or existing expression.";
-						trouble = control.msgInvalidExpr.getText().replace("%1", condStr);
+						trouble = control.msgInvalidExpr.getText().replace("%1", condTokens.getString());
 						// END KGU#197 2016-07-27
 					}
 					// START KGU#156 2016-03-11: Enh. #124
@@ -7245,7 +7626,8 @@ public class Executor implements Runnable
 			// which is sound with scope rules in C or Java.
 			// START KGU#413 2017-06-09: Enh. #416: Cope with user-inserted line breaks
 			//String condStr = element.getText().getText();
-			String condStr = element.getUnbrokenText().getLongString();
+			//String condStr = element.getUnbrokenText().getLongString();
+			TokenList condTokens = TokenList.concatenate(element.getUnbrokenTokenText(), null);
 			// END KGU#413 2017-06-09
 			// START KGU#150 2016-04-03: More precise processing
 //			if (!CodeParser.preRepeat.equals(""))
@@ -7259,19 +7641,27 @@ public class Executor implements Runnable
 //				condStr = BString.replace(condStr, CodeParser.postRepeat, "");
 //			}
 //			condStr = convert(condStr, false);
-			StringList tokens = Syntax.splitLexically(condStr, true);
-			for (String key : new String[]{
-					Syntax.getKeyword("preRepeat"),
-					Syntax.getKeyword("postRepeat")})
+			//StringList tokens = Syntax.splitLexically(condStr, true);
+			// FIXME: Should decorators only be removed at their expected positions (start/end)?
+			for (TokenList key : new TokenList[]{
+					Syntax.getSplitKeyword("preRepeat"),
+					Syntax.getSplitKeyword("postRepeat")})
 			{
-				if (!key.trim().isEmpty())
+				if (key != null && !key.isBlank())
 				{
-					tokens.removeAll(Syntax.splitLexically(key, false), !Syntax.ignoreCase);
+					//tokens.removeAll(Syntax.splitLexically(key, false), !Syntax.ignoreCase);
+					int keySize = key.size();
+					int posKey = condTokens.size() - keySize;
+					while (posKey >= 0
+							&& (posKey = condTokens.lastIndexOf(key, posKey, !Syntax.ignoreCase)) >= 0) {
+						condTokens.remove(posKey, posKey + keySize);
+						posKey -= keySize;
+					}
 				}		
 			}
 			// START KGU#433 2017-10-11: Bugfix #434 Don't try to be too clever here - variables might change type within the loop...
 			//condStr = convert(tokens.concatenate());
-			condStr = convert(tokens.concatenate(), false);
+			condTokens = convertExpression(condTokens, false);
 			// END KGU#433 2017-10-11
 			// END KGU#150 2016-04-03
 
@@ -7290,7 +7680,7 @@ public class Executor implements Runnable
 			//	trouble = control.msgInvalidExpr.getText().replace("%1", condStr);
 			//	// END KGU#197 2016-07-27
 			//} else
-			Object cond = null;
+			Object condVal = null;
 			// END KGU#487 2018-01-23
 			{
 				// START KGU#78 2015-11-25: In order to handle exits we must know the nesting depth
@@ -7317,13 +7707,13 @@ public class Executor implements Runnable
 						delay();	// Symbolizes the loop condition check time
 						// END KGU#665 2019-02-26
 						// START KGU#417 2017-06-30: Enh. #424 - Turtleizer functions must be evaluated each time
-						String tempCondStr = this.evaluateDiagramControllerFunctions(condStr);
-						cond = this.evaluateExpression(convertStringComparison(tempCondStr), false, false);
+						TokenList tempTokens = this.evaluateDiagramControllerFunctions(condTokens);
+						condVal = this.evaluateExpression(convertStringComparison(tempTokens), false, false);
 						// END KGU#417 2017-06-30
-						if (cond == null || !(cond instanceof Boolean))
+						if (condVal == null || !(condVal instanceof Boolean))
 						{
 							// START KGU#197 2016-07-27: Localization support
-							trouble = control.msgInvalidBool.getText().replace("%1", condStr);
+							trouble = control.msgInvalidBool.getText().replace("%1", condTokens.getString());
 							// END KGU#197 2016-07-27
 						}
 
@@ -7339,7 +7729,8 @@ public class Executor implements Runnable
 				//} while (!(n.toString().equals("true") && trouble.equals("") && (stop == false)));
 				// START KGU#77/KGU#78 2015-11-25: Leave if some kind of Jump statement has been executed
 				//} while (!(n.toString().equals("true")) && trouble.equals("") && (stop == false))
-				} while (cond != null && !(cond.toString().equals("true")) && trouble.equals("") && (stop == false) &&
+				} while (condVal != null && !(condVal.toString().equals("true"))
+						&& trouble.equals("") && (stop == false) &&
 						!context.returned && leave == 0);
 				// END KGU#77/KGU#78 2015-11-25
 				// END KGU#70 2015-11-09
@@ -7399,84 +7790,84 @@ public class Executor implements Runnable
 			context.forLoopVars.add(counter);
 			// END KGU#307 2016-12-12
 
-			String s = element.getStartValue(); 
+			TokenList tokens = new TokenList(element.getStartValue()); 
 
-			s = convert(s);
+			tokens = convertExpression(tokens);
 			// START KGU#417 2017-06-30: Enh. #424 - Turtleizer functions must be evaluated
-			s = this.evaluateDiagramControllerFunctions(s);
+			tokens = this.evaluateDiagramControllerFunctions(tokens);
 			// END KGU#417 2017-06-30
-			Object n = this.evaluateExpression(s, false, false);
-			if (n == null)
+			Object obj = this.evaluateExpression(tokens, false, false);
+			if (obj == null)
 			{
 				// START KGU#197 2016-07-27: Localization support
 				//trouble = "<"+s+"> is not a correct or existing expression.";
-				trouble = control.msgInvalidExpr.getText().replace("%1", s);
+				trouble = control.msgInvalidExpr.getText().replace("%1", tokens.getString());
 				// END KGU#197 2016-07-27
 			}
 			int ival = 0;
-			if (n instanceof Integer)
+			if (obj instanceof Integer)
 			{
-				ival = (Integer) n;
+				ival = (Integer) obj;
 			}
-			else if (n instanceof Long)
+			else if (obj instanceof Long)
 			{
-				ival = ((Long) n).intValue();
+				ival = ((Long) obj).intValue();
 			}
-			else if (n instanceof Float)
+			else if (obj instanceof Float)
 			{
-				ival = ((Float) n).intValue();
+				ival = ((Float) obj).intValue();
 			}
-			else if (n instanceof Double)
+			else if (obj instanceof Double)
 			{
-				ival = ((Double) n).intValue();
+				ival = ((Double) obj).intValue();
 			}
 
-			s = element.getEndValue();
-			s = convert(s);
+			tokens = new TokenList(element.getEndValue());
+			tokens = convertExpression(tokens);
 			// START KGU#417 2017-06-30: Enh. #424 - Turtleizer functions must be evaluated
-			s = this.evaluateDiagramControllerFunctions(s);
+			tokens = this.evaluateDiagramControllerFunctions(tokens);
 			// END KGU#417 2017-06-30
-			n = this.evaluateExpression(s, false, false);
-			if (n == null)
+			obj = this.evaluateExpression(tokens, false, false);
+			if (obj == null)
 			{
 				// START KGU#197 2016-07-27: Localization support
 				//trouble = "<"+s+"> is not a correct or existing expression.";
-				trouble = control.msgInvalidExpr.getText().replace("%1", s);
+				trouble = control.msgInvalidExpr.getText().replace("%1", tokens.getString());
 				// END KGU#197 2016-07-27
 			}
 			int fval = 0;
-			if (n instanceof Integer)
+			if (obj instanceof Integer)
 			{
-				fval = (Integer) n;
+				fval = (Integer) obj;
 			}
-			else if (n instanceof Long)
+			else if (obj instanceof Long)
 			{
-				fval = ((Long) n).intValue();
+				fval = ((Long) obj).intValue();
 			}
-			else if (n instanceof Float)
+			else if (obj instanceof Float)
 			{
-				fval = ((Float) n).intValue();
+				fval = ((Float) obj).intValue();
 			}
-			else if (n instanceof Double)
+			else if (obj instanceof Double)
 			{
-				fval = ((Double) n).intValue();
+				fval = ((Double) obj).intValue();
 			}
 
 			// START KGU#156 2016-03-11: Enh. #124
 			element.addToExecTotalCount(1, true);	// For the initialisation and first test
 			//END KGU#156 2016-03-11
 			
-			int cw = ival;
 			// START KGU#77/KGU#78 2015-11-25: Leave if some kind of Jump statement has been executed
 			//while (((sval >= 0) ? (cw <= fval) : (cw >= fval)) && trouble.equals("") && (stop == false))
 			context.loopDepth++;
-			while (((sval >= 0) ? (cw <= fval) : (cw >= fval)) && trouble.equals("") &&
+			// FIXME We might have to re-evaluate the end value
+			while (((sval >= 0) ? (ival <= fval) : (ival >= fval)) && trouble.equals("") &&
 					(stop == false) && !context.returned && leave == 0)
 			// END KGU#77/KGU#78 2015-11-25
 			{
 				// START KGU#307 2016-12-12: Issue #307 - prepare warnings on loop variable manipulations
 				//setVar(counter, cw);
-				setVar(counter, cw, forLoopLevel-1, true);
+				setVar(counter, ival, forLoopLevel-1, true);
 				// END KGU#307 2016-12-12
 				element.waited = true;
 
@@ -7505,7 +7896,7 @@ public class Executor implements Runnable
 				element.waited = true;
 				
 				// START KGU 2015-10-13: The step value is now calculated in advance
-				cw += sval;
+				ival += sval;
 				// END KGU 2015-10-13
 			}
 			// START KGU#78 2015-11-25
@@ -7550,7 +7941,7 @@ public class Executor implements Runnable
 		// START KGU#307 2016-12-12: Issue #307 - prepare warnings on loop variable manipulations
 		int forLoopLevel = context.forLoopVars.count();
 		// END KGU#307 2016-12-12
-		String valueListString = element.getValueList();
+		TokenList valueListTokens = new TokenList(element.getValueList());
 		String iterVar = element.getCounterVar();
 		Object[] valueList = null;
 		String problem = "";	// Gathers exception descriptions for analysis purposes
@@ -7558,7 +7949,7 @@ public class Executor implements Runnable
 		boolean valueNoArray = false;
 		// START KGU#417 2017-06-30: Enh. #424 - Turtleizer functions must be evaluated each time
 		try {
-			valueListString = this.evaluateDiagramControllerFunctions(valueListString).trim();
+			valueListTokens = this.evaluateDiagramControllerFunctions(valueListTokens);
 		}
 		catch (EvalError ex)
 		{
@@ -7576,7 +7967,9 @@ public class Executor implements Runnable
 			// END KGU#1024 2022-01-05
 		}
 		// END KGU#417 2017-06-30
-		if (valueListString.startsWith("{") && valueListString.endsWith("}"))
+		valueListTokens.trim();
+		if (valueListTokens.size() >= 2 
+				&& valueListTokens.get(0).equals("{") && valueListTokens.getLast().equals("}"))
 		{
 			try
 			{
@@ -7584,7 +7977,7 @@ public class Executor implements Runnable
 				//this.evaluateExpression("Object[] tmp20160321kgu = " + valueListString, false, false);
 				//value = context.interpreter.get("tmp20160321kgu");
 				//context.interpreter.unset("tmp20160321kgu");
-				value = this.evaluateExpression(valueListString, true, false);
+				value = this.evaluateExpression(valueListTokens, true, false);
 				// END KGU#439 2017-10-13
 			}
 			catch (EvalError ex)
@@ -7612,7 +8005,7 @@ public class Executor implements Runnable
 		// MUST contain more than one element. (If the comma IS an argument separator of a
 		// function call then either the function will be an element of the value list or
 		// we obtain a single element - or some syntax trouble.)
-		if (value == null && valueListString.contains(","))
+		if (value == null && valueListTokens.contains(","))
 		{
 			try
 			{
@@ -7620,14 +8013,18 @@ public class Executor implements Runnable
 				//this.evaluateExpression("Object[] tmp20160321kgu = {" + valueListString + "}", false, false);
 				//value = context.interpreter.get("tmp20160321kgu");
 				//context.interpreter.unset("tmp20160321kgu");
-				value = this.evaluateExpression("{" + valueListString + "}", true, false);
+				//value = this.evaluateExpression("{" + valueListTokens + "}", true, false);
+				TokenList tempTokens = new TokenList(valueListTokens);
+				tempTokens.add(0, "{");
+				tempTokens.add("}");
+				value = this.evaluateExpression(tempTokens, true, false);
 				// END KGU#439 2017-10-13
 				// START KGU#856 2020-04-23: Bugfix #858 - there ARE functions returning an array or string
 				if (value instanceof ArrayList && ((ArrayList<?>)value).size() == 1) {
 					/* If the array contains only a single element then we must have
-					 * misinterpreted the comma (may have been part of a string literal
-					 * or separator in a function parameter list. So the element is certainly
-					 * the array or string we need
+					 * misinterpreted the comma (may have been a separator in a function
+					 * parameter list. So the element is certainly the array or string
+					 * we need
 					 */
 					value = ((ArrayList<?>)value).get(0);
 				}
@@ -7654,12 +8051,14 @@ public class Executor implements Runnable
 		{
 			try
 			{
-				value = this.evaluateExpression(valueListString, false, false);
+				value = this.evaluateExpression(valueListTokens, false, false);
 				// START KGU#429 2017-10-08
 				// In case it was a variable or function, it MUST contain or return an array to be acceptable
-				if (value != null && /*!(value instanceof Object[]) &&*/ !(value instanceof ArrayList<?>) && !(value instanceof String)) {
+				if (value != null
+						&& /*!(value instanceof Object[]) &&*/ !(value instanceof ArrayList<?>)
+						&& !(value instanceof String)) {
 					valueNoArray = true;
-					problem += valueListString + " = " + prepareValueForDisplay(value, context.dynTypeMap);
+					problem += valueListTokens.getString() + " = " + prepareValueForDisplay(value, context.dynTypeMap);
 				}
 				// END KGU#429 2017-10-08
 			}
@@ -7679,17 +8078,21 @@ public class Executor implements Runnable
 				// END KGU#1024 2022-01-05
 			}
 		}
-		if (value == null && valueListString.contains(" "))
+		if (value == null && valueListTokens.size() > 1 && valueListTokens.getPadding() > 0)
 		{
 			// Rather desperate attempt to compose an array from loose strings (like in shell scripts)
-			StringList tokens = Element.splitExpressionList(valueListString, " ");
+			ArrayList<TokenList> exprTokens = Syntax.splitExpressionList(valueListTokens, " ");
 			try
 			{
 				// START KGU#439 2017-10-13: Issue #436
 				//this.evaluateExpression("Object[] tmp20160321kgu = {" + tokens.concatenate(",") + "}", false, false);
 				//value = context.interpreter.get("tmp20160321kgu");
 				//context.interpreter.unset("tmp20160321kgu");
-				value = this.evaluateExpression("{" + tokens.concatenate(",") + "}", true, false);
+				//value = this.evaluateExpression("{" + tokens.concatenate(",") + "}", true, false);
+				TokenList tempTokens = TokenList.concatenate(exprTokens.subList(0, exprTokens.size()-1), ",");
+				tempTokens.add(0, "{");
+				tempTokens.add("}");
+				value = this.evaluateExpression(tempTokens, true, false);
 				// END KGU#439 2017-10-13
 			}
 			catch (EvalError ex)
@@ -7736,7 +8139,7 @@ public class Executor implements Runnable
 
 		if (valueList == null)
 		{
-			trouble = control.msgBadValueList.getText().replace("%", valueListString);
+			trouble = control.msgBadValueList.getText().replace("%", valueListTokens.getString());
 			// START KGU 2016-07-06: Privide the gathered information
 			if (!problem.isEmpty())
 			{
@@ -7784,7 +8187,7 @@ public class Executor implements Runnable
 
 					if (trouble.isEmpty())
 					{
-						trouble = stepSubqueue(((ILoop)element).getBody(), true);						
+						trouble = stepSubqueue(((ILoop)element).getBody(), true);
 					}
 
 					element.executed = true;
@@ -8076,13 +8479,37 @@ public class Executor implements Runnable
 	 * 
 	 * @throws EvalError an exception if something went wrong (may be raised by the interpreter
 	 *     or this method itself)
+	 * 
+	 * @deprecated use {@link #evaluateExpression(TokenList, boolean, boolean)}
 	 */
 	protected Object evaluateExpression(String _expr, boolean _withInitializers, boolean _preserveBrackets) throws EvalError
+	{
+		return evaluateExpression(new TokenList(_expr), _withInitializers, _preserveBrackets);
+	}
+	/**
+	 * Resolves qualified names (record access) where contained and - if allowed by setting
+	 * {@code _withInitializers} - array or record initializers and has the interpreter evaluate
+	 * the prepared expression.<br/>
+	 * This preparation work might perhaps also have been done by the convert function but requires
+	 * current evaluation context. So it was rather located here.<br/>
+	 * Note: Argument {@code _withInitializers} (and the associated mechanism) was added via
+	 * refactoring afterwards with a default value of {@code false} in order to avoid unwanted
+	 * impact. If there happens to be some place in code where it seems helpful to activate this
+	 * mechanism just go ahead and try.
+	 * 
+	 * @param tokens - the tokenized converted expression to be evaluated
+	 * @param _withInitializers - whether an array or record initializer is to be managed here
+	 * @param _preserveBrackets - if true then brackets won't be substituted
+	 * @return the evaluated result if successful
+	 * 
+	 * @throws EvalError an exception if something went wrong (may be raised by the interpreter
+	 *     or this method itself)
+	 */
+	protected Object evaluateExpression(TokenList tokens, boolean _withInitializers, boolean _preserveBrackets) throws EvalError
 	{
 		Object value = null;
 		// START KGU#773 2019-11-28: Bugfix #786 Blanks are not tolerated by the susequent mechanisms like index evaluation
 		//StringList tokens = Syntax.splitLexically(_expr, true);
-		StringList tokens = Syntax.splitLexically(_expr, true, true);
 		// END KGU#773 2019-11-28
 		// START KGU#439 2017-10-13: Enh. #436 Arrays now represented by ArrayLists
 		if (!_preserveBrackets) {
@@ -8094,7 +8521,7 @@ public class Executor implements Runnable
 			// We accept index lists on the left-hand side, so we should do here too
 			//tokens.replaceAll("[", ".get(");
 			//tokens.replaceAll("]", ")");
-			int pos = tokens.count() - 1;
+			int pos = tokens.size() - 1;
 			while ((pos = tokens.lastIndexOf("]", pos)) >= 0) {
 				Stack<Boolean> context = new Stack<Boolean>();
 				context.push(true);
@@ -8134,31 +8561,31 @@ public class Executor implements Runnable
 			// indexed access to an array element... An how can we make sure its evaluation hasn't got irreversible side
 			// effects?
 			// At least the check against following parenthesis will help to avoid the spoiling of Java method calls.
-			if (i+1 < tokens.count() && Syntax.isIdentifier(tokens.get(i+1), false, null) && (i+2 == tokens.count() || !tokens.get(i+2).equals("("))) {
+			if (i+1 < tokens.size() && Syntax.isIdentifier(tokens.get(i+1), false, null) && (i+2 == tokens.size() || !tokens.get(i+2).equals("("))) {
 				tokens.set(i, ".get(\"" + tokens.get(i+1) + "\")");
 				tokens.remove(i+1);
 			}
 		}
 		// START KGU#100/KGU#388 2017-09-29: Enh. #84, #423 TODO Make this available at more places
-		if (tokens.get(tokens.count()-1).equals("}") && _withInitializers) {
+		if (tokens.getLast().equals("}") && _withInitializers) {
 			TypeMapEntry recordType = null;
 			// START KGU#100 2016-01-14: Enh. #84 - accept array assignments with syntax array <- {val1, val2, ..., valN}
-			if (tokens.get(0).equals("{")) {			
-				value = evaluateArrayInitializer(_expr, tokens);
+			if (tokens.get(0).equals("{")) {
+				value = evaluateArrayInitializer(tokens);
 			}
 			// END KGU#100 2016-01-14
 			// START KGU#388 2017-09-13: Enh. #423 - accept record assignments with syntax recordVar <- typename{comp1: val1, comp2: val2, ..., compN: valN}
 			else if (tokens.get(1).equals("{") && (recordType = identifyRecordType(tokens.get(0), true)) != null) {
-				value = evaluateRecordInitializer(_expr, tokens, recordType);
+				value = evaluateRecordInitializer(tokens, recordType);
 			}
 			// END KGU#388 2017-09-13
 		}
 		// END KGU#100/KGU#388 2017-09-29
 		// START KGU#920 2021-02-01: Bugfix #920: "Infinity" should be interpreted
-		else if (tokens.count() == 1 && tokens.get(0).equals("Infinity")) {
+		else if (tokens.size() == 1 && tokens.get(0).equals("Infinity")) {
 			value = Double.POSITIVE_INFINITY;
 		}
-		else if (tokens.count() == 2 && tokens.get(0).equals("-") && tokens.get(1).equals("Infinity")) {
+		else if (tokens.size() == 2 && tokens.get(0).equals("-") && tokens.get(1).equals("Infinity")) {
 			value = Double.NEGATIVE_INFINITY;
 		}
 		// END KGU#920 2021-02-01
@@ -8174,7 +8601,7 @@ public class Executor implements Runnable
 			boolean error423 = false;
 			// START KGU#773 2019-11-28: Bugfix #786 Since blanks have been eliminated now, we must be cautious on concatenation
 			//String expr = tokens.concatenate();
-			String expr = tokens.concatenate(null);
+			String expr = tokens.getString();
 			// END KGU#773 2019-11-28
 			// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
 			//boolean messageAugmented = false;
@@ -8221,7 +8648,7 @@ public class Executor implements Runnable
 							}
 							String indexExpr = ERROR527MATCHER.group(2);
 							if (indexExpr != null) {
-								indexExpr = Element.splitExpressionList(indexExpr, ",").get(0);
+								indexExpr = Syntax.splitExpressionList(indexExpr, ",").get(0);
 							}
 							Object potIndex = context.interpreter.eval(indexExpr);
 							// END KGU#677 2019-03-09
@@ -8252,7 +8679,7 @@ public class Executor implements Runnable
 								else {
 									// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
 									//messageAugmented = addCauseDescription(_expr, err);
-									prefixMessage = _expr;
+									prefixMessage = expr;
 									// END KGU#1024 2022-01-05
 								}
 								// END KGU#510 2019-02-13
@@ -8277,7 +8704,7 @@ public class Executor implements Runnable
 						// END KGU#677 2019-03-09
 						//throw err;
 						if (prefixMessage == null) {
-							prefixMessage = deriveCauseDescription(_expr, err);
+							prefixMessage = deriveCauseDescription(expr, err);
 						}
 						err.reThrow(prefixMessage);
 						// END KGU#1024 2022-01-05
@@ -8381,21 +8808,20 @@ public class Executor implements Runnable
 	/**
 	 * Recursively pre-evaluates array initializer expressions
 	 * 
-	 * @param _expr - the initializer as String (just for a possible error message)
 	 * @param tokens - the initializer in precomputed tokenized form
-	 * @return object that should be a ArrayList<Object>
+	 * @return object that should be an ArrayList<Object>
 	 * 
 	 * @throws EvalError
 	 */
-	private Object evaluateArrayInitializer(String _expr, StringList tokens) throws EvalError {
+	private Object evaluateArrayInitializer(TokenList tokens) throws EvalError {
 		// We have to evaluate those element values in advance, which are initializers themselves...
 //		this.evaluateExpression("Object[] tmp20160114kgu = " + tokens.concatenate(), false);
 //		value = context.interpreter.get("tmp20160114kgu");
 //		context.interpreter.unset("tmp20160114kgu");
-		StringList elementExprs = Element.splitExpressionList(tokens.subSequence(1, tokens.count()-1), ",", true);
-		int nElements = elementExprs.count();
+		ArrayList<TokenList> elementExprs = Syntax.splitExpressionList(tokens.subSequence(1, tokens.size()-1), ",");
+		int nElements = elementExprs.size();
 		if (!elementExprs.get(nElements-1).isEmpty()) {
-			throw new EvalError(control.msgInvalidExpr.getText().replace("%1", _expr), null, null);				
+			throw new EvalError(control.msgInvalidExpr.getText().replace("%1", tokens.getString()), null, null);				
 		}
 		elementExprs.remove(--nElements);
 		ArrayList<Object> valueArray = new ArrayList<Object>(nElements);
@@ -8408,22 +8834,21 @@ public class Executor implements Runnable
 	// START KGU#388 2017-09-13: Enh. #423 - accept record assignments with syntax recordVar <- typename{comp1: val1, comp2: val2, ..., compN: valN}
 	/**
 	 * Recursively pre-evaluates record initializer expressions
-	 * 
-	 * @param _expr - the expression
-	 * @param tokens - the splitting result
+	 * @param tokens - the tokenized record iniializer expression
 	 * @param recordType - the identified record type entry
+	 * 
 	 * @return the filled {@link HashMap} of component name - value pairs
 	 * 
 	 * @throws EvalError
 	 */
-	private Object evaluateRecordInitializer(String _expr, StringList tokens, TypeMapEntry recordType) throws EvalError {
+	private Object evaluateRecordInitializer(TokenList tokens, TypeMapEntry recordType) throws EvalError {
 //		this.evaluateExpression("HashMap tmp20170913kgu = new HashMap()", false);
 		// START KGU#559 2018-07-20: Enh. #563 - simplified record initializers (smarter interpretation)
 		//HashMap<String, String> components = Element.splitRecordInitializer(tokens.concatenate(null));
-		HashMap<String, String> components = Element.splitRecordInitializer(tokens.concatenate(null), recordType);
+		HashMap<String, String> components = Element.splitRecordInitializer(tokens, recordType);
 		// END KGU#559 2018-07-20
 		if (components == null || components.containsKey("§TAIL§")) {
-			throw new EvalError(control.msgInvalidExpr.getText().replace("%1", _expr), null, null);
+			throw new EvalError(control.msgInvalidExpr.getText().replace("%1", tokens.getString()), null, null);
 		}
 		HashMap<String, Object> valueRecord = new LinkedHashMap<String, Object>();
 		valueRecord.put("§TYPENAME§", components.remove("§TYPENAME§"));
@@ -8432,7 +8857,7 @@ public class Executor implements Runnable
 			if (compDefs.containsKey(comp.getKey())) {
 				// We have to evaluate the component value in advance if it is an initializer itself...
 				//context.interpreter.eval("tmp20170913kgu.put(\"" + comp.getKey() + "\", " + comp.getValue() + ");");
-				valueRecord.put(comp.getKey(), this.evaluateExpression(comp.getValue(), true, false));
+				valueRecord.put(comp.getKey(), this.evaluateExpression(new TokenList(comp.getValue()), true, false));
 			}
 			else {
 				throw new EvalError(control.msgInvalidComponent.getText().replace("%1", comp.getKey()).replace("%2", recordType.typeName), null, null);
@@ -8488,13 +8913,13 @@ public class Executor implements Runnable
 	/**
 	 * Method tries to extract the index value(s) from an expression.
 	 * 
-	 * @param ind - assumed index expression
+	 * @param indTokens - assumed index expression in tokenized form
 	 * @return The evaluated non-negative indices (if there are some).
 	 * 
 	 * @throws EvalError if no non-negative integral index can be evaluated
 	 */
 	// START KGU#1060 2022-08-21: Bugfix #1068 In case of an existing structure allow index lists
-	private int getIndexValue(String ind) throws EvalError
+	private int getIndexValue(TokenList indTokens) throws EvalError
 	// END KGU#1060 2022-08-21
 	{
 		// START KGU#141 2016-01-16: Bugfix #112
@@ -8508,7 +8933,7 @@ public class Executor implements Runnable
 			//index = Integer.parseInt(ind);	// KGU: This was nonsense - usually no literal here
 			// START KGU#1060 2022-08-21: Bugfix #1068 Was still too simple
 			//index = (Integer) this.evaluateExpression(ind, false, false);
-			index = (Integer) this.evaluateExpression(convert(ind), false, false);
+			index = (Integer) this.evaluateExpression(convertExpression(indTokens), false, false);
 			// END KGU#1060 2022-08-21
 		}
 		// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
@@ -8539,7 +8964,7 @@ public class Executor implements Runnable
 		if (index < 0)
 		{
 			// FIXME: Define LangTextHolder in Control
-			throw new EvalError(message + " on evaluating index expression: " + ind, null, null);
+			throw new EvalError(message + " on evaluating index expression: " + indTokens.getString(), null, null);
 		}
 		// END KGU#141 2016-01-16
 		return index;

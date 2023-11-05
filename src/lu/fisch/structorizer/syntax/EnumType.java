@@ -149,7 +149,7 @@ public class EnumType extends Type {
 					}
 				}
 				else {
-					StringList tokens = Syntax.splitLexically(item.getValue(), true, true);
+					TokenList tokens = new TokenList(item.getValue(), true);
 					if (interpreter == null) {
 						interpreter = new Interpreter();
 						try {
@@ -159,10 +159,10 @@ public class EnumType extends Type {
 						}
 					}
 					// Now replace all constant names by the associated expressions
-					for (int i = 0; i < tokens.count(); i++) {
+					for (int i = 0; i < tokens.size(); i++) {
 						String token = tokens.get(i);
 						if (Syntax.isIdentifier(token, false, null)
-								&& (i+1 == tokens.count() || !tokens.get(i+1).equals("("))) {
+								&& (i+1 == tokens.size() || !tokens.get(i+1).equals("("))) {
 							if (values.containsKey(token)) {
 								// An own evaluated enum constant, so get its value
 								tokens.set(i, Integer.toString(values.get(token)));
@@ -186,7 +186,7 @@ public class EnumType extends Type {
 					}
 					// Eventually, evaluate the expression
 					try {
-						Object value = interpreter.eval(tokens.concatenate());
+						Object value = interpreter.eval(tokens.getString());
 						if (value instanceof Integer) {
 							values.put(name, code = (Integer)value);
 						}

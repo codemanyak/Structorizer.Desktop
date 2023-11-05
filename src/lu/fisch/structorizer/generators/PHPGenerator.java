@@ -346,7 +346,7 @@ public class PHPGenerator extends Generator
 					if (k < tokens.size() && tokens.get(k).equals("(")) {
 						// It is a function or procedure call, k is the "(" index
 						if (token.equals("random")) {
-							ArrayList<TokenList> exprs = Syntax.splitExpressionList(tokens.subSequence(k+1, tokens.size()), ",");
+							ArrayList<TokenList> exprs = Syntax.splitExpressionList(tokens.subSequenceToEnd(k+1), ",");
 							if (exprs.size() == 2 && exprs.get(1).startsWith(")")) {
 								// Syntax seems to be okay, so ...
 								tokens.set(i, "rand");	// Replace "random" by "rand", ...
@@ -386,8 +386,8 @@ public class PHPGenerator extends Generator
 			if (root.constants.containsKey(varName)) {
 				String constVal = root.getConstValueString(varName);
 				if (constVal != null) {
-					StringList valTokens = Syntax.splitLexically(constVal, true).trim();
-					if (valTokens.count() == 1) {
+					TokenList valTokens = new TokenList(constVal, true);
+					if (valTokens.size() == 1) {
 						// Don't prefix a name that will be defined view const or define()
 						continue;
 					}}
@@ -429,7 +429,7 @@ public class PHPGenerator extends Generator
 			String prevToken = "";
 			// Find the previous non-blank token in order to decide whether it is a record type name
 			while (posPrev >= 0 && (prevToken = tokens.get(posPrev--).trim()).isEmpty());
-			ArrayList<TokenList> exprs = Syntax.splitExpressionList(tokens.subSequence(posBraceL+1, tokens.size()), ",");
+			ArrayList<TokenList> exprs = Syntax.splitExpressionList(tokens.subSequenceToEnd(posBraceL+1), ",");
 			TokenList tail = exprs.get(exprs.size()-1);
 			if (exprs.size() > 0 && tail.startsWith("}")) {
 				// Syntax is principally okay, so decide whether it is a record or array initilaizer
@@ -447,7 +447,7 @@ public class PHPGenerator extends Generator
 					newTokens.addAll(tokens.subSequence(0, posBraceL));
 					newTokens.addAll(this.transformArrayInit(exprs));
 				}
-				tokens = tail.subSequence(1, tail.size());
+				tokens = tail.subSequenceToEnd(1);
 			}
 			else {
 				// Pass all tokens upto and including the found closing brace
@@ -553,15 +553,15 @@ public class PHPGenerator extends Generator
 			
 			appendComment(_inst, _indent);
 
-			StringList lines = _inst.getUnbrokenText();
-			for (int i = 0; i < lines.count(); i++)
+			ArrayList<TokenList> lines = _inst.getUnbrokenTokenText();
+			for (int i = 0; i < lines.size(); i++)
 			{
 				// START KGU#281 2016-10-16: Enh. #271
 				//addCode(transform(_inst.getText().get(i))+";",
 				//		_indent, isDisabled);
 				// START KGU#653 2019-02-14: Enh. #680 - support for multi-var input
-				String line = lines.get(i);
-				StringList inputItems = Instruction.getInputItems(line);
+				TokenList tokens = lines.get(i);
+				StringList inputItems = Instruction.getInputItems(tokens);
 				if (inputItems != null && inputItems.count() > 1) {
 					String prompt = inputItems.get(0);;
 					// It doesn't make sense to specify the same key for all variables with same prompt
@@ -576,43 +576,44 @@ public class PHPGenerator extends Generator
 					}
 				}
 				// START KGU#840 2020-04-06: Bugfix #844 type definitions had just slipped through
-				else if (Instruction.isTypeDefinition(line)) {
-					this.appendComment(line, _indent);
+				else if (Instruction.isTypeDefinition(tokens, null)) {
+					this.appendComment(tokens.getString(), _indent);
 				}
 				// END KGU#840 2020-04-06
 				else {
 				// END KGU#653 2019-02-14
-					String transf = transform(line) + ";";
+					String transf = transform(tokens.getString()) + ";";
 					if (transf.startsWith("= $_REQUEST[")) {
 						transf = "dummyInputVar " + transf;
 					}
 					// START KGU#284 2016-10-16: Enh. #274
-					else if (Instruction.isTurtleizerMove(line)) {
+					else if (Instruction.isTurtleizerMove(tokens)) {
 						transf += " " + this.commentSymbolLeft() + " color = " + _inst.getHexColor();
 					}
 					// END KGU#284 2016-10-16
 					// START KGU#839 2020-04-06: Bugfix #843 (issues #389, #782)
-					else if (Instruction.isDeclaration(line)) {
-						StringList tokens = Syntax.splitLexically(transf, true);
+					else if (Instruction.isDeclaration(tokens)) {
+						TokenList transTokens = new TokenList(transf, true);
 						// identify declared variable - the token will start with a dollar
-						boolean mereDecl = Instruction.isMereDeclaration(line);
+						boolean mereDecl = Instruction.isMereDeclaration(tokens);
 						String varName = null;
 						// START KGU#1089 2023-10-13: Issue #980
 						if (!mereDecl) {
 						// END KGU#1089 2023-10-13
 							int posVar = 0;
-							while (posVar < tokens.count() && !tokens.get(posVar).startsWith("$")) {
+							while (posVar < transTokens.size() && !transTokens.get(posVar).startsWith("$")) {
 								posVar++;
 							}
-							if (posVar >= tokens.count() && mereDecl) {
+							if (posVar >= transTokens.size() && mereDecl) {
 								posVar = 0;
-								while (posVar < tokens.count() && !varNames.contains(tokens.get(posVar)) && !declVars.contains(tokens.get(posVar))) {
+								while (posVar < transTokens.size() && !varNames.contains(transTokens.get(posVar))
+										&& !declVars.contains(transTokens.get(posVar))) {
 									posVar++;
 								}
 							}
-							int posEqu = tokens.indexOf("=");
-							if (posVar < tokens.count() && (posEqu < 0 || posEqu > posVar)) {
-								varName = tokens.get(posVar);
+							int posEqu = transTokens.indexOf("=");
+							if (posVar < transTokens.size() && (posEqu < 0 || posEqu > posVar)) {
+								varName = transTokens.get(posVar);
 								if (varName.startsWith("$")) { varName = varName.substring(1); }
 								wasDefHandled(Element.getRoot(_inst), varName, true, false);
 							}
@@ -620,16 +621,16 @@ public class PHPGenerator extends Generator
 						//if (mereDecl) {
 							// Now we cut off all remnants of the declaration.
 							posEqu -= (posVar);	// Should still be >= 0 as there must be an assignment
-							tokens.remove(0, posVar);	// This way we should get rid of "var" or "dim"
-							int posColon = tokens.indexOf(":");
+							transTokens.remove(0, posVar);	// This way we should get rid of "var" or "dim"
+							int posColon = transTokens.indexOf(":");
 							if (posColon < 0 || posColon > posEqu) {
-								posColon = tokens.indexOf("as", false);
+								posColon = transTokens.indexOf("as", false);
 							}
 							if (posColon > 0 && posColon < posEqu) {
-								tokens.remove(posColon, posEqu);
-								tokens.insert(" ", posColon);
+								transTokens.remove(posColon, posEqu);
+								//transTokens.add(posColon, " ");
 							}
-							transf = tokens.concatenate(null);
+							transf = transTokens.getString();
 						}
 						else {
 						// END KGU#1089 2023-10-13
@@ -640,7 +641,7 @@ public class PHPGenerator extends Generator
 							//}
 							HashMap<String,TypeMapEntry> tempTypeMap = new LinkedHashMap<String,TypeMapEntry>();
 							// This revised method should reveal all declared variables
-							_inst.updateTypeMapFromLine(tempTypeMap, line, i);
+							_inst.updateTypeMapFromLine(tempTypeMap, tokens, i);
 							for (Entry<String, TypeMapEntry> entry: tempTypeMap.entrySet()) {
 								varName = entry.getKey();
 								if (wasDefHandled(root, varName, true, false)) {
@@ -677,7 +678,7 @@ public class PHPGenerator extends Generator
 									addCode(transf, _indent, isDisabled);
 								}
 								else {
-									appendComment(line, _indent);
+									appendComment(tokens.getString(), _indent);
 								}
 							// START KGU#1089 2023-10-13: Issue #980
 							}
@@ -771,13 +772,13 @@ public class PHPGenerator extends Generator
 		addCode("switch "+condition+" ", _indent, isDisabled);
 		addCode("{", _indent, isDisabled);
 
-		for (int i=0; i<_case.qs.size()-1; i++)
+		for (int i = 0; i < _case.qs.size() - 1; i++)
 		{
 			// START KGU#15 2015-11-02: Support for multiple constants per branch
 			//code.add(_indent+this.getIndent()+"case "+_case.getText().get(i+1).trim()+":");
 			// START KGU#755 2019-11-08: Bugfix #769 - more precise splitting necessary
 			//StringList constants = StringList.explode(lines.get(i+1), ",");
-			StringList constants = Element.splitExpressionList(lines.get(i + 1), ",");
+			StringList constants = Syntax.splitExpressionList(lines.get(i + 1), ",");
 			// END KGU#755 2019-11-08
 			for (int j = 0; j < constants.count(); j++)
 			{
@@ -820,10 +821,11 @@ public class PHPGenerator extends Generator
 		if (_for.isForInLoop())
 		{
 			String valueList = _for.getValueList();
-			StringList items = this.extractForInListItems(_for);
+			//StringList items = this.extractForInListItems(_for);
+			ArrayList<TokenList> items = _for.getValueListItems();
 			if (items != null)
 			{
-				valueList = "array(" + transform(items.concatenate(", "), false) + ")";
+				valueList = "array(" + transform(TokenList.concatenate(items, ", ").getString(), false) + ")";
 			}
 			else
 			{
@@ -1267,12 +1269,12 @@ public class PHPGenerator extends Generator
 					//code.add(_indent + "define('" + varName + "', " + this.transform(_root.getConstValueString(varName))+ ")");
 					// START KGU#1094 2023-10-18: Bugfix #1099
 					String constVal = _root.getConstValueString(varName);
-					StringList valTokens = new StringList();
+					TokenList valTokens = new TokenList();
 					if (constVal != null) {
-						valTokens = Syntax.splitLexically(constVal, true);
+						valTokens = new TokenList(constVal, true);
 					}
 					// Only if the value is a simple literal, this may be used as constant
-					if (valTokens.count() == 1) {
+					if (valTokens.size() == 1) {
 						code.add(_indent + "define('" + varName + "', " + this.transform(constVal)+ ")");
 					}
 					else {

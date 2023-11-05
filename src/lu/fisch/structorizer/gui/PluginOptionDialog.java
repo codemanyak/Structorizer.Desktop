@@ -74,6 +74,7 @@ import lu.fisch.structorizer.helpers.GENPlugin;
 
 import lu.fisch.structorizer.locales.LangDialog;
 import lu.fisch.structorizer.locales.LangTextHolder;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.StringList;
 
 /**
@@ -268,7 +269,7 @@ public class PluginOptionDialog extends LangDialog {
 			if (items != null && items.startsWith("{") && items.endsWith("}")) {
 				// START KGU#472 2018-01-22: Bugfix #484 - wrong string was split
 				//StringList itemVals = Element.splitExpressionList(type.substring(1, type.length()-1), ";");
-				StringList itemVals = Element.splitExpressionList(items.substring(1, items.length()-1), ";");
+				StringList itemVals = Syntax.splitExpressionList(items.substring(1, items.length()-1), ";");
 				// END KGU#472 2018-01-22
 				JComboBox<String> comp = new JComboBox<String>(itemVals.toArray());
 				comp.setEditable(false);

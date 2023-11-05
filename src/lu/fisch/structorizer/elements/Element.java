@@ -250,11 +250,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.Stack;
 import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.swing.ImageIcon;
@@ -633,22 +631,6 @@ public abstract class Element {
 	// START KGU#916 2021-01-25: Enh. #915
 	public static boolean useInputBoxCase = true;
 	// END KGU#916 2021-01-25
-	
-	// START KGU 2017-09-19: Performance tuning for syntax analysis
-	private static final Pattern BIN_PATTERN = Pattern.compile("0b[01]+");
-	private static final Pattern OCT_PATTERN = Pattern.compile("0[0-7]+");
-	private static final Pattern HEX_PATTERN = Pattern.compile("0x[0-9A-Fa-f]+");
-	//private static final java.util.regex.Pattern ARRAY_PATTERN = java.util.regex.Pattern.compile("(\\w.*)(\\[.*\\])$"); // seems to have been wrong
-	private static final Matcher RECORD_MATCHER = java.util.regex.Pattern.compile("([A-Za-z]\\w*)\\s*\\{.*\\}").matcher("");
-	// END KGU 2017-09-19
-	// START KGU#575 2018-09-17: Issue #594 - replace an obsolete 3rd-party Regex library
-	// Remark: It would not be a good idea to define the Matchers here because these aren't really constant but must be
-	// reset for any new string which is likely to cause severe concurrency trouble as the patterns are used on drawing etc.
-	private static final Pattern INC_PATTERN1 = Pattern.compile(BString.breakup("inc", true)+"[(](.*?)[,](.*?)[)](.*?)");
-	private static final Pattern INC_PATTERN2 = Pattern.compile(BString.breakup("inc", true)+"[(](.*?)[)](.*?)");
-	private static final Pattern DEC_PATTERN1 = Pattern.compile(BString.breakup("dec", true)+"[(](.*?)[,](.*?)[)](.*?)");
-	private static final Pattern DEC_PATTERN2 = Pattern.compile(BString.breakup("dec", true)+"[(](.*?)[)](.*?)");
-	// END KGU#575 2018-09-17
 	
 	// START KGU#906 2021-01-02: Enh. #905 Draw markers on elements with related Analyser reports
 	/** Defines the bit number of the canvas flag for drawing Analyser markers or not */
@@ -1302,19 +1284,19 @@ public abstract class Element {
 	 * 
 	 * @see #getBrokenTokenText()
 	 */
-	protected ArrayList<TokenList> getUnbrokenTokenText()
+	public ArrayList<TokenList> getUnbrokenTokenText()
 	{
 		ArrayList<TokenList> tt = new ArrayList<TokenList>();
 		int nLines = text.size();
 		int i = 0;
 		while (i < nLines) {
-			TokenList line = new TokenList(text.get(i));
-			while (!line.isBlank() && line.get(line.size()-1).equals("\\")
+			TokenList tokens = new TokenList(text.get(i));
+			while (!tokens.isBlank() && tokens.getLast().equals("\\")
 					&& (i + 1 < nLines)) {
-				line.remove(line.size()-1);
-				line.addAll(text.get(++i));
+				tokens.remove(tokens.size()-1);
+				tokens.addAll(text.get(++i));
 			}
-			tt.add(line);
+			tt.add(tokens);
 			i++;
 		}
 		return tt;
@@ -1550,17 +1532,17 @@ public abstract class Element {
 		}
 		HashMap<String, String> substitutions = 
 				names2aliases ? controllerName2Alias : controllerAlias2Name;
-		StringList tokens = Syntax.splitLexically(text, true);
-		for (int i = 0; i < tokens.count(); i++) {
+		TokenList tokens = new TokenList(text);
+		for (int i = 0; i < tokens.size(); i++) {
 			String token = tokens.get(i).trim();
 			if (!token.isEmpty() && Syntax.isIdentifier(token, false, null)) {
 				// Skip all whitespace
 				int j = i;
 				String nextToken = null;
-				while (++j < tokens.count() && ((nextToken = tokens.get(j).trim()).isEmpty() || nextToken.equals("\\")));
+				while (++j < tokens.size() && ((nextToken = tokens.get(j).trim()).isEmpty() || nextToken.equals("\\")));
 				// Now check for a beginning parameter list
 				if ("(".equals(nextToken)) {
-					int nArgs = Syntax.splitExpressionList(tokens.subSequence(j+1, tokens.count()), ",").size() - 1;
+					int nArgs = Syntax.splitExpressionList(tokens.subSequenceToEnd(j+1), ",").size() - 1;
 					String key = token.toLowerCase() + "#" + nArgs;
 					String subst = substitutions.get(key);
 					if (subst != null) {
@@ -1573,7 +1555,8 @@ public abstract class Element {
 				}
 			}
 		}
-		return tokens.concatenate();
+		// FIXME Why not return as TokenList?
+		return tokens.getString();
 	}
 
 	/**
@@ -1605,7 +1588,7 @@ public abstract class Element {
 				while (++j < tokens.size() && (nextToken = tokens.get(j)).isBlank());
 				// Now check for a beginning parameter list
 				if ("(".equals(nextToken)) {
-					int nArgs = Syntax.splitExpressionList(tokens.subSequence(j+1, tokens.size()), ",").size() - 1;
+					int nArgs = Syntax.splitExpressionList(tokens.subSequenceToEnd(j+1), ",").size() - 1;
 					String key = token.toLowerCase() + "#" + nArgs;
 					String subst = substitutions.get(key);
 					if (subst != null) {
@@ -2948,371 +2931,343 @@ public abstract class Element {
 		return depth / 2;
 	}
 
-	// START KGU#101 2015-12-11: Enhancement #54: We need to split expression lists (might go to a helper class)
-	/**
-	 * Splits the string {@code _text}, which is supposed to represent a list of expressions
-	 * separated by character sequences {@code _listSeparator}, into strings comprising one of
-	 * the listed expressions each.<br/>
-	 * This does not mean mere string splitting but is aware of string literals, argument lists
-	 * of function calls etc. (These must not be broken.)<br/>
-	 * The analysis stops as soon as there is a level underflow (i.e. an unmatched right parenthesis,
-	 * bracket, or the like).<br/>
-	 * The remaining string from the unsatisfied right parenthesis, bracket, or brace on will
-	 * be ignored!
-	 * @param _text - string containing one or more expressions
-	 * @param _listSeparator - a character sequence serving as separator among the expressions (default: ",") 
-	 * @return a StringList, each element of which contains one of the separated expressions (order preserved)
-	 * @see #splitExpressionList(String, String, boolean)
-	 * @see #splitExpressionList(StringList, String, boolean)
-	 */
-	public static StringList splitExpressionList(String _text, String _listSeparator)
-	// START KGU#93 2015-12-21 Bugfix #41/#68/#69
-	{
-		return splitExpressionList(_text, _listSeparator, false);
-	}
+//	// START KGU#101 2015-12-11: Enhancement #54: We need to split expression lists (might go to a helper class)
+//	/**
+//	 * Splits the string {@code _text}, which is supposed to represent a list of expressions
+//	 * separated by character sequences {@code _listSeparator}, into strings comprising one of
+//	 * the listed expressions each.<br/>
+//	 * This does not mean mere string splitting but is aware of string literals, argument lists
+//	 * of function calls etc. (These must not be broken.)<br/>
+//	 * The analysis stops as soon as there is a level underflow (i.e. an unmatched right parenthesis,
+//	 * bracket, or the like).<br/>
+//	 * The remaining string from the unsatisfied right parenthesis, bracket, or brace on will
+//	 * be ignored!
+//	 * @param _text - string containing one or more expressions
+//	 * @param _listSeparator - a character sequence serving as separator among the expressions (default: ",") 
+//	 * @return a StringList, each element of which contains one of the separated expressions (order preserved)
+//	 * @see #splitExpressionList(String, String, boolean)
+//	 * @see #splitExpressionList(StringList, String, boolean)
+//	 */
+//	public static StringList splitExpressionList(String _text, String _listSeparator)
+//	// START KGU#93 2015-12-21 Bugfix #41/#68/#69
+//	{
+//		return splitExpressionList(_text, _listSeparator, false);
+//	}
+//	
+//	/**
+//	 * Splits the string {@code _text}, which is supposed to represent a list of expressions
+//	 * separated by character sequence {@code _listSeparator}, into strings comprising one of
+//	 * the listed expressions each.<br/>
+//	 * This does not mean mere string splitting but is aware of string literals, argument lists
+//	 * of function calls etc. (These must not be broken.)<br/>
+//	 * The analysis stops as soon as there is a level underflow (i.e. an unmatched right parenthesis,
+//	 * bracket, or the like).<br/>
+//	 * The remaining string from the unsatisfied right parenthesis, bracket, or brace on will
+//	 * be added as last element to the result if {@code _appendTail} is true - otherwise there is no
+//	 * difference to method {@link #splitExpressionList(String, String)}!<br/>
+//	 * If the last result element is empty then the expression list was syntactically "clean".
+//	 * @param _text - string containing one or more expressions
+//	 * @param _listSeparator - a character sequence serving as separator among the expressions (default: ",") 
+//	 * @param _appendTail - if the remaining part of _text from the first unaccepted character on is to be added 
+//	 * @return a StringList consisting of the separated expressions (and the tail if _appendTail was true).
+//	 * @see #splitExpressionList(StringList, String, boolean)
+//	 */
+//	public static StringList splitExpressionList(String _text, String _listSeparator, boolean _appendTail)
+//	// END KGU#93 2015-12-21
+//	{
+//		//StringList expressionList = new StringList();
+//		//if (_listSeparator == null) _listSeparator = ",";
+//		
+//	// START KGU#388 2017-09-13: New subroutine
+//		//StringList tokens = Element.splitLexically(_text, true);
+//		return splitExpressionList(Syntax.splitLexically(_text.trim(), true), _listSeparator, _appendTail);
+//	}
+//	
+//	/**
+//	 * Splits the token list {@code _tokens}, which is supposed to represent a sequence of expressions
+//	 * separated by separators {@code _listSeparator}, into strings comprising one of the listed expressions
+//	 * each.<br/>
+//	 * This is aware of string literals, argument lists of function calls etc. (These must not be broken.)
+//	 * The analysis stops as soon as there is a level underflow (i.e. an unmatched right parenthesis,
+//	 * bracket, or the like).<br/>
+//	 * The remaining tokens from the unsatisfied right parenthesis, bracket, or brace on will
+//	 * be concatenated and added as last element to the result if {@code _appendTail} is true.
+//	 * If the last result element is empty in mode {@code _appendTail} then the expression list was syntactically
+//	 * "clean".<br/>
+//	 * FIXME If the expression was given without some parentheses as delimiters then a tail won't be added.
+//	 * @param _tokens - {@link StringList} of tokens representing one or more expressions
+//	 * @param _listSeparator - a character sequence serving as separator among the expressions (default: ",") 
+//	 * @param _appendTail - if the remaining part of _text from the first unaccepted character on is to be added 
+//	 * @return a StringList consisting of the separated expressions (and the tail if _appendTail was true).
+//	 * @see #splitExpressionList(String, String, boolean)
+//	 */
+//	public static StringList splitExpressionList(StringList _tokens, String _listSeparator, boolean _appendTail)
+//	{
+//
+//		StringList expressionList = new StringList();
+//		if (_listSeparator == null) _listSeparator = ",";
+//	// END KGU#388 2017-09-13
+//		int parenthDepth = 0;
+//		boolean isWellFormed = true;
+//		Stack<String> enclosings = new Stack<String>();
+//		int tokenCount = _tokens.count();
+//		// START KGU#914 2021-01-22: Bugfix - identifiers were glued in expressions if _tokens is condensed
+//		//String currExpr = "";
+//		StringList currExpr = new StringList();
+//		// END KGU#914 2021-01-22
+//		String tail = "";
+//		for (int i = 0; isWellFormed && parenthDepth >= 0 && i < tokenCount; i++)
+//		{
+//			String token = _tokens.get(i);
+//			if (token.equals(_listSeparator) && enclosings.isEmpty())
+//			{
+//				// store the current expression and start a new one
+//				// START KGU#914 2021-01-22: Bugfix - see above
+//				//expressionList.add(currExpr.trim());
+//				//currExpr = new String();
+//				expressionList.add(currExpr.trim().concatenate(null));
+//				currExpr.clear();
+//				// END KGU#914 2021-01-22
+//			}
+//			else
+//			{ 
+//				if (token.equals("("))
+//				{
+//					enclosings.push(")");
+//					parenthDepth++;
+//				}
+//				else if (token.equals("["))
+//				{
+//					enclosings.push("]");
+//					parenthDepth++;
+//				}
+//				else if (token.equals("{"))
+//				{
+//					enclosings.push("}");
+//					parenthDepth++;
+//				}
+//				else if ((token.equals(")") || token.equals("]") || token.equals("}")))
+//				{
+//					isWellFormed = parenthDepth > 0 && token.equals(enclosings.pop());
+//					parenthDepth--;
+//				}
+//				
+//				if (isWellFormed)
+//				{
+//					// START KGU#914 2021-01-22: Bugfix - see above
+//					//currExpr += token;
+//					currExpr.add(token);
+//					// END KGU#914 2021-01-22
+//				}
+//				else if (_appendTail)
+//				{
+//					// START KGU#914 2021-01-22: Bugfix - see above
+//					//expressionList.add(currExpr.trim());
+//					//currExpr = "";
+//					//tail = _tokens.concatenate("", i).trim();
+//					// START KGU#1061 2022-08-23: Bugfix #1068 an empty list generated a list with empty string
+//					//expressionList.add(currExpr.trim().concatenate(null));
+//					if (!(currExpr = currExpr.trim()).isEmpty() || !expressionList.isEmpty()) {
+//						// There must have been at least one separator - so add even an empty term
+//						expressionList.add(currExpr.concatenate(null));
+//					}
+//					// END KGU#1061 2022-08-23
+//					currExpr.clear();
+//					tail = _tokens.concatenate(null, i).trim();
+//					// END KGU#914 2021-01-22
+//				}
+//			}
+//		}
+//		// add the last expression if it's not empty
+//		if (!(currExpr = currExpr.trim()).isEmpty())
+//		{
+//			// START KGU#914 2021-01-22: Bugfix - see above
+//			//expressionList.add(currExpr);
+//			expressionList.add(currExpr.concatenate(null));
+//			// END KGU#914 2021-01-22
+//		}
+//		// Add the tail if requested. Empty if there is no bad tail
+//		if (_appendTail) {
+//			expressionList.add(tail);
+//		}
+//		return expressionList;
+//	}
+//	// END KGU#101 2015-12-11
 	
-	/**
-	 * Splits the string {@code _text}, which is supposed to represent a list of expressions
-	 * separated by character sequence {@code _listSeparator}, into strings comprising one of
-	 * the listed expressions each.<br/>
-	 * This does not mean mere string splitting but is aware of string literals, argument lists
-	 * of function calls etc. (These must not be broken.)<br/>
-	 * The analysis stops as soon as there is a level underflow (i.e. an unmatched right parenthesis,
-	 * bracket, or the like).<br/>
-	 * The remaining string from the unsatisfied right parenthesis, bracket, or brace on will
-	 * be added as last element to the result if {@code _appendTail} is true - otherwise there is no
-	 * difference to method {@link #splitExpressionList(String, String)}!<br/>
-	 * If the last result element is empty then the expression list was syntactically "clean".
-	 * @param _text - string containing one or more expressions
-	 * @param _listSeparator - a character sequence serving as separator among the expressions (default: ",") 
-	 * @param _appendTail - if the remaining part of _text from the first unaccepted character on is to be added 
-	 * @return a StringList consisting of the separated expressions (and the tail if _appendTail was true).
-	 * @see #splitExpressionList(StringList, String, boolean)
-	 */
-	public static StringList splitExpressionList(String _text, String _listSeparator, boolean _appendTail)
-	// END KGU#93 2015-12-21
-	{
-		//StringList expressionList = new StringList();
-		//if (_listSeparator == null) _listSeparator = ",";
-		
-	// START KGU#388 2017-09-13: New subroutine
-		//StringList tokens = Element.splitLexically(_text, true);
-		return splitExpressionList(Syntax.splitLexically(_text.trim(), true), _listSeparator, _appendTail);
-	}
-	
-	/**
-	 * Splits the token list {@code _tokens}, which is supposed to represent a sequence of expressions
-	 * separated by separators {@code _listSeparator}, into strings comprising one of the listed expressions
-	 * each.<br/>
-	 * This is aware of string literals, argument lists of function calls etc. (These must not be broken.)
-	 * The analysis stops as soon as there is a level underflow (i.e. an unmatched right parenthesis,
-	 * bracket, or the like).<br/>
-	 * The remaining tokens from the unsatisfied right parenthesis, bracket, or brace on will
-	 * be concatenated and added as last element to the result if {@code _appendTail} is true.
-	 * If the last result element is empty in mode {@code _appendTail} then the expression list was syntactically
-	 * "clean".<br/>
-	 * FIXME If the expression was given without some parentheses as delimiters then a tail won't be added.
-	 * @param _tokens - {@link StringList} of tokens representing one or more expressions
-	 * @param _listSeparator - a character sequence serving as separator among the expressions (default: ",") 
-	 * @param _appendTail - if the remaining part of _text from the first unaccepted character on is to be added 
-	 * @return a StringList consisting of the separated expressions (and the tail if _appendTail was true).
-	 * @see #splitExpressionList(String, String, boolean)
-	 */
-	public static StringList splitExpressionList(StringList _tokens, String _listSeparator, boolean _appendTail)
-	{
-
-		StringList expressionList = new StringList();
-		if (_listSeparator == null) _listSeparator = ",";
-	// END KGU#388 2017-09-13
-		int parenthDepth = 0;
-		boolean isWellFormed = true;
-		Stack<String> enclosings = new Stack<String>();
-		int tokenCount = _tokens.count();
-		// START KGU#914 2021-01-22: Bugfix - identifiers were glued in expressions if _tokens is condensed
-		//String currExpr = "";
-		StringList currExpr = new StringList();
-		// END KGU#914 2021-01-22
-		String tail = "";
-		for (int i = 0; isWellFormed && parenthDepth >= 0 && i < tokenCount; i++)
-		{
-			String token = _tokens.get(i);
-			if (token.equals(_listSeparator) && enclosings.isEmpty())
-			{
-				// store the current expression and start a new one
-				// START KGU#914 2021-01-22: Bugfix - see above
-				//expressionList.add(currExpr.trim());
-				//currExpr = new String();
-				expressionList.add(currExpr.trim().concatenate(null));
-				currExpr.clear();
-				// END KGU#914 2021-01-22
-			}
-			else
-			{ 
-				if (token.equals("("))
-				{
-					enclosings.push(")");
-					parenthDepth++;
-				}
-				else if (token.equals("["))
-				{
-					enclosings.push("]");
-					parenthDepth++;
-				}
-				else if (token.equals("{"))
-				{
-					enclosings.push("}");
-					parenthDepth++;
-				}
-				else if ((token.equals(")") || token.equals("]") || token.equals("}")))
-				{
-					isWellFormed = parenthDepth > 0 && token.equals(enclosings.pop());
-					parenthDepth--;
-				}
-				
-				if (isWellFormed)
-				{
-					// START KGU#914 2021-01-22: Bugfix - see above
-					//currExpr += token;
-					currExpr.add(token);
-					// END KGU#914 2021-01-22
-				}
-				else if (_appendTail)
-				{
-					// START KGU#914 2021-01-22: Bugfix - see above
-					//expressionList.add(currExpr.trim());
-					//currExpr = "";
-					//tail = _tokens.concatenate("", i).trim();
-					// START KGU#1061 2022-08-23: Bugfix #1068 an empty list generated a list with empty string
-					//expressionList.add(currExpr.trim().concatenate(null));
-					if (!(currExpr = currExpr.trim()).isEmpty() || !expressionList.isEmpty()) {
-						// There must have been at least one separator - so add even an empty term
-						expressionList.add(currExpr.concatenate(null));
-					}
-					// END KGU#1061 2022-08-23
-					currExpr.clear();
-					tail = _tokens.concatenate(null, i).trim();
-					// END KGU#914 2021-01-22
-				}
-			}
-		}
-		// add the last expression if it's not empty
-		if (!(currExpr = currExpr.trim()).isEmpty())
-		{
-			// START KGU#914 2021-01-22: Bugfix - see above
-			//expressionList.add(currExpr);
-			expressionList.add(currExpr.concatenate(null));
-			// END KGU#914 2021-01-22
-		}
-		// Add the tail if requested. Empty if there is no bad tail
-		if (_appendTail) {
-			expressionList.add(tail);
-		}
-		return expressionList;
-	}
-	// END KGU#101 2015-12-11
-	
-	// START KGU#689 2019-03-21 Issue #706
-	/**
-	 * Coagulates all token sequences starting with some kind of brackets, parenthesis,
-	 * or brace and ending with its counterpart (or with a level underflow).
-	 * @param tokens - lexically split tokens (<b>may get modified!</b>).
-	 * @return a sequence of level 0 lexical tokens and coagulated sub expressions
-	 * @see Syntax#splitLexically(String, boolean)
-	 * @see #splitExpressionList(String, String)
-	 * @see #splitExpressionList(String, String, boolean)
-	 * @see #splitExpressionList(StringList, String, boolean)
-	 */
-	public static StringList coagulateSubexpressions(StringList tokens) {
-		final StringList starters = StringList.explode("(,[,{", ",");
-		final StringList stoppers = StringList.explode("),],}", ",");
-		int ix = 0;
-		int ixLastStart = -1;
-		int level = 0;
-		while (ix < tokens.count()) {
-			String token = tokens.get(ix);
-			if (starters.contains(token)) {
-				if (level == 0) {
-					ixLastStart = ix;
-				}
-				level++;
-			}
-			else if (stoppers.contains(token)) {
-				level--;
-				if (level == 0) {
-					tokens.set(ixLastStart, tokens.concatenate("", ixLastStart, ix + 1));
-					tokens.remove(ixLastStart + 1, ix+1);
-					// START KGU#693 2019-03-24: Bugfix #711
-					ix = ixLastStart;
-					// START KGU#693 2019-03-24
-				}
-				// START KGU#693 2019-03-24: Bugfix #711 misplaced instruction, caused an eternal loop
-				//ix = ixLastStart;
-				// START KGU#693 2019-03-24
-			}
-			ix++;
-		}
-		return tokens;
-	}
-	// END KGU#689 2019-03-21
-
 	// START KGU#388 2017-09-13: Enh. #423; KGU#371 2019-03-07: Enh. #385 - parameter declDefaults added
 	/**
 	 * Extracts the parameter or component declarations from the parameter list (or
+	 * record type definition, respectively) given by {@code declText} and adds their
+	 * names and type descriptions to the respective StringList {@code declNames} and
+	 * {@code declTypes}.<br/>
+	 * CAUTION: Some elements of {@code declTypes} may be {@code null} on return!
+	 * 
+	 * @param declText - the text of the declaration inside the parentheses or braces
+	 * @param declNames - the names of the declared parameters or record components (in
+	 *    order of occurrence), or {@code null}
+	 * @param declTypes - the types of the declared parameters or record components (in
+	 *    order of occurrence), or {@code null}
+	 * @param declDefaults - the literals of the declared parameter/component defaults
+	 *    (in order of occurrence), or {@code null}
+	 */
+	protected static void extractDeclarationsFromList(String declText, StringList declNames,
+			StringList declTypes, StringList declDefaults) {
+		extractDeclarationsFromList(new TokenList(declText), declNames, declTypes, declDefaults);
+	}
+	/**
+	 * Extracts the parameter or component declarations from the tokenized parameter list (or
 	 * record type definition, respectively) given by {@code declText} and adds their names
 	 * and type descriptions to the respective StringList {@code declNames} and {@code declTypes}.<br/>
 	 * CAUTION: Some elements of {@code declTypes} may be {@code null} on return!
-	 * @param declText - the text of the declaration inside the parentheses or braces
-	 * @param declNames - the names of the declared parameters or record components (in order of occurrence), or {@code null}
-	 * @param declTypes - the types of the declared parameters or record components (in order of occurrence), or {@code null}
-	 * @param declDefaults - the literals of the declared parameter/component defaults (in order of occurrence), or {@code null}
+	 * 
+	 * @param declTokens - the tokenized text of the declaration inside the parentheses or braces
+	 * @param declNames - the names of the declared parameters or record components (in order
+	 *    of occurrence), or {@code null}
+	 * @param declTypes - the types of the declared parameters or record components (in order
+	 *    of occurrence), or {@code null}
+	 * @param declDefaults - the literals of the declared parameter/component defaults (in order
+	 *    of occurrence), or {@code null}
 	 */
-	protected static void extractDeclarationsFromList(String declText, StringList declNames, StringList declTypes, StringList declDefaults) {
-		// START KGU#371 2019-03-07: Enh. #385 - We have to face e.g. string literals in the argument list now!
-		//StringList declGroups = StringList.explode(declText,";");
-		StringList declGroups = splitExpressionList(declText, ";");
-		// END KGU#371 2019-03-07
-		for(int i = 0; i < declGroups.count(); i++)
+	protected static void extractDeclarationsFromList(TokenList declTokens, StringList declNames,
+			StringList declTypes, StringList declDefaults) {
+		// Enh. #385 We have to face e.g. string literals in the argument list (default values)!
+		ArrayList<TokenList> declGroups = Syntax.splitExpressionList(declTokens, ";");
+		for (int i = 0; i < declGroups.size() - 1; i++)
 		{
 			// common type for parameter / component group
-			String type = null;
-			String group = declGroups.get(i);
-			// START KGU#371 2019-03-07: Enh. #385 - cope with default values
-			String defltGr = null;
-			// END KGU#371 2019-03-07
+			TokenList type = null;
+			TokenList group = declGroups.get(i);
+			// Enh. #385 - cope with default values
+			TokenList defltGr = null;
 			int posColon = group.indexOf(":");
 			if (posColon >= 0)
 			{
-				type = group.substring(posColon + 1).trim();
-				group = group.substring(0, posColon).trim();
-				// START KGU#371 2019-03-07: Enh. #385 - cope with default values
-				int posEq = type.indexOf('=');
+				type = group.subSequenceToEnd(posColon + 1);
+				group = group.subSequence(0, posColon);
+				// Enh. #385 - cope with default values
+				int posEq = type.indexOf("=");
 				if (posEq >= 0) {
-					defltGr = type.substring(posEq+1).trim();
-					type = type.substring(0, posEq).trim();
+					defltGr = type.subSequenceToEnd(posEq+1);
+					type.remove(posEq, type.size());
 				}
-				// END KGU#371 2019-03-07
 			}
-			// START KGU#109 2016-01-15 Bugfix #61/#107 - was wrong, must first split by ','
-//			else if ((posColon = group.indexOf(" as ")) >= 0)
-//			{
-//				type = group.substring(posColon + " as ".length()).trim();
-//				group = group.substring(0, posColon).trim();
-//			}
-			// END KGU#109 2016-01-15
-			// START KGU#371 2019-03-07: Enh. #385 - we must face complex literals here
-			//StringList vars = StringList.explode(group,",");
-			StringList vars = splitExpressionList(group, ",");
-			// END KGU#371 2019-03-07
-			for (int j=0; j < vars.count(); j++)
+			// There may be several listed variables, must first split by ','
+			// Enh. #385 - we must face complex literals here
+			ArrayList<TokenList> vars = Syntax.splitExpressionList(group, ",");
+			for (int j = 0; j < vars.size() - 1; j++)
 			{
-				String decl = vars.get(j).trim();
-				if (!decl.isEmpty())
+				TokenList decl = vars.get(j);
+				if (!decl.isBlank())
 				{
-					String prefix = "";	// KGU#375 2017-03-30: New for enh. #388 (constants)
-					// START KGU#371 2019-03-07: Enh. #385
-					String deflt = defltGr;
-					// END KGU#371 2019-03-07
-					// START KGU#109 2016-01-15: Bugfix #61/#107 - we must split every "varName" by ' '.
-					// START KGU#371 2019-03-07: Enh. #385 - parameter lists getting more complex...
-					//if (type == null && (posColon = decl.indexOf(" as ")) >= 0)
-					StringList tokens = Syntax.splitLexically(decl, true);
-					if (type == null && (posColon = tokens.indexOf("as", false)) >= 0)
-					// END KGU#371 2019-03-07
+					String prefix = "";	// Enh. #388, for constants
+					// Enh. #385 Get default values
+					TokenList deflt = null;
+					if (defltGr != null) {
+						deflt = new TokenList(defltGr);
+					}
+					if (type == null && (posColon = decl.indexOf("as", false)) >= 0)
 					{
-						// START KGU#371 2019-03-07: Enh. #385 Scan for default / initial values
-						//type = decl.substring(posColon + " as ".length()).trim();
-						//decl = decl.substring(0, posColon).trim();
-						type = tokens.concatenate("", posColon + 1, tokens.count()).trim();
-						decl = tokens.concatenate("", 0, posColon).trim();
-						int posEq = type.indexOf('=');
+						// Enh. #385 Scan for default / initial values
+						type = decl.subSequenceToEnd(posColon + 1);
+						decl.remove(posColon, decl.size());
+						int posEq = type.indexOf("=");
 						if (posEq >= 0) {
-							deflt = type.substring(posEq+1).trim();
-							type = type.substring(0, posEq).trim();
+							deflt = type.subSequenceToEnd(posEq+1);
+							type = type.subSequence(0, posEq);
 							// The redundant 'optional' keyword is to be ignored 
-							if (decl.toLowerCase().startsWith("optional ")) {
-								decl = decl.substring("optional ".length());
+							if (!decl.isBlank() && decl.get(0).equalsIgnoreCase("optional")) {
+								decl.remove(0);
 							}
-						}						
-						// END KGU#371 2019-03-07
+						}
 					}
 					//StringList tokens = splitLexically(decl, true);
-					tokens.removeBlanks();
-					if (tokens.count() > 1) {
+					if (decl.size() > 1) {
 						// Is a C or Java array type involved? 
-						if (declGroups.count() == 1 && posColon < 0 || type == null) {
+						if (declGroups.size() == 1 && posColon < 0 || type == null) {
 							// START KGU#371 2019-03-07: Enh. #385 Scan for default / initial values
-							int posEq = tokens.indexOf("=");
+							int posEq = decl.indexOf("=");
 							if (posEq >= 0) {
 								if (deflt == null) {
-									deflt = tokens.concatenate(null, posEq + 1, tokens.count());
+									deflt = decl.subSequenceToEnd(posEq + 1);
 								}
-								tokens = tokens.subSequence(0, posEq);
+								decl.remove(posEq, decl.size());
 							}						
 							// END KGU#371 2019-03-07							
-							int posBrack1 = tokens.indexOf("[");
-							int posBrack2 = tokens.lastIndexOf("]");
+							int posBrack1 = decl.indexOf("[");
+							int posBrack2 = decl.lastIndexOf("]");
+							TokenList tokens = new TokenList(decl);
 							if (posBrack1 > 0 && posBrack2 > posBrack1) {
-								String indices = tokens.concatenate(null, posBrack1, posBrack2+1);
-								if (posBrack2 == tokens.count()-1) {
+								// FIXME This is a syntax we don't want to support, actually!
+								//String indices = tokens.concatenate(null, posBrack1, posBrack2+1);
+								ArrayList<TokenList> indices = Syntax.splitExpressionList(tokens.subSequenceToEnd(posBrack1+1), ",");
+								// TODO check this logic! Looks somewhat poor
+								if (posBrack2 == tokens.size()-1) {
 									// C-style: brackets right of the variable id
-									decl = tokens.get(posBrack1-1);
+									decl.remove(posBrack1, decl.size());
+									decl.remove(0, posBrack1-1);
 									if (posBrack1 > 1 && type == null) {
-										type = tokens.concatenate(null, 0, posBrack1-1);
-										type += indices;
+										type = tokens.subSequence(0, posBrack1-1);
+										type.add("[");
+										for (int k = 0; k < indices.size() - 1; k++) {
+											if (k > 0) {
+												type.add(",");
+											}
+											type.addAll(indices.get(k));
+										}
+										type.add("]");
 									}
 								}
 								else {
 									// Java style: brackets between element type and variable id
-									decl = tokens.concatenate(null, posBrack2+1, tokens.count());
+									decl = tokens.subSequenceToEnd(posBrack2+1);
 									if (type == null) {
-										type = tokens.concatenate(null, 0, posBrack2+1);
+										type = tokens.subSequence(0, posBrack2+1);
 									}
 								}
 							}
 							else {
 								// No brackets...
-								// START KGU#580 2018-09-24: Bugfix #605
-								if (tokens.get(0).equals("const")) {
+								if (decl.get(0).equals("const")) {
 									prefix = "const ";
-									tokens.remove(0);
+									decl.remove(0);
 								}
-								// END KGU#580 2018-09-24
-								// START KGU#371 2019-03-08: Issue #385 - We shouldn't return an empty string but null if there is no type
-								//type = tokens.concatenate(null, 0, tokens.count()-1);
-								if (tokens.count() > 1) {
-									type = tokens.concatenate(null, 0, tokens.count()-1);
+								// Issue #385 - We shouldn't return an empty string but null if there is no type
+								if (decl.size() > 1) {
+									// Type could comprise more words, e.g. unsigned int
+									type = decl.subSequence(0, decl.size()-1);
 								}
-								// END KGU#371 2019-03-07
-								decl = tokens.get(tokens.count()-1);
+								decl.remove(0, decl.size()-1);
 							}
 						}
-						// START KGU#375 2017-03-30: New for enh. #388 (constants)
-						else if (tokens.get(0).equals("const")) {
-							// START KGU#580 2018-09-24: Bugfix #605							
-							decl = decl.substring(6).trim();
-							// END KGU#580 2018-09-24
+						// Enh. #388 - Care for constant declarations
+						else if (decl.get(0).equals("const")) {
+							decl.remove(0);
 							prefix = "const ";
 						}
-						// END KGU#375 2017-03-30
 					}
 					//System.out.println("Adding parameter: " + vars.get(j).trim());
-					if (declNames != null) declNames.add(decl);
-					// START KGU#375 2017-03-30: New for enh. #388 (constants) 
-					//if (declTypes != null)	declTypes.add(type);
+					if (declNames != null) declNames.add(decl.getString());
+					// Enh. #388 Care for constant declarations
 					if (declTypes != null){
 						if (!prefix.isEmpty() || type != null) {
-							declTypes.add(prefix + type);
+							declTypes.add(prefix + type.getString());
 						}
 						else {
-							declTypes.add(type);
+							// type must be null but we cannot add it directly, because it is not a String
+							String dummy = null;
+							declTypes.add(dummy);
 						}
 					}
-					// END KGU#375 2017-03-30
-					// START KGU#371 2019-03-07: Enh. #385
+					// Enh. #385 gather the possible default values
 					if (declDefaults != null) {
-						declDefaults.add(deflt);
+						if (deflt != null) {
+							declDefaults.add(deflt.getString().trim());
+						}
+						else {
+							String dummy = null;
+							declDefaults.add(dummy);
+						}
 					}
-					// END KGU#371 2019-03-07
 				}
 			}
 		}
@@ -3336,28 +3291,54 @@ public abstract class Element {
 	 * @param _text - the initializer expression with or without typename but with braces.
 	 * @param _typeInfo - the type map entry for the corresponding record type if available
 	 * @return the component map (or null if there are no braces).
+	 * 
+	 * @deprecated prefer {@link #splitRecordInitializer(TokenList, TypeMapEntry)}
 	 */
 	public static HashMap<String, String> splitRecordInitializer(String _text, TypeMapEntry _typeInfo)
+	{
+		return splitRecordInitializer(new TokenList(_text), _typeInfo);
+	}
+	/**
+	 * Decomposes the interior of a record initializer of the form<br/>
+	 * [typename]{compname1: value1, compname2: value2, ...}<br/>
+	 * into a hash table mapping the component names to the corresponding value
+	 * strings.<br/>
+	 * If there is text following the closing brace it will be mapped to key "§TAIL§".
+	 * If the typename is given then it will be provided mapped to key "§TYPENAME§".
+	 * If {@code _typeInfo} is given and either {@code typename} was omitted or matches
+	 * name of {@code _typeInfo} then unprefixed component values will be associated
+	 * to the component names of the type in order of occurrence unless an explicit
+	 * component name prefix occurs.<br/>
+	 * If {@code _typeInfo} is null and {@code generateDummyCompNames} is {@code true}
+	 * then generic component names of form {@code "FIXME_<typename>_<i>"} may be
+	 * provided for components with missing names in the {@code _text}.
+	 * 
+	 * @param _tokens - the tokenized initializer expression with or without typename
+	 *    but with braces.
+	 * @param _typeInfo - the type map entry for the corresponding record type if available
+	 * @return the component map (or null if there are no braces).
+	 */
+	public static HashMap<String, String> splitRecordInitializer(TokenList _tokens, TypeMapEntry _typeInfo)
 	{
 		// START KGU#526 2018-08-01: Enh. #423 - effort to make the component order more stable (at higher costs, though)
 		//HashMap<String, String> components = new HashMap<String, String>();
 		HashMap<String, String> components = new LinkedHashMap<String, String>();
 		// END KGU#526 2018-08-01
-		int posBrace = _text.indexOf("{");
+		int posBrace = _tokens.indexOf("{");
 		if (posBrace < 0) {
 			return null;
 		}
-		String typename = _text.substring(0, posBrace);
+		String typename = _tokens.subSequence(0, posBrace).getString().trim();
 		if (!typename.isEmpty()) {
 			components.put("§TYPENAME§", typename);
 		}
-		StringList parts = splitExpressionList(_text.substring(posBrace+1).trim(), ",", true);
-		String tail = parts.get(parts.count()-1);
+		ArrayList<TokenList> parts = Syntax.splitExpressionList(_tokens.subSequenceToEnd(posBrace+1), ",");
+		TokenList tail = parts.get(parts.size()-1);
 		if (!tail.startsWith("}")) {
 			return null;
 		}
-		else if (!(tail = tail.substring(1).trim()).isEmpty()) {
-			components.put("§TAIL§", tail);
+		else if (tail.size() > 1) {
+			components.put("§TAIL§", tail.subSequence(1, tail.size()).getString().trim());
 		}
 		// START KGU#559 2018-07-20: Enh. #563 In case of a given type, we may guess the target fields
 		boolean guessComponents = _typeInfo != null && _typeInfo.isRecord()
@@ -3368,12 +3349,12 @@ public abstract class Element {
 			compNames = keys.toArray(new String[keys.size()]);
 		}
 		// END KGU#559 2018-07-20
-		for (int i = 0; i < parts.count()-1; i++) {
-			StringList tokens = Syntax.splitLexically(parts.get(i), true);
+		for (int i = 0; i < parts.size()-1; i++) {
+			TokenList tokens = parts.get(i);
 			int posColon = tokens.indexOf(":");
 			if (posColon >= 0) {
-				String name = tokens.subSequence(0, posColon).concatenate().trim();
-				String expr = tokens.subSequence(posColon + 1, tokens.count()).concatenate().trim();
+				String name = tokens.subSequence(0, posColon).getString().trim();
+				String expr = tokens.subSequenceToEnd(posColon + 1).getString().trim();
 				if (Syntax.isIdentifier(name, false, null)) {
 					components.put(name, expr);
 					// START KGU#559 2018-07-20: Enh. #563 Stop associating from type as soon as an explicit name is given
@@ -3383,12 +3364,12 @@ public abstract class Element {
 			}
 			// START KGU#559 2018-07-20: Enh. #563
 			else if (guessComponents && i < compNames.length) {
-				components.put(compNames[i], parts.get(i));
+				components.put(compNames[i], parts.get(i).getString());
 			}
 			// END KGU#559 2018-07-20
 			// START KGU#711 2019-11-24: Bugfix #783 workaround for missing type info
 			else if (compNames == null && !typename.isEmpty()) {
-				components.put("FIXME_" + typename + "_" + i, parts.get(i));
+				components.put("FIXME_" + typename + "_" + i, parts.get(i).getString());
 			}
 			// END KGU#711 2019-11-24
 		}
@@ -3396,200 +3377,6 @@ public abstract class Element {
 	}
 	// END KGU#388 2017-09-13
 
-	// START KGU#261 2017-02-01: Enh. #259 (type map) - moved from Instruction hitherto
-	// KGU 2017-04-14: signature enhanced by argument canonicalizeTypeNames
-	/**
-	 * Tries to derive the data type of expression {@code expr} by means of analysing literal
-	 * syntax, built-in functions and the types associated to variables registered in
-	 * the {@code typeMap}.<br/>
-	 * The returned type description (if not empty) will be structurally canonicalised (i.e. array
-	 * levels will be symbolised by a sequence of "@" prefixes, the element type names may also be
-	 * heuristically canonicalised to assumed Java equivalents.
-	 * Record (struct) initializers will be replaced by their respective type name (which must have
-	 * been declared before). 
-	 * @param typeMap - current mapping of variable names to statically concluded type information (may be null)
-	 * @param expr - the expression to be categorised
-	 * @param canonicalizeTypeNames - specifies whether contained type names are to be canonicalised
-	 * (i.e. replaced by guessed Java equivalents) 
-	 * @return a type description if available and unambiguous or an empty string otherwise
-	 */
-	public static String identifyExprType(HashMap<String, TypeMapEntry> typeMap, String expr, boolean canonicalizeTypeNames)
-	{
-		String typeSpec = "";	// This means no info
-		// 1. Check whether it's a known typed variable
-		TypeMapEntry typeEntry = null;
-		if (typeMap != null) {
-			// In case of a variable (name) we might directly get the type
-			typeEntry = typeMap.get(expr);
-			// START KGU#923 2021-02-03: Bugfix #923 complex access paths were ignored
-			if (typeEntry == null && (expr.contains(".") || expr.contains("["))) {
-				StringList tokens = Syntax.splitLexically(expr, true, true);
-				String token0 = tokens.get(0);
-				if (Syntax.isIdentifier(token0, false, null)
-						&& (typeEntry = typeMap.get(token0)) != null) {
-					// Well, that is a start.
-					typeSpec = typeEntry.getCanonicalType(true, false);
-					int nTokens = tokens.count();
-					int pos = 1;
-					while (!typeSpec.isEmpty() && (pos < nTokens)) {
-						if (tokens.get(pos).equals(".")) {
-							// Record component - or not
-							if (typeEntry == null || !typeEntry.isRecord()
-									|| pos + 1 >= nTokens
-									|| !Syntax.isIdentifier(token0 = tokens.get(pos+1), false, null)) {
-								// Something wrong here
-								return "";
-							}
-							if ((typeEntry = typeEntry.getComponentInfo(true).get(token0)) == null) {
-								return "";
-							}
-							typeSpec = typeEntry.getCanonicalType(true, false);
-							pos += 2;
-						}
-						else if (tokens.get(pos).equals("[")) {
-							StringList indexExprs = Element.splitExpressionList(tokens.subSequence(pos+1, nTokens), ",", true);
-							for (int i = 0; i < indexExprs.count()-1; i++) {
-								if (!typeSpec.startsWith("@")) {
-									return "";
-								}
-								typeSpec = typeSpec.substring(1);
-							}
-							// typeSpec should not be the name of a (record) type
-							if ((typeEntry = typeMap.get(":" + typeSpec)) != null) {
-								typeSpec = typeEntry.getCanonicalType(true, false);
-							}
-							tokens.remove(pos, nTokens);
-							tokens.add(Syntax.splitLexically(indexExprs.get(indexExprs.count()-1), true));
-							nTokens = tokens.count();
-							if (nTokens > pos && tokens.get(pos).equals("]")) {
-								// Syntax correct, drop "]", prepare next cycle
-								tokens.remove(pos);
-								nTokens--;
-							}
-							else {
-								// either "]" was missing or nonsense is following
-								return "";
-							}
-						}
-						else {
-							// Neither "." nor "[" --> Syntax error
-							return "";
-						}
-					}
-				}
-			}
-			// END KGU#923 2021-02-03
-		}
-		if (typeEntry != null) {
-			// START KGU#388 2017-07-12: Enh. #423
-			//StringList types = typeEntry.getTypes(canonicalizeTypeNames);
-			//if (types.count() == 1) {
-			//	typeSpec = typeEntry.getTypes().get(0);
-			//}
-			typeSpec = typeEntry.getCanonicalType(canonicalizeTypeNames, true);
-			// END KGU#388 2017-07-12
-		}
-		// Otherwise check if it's a built-in function with unambiguous type
-		else if (Function.isFunction(expr, false)) {
-			typeSpec = (new Function(expr).getResultType(""));
-		}
-		// START KGU#782 2019-12-02 For certain purposes, e.g. export of FOR-IN loops char detection may be essential
-		else if (expr.startsWith("'") && expr.endsWith("'") && (expr.length() == 3 || expr.length() == 4 && expr.charAt(1) == '\\')) {
-			typeSpec = "char";
-		}
-		// END KGU#782 2019-12-02
-		else if (Syntax.STRING_PATTERN.matcher(expr).matches()) {
-			typeSpec = "String";
-		}
-		// START KGU#388 2017-09-12: Enh. #423: Record initializer support (name-prefixed!)
-		else if ((RECORD_MATCHER.reset(expr)).matches() && typeMap != null){
-			typeSpec = RECORD_MATCHER.group(1);
-			if (!typeMap.containsKey(":" + typeSpec)) {
-				// It's hardly a valid prefixed record initializer...
-				typeSpec = "";
-			}
-		}
-		// END KGU#388 2017-09-12
-		// START KGU#354 2017-05-22: Enh. #354
-		// These literals cause errors with Double.parseDouble(expr) and Integer.parseInt(expr)
-		else if (BIN_PATTERN.matcher(expr).matches() || OCT_PATTERN.matcher(expr).matches() || HEX_PATTERN.matcher(expr).matches()) {
-			typeSpec = "int";
-		}
-		// END KGU#354 2017-05-22
-		// START KGU#1060 2022-08-22: Bugfix #1068 Try an array initializer
-		else if (expr.startsWith("{") && expr.endsWith("}")) {
-			StringList exprs = Element.splitExpressionList(expr.substring(1), ",", true);
-			int nExprs = exprs.count() - 1;
-			String elType = null;
-			if (nExprs > 0) {
-				elType = identifyExprType(typeMap, exprs.get(0), canonicalizeTypeNames);
-				for (int i = 1; i < nExprs; i++) {
-					String exprType = identifyExprType(typeMap, exprs.get(i), canonicalizeTypeNames);
-					if (exprType != null) {
-						if (elType == null) {
-							elType = exprType;
-						}
-						else if (!exprType.equals(elType)) {
-							elType = "???";
-							break;
-						}
-					}
-				}
-			}
-			typeSpec = "@" + elType;
-		}
-
-		// 2. If none of the approaches above succeeded check for a numeric literal
-		// START KGU#920 2021-02-03: Issue #920 Inifinity introduced as new literal
-		if (typeSpec.isEmpty() && (expr.equals("Infinity") || expr.equals("-Infinity") || expr.equals("\u221E"))) {
-			typeSpec = "double";
-		}
-		// END KGU#920 2021-02-03
-		if (typeSpec.isEmpty()) {
-			// START KGU#923 2021-02-04: Issue #923 We may at least analyse constant expressions
-			//try {
-			//	Double.parseDouble(expr);
-			//	typeSpec = "double";
-			//	Integer.parseInt(expr);
-			//	typeSpec = "int";
-			//}
-			//catch (NumberFormatException ex) {}
-			StringList tokens = Syntax.splitLexically(expr, true, true);
-			tokens.removeAll("+");
-			tokens.removeAll("-");
-			tokens.removeAll("*");
-			tokens.removeAll("/");
-			tokens.removeAll("%");
-			for (int i = 0; i < tokens.count(); i++) {
-				String token = tokens.get(i);
-				String subType = null;
-				try {
-					Double.parseDouble(token);
-					subType = "double";
-					Integer.parseInt(token);
-					subType = "int";
-				}
-				catch (NumberFormatException ex) {}
-				if (subType == null) {
-					typeSpec = "";
-					break;
-				}
-				if (typeSpec.isEmpty()) {
-					typeSpec = subType;
-				}
-				else if (typeSpec.equals("double") || subType.equals("double")) {
-					typeSpec = "double";
-				}
-			}
-			// END KGU#923 2021-02-04
-		}
-		// Check for boolean literals
-		if (typeSpec.isEmpty() && (expr.equals("true") || expr.equals("false"))) {
-			typeSpec = "boolean";
-		}
-		return typeSpec;
-	}
-	// END KGU#261 2017-02-01
 	
 //	// START KGU#1057 2022-08-20: Enh. #1066 Interactive input assistent
 //	/**
@@ -3895,7 +3682,7 @@ public abstract class Element {
 			Set<String> variableSet = _elem.getVariableSetFor(_elem);
 			// END KGU#686 2019-03-16
 
-			StringList parts = Syntax.splitLexically(_text, true);
+			TokenList parts = new TokenList(_text, true);
 
 			// START KGU#701 2019-03-29: Issue #718 Derived fonts now cached in static fields
 			//Font boldFont = new Font(Element.font.getName(), Font.BOLD, Element.font.getSize());
@@ -4040,13 +3827,13 @@ public abstract class Element {
 			// END KGU#116 2015-12-23
 			String ioSign = null;
 			for (String ioKey: new String[] {"input", "output"}) {
-				StringList splitKey = Syntax.splitLexically(Syntax.getKeywordOrDefault(ioKey, ioKey), false);
+				TokenList splitKey = new TokenList(Syntax.getKeywordOrDefault(ioKey, ioKey), false);
 				// START KGU#1031 2022-05-31: Bugfix #1037
 				//if (parts.indexOf(splitKey, 0, Syntax.ignoreCase) == 0) {
 				if (parts.indexOf(splitKey, 0, !Syntax.ignoreCase) == 0) {
 				// END KGU#1031 2022-05-31
-					ioSign = parts.concatenate("", 0, splitKey.count());
-					parts.remove(1, splitKey.count());
+					ioSign = parts.subSequence(0, splitKey.size()).getString();
+					parts.remove(1, splitKey.size());
 					parts.set(0, ioSign);
 					break;
 				}
@@ -4054,10 +3841,10 @@ public abstract class Element {
 			String jumpSign = null;
 			if (ioSign == null) {
 				for (String jumpKey: new String[] {"preLeave", "preReturn", "preExit", "preThrow"}) {
-					StringList splitKey = Syntax.splitLexically(Syntax.getKeywordOrDefault(jumpKey, jumpKey.substring(3).toLowerCase()), false);
+					TokenList splitKey = new TokenList(Syntax.getKeywordOrDefault(jumpKey, jumpKey.substring(3).toLowerCase()), false);
 					if (parts.indexOf(splitKey, 0, Syntax.ignoreCase) == 0) {
-						jumpSign = parts.concatenate("", 0, splitKey.count());
-						parts.remove(1, splitKey.count());
+						jumpSign = parts.subSequence(0, splitKey.size()).getString();
+						parts.remove(1, splitKey.size());
 						parts.set(0, jumpSign);
 						break;
 					}
@@ -4090,14 +3877,14 @@ public abstract class Element {
 				parts.replaceAll("<>", "!=");
 				parts.replaceAll("\u2264", "<=");
 				parts.replaceAll("\u2265", ">=");
-				parts.replaceAllCi("not", "!");
-				parts.replaceAllCi("and", "&&");
-				parts.replaceAllCi("or", "||");
-				parts.replaceAllCi("xor", "^");
-				parts.replaceAllCi("div", "/");
-				parts.replaceAllCi("mod", "%");
-				parts.replaceAllCi("shl", "<<");
-				parts.replaceAllCi("shr", ">>");
+				parts.replaceAll("not", "!", false);
+				parts.replaceAll("and", "&&", false);
+				parts.replaceAll("or", "||", false);
+				parts.replaceAll("xor", "^", false);
+				parts.replaceAll("div", "/", false);
+				parts.replaceAll("mod", "%", false);
+				parts.replaceAll("shl", "<<", false);
+				parts.replaceAll("shr", ">>", false);
 			}
 			// END KGU#872 2020-10-17
 
@@ -4106,8 +3893,16 @@ public abstract class Element {
 			boolean lastWasNormal = false;
 			// END KGU#701 2019-03-29
 			synchronized (hlUnits) {
-				for (int i = 0; i < parts.count(); i++)
+				for (int i = 0; i < parts.size(); i++)
 				{
+					// START KGU#790 2023-11-05: In TokenLists, the space is to be handled separately
+					int gap = parts.getPadding(i)[0];
+					if (gap > 0) {
+						normalText.append(" ".repeat(gap));
+						lastWasNormal = true;
+					}
+					// END KGU#790 2023-11-05
+					
 					String display = parts.get(i);
 
 					if (!display.equals(""))
@@ -4228,8 +4023,8 @@ public abstract class Element {
 							boolean wasHandled = false;
 							// END KGU#903 3021-01-01
 							int j = i;
-							while (j < parts.count() && parts.get(++j).trim().isEmpty());
-							if (j < parts.count() && parts.get(j).equals("(")) {
+							while (j < parts.size() && parts.get(++j).trim().isEmpty());
+							if (j < parts.size() && parts.get(j).equals("(")) {
 								if (Element.controllerAlias2Name.containsKey(display.toLowerCase())) {
 									// Replace the name and show it underlined
 									// START KGU#701 2019-03-29: Issue #718
@@ -4468,25 +4263,26 @@ public abstract class Element {
      * @param _instructionsOnly - if {@code true} then only the texts of Instruction elements are included
      * @return the composed {@link StringList}
      */
-    public StringList getFullText(boolean _instructionsOnly)
+    public ArrayList<TokenList> getFullText(boolean _instructionsOnly)
     {
     	// The default...
-    	StringList sl = new StringList();
+    	ArrayList<TokenList> sl = new ArrayList<TokenList>();
     	this.addFullText(sl, _instructionsOnly);
     	return sl;
     }
     
     /**
-     * Appends all the texts held within this element and its substructure to the given StringList.
+     * Appends all the tokenized texts held within this element and its substructure to the given list.
      * The argument _instructionsOnly controls whether mere expressions like logical conditions or
      * even call statements are included. As a rule, no lines that may not potentially introduce new
      * variables are added if true (which not only reduces time and space requirements but also avoids
      * "false positives" in variable detection). 
      * (To be overridden by structured subclasses)
-     * @param _lines - the StringList to append to 
+     * 
+     * @param _lines - the list of TokenLists to append to 
      * @param _instructionsOnly - if true then texts not possibly containing variable declarations are omitted
      */
-    protected abstract void addFullText(StringList _lines, boolean _instructionsOnly);
+    protected abstract void addFullText(ArrayList<TokenList> _lines, boolean _instructionsOnly);
     // END KGU 2015-10-16
     
     /**
@@ -4510,12 +4306,14 @@ public abstract class Element {
      * </ul></li>
      * </ul>
      * @return a padded intermediate language equivalent of the stored text
+     * 
+     * @see #getIntermediateTokenText()
      */
     public StringList getIntermediateText()
     {
         var interSl = new StringList();
-        StringList lines = this.getUnbrokenText();
-        for (int i = 0; i < lines.count(); i++)
+        ArrayList<TokenList> lines = this.getUnbrokenTokenText();
+        for (int i = 0; i < lines.size(); i++)
         {
             interSl.add(transformIntermediate(lines.get(i)).getString());
         }
@@ -4555,96 +4353,24 @@ public abstract class Element {
         return interTt;
     }
     
-    /**
-     * Translates the Pascal procedure calls {@code inc(var), inc(var, offs), dec(var)},
-     * and {@code dec(var, offs)} into simple assignments in Structorizer syntax. 
-     * @param code - the piece of text possibly containing {@code inc} or {@code dec} references
-     * @return the transformed string.
-     */
-    public static String transform_inc_dec(String code)
-    {
-        code = INC_PATTERN1.matcher(code).replaceAll("$1 <- $1 + $2");
-        code = INC_PATTERN2.matcher(code).replaceAll("$1 <- $1 + 1");
-        code = DEC_PATTERN1.matcher(code).replaceAll("$1 <- $1 - $2");
-        code = DEC_PATTERN2.matcher(code).replaceAll("$1 <- $1 - 1");
-        return code;
-    }
+//    /**
+//     * Translates the Pascal procedure calls {@code inc(var), inc(var, offs), dec(var)},
+//     * and {@code dec(var, offs)} into simple assignments in Structorizer syntax.
+//     * 
+//     * @param code - the piece of text possibly containing {@code inc} or {@code dec} references
+//     * @return the transformed string.
+//     * 
+//     * @deprecated prefer {@link #transform_inc_dec(TokenList)}
+//     */
+//    public static String transform_inc_dec(String code)
+//    {
+//        code = INC_PATTERN1.matcher(code).replaceAll("$1 <- $1 + $2");
+//        code = INC_PATTERN2.matcher(code).replaceAll("$1 <- $1 + 1");
+//        code = DEC_PATTERN1.matcher(code).replaceAll("$1 <- $1 - $2");
+//        code = DEC_PATTERN2.matcher(code).replaceAll("$1 <- $1 - 1");
+//        return code;
+//    }
     
-    /**
-     * Creates a (hopefully) lossless representation of the {@code _text} String as a
-     * tokens list of a common intermediate language (code generation phase 1).
-     * This allows the language-specific Generator subclasses to concentrate
-     * on the translation into their target language (code generation phase 2).
-     * Conventions of the intermediate language:<br/>
-     * Operators (note the surrounding spaces - no double spaces will exist):
-     * <ul>
-     * <li>Assignment:		"<-"</li>
-     * <li>Comparison:		"=", "<", ">", "<=", ">=", "<>"</li>
-     * <li>Logic:			"&&", "||", "!", "^"</li>
-     * <li>Arithmetics:		usual Java operators</li>
-     * <li>Control key words:<ul>
-     *   <li>If, Case:		none (wiped off)</li>
-     *   <li>While, Repeat:	none (wiped off)</li>
-     *   <li>For:			unchanged</li>
-     *   <li>Forever:		none (wiped off)</li>
-     * </ul></li>
-     * </ul>
-     * @param _text - a line of the Structorizer element
-     * //@return a padded intermediate language equivalent of the stored text
-     * @return a StringList consisting of tokens translated into a unified intermediate language
-     */
-    // START KGU#93 2015-12-21: Bugfix #41/#68/#69
-    //public static String transformIntermediate(String _text)
-    public static TokenList transformIntermediate(String _text)
-    {
-        //final String regexMatchers = ".?*+[](){}\\^$";
-        
-        String interm = " " + _text + " ";
-        // START KGU 2016-01-13: Bugfix #104 - should have been done after the loop only
-        interm = interm.trim();
-        // END KGU 2016-01-13
-        
-        // START KGU#93 2015-12-21 Bugfix #41/#68/#69 Get rid of padding defects and string damages
-        //interm = unifyOperators(interm);
-        // END KGU#93 2015-12-21
-        
-        // START KGU 2015-11-30: Adopted from Root.getVarNames(): 
-        // pascal: convert "inc" and "dec" procedures
-        // (Of course we could omit it for Pascal, and for C offsprings there are more efficient translations, but this
-        // works for all, and so we avoid trouble.
-        // START KGU#575 2018-09-17: Issue #594 - replace obsolete 3rd-party Regex library
-        //Regex r;
-        //r = new Regex(BString.breakup("inc")+"[(](.*?)[,](.*?)[)](.*?)","$1 <- $1 + $2"); interm = r.replaceAll(interm);
-        //r = new Regex(BString.breakup("inc")+"[(](.*?)[)](.*?)","$1 <- $1 + 1"); interm = r.replaceAll(interm);
-        //r = new Regex(BString.breakup("dec")+"[(](.*?)[,](.*?)[)](.*?)","$1 <- $1 - $2"); interm = r.replaceAll(interm);
-        //r = new Regex(BString.breakup("dec")+"[(](.*?)[)](.*?)","$1 <- $1 - 1"); interm = r.replaceAll(interm);
-        interm = transform_inc_dec(interm);
-        // END KGU#575 2018-09-17
-        // END KGU 2015-11-30
-
-        // START KGU#93 2015-12-21 Bugfix #41/#68/#69 Get rid of padding defects and string damages
-        // Reduce multiple space characters
-        //interm = interm.replace("  ", " ");
-        //interm = interm.replace("  ", " ");	// By repetition we eliminate the remnants of odd-number space sequences
-        //return interm/*.trim()*/;
-
-        TokenList tokens = new TokenList(interm, true);
-        
-        // START KGU#165 2016-03-26: Now keyword search with/without case
-        // START KGU#790 2021-10-25: Delegated to Syntax
-        //cutOutRedundantMarkers(tokens);
-        Syntax.removeDecorators(tokens);
-        // END KGU#790 2021-10-25
-        // END KGU#165 2016-03-26
-        
-        Syntax.unifyOperators(tokens, false);
-        
-        return tokens;
-        // END KGU#93 2015-12-21
-
-    }
-    // END KGU#18/KGU#23 2015-10-24
-
 	/**
 	 * Translates the Pascal procedure calls {@code inc(var), inc(var, offs), dec(var)},
 	 * and {@code dec(var, offs)} into simple assignments in Structorizer syntax.
@@ -4654,70 +4380,114 @@ public abstract class Element {
 	 */
 	public static TokenList transform_inc_dec(TokenList code)
 	{
-		int pos = -1;
-		String[][] substPairs = new String[][] {
-			{"inc", " + "},
-			{"dec", " - "}
-		};
-		TokenList argListEnd = new TokenList(")");
-		TokenList transf = new TokenList(code);
-		for (String[] pair: substPairs) {
-			TokenList funcPattern = new TokenList(pair[0] + "(");
-			while ((pos = transf.indexOf(funcPattern, pos+1, false)) >= 0) {
-				ArrayList<TokenList> argExprs = Syntax.splitExpressionList(transf.subSequence(pos + 2, transf.size()), ",");
-				int nArgs = argExprs.size() - 1;
-				if (argExprs.get(nArgs).startsWith(argListEnd, true) &&
-						nArgs >= 1 && nArgs <= 2) {
-					transf.remove(pos, pos + argExprs.get(0).size() + 1);
-					if (nArgs == 1) {
-						transf.add(pos, "1");
-					}
-					else {
-						transf.addAll(pos, argExprs.get(1));
-					}
-					transf.add(pos, pair[1]);
-					transf.addAll(pos, argExprs.get(0));
-					transf.add(pos, " <- ");
-					transf.addAll(pos, argExprs.get(0));
-				}
+//		TokenList argListEnd = new TokenList(")");
+//		TokenList transf = new TokenList(code); // Avoid to backfeed argument modifications
+//		for (String[] pair: substPairs) {
+//			TokenList funcPattern = new TokenList(pair[0] + "(");
+//			while ((pos = transf.indexOf(funcPattern, pos+1, false)) >= 0) {
+//				ArrayList<TokenList> argExprs = Syntax.splitExpressionList(transf.subSequenceToEnd(pos + 2), ",");
+//				int nArgs = argExprs.size() - 1;
+//				if (argExprs.get(nArgs).startsWith(argListEnd, true) &&
+//						nArgs >= 1 && nArgs <= 2) {
+//					transf.remove(pos, pos + argExprs.get(0).size() + 1);
+//					if (nArgs == 1) {
+//						transf.add(pos, "1");
+//					}
+//					else {
+//						transf.addAll(pos, argExprs.get(1));
+//					}
+//					transf.add(pos, pair[1]);
+//					transf.addAll(pos, argExprs.get(0));
+//					transf.add(pos, " <- ");
+//					transf.addAll(pos, argExprs.get(0));
+//				}
+//			}
+//		}
+//		return transf;
+		// Since inc and dec are procedures they can only be placed at the very beginning
+		Function incOrDec = new Function(code);
+		int arity = 0;
+		String name = null;
+		if (incOrDec.isFunction() && (arity = incOrDec.paramCount()) >= 1 && arity <= 2 &&
+				((name = incOrDec.getName().toLowerCase()).equals("inc") || name.equals("dec"))) {
+			TokenList variable = incOrDec.getParamTokens(0);
+			code = new TokenList(variable);
+			code.add(" <- ");
+			code.addAll(variable);
+			if (name.equals("inc")) {
+				code.add(" + ");
 			}
+			else {
+				code.add(" - ");
+			}
+			if (arity == 1) {
+				code.add("1");
+			}
+			else {
+				code.addAll(incOrDec.getParamTokens(1));
+			}
+		}
+		return code;
+	}
+
+	/**
+	 * Translates the Pascal procedure calls {@code insert(w, s, i), delete(s, i, n)} into
+	 * Java-compatible assignments with the respective Structorizer functions:<br/>
+	 * {@code s <- insert(w, s, i)}<br/>
+	 * {@code s <- delete(s, i, n)}<br/>
+	 * 
+	 * @param code - the tokenized text possibly containing {@code insert} or {@code delete}
+	 *     references.
+	 * @return the transformed string.
+	 */
+	public static TokenList transform_insert_delete(TokenList code)
+	{
+		Function insOrDel = new Function(code);
+		String name = null;
+		TokenList transf = code;
+		if (insOrDel.isFunction() && insOrDel.paramCount() == 3 &&
+				((name = insOrDel.getName().toLowerCase()).equals("insert") || name.equals("delete"))) {
+			TokenList variable = insOrDel.getParamTokens(name.equals("insert") ? 1 : 0);
+			transf = new TokenList(variable);
+			transf.add(" <- ");
+			transf.addAll(code);
 		}
 		return transf;
 	}
 
-    /**
-     * Creates a (hopefully) lossless representation of the {@code _text} String as a
-     * tokens list of a common intermediate language (code generation phase 1).
-     * This allows the language-specific Generator subclasses to concentrate
-     * on the translation into their target language (code generation phase 2).
-     * Conventions of the intermediate language:<br/>
-     * Operators (note the surrounding spaces - no double spaces will exist):
-     * <ul>
-     * <li>Assignment:		"<-"</li>
-     * <li>Comparison:		"=", "<", ">", "<=", ">=", "<>"</li>
-     * <li>Logic:			"&&", "||", "!", "^"</li>
-     * <li>Arithmetics:		usual Java operators</li>
-     * <li>Control key words:<ul>
-     *   <li>If, Case:		none (wiped off)</li>
-     *   <li>While, Repeat:	none (wiped off)</li>
-     *   <li>For:			unchanged</li>
-     *   <li>Forever:		none (wiped off)</li>
-     * </ul></li>
-     * </ul>
-     * @param _text - a line of the Structorizer element
-     * //@return a padded intermediate language equivalent of the stored text
-     * @return a StringList consisting of tokens translated into a unified intermediate language
-     */
-    
-    // START KGU#93 2023-10-29: Bugfix #41/#68/#69
-    public static TokenList transformIntermediate(TokenList tokens)
-    {
-        TokenList interm = transform_inc_dec(tokens);
-        Syntax.removeDecorators(interm);
-        Syntax.unifyOperators(interm, false);
-        return interm;
-    }
-    // END KGU#18/KGU#23 2023-10-29
+	/**
+	 * Creates a (hopefully) lossless representation of the {@code _text} String as a
+	 * tokens list of a common intermediate language (code generation phase 1).
+	 * This allows the language-specific Generator subclasses to concentrate
+	 * on the translation into their target language (code generation phase 2).
+	 * Conventions of the intermediate language:<br/>
+	 * Operators (note the surrounding spaces - no double spaces will exist):
+	 * <ul>
+	 * <li>Assignment:		"<-"</li>
+	 * <li>Comparison:		"=", "<", ">", "<=", ">=", "<>"</li>
+	 * <li>Logic:			"&&", "||", "!", "^"</li>
+	 * <li>Arithmetics:		usual Java operators</li>
+	 * <li>Control key words:<ul>
+	 *   <li>If, Case:		none (wiped off)</li>
+	 *   <li>While, Repeat:	none (wiped off)</li>
+	 *   <li>For:			unchanged</li>
+	 *   <li>Forever:		none (wiped off)</li>
+	 * </ul></li>
+	 * </ul>
+	 * @param _text - a line of the Structorizer element
+	 * //@return a padded intermediate language equivalent of the stored text
+	 * @return a StringList consisting of tokens translated into a unified intermediate language
+	 */
+
+	// START KGU#93 2023-10-29: Bugfix #41/#68/#69
+	public static TokenList transformIntermediate(TokenList tokens)
+	{
+		TokenList interm = transform_inc_dec(tokens);
+		Syntax.removeDecorators(interm);
+		Syntax.unifyOperators(interm, false);
+		return interm;
+	}
+	// END KGU#18/KGU#23 2023-10-29
     
     // START KGU#162 2016-03-31: Enh. #144 - undispensible part of transformIntermediate
     // START KGU#790 2021-10-25: Issue #800 replaced by Syntax.removeDecorators(StringList)
@@ -4899,7 +4669,7 @@ public abstract class Element {
 		for (int i = 0; i < _prefNames.length; i++)
 		{
 			TokenList splitKey = _splitOldKeys.get(_prefNames[i]);
-			if (splitKey != null)
+			if (splitKey != null && !splitKey.isBlank())
 			{
 				//TokenList subst = new TokenList(Syntax.getSplitKeyword(_prefNames[i]));
 				TokenList subst = Syntax.getSplitKeyword(_prefNames[i]);

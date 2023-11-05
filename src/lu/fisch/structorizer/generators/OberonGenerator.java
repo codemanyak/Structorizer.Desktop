@@ -24,6 +24,8 @@
 
 package lu.fisch.structorizer.generators;
 
+import java.util.ArrayList;
+
 /******************************************************************************************************
  *
  *      Author:         Klaus-Peter Reimers
@@ -563,16 +565,16 @@ public class OberonGenerator extends Generator {
 			
 			appendComment(_inst, _indent);
 
-			String outputKey = Syntax.getKeyword("output");
-			StringList lines = _inst.getUnbrokenText();
-			for (int i=0; i<lines.count(); i++)
+			TokenList outputKey = Syntax.getSplitKeyword("output");
+			ArrayList<TokenList> lines = _inst.getUnbrokenTokenText();
+			for (int i = 0; i < lines.size(); i++)
 			{
 				// START KGU#1089 2023-10-17: Issue #980 Ensure line-specific suppression is lifted
 				isDisabled = _inst.isDisabled(false);
 				// END KGU#1089 2023-10-17
 				// START KGU#101/KGU#108 2015-12-20 Issue #51/#54
 				//code.add(_indent+transform(_inst.getText().get(i))+";");
-				String line = lines.get(i);
+				TokenList tokens = lines.get(i);
 				// START KGU#236 2016-08-10: Issue #227: Simplification by delegation
 //				String matcherInput = "^" + getKeywordPattern(CodeParser.input);
 //				String matcherOutput = "^" + getKeywordPattern(CodeParser.output);
@@ -581,7 +583,7 @@ public class OberonGenerator extends Generator {
 //				boolean isInput = (line.trim()+" ").matches(matcherInput + "(.*)");			// only non-empty input instructions relevant  
 //				boolean isOutput = (line.trim()+" ").matches(matcherOutput + "(.*)"); 	// also empty output instructions relevant
 				// END KGU#236 2016-08-10
-				if (Instruction.isInput(line))
+				if (Instruction.isInput(tokens))
 				{
 					// START KGU#236 2016-08-10: Issue #227 - moved to the algorithm start now
 					//code.add(_indent + "In.Open;");
@@ -602,12 +604,12 @@ public class OberonGenerator extends Generator {
 					//	insertComment("TODO: Replace \"TYPE\" by the the actual In procedure name for this type!", _indent);
 					//}
 					//addCode(transf, _indent, isDisabled);
-					StringList inputItems = Instruction.getInputItems(line);
+					StringList inputItems = Instruction.getInputItems(tokens);
 					if (inputItems.count() > 2) {
 						String inputKey = Syntax.getKeyword("input");
 						String prompt = inputItems.get(0);
 						if (!prompt.isEmpty()) {
-							generateTypeSpecificOutput(prompt, _indent, isDisabled, outputKey);
+							generateTypeSpecificOutput(new TokenList(prompt), _indent, isDisabled, outputKey.getString());
 						}
 						//appendComment("TODO: Replace \"TYPE\" by the the actual In procedure name for the respective type!", _indent);
 						for (int j = 1; j < inputItems.count(); j++) {
@@ -619,7 +621,8 @@ public class OberonGenerator extends Generator {
 						}
 					}
 					else {
-						String transf = transform(line).replace("In.TYPE()", "In.Char(dummyInputChar)") + ";";
+						// FIXME Don't descend to string level
+						String transf = transform(tokens.getString()).replace("In.TYPE()", "In.Char(dummyInputChar)") + ";";
 						if (transf.contains("In.TYPE(")) {
 							// START KGU#761 2019-11-12: Enh. #775 - slightly more intelligence is feasible here
 							//appendComment("TODO: Replace \"TYPE\" by the the actual In procedure name for this type!", _indent);
@@ -631,15 +634,15 @@ public class OberonGenerator extends Generator {
 					// END KGU#653 2019-02-14
 					// END KGU#281 2016-10-15
 				}
-				else if (Instruction.isOutput(line))
+				else if (Instruction.isOutput(tokens))
 				{
-					StringList expressions = Element.splitExpressionList(line.substring(outputKey.length()).trim(), ",");
+					ArrayList<TokenList> expressions = Syntax.splitExpressionList(tokens.subSequenceToEnd(outputKey.size()), ",");
 					// Produce an output instruction for every expression (according to type)
-					for (int j = 0; j < expressions.count(); j++)
+					for (int j = 0; j < expressions.size(); j++)
 					{
 						// START KGU#236 2016-10-15: Issue #227 - For literals, we can of course determine the type...
 						//addCode(transform(outputKey + " " + expressions.get(j)) + ";", _indent, isDisabled);
-						generateTypeSpecificOutput(expressions.get(j), _indent, isDisabled, outputKey);
+						generateTypeSpecificOutput(expressions.get(j), _indent, isDisabled, outputKey.getString());
 						// END KGU#236 2016-10-15
 					}
 					addCode("Out.Ln;", _indent, isDisabled);
@@ -648,19 +651,21 @@ public class OberonGenerator extends Generator {
 				//else
 				// START KGU#504 2018-03-13: Bugfix #520, #521 - consider transformation suppression
 				//else if (!Instruction.isTypeDefinition(line))
-				else if (this.suppressTransformation || !Instruction.isTypeDefinition(line))
+				else if (this.suppressTransformation || !Instruction.isTypeDefinition(tokens, null))
 				// START KGU#504 2018-03-13: Bugfix #520, #521 - consider transformation suppression
 				// END KGU#388 2017-10-24
 				{
 					// START KGU#100/#KGU#141 2016-01-16: Enh. #84 + Bugfix #112 - array handling
 					//code.add(_indent + transform(line) + ";");
-					boolean isConstant = line.toLowerCase().startsWith("const ");
-					String transline = transform(line);
-					int asgnPos = transline.indexOf(":=");
+					boolean isConstant = !tokens.isBlank() && tokens.get(0).equalsIgnoreCase("const");
+					// FIXME shouldn't transform AFTER the structural analysis?
+					String transline = transform(tokens.getString());
+					TokenList transTokens = new TokenList(transline);
+					int asgnPos = transTokens.indexOf(":=");
 					boolean isComplexInit = false;
 					// START KGU#1089 2023-10-17: Issue #980 Suppress defective declarations
-					StringList tokens = Syntax.splitLexically(line, true);
-					tokens.removeAll(" ");
+					//StringList tokens = Syntax.splitLexically(line, true);
+					//tokens.removeAll(" ");
 					if (asgnPos > 0 && Instruction.getAssignedVarname(tokens, false) == null) {
 						isDisabled = true;
 					}
@@ -668,18 +673,19 @@ public class OberonGenerator extends Generator {
 					// START KGU#100 2016-01-16: Enh. #84 - resolve array initialisation
 					// START KGU#504 2018-03-13: Bugfix #520, #521
 					//if (asgnPos >= 0 && transline.contains("{") && transline.contains("}"))
-					if (!this.suppressTransformation && asgnPos >= 0 && transline.contains("{") && transline.contains("}"))
+					if (!this.suppressTransformation && asgnPos >= 0 && transline.contains("{")
+							&& transline.contains("}"))
 					// END KGU#504 2018-03-13
 					{
-						String varName = transline.substring(0, asgnPos).trim();
-						String expr = transline.substring(asgnPos+":=".length()).trim();
+						TokenList varName = transTokens.subSequence(0, asgnPos);
+						TokenList expr = transTokens.subSequenceToEnd(asgnPos+1);
 						int bracePos = expr.indexOf("{");
-						isComplexInit = bracePos == 0 && expr.endsWith("}");
+						isComplexInit = bracePos == 0 && expr.getLast().equals("}");
 						if (isComplexInit)
 						{
 							// START KGU#560 2018-07-22: Bugfix #564
-							if (Instruction.isDeclaration(line) && varName.contains("[")) {
-								varName = varName.substring(0, varName.indexOf('['));
+							if (Instruction.isDeclaration(tokens) && varName.contains("[")) {
+								varName = varName.subSequence(0, varName.indexOf("["));
 							}
 							// END KGU#56 2018-07-22
 							// START KGU#100 2017-10-24: Enh. #84
@@ -690,19 +696,19 @@ public class OberonGenerator extends Generator {
 //								addCode(varName + "[" + el + "] := " + elements.get(el) + ";",
 //										_indent, isDisabled);
 //							}
-							StringList elements = Element.splitExpressionList(
-									expr.substring(1, expr.length()-1), ",");
-							this.generateArrayInit(varName, elements, _indent, isDisabled);
+							ArrayList<TokenList> elements = Syntax.splitExpressionList(
+									expr.subSequence(1, expr.size()-1), ",");
+							this.generateArrayInit(varName.getString(), elements, _indent, isDisabled);
 							// END KGU#100 2017-10-24
 						}
 						// START KGU#388 2017-10-24: Enh. #423 cope with record initializers
-						else if (bracePos > 0 && expr.endsWith("}")
-								&& Syntax.isIdentifier(expr.substring(0, bracePos), false, null))
+						else if (bracePos == 1 && expr.getLast().equals("}")
+								&& Syntax.isIdentifier(expr.get(0), false, null))
 						{
 							isComplexInit = true;
 							// START KGU#559 2018-07-22: Enh. #563
 							//this.generateRecordInit(varName, expr, _indent, isConstant, isDisabled);
-							this.generateRecordInit(varName, expr, _indent, isConstant, isDisabled, typeMap.get(":"+expr.substring(0, bracePos)));
+							this.generateRecordInit(varName.getString(), expr, _indent, isConstant, isDisabled, typeMap.get(":"+expr.get(0)));
 							// END KGU#559 2018-07-22
 						}
 						// END KGU#388 2017-10-24
@@ -713,7 +719,7 @@ public class OberonGenerator extends Generator {
 						// START KGU#277/KGU#284 2016-10-13/16: Enh. #270 + Enh. #274
 						//code.add(_indent + transline + ";");
 						transline += ";";
-						if (Instruction.isTurtleizerMove(line)) {
+						if (Instruction.isTurtleizerMove(tokens)) {
 							transline += " " + this.commentSymbolLeft() + " color = " + _inst.getHexColor() + " " + this.commentSymbolRight();
 						}
 						// START KGU 2017-01-31: return must be capitalized here
@@ -798,37 +804,44 @@ public class OberonGenerator extends Generator {
 
 	// START KGU#236 2016-10-15: Issue #227 - For literals, we can of course determine the type...
 	/**
-	 * Generates an Oberon output command for expression {@code expr}
-	 * @param _expression - the expression the value of which is to be output
+	 * Generates an Oberon output command for expression {@code _expression}
+	 * 
+	 * @param _expression - tokenized expression the value of which is to be output
 	 * @param _indent - current source line indentation (as string)
 	 * @param _isDisabled - whether the element is disabled
-	 * @param _outputKey -
+	 * @param _outputKey - a general output keyword (still to be transformed)
 	 */
-	protected void generateTypeSpecificOutput(String _expression, String _indent, boolean _isDisabled,
+	protected void generateTypeSpecificOutput(TokenList _expression, String _indent, boolean _isDisabled,
 			String _outputKey) {
 		String procName = "";
 		String length = "";
-		try {
-			Double.parseDouble(_expression);
-			procName = "Real";
-			length = ", 10";
-		}
-		catch (NumberFormatException ex) {}
-		try {
-			Integer.parseInt(_expression);
-			procName = "Int";
-			length = ", 10";
-		}
-		catch (NumberFormatException ex) {}
-		if (procName.isEmpty() && (_expression.startsWith("\"") || _expression.startsWith("'"))
-				&& Syntax.splitLexically(_expression, true).count() == 1) {
-			procName = "String";
+		if (_expression.size() == 1) {
+			String literal = _expression.get(0);
+			try {
+				Double.parseDouble(literal);
+				procName = "Real";
+				length = ", 10";
+			}
+			catch (NumberFormatException ex) {}
+			try {
+				Integer.parseInt(literal);
+				procName = "Int";
+				length = ", 10";
+			}
+			catch (NumberFormatException ex) {}
+			if (procName.isEmpty() 
+					&& literal.length() >= 2
+					&& (literal.startsWith("\"") && literal.endsWith("\"")
+							|| literal.startsWith("'") && literal.endsWith("'") && literal.length() != 3)) {
+				procName = "String";
+			}
 		}
 		// START KGU#332 2017-01-30: Enh. #335 Identify variable types if possible
-		if (procName.isEmpty() && Syntax.isIdentifier(_expression, false, ".")) {
+		String exprStr = _expression.getString();
+		if (procName.isEmpty() && Syntax.isIdentifier(exprStr, false, ".")) {
 			// START KGU#388 2017-10-24: Enh. 423
 			//TypeMapEntry typeInfo = typeMap.get(expr);
-			String[] nameParts = _expression.split("[.]");
+			String[] nameParts = exprStr.split("[.]");
 			String topVar = nameParts[0];
 			TypeMapEntry typeInfo = typeMap.get(topVar);
 			int level = 1;
@@ -860,7 +873,7 @@ public class OberonGenerator extends Generator {
 					}
 					else if (type.equals("REAL") || type.equals("LONGREAL")) {
 						procName = "Real";
-						length = ", 10";										
+						length = ", 10";
 					}
 					else if (type.equalsIgnoreCase("STRING") || type.matches("ARRAY(\\s\\d+)? OF CHAR")) {
 						procName = "String";
@@ -872,7 +885,8 @@ public class OberonGenerator extends Generator {
 			}
 		}
 		// END KGU#332 2017-01-30
-		String codeLine = transform(_outputKey + " " + _expression).replace("%LEN%", length) + ";";
+		// FIXME Don't descend to string level
+		String codeLine = transform(_outputKey + " " + exprStr).replace("%LEN%", length) + ";";
 		if (!procName.isEmpty()) {
 			codeLine = codeLine.replace("Out.TYPE(", "Out."+procName+"(");
 		}
@@ -886,13 +900,14 @@ public class OberonGenerator extends Generator {
 	// START KGU#388 2017-10-23: Enh. #423 (copied from PasGenerator)
 	/**
 	 * Appends the code for an array initialisation of variable {@code _varName} from
-	 * the pre-transformed expression {@code _expr}.
+	 * the pre-transformed expression {@code _exprExprs}.
+	 * 
 	 * @param _varName - name of the variable to be initialized
-	 * @param _elemExprs - transformed initializer
+	 * @param _elemExprs - list of tokenized transformed initializer elements
 	 * @param _indent - current indentation string
 	 * @param _isDisabled - whether the source element is disabled (means to comment out the code)
 	 */
-	private void generateArrayInit(String _varName, StringList _elements, String _indent, boolean _isDisabled) {
+	private void generateArrayInit(String _varName, ArrayList<TokenList> _elemExprs, String _indent, boolean _isDisabled) {
 		appendComment("Hint: Automatically decomposed array initialization", _indent);
 		if (_varName.matches("\\w+\\[.*\\]")) {
 			_varName = _varName.replace("]", ", ");
@@ -900,13 +915,13 @@ public class OberonGenerator extends Generator {
 		else {
 			_varName = _varName + "[";
 		}
-		for (int ix = 0; ix < _elements.count(); ix++)
+		for (int ix = 0; ix < _elemExprs.size(); ix++)
 		{
 			// START KGU#560 2018-07-22: Bugfix #564
 			//addCode(_varName + ix + "] := " + 
 			//		_elements.get(ix) + ";",
 			//		_indent, _isDisabled);
-			generateAssignment(_varName + ix + "]", _elements.get(ix), _indent, _isDisabled);
+			generateAssignment(_varName + ix + "]", _elemExprs.get(ix), _indent, _isDisabled);
 			// END KGU#560 2018-07-22
 		}
 	}
@@ -915,13 +930,13 @@ public class OberonGenerator extends Generator {
 	 * Appends the code for a record initialisation of variable {@code _varName} from
 	 * the pre-transformed expression {@code _expr}.
 	 * @param _varName - name of the variable to be initialized
-	 * @param _expr - transformed initializer
+	 * @param _expr - tokenized transformed initializer
 	 * @param _indent - current indentation string
 	 * @param _forConstant - whether this initializer is needed for a constant (a variable otherwise)
 	 * @param _isDisabled - whether the source element is disabled (means to comment out the code)
 	 * @param _recType - used for component name retrieval if the initializer omits them (may be null)
 	 */
-	private void generateRecordInit(String _varName, String _expr, String _indent, boolean _forConstant, boolean _isDisabled, TypeMapEntry _recType)
+	private void generateRecordInit(String _varName, TokenList _expr, String _indent, boolean _forConstant, boolean _isDisabled, TypeMapEntry _recType)
 	{
 		// START KGU#559 2018-07-22: Enh. #563
 		//HashMap<String, String> components = Instruction.splitRecordInitializer(_expr);
@@ -933,7 +948,7 @@ public class OberonGenerator extends Generator {
 		// START KGU#1021 2021-12-05: Bugfix #1024 Instruction might be defective
 		if (components == null) {
 			appendComment("ERROR: defective record initializer in diagram:", _indent);
-			appendComment(_expr, _indent);
+			appendComment(_expr.getString(), _indent);
 			return;
 		}
 		// END KGU#1021 2021-12-05
@@ -944,7 +959,7 @@ public class OberonGenerator extends Generator {
 				// START KGU#560 2018-07-22: Enh. #564 - on occasion of #563, we fix recursive initializers, too
 				//addCode(_varName + "." + compName + " := " + comp.getValue() + ";",
 				//		_indent, _isDisabled);
-				generateAssignment(_varName + "." + compName, comp.getValue(), _indent, _isDisabled);
+				generateAssignment(_varName + "." + compName, new TokenList(comp.getValue()), _indent, _isDisabled);
 				// END KGU#560 2018-07-22
 			}
 		}
@@ -956,33 +971,33 @@ public class OberonGenerator extends Generator {
 	 * Generates code that decomposes possible initializers into a series of separate assignments if
 	 * there no compact translation, otherwise just adds appropriate transformed code.
 	 * @param _target - the left side of the assignment (without modifiers!)
-	 * @param _expr - the expression in Structorizer syntax
+	 * @param _exprTokens - the tokenized expression in Structorizer syntax
 	 * @param _indent - current indentation level (as String)
 	 * @param _isDisabled - indicates whether the code is o be commented out
 	 */
-    private void generateAssignment(String _target, String _expr, String _indent, boolean _isDisabled) {
-		if (_expr.contains("{") && _expr.endsWith("}")) {
-			StringList pureExprTokens = Syntax.splitLexically(_expr, true, true);
-			int posBrace = pureExprTokens.indexOf("{");
-			if (pureExprTokens.count() >= 3 && posBrace <= 1) {
-				if (posBrace == 1 && Syntax.isIdentifier(pureExprTokens.get(0), false, null)) {
+    private void generateAssignment(String _target, TokenList _exprTokens, String _indent, boolean _isDisabled) {
+		if (_exprTokens.contains("{") && _exprTokens.endsWith("}")) {
+			int posBrace = _exprTokens.indexOf("{");
+			if (_exprTokens.size() >= 3 && posBrace <= 1) {
+				if (posBrace == 1 && Syntax.isIdentifier(_exprTokens.get(0), false, null)) {
 					// Record initializer
-					String typeName = pureExprTokens.get(0);							
+					String typeName = _exprTokens.get(0);							
 					TypeMapEntry recType = this.typeMap.get(":"+typeName);
-					this.generateRecordInit(_target, _expr, _indent, false, _isDisabled, recType);
+					this.generateRecordInit(_target, _exprTokens, _indent, false, _isDisabled, recType);
 				}
 				else {
 					// Array initializer
-					StringList items = Element.splitExpressionList(pureExprTokens.subSequence(1, pureExprTokens.count()-1), ",", true);
-					this.generateArrayInit(_target, items.subSequence(0, items.count()-1), _indent, _isDisabled);
+					ArrayList<TokenList> items = Syntax.splitExpressionList(_exprTokens.subSequence(1, _exprTokens.size()-1), ",");
+					items.remove(items.size()-1); // Get rid of the tail
+					this.generateArrayInit(_target, items, _indent, _isDisabled);
 				}
 			}
 			else {
-				addCode(_target + " := " + _expr + ";", _indent, _isDisabled);
+				addCode(_target + " := " + _exprTokens.getString() + ";", _indent, _isDisabled);
 			}
 		}
 		else {
-			addCode(_target + " := " + _expr + ";", _indent, _isDisabled);
+			addCode(_target + " := " + _exprTokens.getString() + ";", _indent, _isDisabled);
 		}
 	}
 	// END KGU#560 2018-07-22

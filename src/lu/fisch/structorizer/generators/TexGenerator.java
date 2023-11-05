@@ -351,36 +351,35 @@ public class TexGenerator extends Generator {
 	protected void generateCode(Instruction _inst, String _indent)
 	{
 		if (!_inst.isDisabled(true)) {
-			StringList lines = _inst.getUnbrokenText();
-			for (int i=0; i<lines.count(); i++)
+			ArrayList<TokenList> lines = _inst.getUnbrokenTokenText();
+			for (int i = 0; i < lines.size(); i++)
 			{
 				// START KGU#483 2017-12-30: Enh. #497
 				//code.add(_indent+"\\assign{\\("+transform(lines.get(i))+"\\)}");
-				String line = lines.get(i);
-				if (Instruction.isTypeDefinition(line)) {
+				TokenList tokens = lines.get(i);
+				if (Instruction.isTypeDefinition(tokens, null)) {
 					code.add(_indent+"\\assign{%");
 					code.add(_indent+this.getIndent() + "\\begin{declaration}[type:]");
 					// get the type name
-					StringList tokens = Syntax.splitLexically(line, true, true);
 					String typeName = tokens.get(1);
 					code.add(_indent+this.getIndent()+this.getIndent() + "\\description{" + typeName + "}{"
-							+ transform(tokens.concatenate(" ", 3)) + "}");
+							+ transform(tokens.subSequenceToEnd(3).getString()) + "}");
 					code.add(_indent+this.getIndent() + "\\end{declaration}");
 					code.add(_indent + "}");
 				}
-				else if (!Instruction.isAssignment(line) && Instruction.isDeclaration(line)) {
+				else if (!Instruction.isAssignment(tokens) && Instruction.isDeclaration(tokens)) {
 					code.add(_indent+"\\assign{%");
 					code.add(_indent+this.getIndent() + "\\begin{declaration}[variable:]");
 					// get the variable name
-					StringList tokens = Syntax.splitLexically(line + "<-", true, true);
+					//StringList tokens = Syntax.splitLexically(line + "<-", true, true);
 					String varName = Instruction.getAssignedVarname(tokens, false);
 					code.add(_indent+this.getIndent()+this.getIndent() + "\\description{" + varName + "}{"
-							+ transform(line) + "}");
+							+ transform(tokens.getString()) + "}");
 					code.add(_indent+this.getIndent() + "\\end{declaration}");
 					code.add(_indent + "}");
 				}
 				else {
-					code.add(_indent+"\\assign{\\("+transform(lines.get(i))+"\\)}");
+					code.add(_indent+"\\assign{\\("+transform(tokens.getString())+"\\)}");
 				}
 				// END KGU#483 2017-12-30
 			}

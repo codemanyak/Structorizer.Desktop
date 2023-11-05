@@ -19,8 +19,6 @@
  */
 package lu.fisch.structorizer.syntax;
 
-import java.util.ArrayList;
-
 /******************************************************************************************************
  *
  *      Author:         Kay Gürtzig
@@ -42,6 +40,7 @@ import java.util.ArrayList;
  *                                      appendToTokenList() method family,
  *                                      embedded Operator class extended with a translation option to function/method
  *      Kay Gürtzig     2021-11-08      Support for ternary conditional operator (? :) added
+ *      Kay Gürtzig     2023-11-04      Implementation adapted from StringList to TokenList
  *
  ******************************************************************************************************
  *
@@ -52,9 +51,11 @@ import java.util.ArrayList;
  *
  ******************************************************************************************************///
 
+import java.util.ArrayList;
 import java.util.Arrays;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.NoSuchElementException;
@@ -92,10 +93,11 @@ public class Expression {
 	 * Structorizer operator precedence map (the higher the value the higher the precedence).<br/>
 	 * Parentheses {@code ()} are not members because they will be eliminated on constructing the
 	 * syntax tree (redundant).
+	 * 
 	 * @see #toString()
-	 * @see #toString(int)
-	 * @see #appendToTokenList(StringList, HashMap)
-	 * @see #appendToTokenList(StringList, HashMap, Byte)
+	 * @see #asTokenList()
+	 * @see #appendToTokenList(TokenList, HashMap)
+	 * @see #appendToTokenList(TokenList, HashMap, Byte)
 	 */
 	@SuppressWarnings("serial")
 	public static final HashMap<String, Byte> OPERATOR_PRECEDENCE = new HashMap<String, Byte>() {{
@@ -138,6 +140,40 @@ public class Expression {
 		put("&1", (byte) 11);	// address (C)
 		put("[]", (byte) 12);
 		put(".", (byte) 12);
+	}};
+	
+	/**
+	 * A set of unambiguous numerical operator symbols, for type inference
+	 */
+	@SuppressWarnings("serial")
+	private static final HashSet<String> OPERATOR_SET_NUM1 = new HashSet<String>()
+	{{
+		add("%");
+		add("div");
+		add("mod");
+		add("<<");
+		add(">>");
+		add(">>>");
+		add("shl");
+		add("shr");
+		add("|");
+		add("&");
+		add("^");
+		add("xor");
+		add("~");
+	}};
+	// "-,*,/,+1,-1"
+	/**
+	 * A set of possible numerical operator symbols, for type inference
+	 */
+	@SuppressWarnings("serial")
+	private static final HashSet<String> OPERATOR_SET_NUM2 = new HashSet<String>()
+	{{
+		add("-");
+		add("*");
+		add("/");
+		add("+1");
+		add("-1");
 	}};
 	
 	/** Logical literals ("false" and "true") */
@@ -301,7 +337,7 @@ public class Expression {
 	 *    (whereas the dot in a method call is handled as {@code OPERATOR}) </li>
 	 * <li>{@code PARENTH} symbolizes an opening parenthesis and is only temporarily
 	 *    used within the shunting yard algorithm in
-	 *    {@link Expression#parse(StringList, StringList, short)}</li>
+	 *    {@link Expression#parse(TokenList, StringList, short)}</li>
 	 * </ul>
 	 */
 	public static enum NodeType {
@@ -403,16 +439,17 @@ public class Expression {
 	/**
 	 * Provides the estimated number of tokens this expression<ul>
 	 * <li>a) was derived from (if {@code _fromPositions} is {@code true});</li>
-	 * <li>b) would be written with in standard representation (if {@code _fromPositions} is {@code false}).</li>
+	 * <li>b) would be written with in standard representation (if {@code _fromPositions}
+	 *      is {@code false}).</li>
 	 * </ul>
 	 * Note that neither of the results may be exactly equal to the true number
 	 * of tokens of the originally parsed expressions string because enclosing
-	 * parentheses will not leave a trace in the nodes whereas on writing superfluous
+	 * parentheses will not leave a trace in the nodes whereas on writing, superfluous
 	 * parentheses won't be inserted again while auxiliary parentheses might be
-	 * added, in particular with ternary operators
+	 * added, in particular with ternary operators.
 	 * 
 	 * @return the estimated number of tokens this expression was derived from or
-	 * be represented with.
+	 *     would be represented with.
 	 * 
 	 * @see #getNodeCount()
 	 */
@@ -424,10 +461,9 @@ public class Expression {
 			nTokens = posRange[1] - posRange[0] + 1;
 		}
 		else {
-			StringList tokens = new StringList();
+			TokenList tokens = new TokenList();
 			this.appendToTokenList(tokens);
-			tokens.removeBlanks();
-			nTokens = tokens.count();
+			nTokens = tokens.size();
 		}
 		return nTokens;
 	}
@@ -506,8 +542,22 @@ public class Expression {
 	 */
 	@Override
 	public String toString() {
-		return toString(-1, null);
+		return toTokenList(-1, null).getString();
 	}
+	
+	/**
+	 * Returns this expression as {@link TokenList} in Structorizer-compatible
+	 * syntax.
+	 * 
+	 * @return this expression as (linear) {@link TokenList}
+	 */
+	public TokenList asTokenList()
+	{
+		TokenList tokens = new TokenList();
+		appendToTokenList(tokens, (byte)-1, null);
+		return tokens;
+	}
+	
 	/**
 	 * Returns this expression as linearized string in Structorizer-compatible
 	 * syntax, assuming that this expression is embedded as operand of an operator
@@ -516,26 +566,27 @@ public class Expression {
 	 * @param parentPrec - the assumed parent operator precedence
 	 * @param _alternOprs - alternative operator specifications (differing symbol
 	 * or precedence).
-	 * @return the composed expression string
+	 * @return the composed expression as {@link TokenList}
 	 * 
 	 * @see #OPERATOR_PRECEDENCE
-	 * @see #appendToTokenList(StringList)
-	 * @see #appendToTokenList(StringList, HashMap)
-	 * @see #appendToTokenList(StringList, byte, HashMap)
+	 * @see #appendToTokenList(TokenList)
+	 * @see #appendToTokenList(TokenList, HashMap)
+	 * @see #appendToTokenList(TokenList, byte, HashMap)
 	 */
-	private String toString(int parentPrec, HashMap<String, Operator> _alternOprs)
+	private TokenList toTokenList(int parentPrec, HashMap<String, Operator> _alternOprs)
 	{
-		StringList tokens = new StringList();
+		TokenList tokens = new TokenList();
 		appendToTokenList(tokens, (byte)parentPrec, _alternOprs);
-		return tokens.concatenate(null);
+		return tokens;
 	}
+
 	
 	/**
 	 * Given an operator symbol mapping to alternative operator symbols and preferences,
 	 * returns a translated linear expression string.
 	 * 
 	 * @param _operatorSpecs - maps operator symbols from the key set of {@link #OPERATOR_PRECEDENCE}
-	 * to pairs of target operator symbol, and preference.
+	 *    to pairs of target operator symbol, and preference.
 	 * @return the linearized expression
 	 * 
 	 * @see #toString()
@@ -544,18 +595,18 @@ public class Expression {
 	 */
 	public String translate(HashMap<String, Operator> _operatorSpecs)
 	{
-		return this.toString(-1, _operatorSpecs);
+		return this.toTokenList(-1, _operatorSpecs).getString();
 	}
 	
 	/**
 	 * Append this expression tree in tokenized form to the given token list {@code tokens}.
 	 * Uses standard operator precedence table {@link #OPERATOR_PRECEDENCE}.
 	 * 
-	 * @param tokens - a non-null {@link #toString(int)} to append my tokens to.
+	 * @param tokens - a non-null {@link #TokenList} to append my tokens to.
 	 * 
-	 * @see #appendToTokenList(StringList, HashMap)
+	 * @see #appendToTokenList(TokenList, HashMap)
 	 */
-	public void appendToTokenList(StringList tokens)
+	public void appendToTokenList(TokenList tokens)
 	{
 		appendToTokenList(tokens, (byte)-1, null);
 	}
@@ -568,14 +619,14 @@ public class Expression {
 	 * equivalent translation to target languages may be addressed. A given empty map will
 	 * force parentheses around any non-atomic sub-expression.
 	 * 
-	 * @param tokens - a non-null {@link StringList} to append my tokens to.
+	 * @param tokens - a non-null {@link TokenList} to append my tokens to.
 	 * @param alternOprs - a customized operator precedence map (if empty, then composed
 	 * operand expressions will be parenthesized).
 	 * 
-	 * @see #appendToTokenList(StringList)
-	 * @see #appendToTokenList(StringList, byte, HashMap)
+	 * @see #appendToTokenList(TokenList)
+	 * @see #appendToTokenList(TokenList, byte, HashMap)
 	 */
-	public void appendToTokenList(StringList tokens, HashMap<String, Operator> alternOprs)
+	public void appendToTokenList(TokenList tokens, HashMap<String, Operator> alternOprs)
 	{
 		appendToTokenList(tokens, (byte)-1, alternOprs);
 	}
@@ -588,17 +639,17 @@ public class Expression {
 	 * equivalent translation to target languages may be addressed. A given empty map will
 	 * force parentheses around any non-atomic sub-expression.
 	 * 
-	 * @param tokens - a non-null {@link StringList} to append my tokens to.
+	 * @param tokens - a non-null {@link TokenList} to append my tokens to.
 	 * @param parentPrec - the operator precedence of the operator this expression forms an
 	 *     operand for. -1 means there is no parent operator.
 	 * @param alternOprs - a customized operator precedence map (if empty, then composed
 	 *     operand expressions will be parenthesized).
 	 * 
-	 * @see #appendToTokenList(StringList)
+	 * @see #appendToTokenList(TokenList)
 	 */
-	private void appendToTokenList(StringList tokens, byte parentPrec, HashMap<String, Operator> alternOprs)
+	private void appendToTokenList(TokenList tokens, byte parentPrec, HashMap<String, Operator> alternOprs)
 	{
-		String[] sepa = new String[]{};
+		String sepa = "";
 		switch (type) {
 		case LITERAL:
 		case IDENTIFIER:
@@ -645,25 +696,24 @@ public class Expression {
 				//}
 				// Insert an opening parenthesis in function style
 				if (asFunc) {
-					sepa = new String[]{"("};
+					sepa = "(";
 				}
 				// Insert a gap if the operator is an identifier (word)
 				else if (Syntax.isIdentifier(symbol, false, null)) {
-					tokens.add(" ");
+					tokens.setPadding(tokens.size()-1, -1, 1);
 				}
 			}
 			// Without pointers, there is no need to put parentheses if parent is . or []
 			else if (noPrec
 				|| myPrec < parentPrec && !(myPrec < 11 && parentPrec == 12)) {
-				sepa = new String[]{"("};
+				sepa = "(";
 			}
 			if (asFunc && opr.argumentOrder.length > 0) {
 				// Specific processing for functions/methods with specified order
-				for (int i = 0; i < sepa.length; i++) tokens.add(sepa[i]);
+				tokens.add(sepa);
 				for (int i = 1; i < opr.argumentOrder.length; i++) {
 					if (i > 1) {
-						tokens.add(",");
-						tokens.add(" ");
+						tokens.add(", ");
 					}
 					int pos = opr.argumentOrder[i] - 1;
 					if (pos < this.children.size()) {
@@ -674,9 +724,9 @@ public class Expression {
 			else {
 				// Standard processing for operators and functions
 				boolean isFirst = true;
-				final String[] comma =  new String[]{",", " "};
+				final String comma =  ", ";
 				for (Expression child: children) {
-					for (int i = 0; i < sepa.length; i++) tokens.add(sepa[i]);
+					tokens.add(sepa);
 					child.appendToTokenList(tokens, asFunc ? 0 : myPrec, alternOprs);
 					if (asFunc) {
 						sepa = comma;
@@ -684,7 +734,7 @@ public class Expression {
 					else if (text.equals("[]")) {
 						// The first operand was the array, now the indices will follow
 						if (isFirst) {
-							sepa = new String[]{symbol.substring(0, 1)};
+							sepa = symbol.substring(0, 1);
 						}
 						else {
 							sepa = comma;
@@ -692,10 +742,10 @@ public class Expression {
 					}
 					// Put a gap around all operators except "."
 					else if (!text.equals(".")) {
-						sepa = new String[]{" ", symbol, " "};
+						sepa = " " + symbol + " ";
 					}
 					else {
-						sepa = new String[]{symbol};
+						sepa = symbol;
 					}
 					isFirst = false;
 				}
@@ -752,9 +802,7 @@ public class Expression {
 						tokens.add(")");
 					}
 					if (ix < symbols.length) {
-						tokens.add(" ");
-						tokens.add(symbols[ix++]);
-						tokens.add(" ");
+						tokens.add(" " + symbols[ix++] + " ");
 					}
 				}
 				tokens.add(")");
@@ -767,8 +815,7 @@ public class Expression {
 				}
 				for (int i = 0; i < Math.min(order.length, children.size()); i++) {
 					if (i > 0) {
-						tokens.add(",");
-						tokens.add(" ");
+						tokens.add(", ");
 					}
 					if (order[i] < children.size()) {
 						children.get(order[i]).appendToTokenList(tokens, parentPrec, alternOprs);
@@ -799,9 +846,9 @@ public class Expression {
 		case ARRAY_INITIALIZER:
 			tokens.add("{");
 			for (Expression child: children) {
-				for (int i = 0; i < sepa.length; i++) tokens.add(sepa[i]);
+				tokens.add(sepa);
 				child.appendToTokenList(tokens, alternOprs);;
-				sepa = new String[]{",", " "};
+				sepa = ", ";
 			}
 			tokens.add("}");
 			break;
@@ -817,9 +864,9 @@ public class Expression {
 			tokens.add(text);
 			tokens.add("(");
 			for (Expression child: children) {
-				for (int i = 0; i < sepa.length; i++) tokens.add(sepa[i]);
+				tokens.add(sepa);
 				child.appendToTokenList(tokens, alternOprs);
-				sepa = new String[]{",", " "};
+				sepa = ", ";
 			}
 			tokens.add(")");
 			break;
@@ -832,9 +879,9 @@ public class Expression {
 			int ix = 0;
 			for (Expression child: children) {
 				if (ix > 0) {	// First child was the target object, skip it here
-					for (int i = 0; i < sepa.length; i++) tokens.add(sepa[i]);
+					tokens.add(sepa);
 					child.appendToTokenList(tokens, alternOprs);
-					sepa = new String[]{",", " "};
+					sepa = ", ";
 				}
 				ix++;
 			}
@@ -1091,7 +1138,7 @@ public class Expression {
 						dType = floatEntry;
 					}
 				}
-				else if (StringList.explode("%,div,mod,<<,>>,>>>,shl,shr,|,&,^,xor,~", ",").contains(text)) {
+				else if (OPERATOR_SET_NUM1.contains(text.toLowerCase())) {
 					if (allSame && allNumeric && floatEntry == null) {
 						// Should actually better be integer
 						dType = operandTypes[0];
@@ -1101,7 +1148,7 @@ public class Expression {
 						dType = TypeRegistry.getStandardType("int");
 					}
 				}
-				else if (StringList.explode("-,*,/,+1,-1", ",").contains(text) && allNumeric) {
+				else if (OPERATOR_SET_NUM2.contains(text) && allNumeric) {
 					if (allNumeric) {
 						if (allSame) {
 							dType = operandTypes[0];
@@ -1220,7 +1267,7 @@ public class Expression {
 	 * list will usually contain a single element. Raises an exception in case of
 	 * syntactical errors.
 	 * 
-	 * @param tokens - a {@link StringList} containing the tokenized (and not necessarily
+	 * @param tokens - a {@link TokenList} containing the tokenized (and not necessarily
 	 *     unified) expression text, will be consumed on parsing until a first token
 	 *     that does not fit well. Spaces will be eliminated (if still present).
 	 * @param stopTokens - a {@link StringList} containing possible delimiters,
@@ -1764,10 +1811,11 @@ public class Expression {
 	 * Recursively gathers variable names occurring in this expression tree,
 	 * differentiating between assigned variables (on the left-hand side of
 	 * an assignment) and merely referenced variables (all else).
+	 * 
 	 * @param assignedVars - {@link StringList} to add assigned variables
 	 * @param usedVars - {@link StringList} to add referenced variables
 	 * @param isLeftSide - whether this expression was found on the left-hand
-	 * side of an assignment (may also be a record or array root)
+	 *    side of an assignment (may also be a record or array root)
 	 * @return {@code true} if there is no structure inconsistency, {@code false} otherwise.
 	 */
 	public boolean gatherVariables(StringList assignedVars, StringList usedVars, boolean isLeftSide)
@@ -1865,8 +1913,8 @@ public class Expression {
 	 * 
 	 * @return total number of replacements
 	 * 
-	 * @see Syntax#unifyOperators(StringList, boolean)
-	 * @see #appendToTokenList(StringList, HashMap)
+	 * @see Syntax#unifyOperators(TokenList, boolean)
+	 * @see #appendToTokenList(TokenList, HashMap)
 	 */
 	public int unifyOperators()
 	{

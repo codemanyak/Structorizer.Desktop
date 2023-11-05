@@ -82,6 +82,7 @@ package lu.fisch.structorizer.elements;
 
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Vector;
 
@@ -487,19 +488,14 @@ public class For extends Element implements ILoop {
 	 * @see lu.fisch.structorizer.elements.Element#addFullText(lu.fisch.utils.StringList, boolean)
 	 */
 	@Override
-	protected void addFullText(StringList _lines, boolean _instructionsOnly)
+	protected void addFullText(ArrayList<TokenList> _lines, boolean _instructionsOnly)
 	{
 		if (!this.isDisabled(false)) {
-			// START KGU#3 2015-11-30: Fine tuning
-			//_lines.add(this.getText());
 			if (!_instructionsOnly)
 			{
-				// START KGU#453 2017-11-02: Issue #447 - Consider deliberate line continuation
-				//_lines.add(this.getText());
-				_lines.add(this.getUnbrokenText());
-				// END KGU#453 2017-11-02
+				// Add text of the condition as a single line
+				_lines.add(TokenList.concatenate(this.getUnbrokenTokenText(), null));
 			}
-			// END KGU#3 2015-11-30
 			this.q.addFullText(_lines, _instructionsOnly);
 		}
 	}
@@ -619,40 +615,47 @@ public class For extends Element implements ILoop {
 	
 	// START KGU 2017-04-14
 	/**
-	 * Tries to identify  the string representing the set or list of values to be traversed (For-In style)
-	 * @return a StringList containing string representations of the items of the value list - or null
+	 * Tries to identify the string representing the set or list of values to be traversed
+	 * (For-In style).
+	 * 
+	 * @return an ArrayList of TokenLists containing tokenized representations of the items
+	 *    of the value list - or {@code null}
 	 */
-	public StringList getValueListItems()
+	public ArrayList<TokenList> getValueListItems()
 	{
-		StringList valueItems = null;
+		ArrayList<TokenList> valueItems = null;
 		String valueListString = this.getValueList();
 		if (valueListString != null) {
-			valueListString = valueListString.trim();
-			boolean hadBraces = valueListString.startsWith("{") && valueListString.endsWith("}");
-			StringList valueListTokens = Syntax.splitLexically(valueListString, true);
+			TokenList valueListTokens = new TokenList(valueListString, true);
+			boolean hadBraces = !valueListTokens.isBlank()
+					&& valueListTokens.get(0).equals("{")
+					&& valueListTokens.get(valueListTokens.size()-1).equals("}");
 			/* There are of course built-in functions with more than one argument (such
 			 * that commas may occur within expressions) but method splitExpressionList
 			 * is structure-aware such that it's relatively safe to decompose an item
 			 * enumeration with commas as separator.
 			 * FIXME: The tricky case is the absence of a comma: If we split by spaces then
 			 * an expression like a + 3 would be broken - and that is exactly what will
-			 * happen in the else branch. So that syntax variant should be declared
-			 * deprecated.
+			 * happen in the else branch. But if the user encloses such an expression in
+			 * parentheses then it will be safe. (That syntax variant should be declared
+			 * deprecated.)
 			 */
 			if (valueListTokens.contains(",")) {
 				if (hadBraces)
 				{
-					valueListTokens = valueListTokens.subSequence(1, valueListTokens.count()-1);
+					valueListTokens = valueListTokens.subSequenceToEnd(1);
 				}
-				valueItems = splitExpressionList(valueListTokens, ",", false);
+				valueItems = Syntax.splitExpressionList(valueListTokens, ",");
 			}
 			else if (valueListTokens.contains(" ")) {
-				valueItems = splitExpressionList(valueListTokens, " ", false);
+				valueItems = Syntax.splitExpressionList(valueListTokens, " ");
 			}
-			
-			if (valueItems != null && valueItems.count() == 1 && !hadBraces && Syntax.isIdentifier(valueItems.get(0), false, ".")) {
-				// Now we get into trouble: It ought to be an array variable, which we cannot evaluate here
-				// So what do we return?
+			// Note that valueItems always contains the tail as last element (even if empty),
+			// hence a size of 2 means a single element.
+			if (valueItems != null && valueItems.size() == 2
+					&& !hadBraces && Syntax.isIdentifier(valueItems.get(0).getString(), false, ".")) {
+				// Now we get into trouble: It ought to be an array variable, which we 
+				// cannot evaluate here So what do we return?
 				// We just return null to avoid misunderstandings
 				valueItems = null;
 			}
@@ -912,7 +915,7 @@ public class For extends Element implements ILoop {
 		{
 			forParts[0] = init.subSequence(0, posAsgnOpr).getString().trim();
 		}
-		forParts[1] = init.subSequence(posAsgnOpr + 1, init.size()).getString().trim();
+		forParts[1] = init.subSequenceToEnd(posAsgnOpr + 1).getString().trim();
 		
 		return forParts;		
 	}
@@ -930,7 +933,7 @@ public class For extends Element implements ILoop {
 		//}
 		// END KGU#61 2016-09-23
 		forParts[0] = _tokens.subSequence(_posForIn + 1, _posIn).getString().trim();
-		forParts[5] = _tokens.subSequence(_posIn + 1, _tokens.size()).getString().trim();
+		forParts[5] = _tokens.subSequenceToEnd(_posIn + 1).getString().trim();
 		return forParts;
 		
 	}
@@ -1278,12 +1281,12 @@ public class For extends Element implements ILoop {
 		}
 		// START KGU#261 2017-04-14: Enh. #259 Try to make as much sense of the value list as possible
 		else {
-			StringList valueItems = this.getValueListItems();
+			ArrayList<TokenList> valueItems = this.getValueListItems();
 			String typeSpec = "";
 			if (valueItems != null) {
 				// Try to identify the element type(s)
-				for (int i = 0; !typeSpec.contains("???") && i < valueItems.count(); i++) {
-					String itemType = identifyExprType(typeMap, valueItems.get(i), true);
+				for (int i = 0; !typeSpec.contains("???") && i < valueItems.size(); i++) {
+					String itemType = Syntax.identifyExprType(typeMap, valueItems.get(i), true);
 					if (typeSpec.isEmpty()) {
 						typeSpec = itemType;
 					}
@@ -1313,7 +1316,7 @@ public class For extends Element implements ILoop {
 				String valueListString = this.getValueList();
 				if (valueListString != null) {
 					// Try to derive the type from the expression
-					typeSpec = identifyExprType(typeMap, valueListString, false);
+					typeSpec = Syntax.identifyExprType(typeMap, new TokenList(valueListString), false);
 					if (!typeSpec.isEmpty() && typeSpec.startsWith("@")) {
 						// nibble one array level off as the loop variable is of the element type
 						this.addToTypeMap(typeMap, this.getCounterVar(), typeSpec.substring(1), 0, true, false);

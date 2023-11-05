@@ -1706,11 +1706,12 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	
 	// START KGU#790 2020-10-31: Issue #800 New approach for exact syntactical processing
 	/**
-	 * Translates the given parsed Structorizer line {@code _line} or (if of type
-	 * {@code LT_RAW}) the raw line {@code _rawLine} into a list of strings for the
-	 * generated output stream.
+	 * Translates the expressions contained in the given parsed Structorizer line
+	 * {@code _line} or (if of type {@code LT_RAW}) the raw line {@code _rawLine}
+	 * into a list of strings for the generated output stream.
+	 * 
 	 * @param _line - a {@link Line} object representing the syntax structure of the
-	 * raw text line {@code _rawLine} if possible.
+	 *    raw text line {@code _rawLine} if possible.
 	 * @param _rawLine - the original text line
 	 * @return a list of code lines for the translation result
 	 */
@@ -1828,11 +1829,10 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		
 		// START KGU#162 2016-03-31: Enh. #144
 		//StringList tokens = Element.transformIntermediate(_input);
-		TokenList tokens = null;
+		TokenList tokens = new TokenList(_input);
 		if (this.suppressTransformation)
 		{
-			// Suppress all syntax changes, just split to tokens.
-			tokens = new TokenList(_input);
+			// Suppress all syntax changes, just cut out decorators.
 			// START KGU#884 2021-10-25: Issue #800
 			//Element.cutOutRedundantMarkers(tokens);
 			Syntax.removeDecorators(tokens);
@@ -1841,7 +1841,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		else
 		{
 			// convert to tokens into a common intermediate language
-			tokens = Element.transformIntermediate(_input);
+			tokens = Element.transformIntermediate(tokens);
 		}
 		// END KGU#162 2016-03-31
 		
@@ -1856,17 +1856,15 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 			if (keyword.trim().length() > 0)
 			{
 				TokenList keyTokens = Syntax.getSplitKeyword(key);
-				int keyLength = keyTokens.size();
-				int pos = -1;
-				while ((pos = tokens.indexOf(keyTokens, pos + 1, !Syntax.ignoreCase)) >= 0)
+				int keySize = keyTokens.size();
+				int posKey = tokens.size() - keySize;
+				while (posKey >= 0 && (posKey = tokens.lastIndexOf(keyTokens, posKey, !Syntax.ignoreCase)) >= 0)
 				{
 					// Replace the first token of the keyword by the entire keyword
-					tokens.set(pos, keyword);
+					tokens.set(posKey, keyword);
 					// Remove the remaining tokens of the split keyword
-					for (int j=1; j < keyLength; j++)
-					{
-						tokens.remove(pos+1);
-					}
+					tokens.remove(posKey+1, posKey + keySize);
+					posKey -= keySize;
 				}
 			}
 		}
@@ -2464,6 +2462,20 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		// START KGU#334 2017-01-30: Bugfix #337 - lvalue was mutilated with nested index access
 		//Regex r = new Regex("(.*?)\\[(.*?)\\](.*?)","$1 $3");
 		// END KGU#334 2017-01-30
+		return lValueToTypeNameIndexComp(new TokenList(_lval, true));
+	}
+	/**
+	 * Decomposes the left-hand side of an assignment passed in as _lval
+	 * into four strings:<br/>
+	 * [0] - type specification (a sequence of tokens, may be empty)<br/>
+	 * [1] - variable name (a single token supposed to be the identifier)<br/>
+	 * [2] - index expression (if _lval is an indexed variable, else empty)<br/>
+	 * [3] - component path (if _lval is a record component of an indexed variable, else empty)
+	 * @param tokens - a string found on the left-hand side of an assignment operator
+	 * @return String array of [0] type, [1] name, [2] index, [3] component path; all but [1] may be empty
+	 */
+	protected String[] lValueToTypeNameIndexComp(TokenList tokens)
+	{
 		String type = "";
 		// START KGU#1090 2023-10-15: Bugfix #1096
 		//String name = null;
@@ -2473,15 +2485,14 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		//String after = "";
 		//int posL = _lval.indexOf("[");
 		//int posR = _lval.lastIndexOf("]");
-		StringList name = new StringList();
-		StringList tokens = Syntax.splitLexically(_lval, true);
-		StringList after = new StringList();
+		TokenList name = new TokenList();
+		TokenList after = new TokenList();
 		tokens.removeAll(" ");
 		int posColon = -1;
 		if ((tokens.indexOf("var", false) == 0 || tokens.indexOf("dim", false) == 0)
 				&& ((posColon = tokens.indexOf(":")) > 0 || (posColon = tokens.indexOf("as", false)) > 0 )) {
-			type = tokens.concatenate(null, posColon+1, tokens.count()).trim();
-			tokens.remove(posColon, tokens.count());
+			type = tokens.subSequence(posColon+1, tokens.size()).getString().trim();
+			tokens.remove(posColon, tokens.size());
 			tokens.remove(0);
 			tokens.trim();
 		}
@@ -2493,8 +2504,8 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 			//index = _lval.substring(posL + 1, posR);
 			//before = _lval.substring(0, posL);
 			//after = _lval.substring(posR + 1);
-			tokens = Element.coagulateSubexpressions(tokens);
-			for (int i = tokens.count()-1; i >= 0; i--) {
+			tokens = Syntax.coagulateSubexpressions(tokens);
+			for (int i = tokens.size()-1; i >= 0; i--) {
 				String token = tokens.get(i);
 				if (token.startsWith("[") && token.endsWith("]")) {
 					if (name.isEmpty()) {
@@ -2502,36 +2513,36 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 							index = "," + index;
 						}
 						index = token.substring(1, token.length()-1) + index;
-						tokens.remove(i, tokens.count());
+						tokens.remove(i, tokens.size());
 					}
 					else if (name.get(0).startsWith(".") || name.get(0).startsWith("[")) {
 						// It must be a part of the access path
-						name.insert(token, 0);
+						name.add(0, token);
 						break;
 					}
 					else {
-						type += tokens.concatenate(null, 0, i+1);
+						type += tokens.subSequence(0, i+1).getString();
 						tokens.remove(0, i+1);
 						break;
 					}
 				}
 				else if (index.isEmpty()) {
 					if (name.isEmpty()) {
-						after.insert(token, 0);
+						after.add(0, token);
 					}
 					else {
-						name.insert(token, 0);
+						name.add(0, token);
 					}
 				}
 				else {
-					name.insert(token, 0);
+					name.add(0, token);
 				}
 			}
 			// END KGU#1090 2023-12-15
 		}
 		// If after is a component access sequence then it shall be placed in comp
-		if (after.indexOf(".") == 0 && Syntax.isIdentifier(after.concatenate(null, 1), false, ".")) {
-			comp = after.concatenate();
+		if (after.indexOf(".") == 0 && Syntax.isIdentifier(after.subSequenceToEnd(1).getString(), false, ".")) {
+			comp = after.getString();
 			// START KGU#1090 2023-10-15: Bugfix #1096
 			//name = before;
 			if (name.isEmpty()) {
@@ -2544,7 +2555,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		//	name = (before + " " + after).trim();	// This is somewhat strange in general
 		//}
 		else if (name.isEmpty() && !after.isEmpty()) {
-			name.add(after);
+			name.addAll(after);
 			after.clear();
 		}
 		else if (name.isEmpty()) {
@@ -2587,15 +2598,14 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		//return typeNameIndex;
 		//String[] typeNameIndexPath = {type, name, index, comp};
 		// END KGU#1090 2023-101-15
-		StringList nameParts = StringList.explode(name.concatenate(null), " ");
-		if (type.isEmpty() || nameParts.count() > 1) {
-			type += " " + nameParts.concatenate(" ", 0, nameParts.count()-1).trim() + " ";
+		//StringList nameParts = StringList.explode(name.getString(), " ");
+		if (type.isEmpty() || name.size() > 1) {
+			type += " " + name.subSequence(0, name.size()-1).getString().trim() + " ";
 			if (type.isBlank()) {
 				type = "";
 			}
 		}
-		name = nameParts.subSequence(nameParts.count()-1, nameParts.count());
-		String[] typeNameIndexPath = {type, name.concatenate(), index, comp};
+		String[] typeNameIndexPath = {type, name.get(name.size()-1), index, comp};
 		return typeNameIndexPath;
 		// END KGU#388 2017-09-27
 	}
@@ -2611,6 +2621,8 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	 * 
 	 * @param _for - the For loop of FOR-IN style to be analysed
 	 * @return a StringList where every element contains one item (as string), or {@code null}
+	 * 
+	 * @deprecated use {@link For#getValueListItems()} instead
 	 */
 	protected StringList extractForInListItems(For _for)
 	{
@@ -2619,15 +2631,15 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		boolean isComplexObject = Function.isFunction(valueList, false) || this.varNames.contains(valueList);
 		if (valueList.startsWith("{") && valueList.endsWith("}"))
 		{
-			items = Element.splitExpressionList(valueList.substring(1, valueList.length()-1), ",");
+			items = Syntax.splitExpressionList(valueList.substring(1, valueList.length()-1), ",");
 		}
 		else if (valueList.contains(","))
 		{
-			items = Element.splitExpressionList(valueList, ",");
+			items = Syntax.splitExpressionList(valueList, ",");
 		}
 		else if (!isComplexObject && valueList.contains(" "))
 		{
-			items = Element.splitExpressionList(valueList, " ");
+			items = Syntax.splitExpressionList(valueList, " ");
 		}
 		return items;
 	}
@@ -2969,29 +2981,29 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	 * @param _mayBeQualified - whether qualifiers are allowed (see above)
 	 * @return {@code true} if the expression is a variable
 	 */
-	protected boolean isVariable(StringList _tokens, boolean _mayBeQualified, HashMap<String, TypeMapEntry> _typeMap) {
+	protected boolean isVariable(TokenList _tokens, boolean _mayBeQualified, HashMap<String, TypeMapEntry> _typeMap) {
 		boolean isVar = false;
 		String token0 = null;
 		if (!_tokens.isEmpty() && Syntax.isIdentifier(token0 = _tokens.get(0), false, null)
 				&& (varNames.contains(token0) || _typeMap != null && _typeMap.containsKey(token0))) {
 			if (_mayBeQualified) {
 				isVar = true;
-				_tokens = _tokens.subSequence(1, _tokens.count());
-				while (isVar && _tokens.count() > 1 && ".[".contains(token0 = _tokens.get(0))) {
+				_tokens = _tokens.subSequenceToEnd(1);
+				while (isVar && _tokens.size() > 1 && ".[".contains(token0 = _tokens.get(0))) {
 					if (token0.equals(".") && Syntax.isIdentifier(_tokens.get(1), false, null)) {
 						// Okay, is a component access qualifier
 						_tokens.remove(0, 2);
 					}
 					else if (token0.equals("[") && _tokens.contains("]")) {
 						// Should be an index access
-						StringList indices = Element.splitExpressionList(_tokens.subSequence(1, _tokens.count()), ",", true);
-						String tail = indices.get(indices.count()-1);
+						ArrayList<TokenList> indices = Syntax.splitExpressionList(_tokens.subSequenceToEnd(1), ",");
+						TokenList tail = indices.get(indices.size()-1);
 						// FIXME do we allow more than one index expression?
 						if (!tail.startsWith("]")) {
 							isVar = false;
 						}
 						else {
-							_tokens = Syntax.splitLexically(tail.substring(1), true);
+							_tokens = tail.subSequenceToEnd(1);
 						}
 					}
 					else {
@@ -3002,7 +3014,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 				isVar = _tokens.isEmpty();
 			}
 			else {
-				isVar = _tokens.count() == 1;
+				isVar = _tokens.size() == 1;
 			}
 		}
 		return isVar;

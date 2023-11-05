@@ -20,6 +20,8 @@
 
 package lu.fisch.structorizer.generators;
 
+import java.util.ArrayList;
+
 /******************************************************************************************************
  *
  *      Author:         Daniel Spittank
@@ -366,7 +368,7 @@ public class PythonGenerator extends Generator
 				//	this.usesTurtleizer = true;
 				//}
 				if (j+1 < tokens.size() && tokens.get(j).equals("(")) {
-					int nArgs = Syntax.splitExpressionList(tokens.subSequence(j+1, tokens.size()), ",").size()-1;
+					int nArgs = Syntax.splitExpressionList(tokens.subSequenceToEnd(j+1), ",").size()-1;
 					for (Entry<DiagramController, String> entry: controllerMap.entrySet()) {
 						String name = entry.getKey().providedRoutine(token, nArgs);
 						if (name != null) {
@@ -453,7 +455,7 @@ public class PythonGenerator extends Generator
 				//HashMap<String, String> comps = Instruction.splitRecordInitializer(tokens.concatenate("", posLBrace));
 				// START KGU#1021 2021-12-05: Bugfix #1024 Instruction might be defective
 				//HashMap<String, String> comps = Instruction.splitRecordInitializer(tokens.concatenate("", posLBrace), typeEntry, false);
-				String tail = tokens.subSequence(posLBrace, tokens.size()).getString();
+				String tail = tokens.subSequenceToEnd(posLBrace).getString();
 				HashMap<String, String> comps = Instruction.splitRecordInitializer(tail, typeEntry);
 				// END KGU#1021 2021-12-05
 				// END KGU#559 2018-07-20
@@ -556,16 +558,16 @@ public class PythonGenerator extends Generator
 			//{
 			//	String lval = _input.substring(0, asgnPos).trim();
 			//	String expr = _input.substring(asgnPos + "<-".length()).trim();
-			if (Instruction.isAssignment(_input))
+			TokenList tokens = new TokenList(_input);
+			if (Instruction.isAssignment(tokens))
 			{
-				StringList tokens = Syntax.splitLexically(_input, true);
 				// START KGU#698 2019-03-26: Bugfix #716
 				Syntax.unifyOperators(tokens, false);
 				// END KGU#698 2019-03-26
-				tokens = Element.coagulateSubexpressions(tokens);
+				tokens = Syntax.coagulateSubexpressions(tokens);
 				int asgnPos = tokens.indexOf("<-");
-				String lval = tokens.concatenate("", 0, asgnPos).trim();
-				String expr = tokens.concatenate("", asgnPos + 1).trim();
+				String lval = tokens.subSequence(0, asgnPos).getString().trim();
+				String expr = tokens.subSequenceToEnd(asgnPos + 1).getString().trim();
 			// END KGU#689 2019-03-21
 				String[] typeNameIndex = this.lValueToTypeNameIndexComp(lval);
 				String index = typeNameIndex[2];
@@ -629,6 +631,7 @@ public class PythonGenerator extends Generator
 		return s.trim();
 	}
 
+	@Override
 	protected void generateCode(Instruction _inst, String _indent)
 	{
 		if(!appendAsComment(_inst, _indent)) {
@@ -636,15 +639,15 @@ public class PythonGenerator extends Generator
 			// START KGU 2014-11-16
 			appendComment(_inst, _indent);
 			// END KGU 2014-11-16
-			StringList lines = _inst.getUnbrokenText();
+			ArrayList<TokenList> lines = _inst.getUnbrokenTokenText();
 			String tmpCol = null;
 			Root root = Element.getRoot(_inst);
-			for(int i = 0; i < lines.count(); i++)
+			for(int i = 0; i < lines.size(); i++)
 			{
 				// START KGU#277/KGU#284 2016-10-13/16: Enh. #270 + Enh. #274
 				//code.add(_indent + transform(_inst.getText().get(i)));
-				String line = lines.get(i);
-				String codeLine = transform(line);
+				TokenList tokens = lines.get(i);
+				String codeLine = transform(tokens.getString());
 				boolean done = false;
 
 				// START KGU#1053 2022-08-14: Bugfix #1061 - hands off in "no conversion" mode!
@@ -652,7 +655,7 @@ public class PythonGenerator extends Generator
 				{
 				// END KGU#1053 2022-08-14
 					// START KGU#653 2019-02-14: Enh. #680 - face input instructions with multiple variables
-					StringList inputItems = Instruction.getInputItems(line);
+					StringList inputItems = Instruction.getInputItems(tokens);
 					// START KGU#799 2020-02-13: Bugfix #812
 					if (inputItems != null && root.isInclude()) {
 						for (int j = 1; j < inputItems.count(); j++) {
@@ -679,7 +682,7 @@ public class PythonGenerator extends Generator
 						done = true;
 					}
 					// END KGU#653 2019-02-14
-					else if (Instruction.isTurtleizerMove(line)) {
+					else if (Instruction.isTurtleizerMove(tokens)) {
 						// START KGU#599 2018-10-17: Bugfix #623 (turtle moves hadn't been exported)
 						//codeLine += " " + this.commentSymbolLeft() + " color = " + _inst.getHexColor();
 						//done = true;
@@ -693,20 +696,20 @@ public class PythonGenerator extends Generator
 						// END KGU#599 2018-10-17
 					}
 					// START KGU#388 2017-10-02: Enh. #423 translate record types into mutable recordtype
-					else if (Instruction.isTypeDefinition(line)) {
-						mtchTypename.reset(line).matches();
+					else if (Instruction.isTypeDefinition(tokens, null)) {
+						mtchTypename.reset(tokens.getString()).matches();
 						String typeName = mtchTypename.group(1);
 						done = this.generateTypeDef(root, typeName, null, _indent, isDisabled);
 					}
 					// END KGU#388 2017-10-02
 					// START KGU#767 2019-11-24: Bugfix #782 We must handle variable declarations as unspecified initialisations
-					else if (Instruction.isMereDeclaration(line)) {
-						done = generateDeclaration(line, root, _indent, isDisabled);
+					else if (Instruction.isMereDeclaration(tokens)) {
+						done = generateDeclaration(tokens, root, _indent, isDisabled);
 					}
 					// END KGU#767 2019-11-24
 					// START KGU#799 2020-02-13: Bugfix #812
-					else if (Instruction.isAssignment(line) && root.isInclude()) {
-						String var = this.getAssignedVarname(line, true);
+					else if (Instruction.isAssignment(tokens) && root.isInclude()) {
+						String var = this.getAssignedVarname(tokens, true);
 						if (var != null) {
 							this.wasDefHandled(root, var, true, true);	// mark var as defined if it isn't
 						}
@@ -716,9 +719,9 @@ public class PythonGenerator extends Generator
 				}
 				// END KGU#1053 2022-08-14
 				// START KGU#1089 2023-10-18: Issue #980 Reject a multi-var declaration
-				if (!done && (Instruction.isAssignment(line))
-						&& this.getAssignedVarname(line, false) == null) {
-					this.appendComment("*** ILLEGAL LINE SKIPPED: " + line, _indent);
+				if (!done && (Instruction.isAssignment(tokens))
+						&& this.getAssignedVarname(tokens, false) == null) {
+					this.appendComment("*** ILLEGAL LINE SKIPPED: " + tokens.getString(), _indent);
 					done = true;
 				}
 				// END KGU#1089 2023-10-18
@@ -779,13 +782,13 @@ public class PythonGenerator extends Generator
 		// END KGU#453 2017-11-02
 		String condition = transform(lines.get(0));
 
-		for(int i=0; i<_case.qs.size()-1; i++)
+		for(int i = 0; i < _case.qs.size()-1; i++)
 		{
 			String caseline = _indent + ((i == 0) ? "if" : "elif") + " (";
 			// START KGU#15 2015-10-21: Support for multiple constants per branch
 			// START KGU#755 2019-11-08: Bugfix #769 - more precise splitting necessary
 			//StringList constants = StringList.explode(lines.get(i+1), ",");
-			StringList constants = Element.splitExpressionList(lines.get(i + 1), ",");
+			StringList constants = Syntax.splitExpressionList(lines.get(i + 1), ",");
 			// END KGU#755 2019-11-08
 			for (int j = 0; j < constants.count(); j++)
 			{
@@ -1059,7 +1062,7 @@ public class PythonGenerator extends Generator
 					threadFunc = ((Call)el).getCalledRoutine().getName();
 					// START KGU#819 2020-03-08: Bugfix #831 - In case of a call we can (and must) simply copy the arg list.
 					String line = ((Call)el).getUnbrokenText().get(0);
-					used = Element.splitExpressionList(line.substring(line.indexOf("(")+1), ",");
+					used = Syntax.splitExpressionList(line.substring(line.indexOf("(")+1), ",");
 					for (int j = 0; j < used.count(); j++) {
 						used.set(j, transform(used.get(j)));
 					}
@@ -1372,43 +1375,44 @@ public class PythonGenerator extends Generator
 	/**
 	 * Generates a declaration from the given line and registers it with the given root.
 	 * 
-	 * @param _line - the original line of the declaration (should start with "var" or "dim")
+	 * @param _tokens - the tokenized original line of the declaration (should start with
+	 *     "var" or "dim")
 	 * @param _root - the owning {@link Root} object
 	 * @param _indent - current indentation level
 	 * @param _isDisabled - whether this element is disabled (i.e. all content is going to
 	 *     be a comment)
 	 * @return true iff all code generation for the instruction line is done
 	 */
-	private boolean generateDeclaration(String _line, Root _root, String _indent, boolean _isDisabled) {
+	private boolean generateDeclaration(TokenList _tokens, Root _root, String _indent, boolean _isDisabled) {
 		// START KGU#1089 2023-10-12: Issue #980
 		//StringList tokens = Element.splitLexically(_line + " <- 0", true);
 		//tokens.removeAll(" ");
 		//String varName = Instruction.getAssignedVarname(tokens, false);
 		//return generateDeclaration(_root, varName, _indent, _isDisabled);
-		StringList tokens = Syntax.splitLexically(_line, true);
-		tokens.removeBlanks();
-		if (!tokens.isEmpty()) {
+		//StringList tokens = Syntax.splitLexically(_line, true);
+		//tokens.removeBlanks();
+		if (!_tokens.isEmpty()) {
 			// First tokens should be "var" or "dim" now.
-			tokens.remove(0);
+			_tokens.remove(0);
 		}
-		int posColon = tokens.indexOf(":");
+		int posColon = _tokens.indexOf(":");
 		if (posColon < 0) {
-			posColon = tokens.indexOf("as", false);
+			posColon = _tokens.indexOf("as", false);
 		}
 		if (posColon < 0) {
 			// Something's wrong here!
-			posColon = tokens.count();
+			posColon = _tokens.size();
 		}
 		boolean done = true;
-		StringList declItems = Element.splitExpressionList(tokens.subSequence(0, posColon), ",", false);
-		for (int i = 0; i < declItems.count(); i++) {
-			String declItem = declItems.get(i);
+		ArrayList<TokenList> declItems = Syntax.splitExpressionList(_tokens.subSequence(0, posColon), ",");
+		for (int i = 0; i < declItems.size()-1; i++) {
+			TokenList declItem = declItems.get(i);
 			int posBrack = declItem.indexOf("[");
 			if (posBrack >= 0) {
-				declItem = declItem.substring(0, posBrack);
+				declItem = declItem.subSequence(0, posBrack);
 			}
-			if (Syntax.isIdentifier(declItem, false, null)) {
-				done = generateDeclaration(_root, declItem, _indent, _isDisabled) && done;
+			if (declItem.size() == 1 &&  Syntax.isIdentifier(declItem.get(0), false, null)) {
+				done = generateDeclaration(_root, declItem.get(0), _indent, _isDisabled) && done;
 			}
 			else {
 				// FIXME This may cause more trouble then to return always true
@@ -1424,11 +1428,13 @@ public class PythonGenerator extends Generator
 	/**
 	 * Generates a declaration for the given variable and registers it with the given root
 	 * if is hadn't already been declared.
+	 * 
 	 * @param _root - the owning {@link Root} object
 	 * @param _varName - the variable for which the declaration is to be generated (from
 	 *     {@code root}'s type map)
 	 * @param _indent - current indentation level
-	 * @param _isDisabled - whether this element is disabled (i.e. all content is going to be a comment)
+	 * @param _isDisabled - whether this element is disabled (i.e. all content is going to
+	 *     be a comment)
 	 * @return true iff declaration for the given variable was or had been generated
 	 */
 	private boolean generateDeclaration(Root _root, String _varName, String _indent, boolean _isDisabled) {
@@ -1656,10 +1662,18 @@ public class PythonGenerator extends Generator
 	// END KGU 2015-12-15
 	
 	// START KGU#799 2020-02-13: Auxiliary for bugfix #812
-	private String getAssignedVarname(String line, boolean pureBasename)
+	/**
+	 * Identifies the target variable of an assignment given in the token list
+	 * {@code tokens}
+	 * 
+	 * @param tokens - the tokenized assignment line
+	 * @param pureBasename - (currently not used)
+	 * @return the name of the assigned variable
+	 */
+	private String getAssignedVarname(TokenList tokens, boolean pureBasename)
 	{
-		StringList tokens = Syntax.splitLexically(line, true, true);
 		Syntax.unifyOperators(tokens, true);
+		// What is argument pureBasename used for? Should it be passed to Instruction?
 		String var = Instruction.getAssignedVarname(tokens, false);
 		if (var != null && !Syntax.isIdentifier(var, false, "")) {
 			if (MTCH_IDENTIFIER.reset(var).matches()) {

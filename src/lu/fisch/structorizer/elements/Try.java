@@ -46,6 +46,7 @@ package lu.fisch.structorizer.elements;
 
 import java.awt.Color;
 import java.awt.Rectangle;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
@@ -57,6 +58,7 @@ import lu.fisch.graphics.Rect;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.StringList;
 
 /**
@@ -479,10 +481,10 @@ public class Try extends Element {
 	}
 
 	/* (non-Javadoc)
-	 * @see lu.fisch.structorizer.elements.Element#addFullText(lu.fisch.utils.StringList, boolean)
+	 * @see Element#addFullText(ArrayList<TokenList>, boolean)
 	 */
 	@Override
-	protected void addFullText(StringList _lines, boolean _instructionsOnly) {
+	protected void addFullText(ArrayList<TokenList> _lines, boolean _instructionsOnly) {
 		if (!this.isDisabled(false)) {
 			this.qTry.addFullText(_lines, _instructionsOnly);
 			// FIXME the contents of the catch block may not be wanted
@@ -568,10 +570,14 @@ public class Try extends Element {
 	 */
 	public String getExceptionVarName()
 	{
-		return Instruction.getAssignedVarname(
-				Syntax.splitLexically(this.getUnbrokenText().getLongString(), true),
-				false
-				);
+		ArrayList<TokenList> unbr = this.getUnbrokenTokenText();
+		if (unbr.isEmpty()) {
+			return null;
+		}
+		for (int i = 1; i < unbr.size(); i++) {
+			unbr.get(0).addAll(unbr.get(i));
+		}
+		return Instruction.getAssignedVarname(unbr.get(0), false);
 	}
 	
 	// START KGU#695 2021-01-22: Enh. #714

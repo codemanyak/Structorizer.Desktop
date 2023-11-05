@@ -109,6 +109,7 @@ import lu.fisch.structorizer.arranger.Arranger;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
 import lu.fisch.structorizer.syntax.Function;
+import lu.fisch.structorizer.syntax.TokenList;
 
 /**
  * This Structorizer class represents a procedure or function Call in a diagram.
@@ -328,11 +329,12 @@ public class Call extends Instruction {
 	/**
 	 * Returns a {@link Function} object describing the signature of
 	 * <ul>
-	 * <li> the referred method declaration (in case this obect represents a method reference),</li>
+	 * <li> the referred method declaration (in case this object represents a method reference),</li>
 	 * <li> the called routine if the text complies to the call syntax described in the user guide,</li>
 	 * <li> {@code null} otherwise.</li>
 	 * </ul>
 	 * @return Function object or {@code null}.
+	 * 
 	 * @see #isFunctionCall(boolean)
 	 * @see #isProcedureCall(boolean)
 	 */
@@ -341,10 +343,10 @@ public class Call extends Instruction {
 	{
 		// START KGU#408 2021-02-26: Enh. #410 Different kind of retrieval for method declaration
 		if (this.isMethodDeclaration) {
-			String decl = this.getText().getLongString();
+			TokenList decl = TokenList.concatenate(this.getUnbrokenTokenText(), null);
 			StringList paramNames = new StringList();
 			boolean hasParamList = Root.extractMethodParamDecls(decl, paramNames, null, null);
-			String methodName = Root.getMethodName(decl, Root.DiagramType.DT_SUB, true);
+			String methodName = Root.getMethodName(decl.getString(), Root.DiagramType.DT_SUB, true);
 			if (hasParamList) {
 				return new Function(methodName + "(" + paramNames.concatenate(", ") + ")");
 			}
@@ -412,7 +414,7 @@ public class Call extends Instruction {
 	 * @see lu.fisch.structorizer.elements.Instruction#getTypeFromAssignedValue(lu.fisch.utils.StringList, java.util.HashMap)
 	 */
 	@Override
-	protected String getTypeFromAssignedValue(StringList rightSide, HashMap<String, TypeMapEntry> knownTypes)
+	protected String getTypeFromAssignedValue(TokenList rightSide, HashMap<String, TypeMapEntry> knownTypes)
 	{
 		String typeSpec = "";
 		Function called = this.getCalledRoutine();

@@ -915,7 +915,7 @@ public class StringList {
 
 	/**
 	 * Returns the String element at position {@code _index}<br/>
-	 * NOTE: In case the given index is invalid (i.e. {@code _index < 0} or
+	 * <b>NOTE</b>: In case the given index is invalid (i.e. {@code _index < 0} or
 	 * {@code _index >= this.count()} neither an exception is raised nor
 	 * {@code null} is returned but an empty String!
 	 *

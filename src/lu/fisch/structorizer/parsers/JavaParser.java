@@ -96,6 +96,7 @@ import lu.fisch.structorizer.elements.Subqueue;
 import lu.fisch.structorizer.elements.Try;
 import lu.fisch.structorizer.elements.While;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.StringList;
 
 /**
@@ -1031,7 +1032,7 @@ public class JavaParser extends CodeParser
 	
 	// START KGU#953 2021-03-04: Bugfix #955 The original approach seemed clever but left an empty string at start
 	//static final StringList CLASS_LITERAL = StringList.explodeWithDelimiter(".class", ".");
-	static final StringList CLASS_LITERAL = StringList.explode(".:class", ":");
+	static final TokenList CLASS_LITERAL = new TokenList(".class");
 	// END KGU#953 2021-03-04
 
 	/**
@@ -1103,7 +1104,7 @@ public class JavaParser extends CodeParser
 					 */
 					if (strLine.contains("class")) {
 						// Tokenization is to make sure that we don't substitute in wrong places
-						StringList tokens = Syntax.splitLexically(strLine, true);
+						TokenList tokens = new TokenList(strLine, true);
 						int ixClass = -1;
 						boolean replaced = false;
 						while ((ixClass = tokens.indexOf(CLASS_LITERAL, 0, true)) >= 0) {
@@ -1111,7 +1112,7 @@ public class JavaParser extends CodeParser
 							replaced = true;
 						}
 						if (replaced) {
-							strLine = tokens.concatenate();
+							strLine = tokens.getString();
 						}
 					}
 					srcCode.append(strLine + "\n");
@@ -3550,20 +3551,23 @@ public class JavaParser extends CodeParser
 	protected String translateContent(String _content)
 	{
 		String output = getKeyword("output");
-		StringList outputTokens = StringList.explodeWithDelimiter("System.out.println", ".");
+		final TokenList outputTokens = new TokenList("System.out.println");
+		final TokenList mathTokens = new TokenList("Math.");
 		// An input conversion is not feasible.
 		//String input = getKeyword("input");
 		
-		StringList tokens = Syntax.splitLexically(_content, true);
+		TokenList tokens = new TokenList(_content, true);
 		int ix = -1;
-		while ((ix = tokens.indexOf(outputTokens, 0, true)) >= 0) {
-			tokens.remove(ix, ix + outputTokens.count());
-			tokens.insert(output, ix);
+		while ((ix = tokens.indexOf(outputTokens, ix+1, true)) >= 0) {
+			tokens.remove(ix, ix + outputTokens.size());
+			tokens.add(ix, output);
 		}
-		
-		tokens.removeAll(StringList.explode("Math,.", ","), true);
+		ix = -1;
+		while ((ix = tokens.indexOf(mathTokens, ix+1, true)) >= 0) {
+			tokens.remove(ix, ix + mathTokens.size());
+		};
 
-		return _content.trim();
+		return tokens.getString().trim();
 	}
 	
 	/**

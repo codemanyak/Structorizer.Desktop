@@ -298,10 +298,13 @@ public class InputBox extends LangDialog implements ActionListener, KeyListener 
             }
             ArrayList<String> suggestions = new ArrayList<String>();
             String prefix = content.substring(w);
-            StringList tokens = Syntax.splitLexically(content.substring(0, w), true);
-            tokens.removeAll(" ");
-            int nTokens = tokens.count();
-            String lastToken = tokens.get(nTokens-1).toLowerCase();
+            TokenList tokens = new TokenList(content.substring(0, w), true);
+            //tokens.removeAll(" ");
+            int nTokens = tokens.size();
+            String lastToken = "";
+            if (nTokens > 0) {
+                lastToken = tokens.getLast().toLowerCase();
+            }
             if ((w == 0 || content.charAt(w-1) == '\n')) {
                 StringList keys = KEYWORD_SUGGESTIONS.get(elementType);
                 if (keys != null) {

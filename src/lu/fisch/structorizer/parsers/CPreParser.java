@@ -82,6 +82,7 @@ import lu.fisch.structorizer.elements.Jump;
 import lu.fisch.structorizer.elements.Root;
 import lu.fisch.structorizer.elements.Subqueue;
 import lu.fisch.structorizer.elements.TypeMapEntry;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.StringList;
 
 /**
@@ -1347,7 +1348,7 @@ public abstract class CPreParser extends CodeParser
 						String argsRaw = matcher.group(3);
 						// Now we split the balanced substring (up to the first unexpected closing parenthesis) syntactically
 						// (The unmatched tail of argsRaw will be re-appended later)
-						StringList args = Element.splitExpressionList(argsRaw, ",");
+						StringList args = Syntax.splitExpressionList(argsRaw, ",");
 						// We test whether argument and parameter count match
 						if (args.count() != entry.getValue().length - 1) {
 							// FIXME: function-like define doesn't match arg count
@@ -1407,7 +1408,7 @@ public abstract class CPreParser extends CodeParser
 								}
 							}
 							// Now we correct possible matching defects
-							StringList argsPlusTail = Element.splitExpressionList(argsRaw, ",", true);
+							StringList argsPlusTail = Syntax.splitExpressionList(argsRaw, ",");
 							if (argsPlusTail.count() > args.count()) {
 								String tail = argsPlusTail.get(args.count()).trim();
 								// With high probability tail stars with a closing parenthesis, which has to be dropped if so
@@ -1586,7 +1587,7 @@ public abstract class CPreParser extends CodeParser
 	 * @return the converted initializer
 	 */
 	protected String convertStructInitializer(String _typeName, String _expr, TypeMapEntry _typeEntry) {
-		StringList parts = Element.splitExpressionList(_expr.substring(1), ",", true);
+		StringList parts = Syntax.splitExpressionList(_expr.substring(1), ",");
 		LinkedHashMap<String, TypeMapEntry> compInfo = _typeEntry.getComponentInfo(false);
 		// START KGU#1080a 2023-09-27: Bugfix #1089.1 handle trailing commas
 		//if (parts.count() > 1 && compInfo.size() >= parts.count() - 1) {
@@ -1610,7 +1611,7 @@ public abstract class CPreParser extends CodeParser
 				String compName = comp.getKey();
 				if (part.startsWith(".")) {
 					named = true;
-					StringList sides = Element.splitExpressionList(part, "<-");
+					StringList sides = Syntax.splitExpressionList(part, "<-");
 					if (sides.count() == 2 && compInfo.containsKey(compName = sides.get(0).trim().substring(1))) {
 						// This can be converted directly, so 
 						compType = compInfo.get(compName);

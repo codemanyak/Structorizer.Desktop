@@ -57,6 +57,7 @@ import lu.fisch.structorizer.elements.Root;
 import lu.fisch.structorizer.elements.TypeMapEntry;
 import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.StringList;
 
 /**
@@ -85,7 +86,7 @@ public class CaseEditHelper {
 	 */
 	public boolean isStructured(String expr)
 	{
-		String typeName = Root.identifyExprType(root.getTypeInfo(), expr, true);
+		String typeName = Syntax.identifyExprType(root.getTypeInfo(), new TokenList(expr), true);
 		if (typeName.startsWith("@") || typeName.startsWith("$")) {
 			return true;
 		}
@@ -106,7 +107,7 @@ public class CaseEditHelper {
 	public HashMap<String, Integer> getEnumeratorInfo(String name)
 	{
 		HashMap<String, Integer> enumValues = null;
-		String typeName = Root.identifyExprType(root.getTypeInfo(), name, true);
+		String typeName = Syntax.identifyExprType(root.getTypeInfo(), new TokenList(name), true);
 		TypeMapEntry type = root.getTypeInfo().get(":" + typeName);
 		if (type != null && type.isEnum()) {
 			StringList enumNames = type.getEnumerationInfo();
@@ -203,10 +204,11 @@ public class CaseEditHelper {
 			 * via tokenization.
 			 */
 			String line = valueLists.get(i).replace("\\n", "\n");
-			StringList tokens = Syntax.splitLexically(line, true);
-			tokens.replaceAll("\n", " ");
-			line = tokens.concatenate().replace("\n", "\\n");
-			StringList items = Element.splitExpressionList(line, ",");
+			TokenList tokens = new TokenList(line, true);
+			//tokens.replaceAll("\n", " ");
+			tokens.removeAll("\n");	// Removes all newlines between literals
+			line = tokens.getString().replace("\n", "\\n");	// Restores newlines in literals
+			StringList items = Syntax.splitExpressionList(line, ",");
 			for (int j = 0; j < items.count(); j++) {
 				String valStr = items.get(j);
 				Object value = evaluateExpression(valStr);

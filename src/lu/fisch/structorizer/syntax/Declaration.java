@@ -249,7 +249,7 @@ public class Declaration {
 			listItems.add(tokens.subSequence(posStart, posSemi));
 			posSemi = tokens.indexOf(";", posStart = posSemi + 1);
 		}
-		listItems.add(tokens.subSequence(posStart, tokens.size()));
+		listItems.add(tokens.subSequenceToEnd(posStart));
 		DeclarationRule thisRule = expectedRule;
 		if (thisRule == DeclarationRule.PAR_GROUP_LIST) {
 			expectedRule = DeclarationRule.PAR_GROUP;
@@ -317,7 +317,7 @@ public class Declaration {
 //						DeclarationRule.VDECL, tokenNo, typeMap));
 				// Parse the right-hand side (the default value, an expression)
 				LinkedList<Expression> exprs = 
-						Expression.parse(tokens.subSequence(posDef+1, tokens.size()), null, (short)(tokenNo + posDef+1));
+						Expression.parse(tokens.subSequenceToEnd(posDef+1), null, (short)(tokenNo + posDef+1));
 				if (exprs == null || exprs.size() != 1) {
 					// Actually, method Expression.parse is likely to have thrown a more expressive exception itself
 					throw new SyntaxException("Defective default value expression", tokenNo + posDef + 1);
@@ -327,7 +327,7 @@ public class Declaration {
 			}
 			// No default value, hence a REC_GROUP
 			Type type = null;
-			TokenList typeDescr = tokens.subSequence(posColon+1, tokens.size());
+			TokenList typeDescr = tokens.subSequenceToEnd(posColon+1);
 			if (typeDescr.size() == 1 && typeMap != null) {
 				type = typeMap.getType(typeDescr.get(0));	// This may fail, of course
 				if (type == null) {

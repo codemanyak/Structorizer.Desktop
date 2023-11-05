@@ -853,41 +853,41 @@ public class TexAlgGenerator extends Generator {
 			if (packageIndex > 1 || _inst.getComment().count() > 1) {
 				appendComment(_inst, _indent);
 			}
-			StringList lines = _inst.getUnbrokenText();
+			ArrayList<TokenList> lines = _inst.getUnbrokenTokenText();
 			String semi = optionAppendSemicolon() ? ";" : "";
-			for (int i = 0; i < lines.count(); i++)
+			for (int i = 0; i < lines.size(); i++)
 			{
-				String line = lines.get(i);
+				TokenList tokens = lines.get(i);
 				String instrCommand = INSTR_MACRO[packageIndex][0];
-				if (packageIndex == 0 /* algorithmicx*/ && Instruction.isTypeDefinition(line)) {
+				if (packageIndex == 0 /* algorithmicx*/ && Instruction.isTypeDefinition(tokens, null)) {
 					addCode("\\Decl{type:}", _indent, false);
 					// get the type name
-					StringList tokens = Syntax.splitLexically(line, true, true);
+					//StringList tokens = Syntax.splitLexically(line, true, true);
 					String typeName = tokens.get(1);
 					addCode(instrCommand
-							.replace("%1", typeName + " = " + transform(tokens.concatenate(" ", 3)))
+							.replace("%1", typeName + " = " + transform(tokens.subSequenceToEnd(3).getString()))
 							.replace("%2", semi),
 							_indent+this.getIndent(), false);
 					addCode("\\EndDecl", _indent, false);
 				}
-				else if (Jump.isReturn(line) && sq != null && sq.parent instanceof Root
+				else if (Jump.isReturn(tokens) && sq != null && sq.parent instanceof Root
 						&& isLastEl) {
-					String keyword = Syntax.getKeyword("preReturn");
-					line = line.substring(keyword.length()).trim();
+					TokenList keyword = Syntax.getSplitKeyword("preReturn");
+					tokens.remove(0, keyword.size());
 					addCode(JUMP_MACROS[packageIndex][1]
-							.replace("%1", transformText(keyword))
-							.replace("%2", line)
+							.replace("%1", transformText(keyword.getString())).trim()
+							.replace("%2", tokens.getString().trim())
 							.replace("%3", semi),
 							_indent, false);
 					
 				}
 				else {
-					if (Instruction.isOutput(line) || Instruction.isInput(line)) {
+					if (Instruction.isOutput(tokens) || Instruction.isInput(tokens)) {
 						// We must not use a \STATE prefix in this case!
 						instrCommand = INSTR_MACRO[packageIndex][1];
 					}
 					addCode(instrCommand
-							.replace("%1", transform(line))
+							.replace("%1", transform(tokens.getString()))
 							.replace("%2", semi),
 							_indent, false);
 				}
@@ -996,7 +996,7 @@ public class TexAlgGenerator extends Generator {
 					 * and selector = "12, 23+5, -9, abs(b)" the resulting condition
 					 * will be: "a = 12 or a = 23+5 or a = -9 or a = abs(b)".
 					 */
-					StringList exprs = Element.splitExpressionList(caseText.get(i+1).trim(), ",");
+					StringList exprs = Syntax.splitExpressionList(caseText.get(i+1).trim(), ",");
 					String cond = var + " = " + exprs.concatenate(" or " + var + " = ");
 					addCode(IF_MACROS[packageIndex][i == 0 ? 0 : 3]
 							.replace("%1", transform(cond))
@@ -1186,15 +1186,15 @@ public class TexAlgGenerator extends Generator {
 			if (packageIndex > 1 || _call.getComment().count() > 1) {
 				appendComment(_call, _indent);
 			}
-			StringList lines = _call.getUnbrokenText();
+			ArrayList<TokenList> lines = _call.getUnbrokenTokenText();
 			String instrMacro = INSTR_MACRO[packageIndex][0];
-			for (int i = 0; i < lines.count(); i++)
+			for (int i = 0; i < lines.size(); i++)
 			{
-				String line = lines.get(i);
-				StringList tokens = Syntax.splitLexically(line, true);
+				TokenList tokens = lines.get(i);
+				String line = tokens.getString();
 				Syntax.unifyOperators(tokens, true);
 				int posAsgnOpr = tokens.indexOf("<-");
-				StringList left = null;
+				TokenList left = null;
 				if (posAsgnOpr >=0 ) {
 					left = tokens.subSequence(0, posAsgnOpr+1);
 					tokens.remove(0, posAsgnOpr+1);
@@ -1203,14 +1203,14 @@ public class TexAlgGenerator extends Generator {
 				int posPar1 = tokens.indexOf("(");
 				int posPar2 = tokens.lastIndexOf(")");
 				if (posPar1 >= 0 && posPar2 > posPar1) {
-					String name = tokens.concatenate("", 0, posPar1);
+					String name = tokens.subSequence(0, posPar1).getString();
 					if (packageIndex == 2 /* algorithm2e */) {
 						name = name.replace("_", "");
 					}
 					line = callMacro.replace("%1", transformText(name))
-							.replace("%2", transform(tokens.concatenate("", posPar1+1, posPar2)));
+							.replace("%2", transform(tokens.subSequence(posPar1+1, posPar2).getString()));
 					if (left != null) {
-						line = transform(left.concatenate()) + line;
+						line = transform(left.getString()) + line;
 					}
 				}
 				else {

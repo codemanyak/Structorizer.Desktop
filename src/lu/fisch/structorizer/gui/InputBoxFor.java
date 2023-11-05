@@ -79,6 +79,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
 import java.awt.event.KeyEvent;
+import java.util.LinkedList;
 
 import javax.swing.ButtonGroup;
 import javax.swing.JCheckBox;
@@ -93,12 +94,14 @@ import javax.swing.text.JTextComponent;
 import com.logicbig.uicommon.SuggestionClient;
 import com.logicbig.uicommon.SuggestionDropDownDecorator;
 
-import lu.fisch.structorizer.elements.Element;
 import lu.fisch.structorizer.elements.For;
 import lu.fisch.structorizer.io.Ini;
 import lu.fisch.structorizer.locales.LangTextHolder;
+import lu.fisch.structorizer.syntax.Expression;
 import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.SyntaxException;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.StringList;
 
 /**
@@ -146,6 +149,7 @@ public class InputBoxFor extends InputBox implements ItemListener {
 	protected LangTextHolder msgMissingBrace1 = new LangTextHolder("Value list must begin with '{'");
 	protected LangTextHolder msgMissingBrace2 = new LangTextHolder("Value list must end with '}'");
 	protected LangTextHolder msgSeparateWithComma = new LangTextHolder("Within braces, commas must separate values.");
+	protected LangTextHolder msgInvalidExpression = new LangTextHolder("Item %1 «%2» is an invalid expression.");
 	protected LangTextHolder msgEnsureReturnedArray = new LangTextHolder("Ensure the function returns an array or string.");
 	protected LangTextHolder msgEnsureVariableIsArray = new LangTextHolder("Ensure that <%> is an array or string.");
 	protected LangTextHolder msgEnterValueList = new LangTextHolder("Enter the value list for the loop.");
@@ -576,12 +580,12 @@ public class InputBoxFor extends InputBox implements ItemListener {
 		// START KGU#1064 2022-09-29: Bugfix #1072
 		//txtText.setText(For.composeForClause(txtVariable.getText(), txtStartVal.getText(), txtEndVal.getText(), incr, false));
 		String strEndVal = txtEndVal.getText();
-		StringList tokensEndVal = Syntax.splitLexically(strEndVal, true);
+		TokenList tokensEndVal = new TokenList(strEndVal, true);
 		String stepFor = Syntax.getKeyword("stepFor");
 		if (tokensEndVal.contains(stepFor)) {
 			JOptionPane.showMessageDialog(this, this.msgIllegalWordInField.getText().
 					replace("%1", lblEndVal.getText()).replace("%2", stepFor));
-			strEndVal = tokensEndVal.concatenate("", 0, tokensEndVal.indexOf(stepFor)).trim();
+			strEndVal = tokensEndVal.subSequence(0, tokensEndVal.indexOf(stepFor)).getString().trim();
 		}
 		txtText.setText(For.composeForClause(txtVariable.getText(), txtStartVal.getText(), strEndVal, incr, false));
 		// END KGU#1064 2022-09-29
@@ -768,13 +772,31 @@ public class InputBoxFor extends InputBox implements ItemListener {
 		}
 		else if (startsWithBrace && endsWithBrace)
 		{
-			StringList elements = Element.splitExpressionList(forInValueList.substring(1, forInValueList.length()-1).trim(), ",");
-			for (int i = 0; i < elements.count(); i++)
+			StringList elements = Syntax.splitExpressionList(forInValueList.substring(1, forInValueList.length()-1), ",");
+			for (int i = 0; i < elements.count()-1; i++)
 			{
-				if (Element.splitExpressionList(elements.get(i).trim(), " ").count() > 1)
-				{
+				String element = elements.get(i).trim();
+				boolean syntaxWrong = false;
+				boolean wrongSeparator = false;
+				// Find out whether the component is a valid expression then we won't complain
+				try {
+					LinkedList<Expression> exprs = Expression.parse(new TokenList(element), null, (short)i);
+					wrongSeparator = elements.count() == 2 && exprs.size() > 1;
+					if (exprs.size() != 1) {
+						syntaxWrong = true;
+					}
+				} catch (SyntaxException exc) {
+					syntaxWrong = true;
+				}
+				if (wrongSeparator) {
 					txtParserInfo.setForeground(Color.RED);
 					txtParserInfo.setText(msgSeparateWithComma.getText());
+					// Loop will end anyway
+				}
+				if (syntaxWrong) {
+					txtParserInfo.setForeground(Color.RED);
+					txtParserInfo.setText(msgInvalidExpression.getText().
+							replace("%1", Integer.toString(i)).replace("%2", element));
 					break;
 				}
 			}

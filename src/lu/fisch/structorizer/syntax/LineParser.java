@@ -1069,10 +1069,10 @@ public class LineParser /*extends CodeParser*/
 				catch (SyntaxException ex) {
 					problems.append(ex.getMessage());
 					int pos = ex.getPosition();
-					StringList tokens = Syntax.splitLexically(_textToParse, true);
+					TokenList tokens = new TokenList(_textToParse, true);
 					problems.append(": ");
 					int ix = 0;
-					while (ix < tokens.count() && pos > 0) {
+					while (ix < tokens.size() && pos > 0) {
 						String token = tokens.get(ix++);
 						if (!token.isBlank()) {
 							pos--;
@@ -1080,7 +1080,7 @@ public class LineParser /*extends CodeParser*/
 						problems.append(token);
 					}
 					problems.append(" ► ");
-					problems.append(tokens.concatenate("", ix));
+					problems.append(tokens.subSequenceToEnd(ix).getString());
 					line = new Line(lineType, problems.toString());
 				}
 			}

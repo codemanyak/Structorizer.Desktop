@@ -47,6 +47,8 @@ package lu.fisch.structorizer.syntax;
  *      Kay Gürtzig     2021-06-06      sgn function added to knownResultTypes
  *      Kay Gürtzig     2021-12-10      New result type mapping for DiagramController routines added
  *      Kay Gürtzig     2021-12-22      Issue #800: parts of builtInFunctions adopted from Executor
+ *      Kay Gürtzig     2023-11-02      Issue #800: New method variants based on TokenList arguments
+ *      Kay Gürtzig     2021-11-04      Issue #800: methods getParamExpr() and getParamTokens() added
  *
  ******************************************************************************************************
  *
@@ -275,7 +277,6 @@ public class Function
 	 */
 	public Function(String exprStr)
 	{
-		this.str = exprStr.trim();
 		// START KGU#790 2020-11-02: Issue #800 - totally redesigned
 //		// START KGU#56 2015-10-27
 //		// START KGU#332 2017-01-29: Enh. #335 We need a more precise test
@@ -313,9 +314,25 @@ public class Function
 //            // END KGU#341 2017-02-06
 //		}
 //		// END KGU#56 2015-10-27
-		TokenList tokens = new TokenList(exprStr, true);
+		this(new TokenList(exprStr));
+	}
+		
+	/**
+	 * Parses the expression held in string {@code expr} and tries to build a
+	 * Function object from it. The resulting object can be asked if it
+	 * actually represents a valid function (or method) invocation.
+	 * 
+	 * @param exprStr - a linearised expression in Structorizer syntax as string
+	 * 
+	 * @see #Function(Expression)
+	 * @see #isFunction()
+	 * @see #isMethod()
+	 */
+	public Function(TokenList exprTokens)
+	{
+		this.str = exprTokens.getString().trim();
 		try {
-			LinkedList<Expression> exprs = Expression.parse(tokens, null, (short)0);
+			LinkedList<Expression> exprs = Expression.parse(new TokenList(exprTokens), null, (short)0);
 			if (exprs.size() == 1) {
 				if (isFunction(exprs.get(0), true)) {
 					expr = exprs.get(0);
@@ -428,10 +445,13 @@ public class Function
 	 * Tests whether the passed-in expression string {@code expr} may represent a
 	 * routine (or method) call, i.e., consists of an identifier or component access
 	 * followed by a parenthesized comma-separated list of argument expressions.
+	 * 
 	 * @param expr - an expression as string
 	 * @param acceptQualifiers - whether a qualified name (i.e an explicit method call)
 	 *  is okay
 	 * @return {@code true} if the expression has got function or method call syntax
+	 * 
+	 * @see #isFunction(TokenList, boolean)
 	 * @see #isFunction(Expression, boolean)
 	 */
 	// START KGU#959 2021-03-05: Issue #961 We need a possibility to detect method calls
@@ -464,10 +484,28 @@ public class Function
 //			}
 //		}
 //		return isFunc;
-		TokenList tokens = new TokenList(expr, true);
+		return isFunction(new TokenList(expr), acceptQualifiers);
+	}
+	/**
+	 * Tests whether the passed-in TokenList {@code exprTokens} may represent a
+	 * routine (or method) call, i.e., consists of an identifier or component access
+	 * followed by a parenthesized comma-separated list of argument expressions.
+	 * 
+	 * @param exprTokens - a tokenized expression
+	 * @param acceptQualifiers - whether a qualified name (i.e an explicit method call)
+	 *  is okay
+	 * @return {@code true} if the expression has got function or method call syntax
+	 * 
+	 * @see #isFunction(Expression, boolean)
+	 */
+	// START KGU#959 2021-03-05: Issue #961 We need a possibility to detect method calls
+	//public static boolean isFunction(String expr)
+	public static boolean isFunction(TokenList exprTokens, boolean acceptQualifiers)
+	// END KGU#959 2021-03-05
+	{
 		LinkedList<Expression> exprs = null;
 		try {
-			exprs = Expression.parse(tokens, null, (short)0);
+			exprs = Expression.parse(exprTokens, null, (short)0);
 		} catch (SyntaxException exc) {}
 		if (exprs != null && exprs.size() == 1) {
 			// START KGU#959 2021-03-05: Issue #961 We need a possibility to detect method calls
@@ -498,6 +536,9 @@ public class Function
 	}
 	// END KGU 2017-02-21
 
+	/**
+	 * @return the function name (may be qualified)
+	 */
 	public String getName()
 	{
 		// START KGU#56 2015-10-27: Analysis now already done by the constructor
@@ -550,6 +591,9 @@ public class Function
 //    }
 //    // END KGU 2017-02-06
 
+	/**
+	 * @return the number of function arguments
+	 */
 	public int paramCount()
 	{
 		// START KGU#56 2015-10-27: Performance improvements
@@ -580,37 +624,68 @@ public class Function
 		else return 0;
 	}
 
+	/**
+	 * Returns the function argument (an expression) with given {@code index} as
+	 * string.
+	 * 
+	 * @param index - the index of the interesting argument expression
+	 * @return the argument expression at {@code index}, or {@code null} (e.g. if
+	 *    {@code index} is out of range ({@code index < 0 || index >= paramCount()})
+	 * 
+	 * @see #paramCount()
+	 * @see #getParamExpr(int)
+	 */
 	public String getParam(int index)
 	{
-		// START KGU#56 2015-10-27: Analysis now only done once by the constructor
-//        if (isFunction())
-//        {
-//            String params = str.trim().substring(str.trim().indexOf("(")+1,str.length()-1).trim();
-//            if(!params.equals(""))
-//            {
-//                StringList sl = StringList.explode(params,",");
-//                return sl.get(index);
-//            }
-//            else return null;
-//        }
-		// START KGU#790 2020-11-02: Issue #800
-		//if (this.parameters != null)
-		//{
-		//	return this.parameters.get(index);
-		//}
-		//else return null;
+		Expression param = getParamExpr(index);
+		if (param != null) {
+			return param.toString();
+		}
+		return null;
+	}
+
+	/**
+	 * Returns the function argument (an expression) with given {@code index} as
+	 * {@link Expression}.
+	 * 
+	 * @param index - the index of the interesting argument expression
+	 * @return the argument expression at index, or {@code null} (e.g. if {@code index} is
+	 *    out of range, i.e. {@code (0 <= index < paramCount())}
+	 * 
+	 * @see #paramCount()
+	 */
+	public Expression getParamExpr(int index)
+	{
 		if (this.expr != null) {
 			Expression funcNode = expr;
 			if (expr.type == Expression.NodeType.OPERATOR) {
 				funcNode = expr.children.getLast();
 			}
 			if (index >= 0 && index < funcNode.children.size()) {
-				return funcNode.children.get(index).toString();
+				return funcNode.children.get(index);
 			}
 		}
 		return null;
-		// END KGU#790 2020-11-02
-		// END KGU#56 2015-10-27
+	}
+
+	/**
+	 * Returns the function argument (an expression) with given {@code index} as
+	 * {@link TokenList}.
+	 * 
+	 * @param index - the index of the interesting argument expression
+	 * @return the argument expression at {@code index}, or {@code null} (e.g. if
+	 *    {@code index} is out of range ({@code index < 0 || index >= paramCount()})
+	 * 
+	 * @see #paramCount()
+	 * @see #getParamExpr(int)
+	 */
+	public TokenList getParamTokens(int index)
+	{
+		Expression param = getParamExpr(index);
+		if (param != null) {
+			return param.asTokenList();
+		}
+		return null;
 	}
 
 	// START KGU#332 2017-01-29: Enh. #335 - type map
@@ -636,9 +711,11 @@ public class Function
 	 * built-in function with unambiguous type.
 	 * If this is known as built-in procedure then it returns "void".
 	 * If unknown then returns the given defaultType
+	 * 
 	 * @param defaultType - null or some default type name for unsuccessful retrieval
 	 * @return name of the result type (Java type name), or {@code null} in case
-	 * this function does not actually represent a function
+	 *    this function does not actually represent a function
+	 * 
 	 * @see #isFunction()
 	 */
 	public String getResultType(String defaultType)

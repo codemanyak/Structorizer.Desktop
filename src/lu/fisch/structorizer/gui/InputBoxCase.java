@@ -89,6 +89,7 @@ import lu.fisch.structorizer.io.Ini;
 import lu.fisch.structorizer.locales.LangTextHolder;
 import lu.fisch.structorizer.locales.Locales;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.StringList;
 
 /**
@@ -604,13 +605,13 @@ public class InputBoxCase extends InputBox implements ItemListener, PropertyChan
 		 */
 		line = line.replace("\\n", "\n");
 		
-		StringList tokens = Syntax.splitLexically(line, true);
+		TokenList tokens = new TokenList(line, true);
 		int posNl = -1;
 		while ((posNl = tokens.indexOf("\n")) >= 0) {
-			text.add(tokens.concatenate(null, 0, posNl).replace("\n", "\\n") + "\\");
+			text.add(tokens.subSequence(0, posNl).getString().replace("\n", "\\n") + "\\");
 			tokens.remove(0, posNl+1);
 		}
-		text.add(tokens.concatenate(null).replace("\n", "\\n"));
+		text.add(tokens.getString().replace("\n", "\\n"));
 		String lastLine = text.get(text.count()-1);
 		while (lastLine.endsWith("\\")) {
 			lastLine = lastLine.substring(0, lastLine.length()-1);
@@ -706,7 +707,7 @@ public class InputBoxCase extends InputBox implements ItemListener, PropertyChan
 			Object val = tm.getValueAt(ixSel, 1);
 			if (val instanceof String) {
 				tblSelectors.clearSelection();
-				StringList exprs = Element.splitExpressionList((String)val, ",");
+				StringList exprs = Syntax.splitExpressionList((String)val, ",");
 				if (exprs.count() > 1) {
 					// Replace the line content by its first element
 					tm.setValueAt(exprs.get(0), ixSel, 1);
@@ -908,7 +909,7 @@ public class InputBoxCase extends InputBox implements ItemListener, PropertyChan
 				String line = (String)tm.getValueAt(i, 1);
 				lines.add(line);
 				// Now replace all code literals with the respective constant name
-				StringList exprs = Element.splitExpressionList(line.replace("\\n", " "), ",", true);
+				StringList exprs = Syntax.splitExpressionList(line.replace("\\n", " "), ",");
 				boolean replaced = false;
 				for (int j = 0; j < exprs.count(); j++) {
 					String expr = exprs.get(j);
@@ -1158,7 +1159,7 @@ public class InputBoxCase extends InputBox implements ItemListener, PropertyChan
 		if (canSplit) {
 			Object val = tblSelectors.getValueAt(ixSelected[0], 1);
 			if (val instanceof String) {
-				StringList exprs = Element.splitExpressionList((String)val, ",");
+				StringList exprs = Syntax.splitExpressionList((String)val, ",");
 				canSplit = exprs.count() > 1;
 			}
 		}

@@ -60,6 +60,7 @@ import java.awt.Color;
 import java.awt.FontMetrics;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.util.ArrayList;
 import java.util.Vector;
 
 import lu.fisch.graphics.Canvas;
@@ -68,6 +69,7 @@ import lu.fisch.structorizer.elements.Element;
 import lu.fisch.structorizer.elements.IElementSequence;
 import lu.fisch.structorizer.elements.IElementVisitor;
 import lu.fisch.structorizer.elements.Subqueue;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.StringList;
 
 /**
@@ -585,15 +587,15 @@ public class SelectedSequence extends Element implements IElementSequence {
 	 * @see lu.fisch.structorizer.elements.Element#addFullText(lu.fisch.utils.StringList, boolean)
 	 */
 	@Override
-	protected void addFullText(StringList _lines, boolean _instructionsOnly) {
-		// This class will hardly be object of code generation
+	protected void addFullText(ArrayList<TokenList> _lines, boolean _instructionsOnly) {
+		// This class will hardly be object of code generation or diagram analysis
 	}
 
 	@Override
 	public void setColor(Color _color) 
 	{
 		for(int i = firstIndex; i <= lastIndex; i++)
-		{      
+		{
 			((Subqueue)parent).getElement(i).setColor(_color);
 		}
 	}

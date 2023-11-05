@@ -196,6 +196,7 @@ import lu.fisch.structorizer.parsers.CobTools.CobVar;
 import lu.fisch.structorizer.parsers.CobTools.Usage;
 import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 //import lu.fisch.structorizer.parsers.CodeParser.FilePreparationException;
 import lu.fisch.utils.BString;
 import lu.fisch.utils.StringList;
@@ -8349,7 +8350,7 @@ public class COBOLParser extends CodeParser
 				String by = this.getContent_R(forRed.get(4).asReduction(), "");
 				String cond = this.getContent_R(condRed, "").trim();
 				// Check whether the condition might be composed and build a while loop in this case!
-				StringList condTokens = Syntax.splitLexically(cond, true);
+				TokenList condTokens = new TokenList(cond, true);
 				// FIXME this is just a quick hack
 				int step = 0;
 				try {
@@ -9067,7 +9068,7 @@ public class COBOLParser extends CodeParser
 			currentVar.setComment(this.retrieveComment(_reduction));
 			currentProg.insertVar(currentVar);
 
-			String type = Element.identifyExprType(null, value, true);
+			String type = Syntax.identifyExprType(null, new TokenList(value), true);
 			if (!type.isEmpty() && _typeInfo != null) {
 				_typeInfo.put(constName, type);
 			}
@@ -10232,7 +10233,7 @@ public class COBOLParser extends CodeParser
 				if (posSub > 0) {
 					String indexStr = this.getContent_R(_reduction.get(posSub).asReduction(), "");
 					// For the case of a multidimensional table split the index iexpressions
-					StringList ixExprs = Element.splitExpressionList(indexStr.substring(1), ",");
+					StringList ixExprs = Syntax.splitExpressionList(indexStr.substring(1), ",");
 					if (this.functionNames.contains(qualName)) {
 						// We take all as arguments ...
 						qualName += indexStr;

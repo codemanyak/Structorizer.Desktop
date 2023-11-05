@@ -116,6 +116,7 @@ package lu.fisch.structorizer.elements;
 
 import java.awt.Color;
 import java.awt.Rectangle;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -126,6 +127,7 @@ import lu.fisch.utils.*;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 
 /**
  * This Structorizer class represents a "jump" (i.e., an exit) element in a diagram.
@@ -248,14 +250,14 @@ public class Jump extends Instruction {
 	 * @see lu.fisch.structorizer.elements.Element#addFullText(lu.fisch.utils.StringList, boolean)
 	 */
 	@Override
-	protected void addFullText(StringList _lines, boolean _instructionsOnly)
+	protected void addFullText(ArrayList<TokenList> _lines, boolean _instructionsOnly)
 	{
 		// In a jump instruction no variables ought to be introduced - so we ignore this text on _instructionsOnly
 		if (!this.isDisabled(false) && !_instructionsOnly)
 		{
 			// START KGU#413 2017-06-09: Enh. #416: Cope with user-inserted line breaks
 			//_lines.add(this.getText());
-			_lines.add(this.getUnbrokenText());
+			_lines.addAll(this.getUnbrokenTokenText());
 			// END KGU#413 2017-06-09
 		}
 	}
@@ -274,72 +276,119 @@ public class Jump extends Instruction {
 	
 	// START KGU#354 2017-03-03: Enh. #354 More consistent support for generators etc.
 	/**
-	 * Checks whether the given line contains a return statement
+	 * Checks whether the given {@code line} contains a return statement
 	 * @param line - the text line to be analysed
-	 * @return {@code true} if {@code line} matches the return syntax 
+	 * @return {@code true} if {@code line} matches the return syntax
+	 * 
+	 * @deprecated prefer {@link #isReturn(TokenList)}
 	 */
 	public static boolean isReturn(String line)
 	{
-		StringList tokens = Syntax.splitLexically(line, false);
-		StringList keyTokens = Syntax.splitLexically(Syntax.getKeyword("preReturn"), false);
+		return isReturn(new TokenList(line, false));
+	}
+	/**
+	 * Checks whether the given line contains a return statement
+	 * @param tokens - the tokenized text line to be analysed
+	 * @return {@code true} if {@code tokens} matches the return syntax 
+	 */
+	public static boolean isReturn(TokenList tokens)
+	{
+		TokenList keyTokens = Syntax.getSplitKeyword("preReturn");
 		return (tokens.indexOf(keyTokens, 0, !Syntax.ignoreCase) == 0);
 	}
 	/**
 	 * Checks whether this element contains a return statement
-	 * @return {@code true} if this has one line and matches the return syntax 
+	 * @return {@code true} if this has one line and matches the return syntax
+	 * 
+	 * @see #isLeave()
+	 * @see #isExit()
+	 * @see #isThrow()
 	 */
 	public boolean isReturn()
 	{
 		// START KGU#413 2017-06-09: Enh. #416 cope with user-defined line breaks
 		//return this.text.count() == 1 && isReturn(this.text.get(0).trim());
-		StringList lines = this.getUnbrokenText();
-		return lines.count() == 1 && isReturn(lines.get(0));
+		ArrayList<TokenList> lines = this.getUnbrokenTokenText();
+		return lines.size() == 1 && isReturn(lines.get(0));
 		// END KGU#413 2017-06-09
 	}
 	/**
 	 * Checks whether the given line contains a leave statement
+	 * 
 	 * @param line - the text line to be analysed
-	 * @return {@code true} if {@code line} matches the leave syntax 
+	 * @return {@code true} if {@code line} matches the leave syntax
+	 * 
+	 * @deprecated prefer #isLeave(TokenList)
 	 */
 	public static boolean isLeave(String line)
 	{
-		StringList tokens = Syntax.splitLexically(line, false);
-		StringList keyTokens = Syntax.splitLexically(Syntax.getKeyword("preLeave"), false);
+		return isLeave(new TokenList(line, false));
+	}
+	/**
+	 * Checks whether the given tokenized line contains a leave statement
+	 * @param tokens - the tokenized text line to be analysed
+	 * @return {@code true} if {@code tokens} matches the leave syntax 
+	 */
+	public static boolean isLeave(TokenList tokens)
+	{
+		TokenList keyTokens = Syntax.getSplitKeyword("preLeave");
 		return (tokens.indexOf(keyTokens, 0, !Syntax.ignoreCase) == 0);
 	}
 	/**
-	 * Checks whether this element contains a leave statement
+	 * Checks whether this element contains a leave statement.
+	 * 
 	 * @return {@code true} if this has one line and matches the leave syntax 
+	 * 
+	 * @see #isReturn()
+	 * @see #isExit()
+	 * @see #isThrow()
 	 */
 	public boolean isLeave()
 	{
 		// START KGU#413 2017-06-09: Enh. #416 cope with user-defined line breaks
 		//return this.text.getLongString().trim().isEmpty() || this.text.count() == 1 && isLeave(this.text.get(0).trim());
-		StringList lines = this.getUnbrokenText();
-		return lines.getLongString().trim().isEmpty() || lines.count() == 1 && isLeave(lines.get(0).trim());
+		ArrayList<TokenList> lines = this.getUnbrokenTokenText();
+		return lines.isEmpty() || lines.size() == 1 && isLeave(lines.get(0));
 		// END KGU#413 2017-06-09
 	}
 	/**
 	 * Checks whether this line contains an exit statement
+	 * 
 	 * @param line - the text line to be analysed
-	 * @return {@code true} if the given {@code line} matches the exit syntax 
+	 * @return {@code true} if the given {@code line} matches the exit syntax
+	 * 
+	 * @deprecated prefer #isExit(TokenList)
 	 */
 	public static boolean isExit(String line)
 	{
-		StringList tokens = Syntax.splitLexically(line, false);
-		StringList keyTokens = Syntax.splitLexically(Syntax.getKeyword("preExit"), false);
+		return isExit(new TokenList(line, false));
+	}
+	/**
+	 * Checks whether this tokenized line contains an exit statement
+	 * 
+	 * @param tokens - the tokenized text line to be analysed
+	 * @return {@code true} if the given {@code tokens} matches the exit syntax 
+	 */
+	public static boolean isExit(TokenList tokens)
+	{
+		TokenList keyTokens = Syntax.getSplitKeyword("preExit");
 		return (tokens.indexOf(keyTokens, 0, !Syntax.ignoreCase) == 0);
 	}
 	/**
 	 * Checks whether this element contains an exit statement
-	 * @return {@code true} if this has one line and matches the exit syntax 
+	 * 
+	 * @return {@code true} if this has one line and matches the exit syntax
+	 * 
+	 * @see #isLeave()
+	 * @see #isReturn()
+	 * @see #isThrow()
 	 */
 	public boolean isExit()
 	{
 		// START KGU#413 2017-06-09: Enh. #416 cope with user-defined line breaks
 		//return this.text.count() == 1 && isExit(this.text.get(0).trim());
-		StringList lines = this.getUnbrokenText();
-		return lines.count() == 1 && isExit(lines.get(0));
+		ArrayList<TokenList> lines = this.getUnbrokenTokenText();
+		return lines.size() == 1 && isExit(lines.get(0));
 		// END KGU#413 2017-06-09
 	}
 	// END KGU#354 2017-03-03
@@ -347,50 +396,71 @@ public class Jump extends Instruction {
 	// START KGU#686 2019-03-18: Enh. #56 Support for try / catch / throw
 	/**
 	 * Checks whether this line contains a throw statement
+	 * 
 	 * @param line - the text line to be analysed
-	 * @return {@code true} if the given {@code line} matches the throw syntax 
+	 * @return {@code true} if the given {@code line} matches the throw syntax
+	 * 
+	 * @deprecated prefer #isThrow(TokenList)
 	 */
 	public static boolean isThrow(String line)
 	{
-		StringList tokens = Syntax.splitLexically(line, false);
-		StringList keyTokens = Syntax.splitLexically(Syntax.getKeyword("preThrow"), false);
+		return isThrow(new TokenList(line, false));
+	}
+	/**
+	 * Checks whether this line contains a throw statement
+	 * 
+	 * @param line - the text line to be analysed
+	 * @return {@code true} if the given {@code line} matches the throw syntax
+	 */
+	public static boolean isThrow(TokenList tokens)
+	{
+		TokenList keyTokens = Syntax.getSplitKeyword("preThrow");
 		return (tokens.indexOf(keyTokens, 0, !Syntax.ignoreCase) == 0);
 	}
 	/**
 	 * Checks whether this element contains a throw statement
-	 * @return {@code true} if this has one line and matches the throw syntax 
+	 * 
+	 * @return {@code true} if this has one line and matches the throw syntax
+	 * 
+	 * @see #isLeave()
+	 * @see #isReturn()
+	 * @see #isExit()
 	 */
 	public boolean isThrow()
 	{
-		StringList lines = this.getUnbrokenText();
-		return lines.count() == 1 && isThrow(lines.get(0));
+		ArrayList<TokenList> lines = this.getUnbrokenTokenText();
+		return lines.size() == 1 && isThrow(lines.get(0));
 	}
 	// END KGU#686 2019-03-18
 
 	// START KGU#78/KGU#365 3017-04-14: Enh. #23, #380: leave analyses unified here
 	/**
-	 * In case of a leave jump returns the specified number of loop levels to leave,
-	 * otherwise 0.
-	 * If the returned level specification is not a positive integer value then a
+	 * In case of a leave jump, returns the specified number of loop levels to leave,
+	 * otherwise 0.<br/>
+	 * If the returned level specification is not a positive integer literal then a
 	 * negative value will be returned.
-	 * @return number of loop levels > 0 or 0 (wrong Jump type) or negative (wrong specification)
+	 * 
+	 * @return number of loop levels > 0, or 0 (wrong Jump type) or negative (wrong
+	 *    specification)
 	 */
 	public int getLevelsUp()
 	{
 		int levelsUp = 0;
-		if (this.isLeave()) {
+		if (text.isEmpty()) {
+			// Definitively a leave, no line to examine
+			levelsUp = 1;
+		}
+		else if (this.isLeave()) {
 			// START KGU#413 2017-06-09: Enh. #416 - cope with user-broken lines
 			//StringList tokens = Element.splitLexically(getText().get(0), true);
-			StringList tokens = Syntax.splitLexically(getUnbrokenText().get(0), true);
+			TokenList tokens = getUnbrokenTokenText().get(0);
 			// END KGU#413 2017-06-09
-			if (tokens.count() > 0) {
-				tokens.remove(0);
-			}
-			String expr = tokens.concatenate().trim();
-			if (expr.isEmpty()) {
+			if (tokens.isBlank()) {
 				levelsUp = 1;
 			}
 			else {
+				TokenList keyTokens = Syntax.getSplitKeyword("preLeave");
+				String expr = tokens.subSequenceToEnd(keyTokens.size()).getString().trim();
 				try {
 					if ((levelsUp = Integer.parseInt(expr)) == 0) {
 						levelsUp = -1;

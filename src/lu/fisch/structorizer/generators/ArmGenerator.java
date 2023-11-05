@@ -1271,7 +1271,7 @@ public class ArmGenerator extends Generator {
                     // Is it a function call? Then produce an assignment with variable mapping
                     if (_call.isAssignment()) {
                         // Get the result value
-                        StringList tokens = Syntax.splitLexically(lines.get(0), true, true);
+                        TokenList tokens = new TokenList(lines.get(0), true);
                         String target = Call.getAssignedVarname(tokens, false);
                         target = variablesToRegisters(target);
                         appendComment("Subroutine result:", getIndent());
@@ -1527,7 +1527,7 @@ public class ArmGenerator extends Generator {
             //newline = variablesToRegisters(line);
             //generateAssignment(newline.replace("\"", "'"), isDisabled);
             {
-                StringList tokens = Syntax.splitLexically(line, true, true);
+                TokenList tokens = new TokenList(line, true);
                 StringBuilder charRepr = stringContentToList(tokens.get(2));
                 newline = variablesToRegisters(tokens.get(0)) + "<-" + charRepr.toString();
                 done = generateAssignment(newline, isDisabled);
@@ -1543,15 +1543,15 @@ public class ArmGenerator extends Generator {
             // START KGU#1066 2022-09-30: Bugfix #1074
             //newline = variablesToRegisters(line);
             {
-                StringList tokens = Syntax.splitLexically(line, true);
-                for (int i = 1; i < tokens.count(); i++) {
+                TokenList tokens = new TokenList(line, true);
+                for (int i = 1; i < tokens.size(); i++) {
                     try {
                         int val = Integer.parseInt(tokens.get(i));
                         tokens.set(i, "#" + val);
                     }
                     catch (NumberFormatException ex) {}
                 }
-                newline = tokens.get(0).toUpperCase() + variablesToRegisters(tokens.concatenate("", 1));
+                newline = tokens.get(0).toUpperCase() + variablesToRegisters(tokens.subSequenceToEnd(1).getString());
             }
             // END KGU#1066 2022-09-30
             addCode(newline, getIndent(), isDisabled);
@@ -1564,24 +1564,23 @@ public class ArmGenerator extends Generator {
                 // START KGU#968 2021-04-25/2021-11-14: Remove the keyword and a possible prompt string
                 //newline = variablesToRegisters(line);
                 //String register = newline.split(" ")[1];
-                StringList tokens = Syntax.splitLexically(line, true);
-                StringList inputTokens = Syntax.splitLexically(Syntax.getKeywordOrDefault("input", "input"), true);
+                TokenList tokens = new TokenList(line, true);
+                TokenList inputTokens = Syntax.getSplitKeyword("input");
                 // Check for a prompt string literal and remove it (plus a possible comma)
-                int ix = inputTokens.count();
+                int ix = inputTokens.size();
                 tokens.remove(0, ix);
-                tokens.removeBlanks();
                 if (!tokens.isEmpty() && (tokens.get(0).startsWith("\"") || tokens.get(0).startsWith("'"))) {
                     tokens.remove(0);
                     appendComment("Prompt string of input instruction ignored", getIndent());
                 }
-                newline = variablesToRegisters(tokens.concatenate(null));
-                tokens = Syntax.splitLexically(newline, true);
+                newline = variablesToRegisters(tokens.getString());
+                tokens = new TokenList(newline, true);
                 tokens.removeAll(",");
                 if (!tokens.isEmpty()) {
                     // Use the last register for the input address as it is overwritten last
-                    String addrRegister = tokens.get(tokens.count()-1);
+                    String addrRegister = tokens.get(tokens.size()-1);
                     addCode(String.format("LDR %s, =0xFF200050", addrRegister), getIndent(), isDisabled);
-                    for (int i = 0; i < tokens.count(); i++) {
+                    for (int i = 0; i < tokens.size(); i++) {
                         String register = tokens.get(i);
                         // START KGU#968 2021-04-24: We must not add two lines via a single call (for correct line counting)
                         //addCode(String.format("LDR %s, =0xFF200050\n%sLDR %s, [%s]", register, getIndent(), register, register), getIndent(), isDisabled);
@@ -1604,19 +1603,19 @@ public class ArmGenerator extends Generator {
                 // We must add two lines via two calls (for correct line counting)
                 //addCode(String.format("LDR %s, =0xFF201000", addrRegister), getIndent(), isDisabled);
                 //addCode(String.format("STR %s, [%s]", register, addrRegister), getIndent(), isDisabled);
-                StringList tokens = Syntax.splitLexically(line, true);
-                StringList outputTokens = Syntax.splitLexically(Syntax.getKeywordOrDefault("output", "output"), true);
-                tokens.remove(0, outputTokens.count());
-                StringList exprs = Element.splitExpressionList(tokens, ",", true);
-                if (exprs.count() > 1) {
+                TokenList tokens = new TokenList(line, true);
+                TokenList outputTokens = Syntax.getSplitKeyword("output");
+                tokens.remove(0, outputTokens.size());
+                ArrayList<TokenList> exprs = Syntax.splitExpressionList(tokens, ",");
+                if (exprs.size() > 1) {
                     String addrRegister = getAvailableRegister();
                     if (!addrRegister.isEmpty()) {
                         mVariables.put(addrRegister, TEMP_REGISTER_TAG);
                     }
                     addCode(String.format("LDR %s, =0xFF201000", addrRegister), getIndent(), isDisabled);
-                    for (int i = 0; i < exprs.count() - 1; i++) {
+                    for (int i = 0; i < exprs.size() - 1; i++) {
                         boolean itemDone = false;
-                        String expr = exprs.get(i);
+                        String expr = exprs.get(i).getString();
                         // START KGU#968 2021-11-15: Issue #967 Don't reserve a register without need
                         //String register = getAvailableRegister();
                         String register = "";
@@ -1936,14 +1935,14 @@ public class ArmGenerator extends Generator {
         //        varName = varName.replace(type, "").replace(" ", "");
         //        type = "." + type;
         //    }
-        StringList tokens = Syntax.splitLexically(line, true, true);
+        TokenList tokens = new TokenList(line, true);
         Syntax.unifyOperators(tokens, true);
         int posAsgnOpr = tokens.indexOf("<-");
-        StringList lhSide = tokens.subSequence(0, posAsgnOpr);
-        StringList rhSide = tokens.subSequence(posAsgnOpr+1, tokens.count());
+        TokenList lhSide = tokens.subSequence(0, posAsgnOpr);
+        TokenList rhSide = tokens.subSequenceToEnd(posAsgnOpr+1);
         String type = "";
-        String varName = lhSide.get(lhSide.count()-1);
-        if (lhSide.count() > 1) {
+        String varName = lhSide.get(lhSide.size()-1);
+        if (lhSide.size() > 1) {
             type = lhSide.get(0);
         }
         int sizeLd = TYPES.indexOf(type);
@@ -1955,9 +1954,9 @@ public class ArmGenerator extends Generator {
             type = TYPE2KEIL.get(type);
         }
         // rhSide should start with "{" and end with "}", so remove the braces now
-        rhSide.remove(rhSide.count()-1);
+        rhSide.remove(rhSide.size()-1);
         rhSide.remove(0);
-        String expr = rhSide.concatenate();
+        String expr = rhSide.getString();
         // START KGU#1010 2021-11-02: Bugix #1015
         //int[] codeMapEntry = this.codeMap.get(elem);
         // END KGU#1010 2021-11-02
@@ -2087,9 +2086,9 @@ public class ArmGenerator extends Generator {
                     if (arNameOrig.equals(USER_REGISTER_TAG)) {
                         String decl = findArrayDeclaration(arName);
                         if (decl != null) {
-                            StringList declTokens = Syntax.splitLexically(decl, true);
+                            TokenList declTokens = new TokenList(decl, true);
                             // Fetch the label
-                            if (declTokens.count() >= 1) {
+                            if (declTokens.size() >= 1) {
                                 arNameOrig = declTokens.get(0);
                             }
                         }
@@ -2177,9 +2176,9 @@ public class ArmGenerator extends Generator {
                     if (arNameOrig.equals(USER_REGISTER_TAG)) {
                         String decl = findArrayDeclaration(arName);
                         if (decl != null) {
-                            StringList declTokens = Syntax.splitLexically(decl, true);
+                            TokenList declTokens = new TokenList(decl, true);
                             // Fetch the label
-                            if (declTokens.count() >= 1) {
+                            if (declTokens.size() >= 1) {
                                 arNameOrig = declTokens.get(0);
                             }
                         }
@@ -2559,7 +2558,7 @@ public class ArmGenerator extends Generator {
         //    }
         //}
         //generateArrayInitialization(String.format(format, split[0], array), isDisabled, elem);
-        StringList tokens = Syntax.splitLexically(line, true, true);
+        TokenList tokens = new TokenList(line, true);
         String literal = tokens.get(2);
         StringBuilder array = stringContentToList(literal);
         if (terminateStrings) {
@@ -2751,8 +2750,8 @@ public class ArmGenerator extends Generator {
             if (declPattern == null && (line.contains(addrPattern1)
                     || gnuEnabled && line.contains(addrPattern2))) {
             // END KGU#1003 2021-10-29
-                StringList tokens = Syntax.splitLexically(line, true, true);
-                arName = tokens.get(tokens.count()-1);
+                TokenList tokens = new TokenList(line, true);
+                arName = tokens.get(tokens.size()-1);
                 if (gnuEnabled) {
                     declPattern = arName + ":";
                 }
@@ -2795,7 +2794,7 @@ public class ArmGenerator extends Generator {
         String decl = findArrayDeclaration(register);
         if (decl != null) {
             String type = "";
-            StringList tokens = Syntax.splitLexically(decl.replace("\t", " "), true, true);
+            TokenList tokens = new TokenList(decl.replace("\t", " "), true);
             int dotPos = -1;
             if (gnuEnabled && (dotPos = tokens.indexOf(".")) >= 0) {
                 type = tokens.get(dotPos + 1);
@@ -2817,7 +2816,7 @@ public class ArmGenerator extends Generator {
                 // Must have found it with KEIL syntax
                 dotPos = 2;
             }
-            if (dotPos > 0 && tokens.count() > dotPos) {
+            if (dotPos > 0 && tokens.size() > dotPos) {
                 tokens.remove(0, dotPos);
                 dim[1] = tokens.count(",") + 1;
             }
@@ -3113,9 +3112,9 @@ public class ArmGenerator extends Generator {
         // the tuple arraylist is useful to rebuild the string later
         ArrayList<Tuple<String, Integer>> stringPositions = new ArrayList<>();
         
-        StringList tokens = Syntax.splitLexically(line, true);
+        TokenList tokens = new TokenList(line, true);
         int position = 0;
-        for (int i = 0; i < tokens.count(); i++) {
+        for (int i = 0; i < tokens.size(); i++) {
             String token = tokens.get(i);
             if (token.matches(variablePattern)) {
                 if (token.matches(registerPattern)) {
@@ -3232,7 +3231,7 @@ public class ArmGenerator extends Generator {
                 ARM_INSTR_LOOKUP.add(s);
             }
         }
-        StringList tokens = Syntax.splitLexically(line.toLowerCase(), true, true);
+        TokenList tokens = new TokenList(line.toLowerCase(), true);
         // START KGU#1066 2022-09-30: Bugfix #1074 ARM instruction code must be at index 0
         //for (int i = 0; i < tokens.count(); i++) {
         //    if (ARM_INSTR_LOOKUP.contains(tokens.get(i))) {
@@ -3240,7 +3239,7 @@ public class ArmGenerator extends Generator {
         //    }
         //}
         String token0;
-        return tokens.count() > 0
+        return tokens.size() > 0
                && ARM_INSTR_LOOKUP.contains((token0 = tokens.get(0)).toLowerCase())
                && !this.varNames.contains(token0);
         // END KGU#1066 2022-09-30
@@ -3259,14 +3258,14 @@ public class ArmGenerator extends Generator {
      */
     private String[] parseExpression(String expression) {
         //String[] expressionSplit = expression.split("");
-        StringList tokens = Syntax.splitLexically(expression, true);
+        TokenList tokens = new TokenList(expression, true);
         ArrayList<String> result = new ArrayList<>();
         StringBuilder item = new StringBuilder();
         boolean afterOpr = true;
 
         //int i = 0;
         //while (i < expressionSplit.length) {
-        for (int i = 0; i < tokens.count(); i++) {
+        for (int i = 0; i < tokens.size(); i++) {
             // If we find one of the supported operations inside the expression
             //if (expressionSplit[i].matches(supportedOperationsPattern) && !expressionSplit[i + 1].matches(numberPattern)) {
             String token = tokens.get(i);

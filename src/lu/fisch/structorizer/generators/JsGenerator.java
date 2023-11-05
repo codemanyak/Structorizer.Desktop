@@ -230,7 +230,7 @@ public class JsGenerator extends CGenerator {
 					String typeName = tokens.get(0);
 					TypeMapEntry recType = this.typeMap.get(":"+typeName);
 					if (recType != null) {
-						return this.transformRecordInit(tokens.getString(), recType);
+						return this.transformRecordInit(tokens, recType);
 					}
 				}
 				else if (posBrace == 0) {
@@ -276,7 +276,7 @@ public class JsGenerator extends CGenerator {
 	 * @see lu.fisch.structorizer.generators.CGenerator#transformRecordInit(java.lang.String, lu.fisch.structorizer.elements.TypeMapEntry)
 	 */
 	@Override
-	protected String transformRecordInit(String constValue, TypeMapEntry typeInfo) {
+	protected String transformRecordInit(TokenList constValue, TypeMapEntry typeInfo) {
 		// START KGU#559 2018-07-20: Enh. #563 - smarter initializer evaluation
 		//HashMap<String, String> comps = Instruction.splitRecordInitializer(constValue);
 		// START KGU#771 2019 11-24: Bugfix #783 - precaution against unknown type
@@ -307,6 +307,7 @@ public class JsGenerator extends CGenerator {
 			// END KGU#1021 2021-12-05
 			TypeMapEntry compType = compEntry.getValue();
 			if (!compName.startsWith("§") && compVal != null) {
+				TokenList compValTokens = new TokenList(compVal);
 				if (isFirst) {
 					isFirst = false;
 				}
@@ -315,14 +316,15 @@ public class JsGenerator extends CGenerator {
 				}
 				recordInit.append(compName + ":");
 				if (compType != null && compType.isRecord()) {
-					recordInit.append(transformRecordInit(compVal, compType));
+					recordInit.append(transformRecordInit(compValTokens, compType));
 				}
 				// START KGU#732 2019-10-03: Bugfix #755 FIXME - nasty workaround
 				// START KGU#771 2019-11-24: Bugfix #783 Caused a NullPointer exception on missing type info
 				//else if (compType.isArray() && compVal.startsWith("{") && compVal.endsWith("}")) {
-				else if (compType != null && compType.isArray() && compVal.startsWith("{") && compVal.endsWith("}")) {
+				else if (compType != null && compType.isArray() && compValTokens.size() >= 2
+						&& compValTokens.get(0).equals("{") && compValTokens.getLast().equals("}")) {
 				// END KGU#771 2019-11-24
-					StringList items = Element.splitExpressionList(compVal.substring(1), ",", true);
+					StringList items = Syntax.splitExpressionList(compVal.substring(1), ",");
 					items.delete(items.count()-1);
 					for (int i = 0; i < items.count(); i++) {
 						items.set(i, transform(items.get(i)));
@@ -354,7 +356,8 @@ public class JsGenerator extends CGenerator {
 	 * @see lu.fisch.structorizer.generators.CGenerator#generateRecordInit(java.lang.String, java.lang.String, java.lang.String, boolean, lu.fisch.structorizer.elements.TypeMapEntry)
 	 */
 	@Override
-	protected void generateRecordInit(String _lValue, String _recordValue, String _indent, boolean _isDisabled, TypeMapEntry _typeEntry)
+	protected void generateRecordInit(String _lValue, TokenList _recordValue, String _indent,
+			boolean _isDisabled, TypeMapEntry _typeEntry)
 	{
 		String compVal = transformRecordInit(_recordValue, _typeEntry);
 		addCode(_lValue + " = " + compVal, _indent, _isDisabled);
@@ -377,10 +380,14 @@ public class JsGenerator extends CGenerator {
 	
 	// START KGU#653/KGU#797 2020-02-11: Enh. #680, bugfix #810
 	/**
-	 * Subclassable method possibly to obtain a suited transformed argument list string for the given series of
-	 * input items (i.e. expressions designating an input target variable each) to be inserted in the input replacer
-	 * returned by {@link #getInputReplacer(boolean)}, this allowing to generate a single input instruction only.<br/>
-	 * This instance just returns null (forcing the generate method to produce consecutive lines).
+	 * Subclassable method possibly to obtain a suited transformed argument list string
+	 * for the given series of input items (i.e. expressions designating an input target
+	 * variable each) to be inserted in the input replacer returned by
+	 * {@link #getInputReplacer(boolean)}, this allowing to generate a single input
+	 * instruction only.<br/>
+	 * This instance just returns null (forcing the generate method to produce consecutive
+	 * lines).
+	 * 
 	 * @param _inputVarItems - {@link StringList} of variable descriptions for input
 	 * @return either a syntactically converted combined string with suited operator or separator symbols, or null.
 	 */
@@ -395,13 +402,14 @@ public class JsGenerator extends CGenerator {
 	 * @see lu.fisch.structorizer.generators.CGenerator#generateInstructionLine(lu.fisch.structorizer.elements.Instruction, java.lang.String, boolean, java.lang.String)
 	 */
 	@Override
-	protected boolean generateInstructionLine(Instruction _inst, String _indent, boolean _commentInserted, String _line)
+	protected boolean generateInstructionLine(Instruction _inst, String _indent, boolean _commentInserted,
+			TokenList _tokens)
 	{
 		// Don't do anything with type definitions
-		if (Instruction.isTypeDefinition(_line, typeMap)) {
+		if (Instruction.isTypeDefinition(_tokens, typeMap)) {
 			return false;
 		}
-		return super.generateInstructionLine(_inst, _indent, _commentInserted, _line);
+		return super.generateInstructionLine(_inst, _indent, _commentInserted, _tokens);
 	}
 	
 	/**
@@ -414,13 +422,15 @@ public class JsGenerator extends CGenerator {
 	{
 		String var = _for.getCounterVar();
 		String valueList = _for.getValueList();
-		StringList items = this.extractForInListItems(_for);
+		//StringList items = this.extractForInListItems(_for);
+		ArrayList<TokenList> items = _for.getValueListItems();
 		
 		if (items != null) {
-			for (int i = 0; i < items.count(); i++) {
-				items.set(i,  transform(items.get(i), false));
+			for (int i = 0; i < items.size(); i++) {
+				// FIXME Don't descend to string level, transform via the parsed expressions
+				items.set(i, new TokenList (transform(items.get(i).getString(), false)));
 			}
-			valueList = "[" + items.concatenate(", ") + "]";
+			valueList = "[" + TokenList.concatenate(items, ", ").getString() + "]";
 		}
 		
 		// Creation of the loop header
@@ -657,8 +667,9 @@ public class JsGenerator extends CGenerator {
 			decl = "const " + _name;
 			// FIXME
 			TypeMapEntry typeInfo = typeMap.get(_name);
-					if (constValue.contains("{") && constValue.endsWith("}") && typeInfo != null && typeInfo.isRecord()) {
-						constValue = transformRecordInit(constValue, typeInfo);
+					if (constValue.contains("{") && constValue.endsWith("}")
+							&& typeInfo != null && typeInfo.isRecord()) {
+						constValue = transformRecordInit(new TokenList(constValue), typeInfo);
 					}
 					else {
 						constValue = transform(constValue);

@@ -108,6 +108,7 @@ import lu.fisch.structorizer.elements.Subqueue;
 import lu.fisch.structorizer.elements.Try;
 import lu.fisch.structorizer.elements.While;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.BString;
 import lu.fisch.utils.StringList;
 
@@ -1222,19 +1223,19 @@ public class D7Parser extends CodeParser
 						case RuleConstants.PROD_ARRAYCONSTANT_LPAREN_RPAREN:
 							value = getContent_R(valRed.get(1).asReduction(), " <- {") + "}";
 							{
-								StringList valueTokens = Syntax.splitLexically(value, true);
+								TokenList valueTokens = new TokenList(value, true);
 								valueTokens.replaceAll(",", ", ");
-								value = valueTokens.concatenate();
+								value = valueTokens.getString();
 							}
 							break;
 						case RuleConstants.PROD_RECORDCONSTANT_LPAREN_RPAREN:
 						case RuleConstants.PROD_RECORDCONSTANT_LPAREN_SEMI_RPAREN:
 							value = getContent_R(valRed.get(1).asReduction(), " <- " + type + "{") + "}";
 							{
-								StringList valueTokens = Syntax.splitLexically(value, true);
+								TokenList valueTokens = new TokenList(value, true);
 								valueTokens.replaceAll(":", ": ");
 								valueTokens.replaceAll(";", "; ");
-								value = valueTokens.concatenate();
+								value = valueTokens.getString();
 							}
 							break;
 						default:
@@ -2028,20 +2029,20 @@ public class D7Parser extends CodeParser
 	private String translateContentWithCalls(String _content)
 	{
 		String translated = this.translateContent(_content);
-		StringList tokens = Syntax.splitLexically(translated, true);
+		TokenList tokens = new TokenList(translated, true);
 		int posAsgn = tokens.indexOf("<-");
 		for (int i = 0; i < paramlessRoutineNames.count(); i++) {
 			String routineName = paramlessRoutineNames.get(i);
 			int pos = posAsgn;
 			while ((pos = tokens.indexOf(routineName, pos+1)) >= 0) {
 				int parPos = pos;
-				while (parPos < tokens.count() && tokens.get(++parPos).trim().isEmpty());
-				if (parPos >= tokens.count() || !tokens.get(parPos).equals("(")) {
+				while (parPos < tokens.size() && tokens.get(++parPos).trim().isEmpty());
+				if (parPos >= tokens.size() || !tokens.get(parPos).equals("(")) {
 					tokens.set(pos, routineName + "()");
 				}
 			}
 		}
-		return tokens.concatenate();
+		return tokens.getString();
 	}
 	// END KGU#821 2020-03-08
 	

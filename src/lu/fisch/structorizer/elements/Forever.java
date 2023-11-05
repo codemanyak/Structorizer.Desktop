@@ -64,12 +64,14 @@ package lu.fisch.structorizer.elements;
 
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.util.ArrayList;
 
 import javax.swing.ImageIcon;
 
 import lu.fisch.graphics.*;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.*;
 
 /**
@@ -350,16 +352,16 @@ public class Forever extends Element implements ILoop {
 
 	// START KGU 2015-10-16
 	/* (non-Javadoc)
-	 * @see lu.fisch.structorizer.elements.Element#addFullText(lu.fisch.utils.StringList, boolean)
+	 * @see lu.fisch.structorizer.elements.Element#addFullText(lu.fisch.structorizer.syntax.TokenList, boolean)
 	 */
 	@Override
-    protected void addFullText(StringList _lines, boolean _instructionsOnly)
-    {
+	protected void addFullText(ArrayList<TokenList> _lines, boolean _instructionsOnly)
+	{
 		if (!this.isDisabled(false)) {
 			this.q.addFullText(_lines, _instructionsOnly);
 		}
-    }
-    // END KGU 2015-10-16
+	}
+	// END KGU 2015-10-16
 
 	// START KGU 2015-11-30
 	@Override

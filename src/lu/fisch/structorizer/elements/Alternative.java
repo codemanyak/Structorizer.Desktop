@@ -73,12 +73,14 @@ package lu.fisch.structorizer.elements;
 import java.awt.Color;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.util.ArrayList;
 
 import javax.swing.ImageIcon;
 
 import lu.fisch.graphics.*;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.*;
 
 /**
@@ -769,17 +771,19 @@ public class Alternative extends Element implements IFork {
 
 	// START KGU 2015-10-16
 	/* (non-Javadoc)
-	 * @see lu.fisch.structorizer.elements.Element#addFullText(lu.fisch.utils.StringList, boolean)
+	 * @see lu.fisch.structorizer.elements.Element#addFullText(ArrayList<Tokenist>, boolean)
 	 */
 	@Override
-	protected void addFullText(StringList _lines, boolean _instructionsOnly)
+	protected void addFullText(ArrayList<TokenList> _lines, boolean _instructionsOnly)
 	{
 		if (!this.isDisabled(false)) {
 			if (!_instructionsOnly) {
-				// START KGU#453 2017-11-01: Bugfix 447 Someone might have placed line continuation backslashes...
-				//_lines.add(this.getText());	// Text of the condition
-				_lines.add(this.getUnbrokenText().getLongString());	// Text of the condition as a single line
-				// END KGU#453 2017-11-01
+				ArrayList<TokenList> unbroken = this.getUnbrokenTokenText();
+				// Add the condition as a single TokenList
+				if (!unbroken.isEmpty()) {
+					// Add text of the condition as a single line
+					_lines.add(TokenList.concatenate(unbroken, null));
+				}
 			}
 			this.qTrue.addFullText(_lines, _instructionsOnly);
 			this.qFalse.addFullText(_lines, _instructionsOnly);

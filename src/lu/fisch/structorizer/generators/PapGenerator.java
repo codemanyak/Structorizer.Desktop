@@ -1085,7 +1085,7 @@ public class PapGenerator extends Generator {
 				boolean descendTrue = true;
 				if (i+2 < text.count()) {
 					String operator = " = ";
-					if (Element.splitExpressionList(selector, ",", true).count() > 2) {
+					if (Syntax.splitExpressionList(selector, ",").count() > 2) {
 						selector = "{" + selector + "}";
 						operator = " in ";
 					}

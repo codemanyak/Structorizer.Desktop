@@ -20,6 +20,8 @@
 
 package lu.fisch.structorizer.generators;
 
+import java.util.ArrayList;
+
 /******************************************************************************************************
  *
  *      Author:         Bob Fisch
@@ -648,10 +650,10 @@ public class CGenerator extends Generator {
 				// START KGU#739 2019-10-03: Bugfix #756 we must avoid false positives...
 				//String lval = _input.substring(0, asgnPos).trim();
 				//String expr = _input.substring(asgnPos + "<-".length()).trim();
-				StringList tokens = Syntax.splitLexically(_input, true);
+				TokenList tokens = new TokenList(_input, true);
 				if ((asgnPos = tokens.indexOf("<-")) > 0) {
-					String lval = tokens.concatenate("", 0, asgnPos);
-					String expr = tokens.concatenate("", asgnPos+1).trim();
+					TokenList lval = tokens.subSequence(0, asgnPos);
+					String expr = tokens.subSequenceToEnd(asgnPos+1).getString().trim();
 				// END KGU#739 2019-10-03
 					String[] typeNameIndex = this.lValueToTypeNameIndexComp(lval);
 					String index = typeNameIndex[2];
@@ -681,20 +683,23 @@ public class CGenerator extends Generator {
 			//_input = _input.replace("printf(\"TODO: specify format\\n\", )", "printf(\"\\n\")");
 			if (_input.startsWith("printf(\"TODO: specify format\\n\",")) {
 				// Decompose the output items and try to derive sensible format specifiers
-				StringList exprs = Element.splitExpressionList(_input.substring("printf(\"TODO: specify format\\n\",".length()), ",", true);
-				if (exprs.isEmpty()) {
+				ArrayList<TokenList> exprs = Syntax.splitExpressionList(
+						new TokenList(_input.substring("printf(\"TODO: specify format\\n\",".length())), ",");
+				if (exprs.size() <= 1) {
 					_input = "printf(\"\\n\")";
 				}
 				else {
-					String tail = exprs.get(exprs.count() - 1);
-					exprs.remove(exprs.count()-1);
-					exprs.removeAll("");
+					TokenList tail = exprs.get(exprs.size() - 1);
+					exprs.remove(exprs.size()-1);
 					_input = "printf(\"";
-					for (int i = 0; i < exprs.count(); i++) {
-						String expr = exprs.get(i);
-						StringList tokens = Syntax.splitLexically(expr, true, true);
+					StringList exprStrings = new StringList();
+					for (int i = 0; i < exprs.size(); i++) {
+						TokenList tokens = exprs.get(i);
+						if (tokens.isBlank()) {
+							continue;
+						}
 						String fSpec = "?";
-						if (tokens.count() == 1) {
+						if (tokens.size() == 1) {
 							String token = tokens.get(0);
 							if (token.startsWith("\"") && token.endsWith("\"")) {
 								fSpec = "s";
@@ -743,9 +748,10 @@ public class CGenerator extends Generator {
 							}
 						}
 						_input += "%" + fSpec;
+						exprStrings.add(tokens.getString());
 					}
 					_input +="\\n\"" + (exprs.isEmpty() ? "" : ", ")
-							+ exprs.concatenate(", ") + tail;
+							+ exprStrings.concatenate(", ") + tail.getString();
 				}
 			}
 			// END KGU#794 2020-02-11
@@ -857,11 +863,12 @@ public class CGenerator extends Generator {
 	/**
 	 * Returns a target-language expression replacing the Structorizer record
 	 * initializer - as far as it can be handled within one line
-	 * @param constValue - the Structorizer record initializer
+	 * 
+	 * @param constValue - the tokenized Structorizer record initializer
 	 * @param typeInfo - the TypeMapEntry describing the record type
 	 * @return the equivalent target code as expression string
 	 */
-	protected String transformRecordInit(String constValue, TypeMapEntry typeInfo) {
+	protected String transformRecordInit(TokenList constValue, TypeMapEntry typeInfo) {
 		// START KGU#559 2018-07-20: Enh. #563 - smarter initializer evaluation
 		//HashMap<String, String> comps = Instruction.splitRecordInitializer(constValue);
 		HashMap<String, String> comps = Instruction.splitRecordInitializer(constValue, typeInfo);
@@ -889,7 +896,7 @@ public class CGenerator extends Generator {
 					recordInit.append("0 /*undef.*/");
 				}
 				else if (compEntry.getValue().isRecord()) {
-					recordInit.append(transformRecordInit(compVal, compEntry.getValue()));
+					recordInit.append(transformRecordInit(new TokenList(compVal), compEntry.getValue()));
 				}
 				else {
 					recordInit.append(transform(compVal));
@@ -1147,14 +1154,12 @@ public class CGenerator extends Generator {
 
 		if (!appendAsComment(_inst, _indent)) {
 
-			// START KGU#424 2017-09-26: Avoid the comment here if the element contains mere declarations
-			//insertComment(_inst, _indent);
+			// Avoid the comment here if the element contains mere declarations
 			boolean commentInserted = false;
-			// END KGU#424 2017-09-26
 
-			StringList lines = _inst.getUnbrokenText();
-			for (int i = 0; i < lines.count(); i++) {
-				// FIXME: We must distinguish for every line:
+			ArrayList<TokenList> lines = _inst.getUnbrokenTokenText();
+			for (int i = 0; i < lines.size(); i++) {
+				// Every line will be distinguished among:
 				// 1. assignment
 				// 1.1 with declaration (mind record initializer!)
 				// 1.1.1 as constant
@@ -1167,19 +1172,8 @@ public class CGenerator extends Generator {
 				// 2.2 as variable
 				// 3. type definition
 				// 4. Input / output
-				// START KGU#277/KGU#284 2016-10-13/16: Enh. #270 + Enh. #274
-				//code.add(_indent + transform(lines.get(i)) + ";");
-				// START KGU#504 2018-03-13: Bugfix #520/#521
-				//String line = _inst.getText().get(i);
-				String line = lines.get(i);
-				// END KGU#504 2018-03-13
-				// START KGU#261/KGU#332 2017-01-26: Enh. #259/#335
-				//String codeLine = transform(line) + ";";
-				//addCode(codeLine, _indent, isDisabled);
-				// Things will get easier and more precise with tokenization
-				// (which must be done based on the original line)
-				commentInserted = generateInstructionLine(_inst, _indent, commentInserted, line);
-				// END KGU#277/KGU#284 2016-10-13
+				commentInserted = generateInstructionLine(_inst, _indent,
+						commentInserted, lines.get(i));
 			}
 
 		}
@@ -1197,7 +1191,7 @@ public class CGenerator extends Generator {
 	 * @return {@code true} if the element comment will have been inserted when this
 	 *     routine is being left
 	 */
-	protected boolean generateInstructionLine(Instruction _inst, String _indent, boolean _commentInserted, String _line) {
+	protected boolean generateInstructionLine(Instruction _inst, String _indent, boolean _commentInserted, TokenList tokens) {
 		// Cases to be distinguished and handled:
 		// 1. assignment
 		// 1.1 with declaration (mind record initializer!)
@@ -1212,26 +1206,22 @@ public class CGenerator extends Generator {
 		// 3. type definition
 		// 4. Input / output
 		boolean isDisabled = _inst.isDisabled(false); 
-		StringList tokens = Syntax.splitLexically(_line.trim(), true);
 		// START KGU#796 2020-02-10: Bugfix #808
 		Syntax.unifyOperators(tokens, false);
 		// END KGU#796 2020-02-10
-		StringList pureTokens = new StringList(tokens);	// will not contain separating space
-		StringList exprTokens = null;	// Tokens of the expression in case of an assignment
-		StringList pureExprTokens = null;	// as before, will not contain separating space
-		pureTokens.removeBlanks();
+		TokenList exprTokens = null;	// Tokens of the expression in case of an assignment
 		String expr = null;	// Original expression
 		int posAsgn = tokens.indexOf("<-");
 		if (posAsgn < 0) {
-			posAsgn = tokens.count();
+			posAsgn = tokens.size();
 		}
 		else {
-			exprTokens = tokens.subSequence(posAsgn + 1, tokens.count());
-			pureExprTokens = pureTokens.subSequence(pureTokens.indexOf("<-")+1, pureTokens.count());
+			exprTokens = tokens.subSequenceToEnd(posAsgn + 1);
 		}
 		String codeLine = null;
-		String varName = Instruction.getAssignedVarname(pureTokens, false);
-		boolean isDecl = Instruction.isDeclaration(_line);
+		// The varName result will only make sense in case of an assignment or declaration
+		String varName = Instruction.getAssignedVarname(tokens, false);
+		boolean isDecl = Instruction.isDeclaration(tokens);
 		//exprTokens.removeAll(" ");
 		if (!this.suppressTransformation && (isDecl || exprTokens != null)) {
 			// Cases 1 or 2
@@ -1248,7 +1238,7 @@ public class CGenerator extends Generator {
 			Root root = Element.getRoot(_inst);
 			StringList paramNames = root.getParameterNames();
 			// START KGU#375 2017-04-12: Enh. #388 special treatment of constants
-			if (pureTokens.get(0).equals("const")) {
+			if (tokens.get(0).equals("const")) {
 				// Cases 1.1.1 or 2.1
 				if (!this.isInternalDeclarationAllowed()) {
 					return _commentInserted;
@@ -1270,7 +1260,8 @@ public class CGenerator extends Generator {
 					// Declaration well-formed?
 					if (posColon > 0) {
 						// Compose the lval without type
-						codeLine = transform(tokens.subSequence(1, posColon).concatenate().trim());
+						// FIXME convert transform to TokenList arg
+						codeLine = transform(tokens.subSequence(1, posColon).getString().trim());
 						if (this.isInternalDeclarationAllowed()) {
 						// START KGU#1089 2023-10-12: Issue #980 Face a list of variables
 							//// START KGU#711 2019-10-01: Enh. #721 Precaution for Javascript
@@ -1285,30 +1276,34 @@ public class CGenerator extends Generator {
 							//type = transformType(type, "");
 							//codeLine = this.transformArrayDeclaration(type, codeLine);
 							//// END KGU#561 2018-07-21
-							String type = tokens.subSequence(posColon+1, posAsgn).concatenate().trim();
-							StringList declItems = Element.splitExpressionList(tokens.subSequence(1, posColon), ",", false);
-							for (int i = 0; i < declItems.count(); i++) {
-								String declItem = declItems.get(i).trim();
+							String type = tokens.subSequence(posColon+1, posAsgn).getString().trim();
+							ArrayList<TokenList> declItems = Syntax.splitExpressionList(tokens.subSequence(1, posColon), ",");
+							for (int i = 0; i < declItems.size() - 1; i++) {
+								TokenList declItem = declItems.get(i);
 								// FIXME there could be asterisks and more!
-								int posBrack = declItem.indexOf('[');
-								String brackets = "";
+								int posBrack = declItem.indexOf("[");
+								TokenList brackets = new TokenList();
 								if (posBrack >= 0) {
-									brackets = declItem.substring(posBrack);
-									declItem = declItem.substring(0, posBrack).trim();
+									brackets = declItem.subSequenceToEnd(posBrack);
+									declItem.remove(posBrack, declItem.size());
 								}
+								String declVar = declItem.getString().trim();
 								// START KGU#711 2019-10-01: Enh. #721 Precaution for Javascript
-								if (declItem.isEmpty() || exprTokens == null && wasDefHandled(root, declItem, false)) {
+								if (declVar.isEmpty()
+										|| exprTokens == null && wasDefHandled(root, declVar, false)) {
 									codeLine = null;	// If this was the last loop cycle then ensure nothing gets coded.
 									continue;
 								}
 								// END KGU#711 2019-10-01
 								StringList dims = new StringList();
-								while (brackets.startsWith("[")) {
-									StringList ranges = Element.splitExpressionList(brackets.substring(1), ",", true);
-									dims.add(ranges.subSequence(0, ranges.count()-1));
-									brackets = ranges.get(ranges.count()-1).trim();
-									if (brackets.startsWith("]")) {
-										brackets = brackets.substring(1).trim();
+								while (!brackets.isBlank() && brackets.get(0).equals("[")) {
+									ArrayList<TokenList> ranges = Syntax.splitExpressionList(brackets.subSequenceToEnd(1), ",");
+									for (int j = 0; j < ranges.size()-1; j++) {
+										dims.add(ranges.get(j).getString().trim());
+									}
+									brackets = ranges.get(ranges.size()-1);
+									if (!brackets.isBlank() && brackets.get(0).equals("]")) {
+										brackets.remove(0);
 									}
 								}
 								String type1 = type;
@@ -1319,15 +1314,15 @@ public class CGenerator extends Generator {
 								// START KGU#561 2018-07-21: Bugfix #564
 								//codeLine = transform(transformType(type, "")) + " " + codeLine;
 								type1 = transformType(type1, "");
-								codeLine = this.transformArrayDeclaration(type1, declItem);
+								codeLine = this.transformArrayDeclaration(type1, declVar);
 								// END KGU#561 2018-07-21
 								if (!_commentInserted) {
 									appendComment(_inst, _indent);
 									_commentInserted = true;
 								}
-								if (exprTokens == null || declItems.count() > 1) {
+								if (exprTokens == null || declItems.size() > 1) {
 									addCode(codeLine + ";", _indent, isDisabled);
-									wasDefHandled(root, declItem, true);
+									wasDefHandled(root, declVar, true);
 									codeLine = null;
 								}
 							}
@@ -1352,13 +1347,13 @@ public class CGenerator extends Generator {
 						}
 						else {
 							// Apparently many declared variables, ambiguous assignment
-							declVars = Instruction.getDeclaredVariables(pureTokens);
+							declVars = Instruction.getDeclaredVariables(tokens);
 							if (declVars.count() > 1) {
 								exprTokens = null;
 							}
 						}
 						int posVar0 = 0;
-						StringList declZones = new StringList();
+						ArrayList<TokenList> declZones = new ArrayList<TokenList>(); // Will be filled in the first loop cycle
 						for (int i = 0; i < declVars.count(); i++) {
 							String declVar = declVars.get(i);
 							// END KGU#1089 2023-10-16
@@ -1381,20 +1376,23 @@ public class CGenerator extends Generator {
 								int posVar = tokens.indexOf(declVar);
 								if (i == 0) {
 									posVar0 = posVar;
-									declZones = Element.splitExpressionList(tokens.subSequence(posVar0, posAsgn), ",", true);
+									declZones = Syntax.splitExpressionList(tokens.subSequence(posVar0, posAsgn), ",");
 								}
-								StringList typeStr = tokens.subSequence(0, posVar0);
-								int posLBrack = declZones.get(i).indexOf('[');
-								int posRBrack = declZones.get(i).lastIndexOf(']');
-								if (!typeStr.isEmpty() && posLBrack > 0 && posRBrack > posLBrack) {
-									typeStr.insert("array "
-											+ declZones.get(i).substring(posLBrack, posRBrack+1) + " of ", 0);
+								TokenList typeTokens = tokens.subSequence(0, posVar0);
+								int posLBrack = declZones.get(i).indexOf("[");
+								int posRBrack = declZones.get(i).lastIndexOf("]");
+								if (!typeTokens.isEmpty() && posLBrack > 0 && posRBrack > posLBrack) {
+									//typeStr.insert("array "
+									//		+ declZones.get(i).substring(posLBrack, posRBrack+1) + " of ", 0);
+									typeTokens.addAll(0, new TokenList("array  of"));
+									typeTokens.addAll(1, declZones.get(i).subSequence(posLBrack, posRBrack+1));
 								}
-								else if (typeStr.isEmpty() && exprTokens != null) {
-									declVar = declZones.get(i);
+								else if (typeTokens.isEmpty() && exprTokens != null) {
+									declVar = declZones.get(i).getString();
 								}
+								// FIXME don't pass this through strings
 								codeLine = this.composeTypeAndNameForDecl(
-										typeStr.concatenate(null).trim(),
+										typeTokens.getString().trim(),
 										declVar.trim());
 								codeLine = transform(codeLine);
 								// END KGU#711 2019-09-30
@@ -1414,7 +1412,8 @@ public class CGenerator extends Generator {
 						if (!isDecl || posEnd < 0 || posEnd > posAsgn) {
 							posEnd = posAsgn;
 						}
-						codeLine = transform(tokens.subSequence(posVar, posEnd).concatenate().trim());
+						// FIXME Don't descend to string here
+						codeLine = transform(tokens.subSequence(posVar, posEnd).getString().trim());
 						// END KGU#560 2018-07-21
 					}
 //							// START KGU#375 2017-04-13: Enh. #388
@@ -1435,7 +1434,7 @@ public class CGenerator extends Generator {
 			else if (!isDecl && exprTokens != null) {
 				// Case 1.2
 				// Combine variable access as is
-				codeLine = transform(tokens.subSequence(0, posAsgn).concatenate()).trim();
+				codeLine = transform(tokens.subSequence(0, posAsgn).getString()).trim();
 				// START KGU#767 2019-11-30: Bugfix #782 maybe we must introduce a postponed declaration here
 				if (varName != null
 						&& Syntax.isIdentifier(varName, false, null)
@@ -1465,17 +1464,17 @@ public class CGenerator extends Generator {
 				// END KGU#767 2019-11-30
 			}
 			// Now we care for a possible assignment
-			if (codeLine != null && exprTokens != null && pureExprTokens.count() > 0) {
+			if (codeLine != null && exprTokens != null && !exprTokens.isBlank()) {
 				// START KGU#560 2018-07-21: Bugfix #564 - several problems with array initializers
-				int posBrace = pureExprTokens.indexOf("{");
-				if (posBrace >= 0 && posBrace <= 1 && pureExprTokens.get(pureExprTokens.count()-1).equals("}")) {
+				int posBrace = exprTokens.indexOf("{");
+				if (posBrace >= 0 && posBrace <= 1 && exprTokens.get(exprTokens.size()-1).equals("}")) {
 					// Case 1.1 or 1.2.1 (either array or record initializer)
-					if (posBrace == 1 && pureExprTokens.count() >= 3 && Syntax.isIdentifier(pureExprTokens.get(0), false, null)) {
-						String typeName = pureExprTokens.get(0);
+					if (posBrace == 1 && exprTokens.size() >= 3 && Syntax.isIdentifier(exprTokens.get(0), false, null)) {
+						String typeName = exprTokens.get(0);
 						TypeMapEntry recType = this.typeMap.get(":"+typeName);
 						if (isDecl && this.isInternalDeclarationAllowed() && recType != null) {
 							// transforms the Structorizer record initializer into a C-conform one
-							expr = this.transformRecordInit(exprTokens.concatenate().trim(), recType);
+							expr = this.transformRecordInit(exprTokens, recType);
 						}
 						else {
 							// In this case it's either no declaration or the declaration has already been generated
@@ -1487,13 +1486,13 @@ public class CGenerator extends Generator {
 							// FIXME: Possibly codeLine (the lval string) might be too much as first argument
 							// START KGU#559 2018-07-20: Enh. #563
 							//this.generateRecordInit(codeLine, pureExprTokens.concatenate(), _indent, isDisabled, null);
-							this.generateRecordInit(codeLine, pureExprTokens.concatenate(), _indent, isDisabled, recType);
+							this.generateRecordInit(codeLine, exprTokens, _indent, isDisabled, recType);
 							// END KGU#559 2018-07-20
 							return _commentInserted;
 						}
 					}
 					else {
-						StringList items = Element.splitExpressionList(pureExprTokens.subSequence(1, pureExprTokens.count()), ",", true);
+						ArrayList<TokenList> items = Syntax.splitExpressionList(exprTokens.subSequenceToEnd(1), ",");
 						String elemType = null;
 						TypeMapEntry arrType = this.typeMap.get(varName);
 						if (arrType != null && arrType.isArray()) {
@@ -1506,7 +1505,7 @@ public class CGenerator extends Generator {
 							String indices = codeLine.substring(posIdx).trim();
 							while (elemType.startsWith("@") && indices.startsWith("[")) {
 								elemType = elemType.substring(1);
-								StringList indexList = Element.splitExpressionList(indices.substring(1), ",", true);
+								StringList indexList = Syntax.splitExpressionList(indices.substring(1), ",");
 								indexList.remove(0); // Drop first index expression (has already been handled)
 								// Are there perhaps more indices within the same bracket pair (comma-separated list)?
 								while (indexList.count() > 1 && elemType.startsWith("@")) {
@@ -1523,7 +1522,8 @@ public class CGenerator extends Generator {
 							}
 							// END KGU#784 2019-12-02
 						}
-						expr = this.transformOrGenerateArrayInit(codeLine, items.subSequence(0, items.count()-1), _indent, isDisabled, elemType, isDecl);
+						items.remove(items.size()-1); // Get rid of tail
+						expr = this.transformOrGenerateArrayInit(codeLine, items, _indent, isDisabled, elemType, isDecl);
 						if (expr == null) {
 							return _commentInserted;
 						}
@@ -1531,7 +1531,8 @@ public class CGenerator extends Generator {
 				}
 				// END KGU#560 2018-07-21
 				else {
-					expr = this.transform(exprTokens.concatenate()).trim();
+					// FIXME Don't descend to string level
+					expr = this.transform(exprTokens.getString()).trim();
 				}
 			}
 			if (expr != null) {
@@ -1540,10 +1541,9 @@ public class CGenerator extends Generator {
 			}
 		} // if (!this.suppressTransformation && (isDecl || exprTokens != null))
 		// START KGU#388 2017-09-25: Enh. #423
-		else if (!this.suppressTransformation && Instruction.isTypeDefinition(_line, typeMap)) {
+		else if (!this.suppressTransformation && Instruction.isTypeDefinition(tokens, typeMap)) {
 			// Attention! The following condition must not be combined with the above one! 
 			if (this.isInternalDeclarationAllowed()) {
-				tokens.removeBlanks();
 				// START KGU#878 2020-10-16: Bugfix #873 - collateral damage of bugfix #808 mended
 				//int posEqu = tokens.indexOf("=");
 				int posEqu = tokens.indexOf("==");
@@ -1561,7 +1561,8 @@ public class CGenerator extends Generator {
 				}
 				else {
 					// Hardly a recognizable type definition, just put it as is...
-					codeLine = "typedef " + transform(tokens.concatenate(" ", posEqu + 1)) + " " + typeName;
+					// FIXME Don't descend to String level
+					codeLine = "typedef " + transform(tokens.subSequenceToEnd(posEqu + 1).getString()) + " " + typeName;
 				}
 			}
 		}
@@ -1570,9 +1571,11 @@ public class CGenerator extends Generator {
 			// All other cases (e.g. input, output)
 			// START KGU#653 2019-02-14: Enh. #680 - care for multi-variable input lines
 			//codeLine = transform(line);
-			StringList inputItems = Instruction.getInputItems(_line);
-			if (inputItems == null || !generateMultipleInput(inputItems, _indent, isDisabled, _commentInserted ? null : _inst.getComment())) {
-				codeLine = transform(_line);
+			StringList inputItems = Instruction.getInputItems(tokens);
+			if (inputItems == null
+					|| !generateMultipleInput(inputItems, _indent, isDisabled, _commentInserted ? null : _inst.getComment())) {
+				// FIXME Don't descend to String level
+				codeLine = transform(tokens.getString());
 			}
 			else {
 				codeLine = null;
@@ -1582,7 +1585,7 @@ public class CGenerator extends Generator {
 		// Now append the codeLine in case it was composed and not already appended
 		if (codeLine != null) {
 			String lineEnd = ";";
-			if (Instruction.isTurtleizerMove(_line)) {
+			if (Instruction.isTurtleizerMove(tokens)) {
 				codeLine = this.enhanceWithColor(codeLine, _inst);
 				lineEnd = "";	// codeLine already contains a line end in this case
 			}
@@ -1772,7 +1775,7 @@ public class CGenerator extends Generator {
 			// branch
 			// START KGU#755 2019-11-08: Bugfix #769 - more precise splitting necessary
 			//StringList constants = StringList.explode(lines.get(i + 1), ",");
-			StringList constants = Element.splitExpressionList(lines.get(i + 1), ",");
+			StringList constants = Syntax.splitExpressionList(lines.get(i + 1), ",");
 			// END KGU#755 2019-11-08
 			for (int j = 0; j < constants.count(); j++) {
 				addCode("case " + constants.get(j).trim() + ":", _indent, isDisabled);
@@ -1879,7 +1882,8 @@ public class CGenerator extends Generator {
 		String var = _for.getCounterVar();
 		String valueList = _for.getValueList();
 		TypeMapEntry typeInfo = this.typeMap.get(valueList);
-		StringList items = this.extractForInListItems(_for);
+		//StringList items = this.extractForInListItems(_for);
+		ArrayList<TokenList> items = _for.getValueListItems();
 		String itemVar = var;
 		String itemType = "";
 		String nameSuffix = Integer.toHexString(_for.hashCode());
@@ -1897,7 +1901,7 @@ public class CGenerator extends Generator {
 			// Good question is: how do we guess the element type and what do we
 			// do if items are heterogeneous? We will make use of the typeMap and
 			// hope to get sensible information. Otherwise we add a TODO comment.
-			int nItems = items.count();
+			int nItems = items.size();
 			boolean allChar = true;	// KGU#782 2019-12-02: We now also detect char elements
 			boolean allInt = true;
 			boolean allDouble = true;
@@ -1905,8 +1909,8 @@ public class CGenerator extends Generator {
 			StringList itemTypes = new StringList();
 			for (int i = 0; i < nItems; i++)
 			{
-				String item = items.get(i);
-				String type = Element.identifyExprType(this.typeMap, item, false);
+				TokenList item = items.get(i);
+				String type = Syntax.identifyExprType(this.typeMap, item, false);
 				itemTypes.add(this.transformType(type, "int"));
 				if (!type.equals("char")) {
 					allChar = false;
@@ -1928,7 +1932,7 @@ public class CGenerator extends Generator {
 			else if (allInt) itemType = "int";
 			else if (allDouble) itemType = "double";
 			else if (allString) itemType = "char*";
-			String arrayLiteral = "{" + items.concatenate(", ") + "}";
+			String arrayLiteral = "{" + TokenList.concatenate(items, ", ").getString() + "}";
 
 			// Start an extra block to encapsulate the additional definitions
 			addCode("{", _indent, isDisabled);
@@ -1950,7 +1954,7 @@ public class CGenerator extends Generator {
 						typeDef += itemTypes.get(i) + " comp" + i + "; ";
 						// START KGU#355 2017-03-30: #365 - initializers needs selectors
 						if (i > 0) arrayLiteral += ", ";
-						arrayLiteral += ".comp" + i + "<-" + items.get(i);
+						arrayLiteral += ".comp" + i + "<-" + items.get(i).getString();
 						// END KGU#355 2017-03-30
 					}
 					// START KGU#355 2017-03-30: #365 - initializers needs selectors
@@ -2141,10 +2145,14 @@ public class CGenerator extends Generator {
 			//appendComment(_call, _indent);
 			// END KGU#1065 2022-09-29
 			// In theory, here should be only one line, but we better be prepared...
-			StringList lines = _call.getUnbrokenText();
+			ArrayList<TokenList> lines = _call.getUnbrokenTokenText();
 			Root owningRoot = Element.getRoot(_call);
-			for (int i = 0; i < lines.count(); i++) {
-				String line = lines.get(i).trim();
+			for (int i = 0; i < lines.size(); i++) {
+				TokenList tokens = lines.get(i);
+				if (tokens.isBlank()) {
+					addCode("", _indent, isDisabled);
+					continue;
+				}
 //				// START KGU#376 2017-04-13: Enh. #389 handle import calls - withdrawn here
 //				if (!isDisabled && Call.isImportCall(lines.get(i))) {
 //					generateImportCode(_call, line, _indent);
@@ -2152,7 +2160,9 @@ public class CGenerator extends Generator {
 //				else
 //				// END KGU#376 2017-04-13
 				// START KGU#371 2019-03-07: Enh. #385 Support for declared optional arguments
-				boolean mustHealDefaults = line.endsWith(")") && this.getOverloadingLevel() == OverloadingLevel.OL_NO_OVERLOADING;
+				boolean isAssignment = Instruction.isAssignment(tokens);
+				boolean mustHealDefaults = tokens.get(tokens.size()-1).equals(")")
+						&& this.getOverloadingLevel() == OverloadingLevel.OL_NO_OVERLOADING;
 				if ((routinePool != null) && (mustHealDefaults || this.importedLibRoots != null)) {
 					Function call = _call.getCalledRoutine(i);
 					// START KGU#877 2020-10-16: Bugfix #874 name extraction may fail (e.g. non-ASCII letters)
@@ -2167,18 +2177,21 @@ public class CGenerator extends Generator {
 								called.collectParameters(null, null, defaults);
 								if (defaults.count() > call.paramCount()) {
 									// We just add the list of default values for the missing arguments
-									line = line.substring(0, line.length()-1) + (call.paramCount() > 0 ? ", " : "") + 
-											defaults.subSequence(call.paramCount(), defaults.count()).concatenate(", ") + ")";
+									//line = line.substring(0, line.length()-1) + (call.paramCount() > 0 ? ", " : "") + 
+									//		defaults.subSequence(call.paramCount(), defaults.count()).concatenate(", ") + ")";
+									if (call.paramCount() > 0) {
+										tokens.add(tokens.size()-1, ",");
+									}
+									tokens.addAll(tokens.size()-1,
+											new TokenList(defaults.subSequence(call.paramCount(), defaults.count()).concatenate(", ")));
 								}
 							}
 							// START KGU#815 2020-03-26: Enh. #828 we have to cope with class methods from a foreign library
 							if (this.importedLibRoots != null && this.importedLibRoots.contains(called)) {
-								StringList tokens = Syntax.splitLexically(line, true);
 								Syntax.unifyOperators(tokens, true);
 								int posAsgn = tokens.indexOf("<-");
 								int posCall = tokens.indexOf(call.getName(), posAsgn+1);
 								tokens.set(posCall, this.makeLibCallName(call.getName()));
-								line = tokens.concatenate();
 							}
 							// END KGU#815 2020-03-26
 						}
@@ -2190,8 +2203,8 @@ public class CGenerator extends Generator {
 				// Input or Output should not occur here
 				// START KGU#730 2019-09-24: Bugfix #752 ... but declarations (even const definitions) could occur!
 //				addCode(transform(line, false) + ";", _indent, isDisabled);
-				if (Instruction.isAssignment(line)) {
-					commentInserted = generateInstructionLine(_call, _indent, commentInserted, line);
+				if (isAssignment) {
+					commentInserted = generateInstructionLine(_call, _indent, commentInserted, tokens);
 				}
 				else {
 					// START KGU#1065 2022-09-29: Bugfix #1073 Case comments had occurred twice
@@ -2200,7 +2213,8 @@ public class CGenerator extends Generator {
 						commentInserted = true;
 					}
 					// END KGU#1065 2022-09-29
-					addCode(transform(line, false) + ";", _indent, isDisabled);
+					// FIXME should avoid concatenation here
+					addCode(transform(tokens.getString(), false) + ";", _indent, isDisabled);
 				}
 				// END KGU#730 2019-09-24
 			}
@@ -2757,6 +2771,7 @@ public class CGenerator extends Generator {
 	 * Appends a definition or declaration, respectively, for constant or variable {@code _name}
 	 * to {@code this.code}. If {@code _name} represents a constant, which is checked via {@link Root}
 	 * {@code _root}, then its definition is introduced.
+	 * 
 	 * @param _root - the owning diagram
 	 * @param _name - the identifier of the variable or constant
 	 * @param _indent - the current indentation (as String)
@@ -2816,7 +2831,7 @@ public class CGenerator extends Generator {
 			getLogger().log(Level.WARNING, "appendDeclaration({0}, {1}, ...): MISSING TYPE MAP ENTRY FOR THIS CONSTANT!",
 					new Object[]{_root, _name});
 			// This is likely to fail if constValue is an external function call
-			String type = Element.identifyExprType(typeMap, constValue, false);
+			String type = Syntax.identifyExprType(typeMap, new TokenList(constValue), false);
 			if (!type.isEmpty()) {
 				types = StringList.getNew(transformType(type, "int"));
 				// We place a faked workaround entry
@@ -2840,7 +2855,7 @@ public class CGenerator extends Generator {
 			// START KGU#375 2017-04-12: Enh. #388 - types.get(0) doesn't contain anything more than e.g. "const"?
 			if (decl.equals(transfConst) && constValue != null) {
 				// The actual type spec is missing but we try to extract it from the value
-				decl += " " + Element.identifyExprType(typeMap, constValue, false);
+				decl += " " + Syntax.identifyExprType(typeMap, new TokenList(constValue), false);
 				decl = decl.trim();
 			}
 			// END KGU#375 2017-04-12
@@ -2862,7 +2877,7 @@ public class CGenerator extends Generator {
 					// START KGU#388 2017-09-26: Enh. #423
 					//decl += " = " + transform(constValue);
 					if (constValue.contains("{") && constValue.endsWith("}") && typeInfo != null && typeInfo.isRecord()) {
-						constValue = transformRecordInit(constValue, typeInfo);
+						constValue = transformRecordInit(new TokenList(constValue), typeInfo);
 					}
 					else {
 						constValue = transform(constValue);
@@ -2919,6 +2934,7 @@ public class CGenerator extends Generator {
 	/**
 	 * Just composes given type designator {@code _type} and variable name {@code _name}
 	 * for a declaration.
+	 * 
 	 * @param _type - type designator
 	 * @param _name - variable name
 	 * @return the composed string (usually concatenated via blank)
@@ -2946,8 +2962,9 @@ public class CGenerator extends Generator {
 	/**
 	 * Generates code that decomposes a record initializer into separate component assignments if
 	 * necessary or converts it into the appropriate target language.
+	 * 
 	 * @param _lValue - the left side of the assignment (without modifiers!)
-	 * @param _recordValue - the record initializer according to Structorizer syntax
+	 * @param _recordValue - the tokenized record initializer according to Structorizer syntax
 	 * @param _indent - current indentation level (as String)
 	 * @param _isDisabled - indicates whether the code is o be commented out
 	 * @param _typeEntry - used to interpret a simplified record initializer (may be null)
@@ -2955,11 +2972,12 @@ public class CGenerator extends Generator {
 	// START KGU#559 2018-07-20: Enh. #563
 	//protected void generateRecordInit(String _lValue, String _recordValue, String _indent, boolean _isDisabled) {
 	//	HashMap<String, String> comps = Instruction.splitRecordInitializer(_recordValue, null);
-	protected void generateRecordInit(String _lValue, String _recordValue, String _indent, boolean _isDisabled, TypeMapEntry _typeEntry)
+	protected void generateRecordInit(String _lValue, TokenList _recordValue, String _indent, boolean _isDisabled, TypeMapEntry _typeEntry)
 	{
 		// START KGU#771 2019-11-24: Bugfix #783 In case of an unknown record type we should at least write the original content
 		if (_typeEntry == null) {
-			addCode(_lValue + " = " + _recordValue + ";\t" + this.commentSymbolLeft() + " FIXME: missing type information for struct! " + this.commentSymbolRight(),
+			addCode(_lValue + " = " + _recordValue.getString() + ";\t" +
+					this.commentSymbolLeft() + " FIXME: missing type information for struct! " + this.commentSymbolRight(),
 					_indent, false);
 			return;
 		}
@@ -2969,7 +2987,7 @@ public class CGenerator extends Generator {
 		// START KGU#1021 2021-12-05: Bugfix #1024 Instruction might be defective
 		if (comps == null) {
 			appendComment("ERROR: defective record initializer in diagram:", _indent);
-			appendComment(_recordValue, _indent);
+			appendComment(_recordValue.getString(), _indent);
 			return;
 		}
 		// END KGU#1021 2021-12-05
@@ -2979,7 +2997,7 @@ public class CGenerator extends Generator {
 			if (!compName.startsWith("§") && compVal != null) {
 				// START KGU#560 2018-07-21: Enh. #564 - on occasion of #563, we fix recursive initializers, too
 				//addCode(transform(_lValue + "." + compName + " <- " + compVal) + ";", _indent, _isDisabled);
-				generateAssignment(_lValue + "." + compName, compVal, _indent, _isDisabled);
+				generateAssignment(_lValue + "." + compName, new TokenList(compVal), _indent, _isDisabled);
 				// END KGU#560 2018-07-21
 			}
 		}
@@ -2993,40 +3011,39 @@ public class CGenerator extends Generator {
 	 * transformed code.
 	 * 
 	 * @param _lValue - the left side of the assignment (without modifiers!)
-	 * @param _expr - the expression in Structorizer syntax
+	 * @param _exprTokens - the tokenized expression in Structorizer syntax
 	 * @param _indent - current indentation level (as String)
 	 * @param _isDisabled - indicates whether the code is o be commented out
 	 * 
 	 * @see #transformOrGenerateArrayInit(String, StringList, String, boolean, String, boolean)
 	 */
-	protected void generateAssignment(String _lValue, String _expr, String _indent, boolean _isDisabled) {
-		if (_expr.contains("{") && _expr.endsWith("}")) {
-			StringList pureExprTokens = Syntax.splitLexically(_expr, true, true);
-			int posBrace = pureExprTokens.indexOf("{");
-			if (pureExprTokens.count() >= 3 && posBrace <= 1) {
-				if (posBrace == 1 && Syntax.isIdentifier(pureExprTokens.get(0), false, null)) {
-					// Record initializer
-					String typeName = pureExprTokens.get(0);
-					TypeMapEntry recType = this.typeMap.get(":"+typeName);
-					this.generateRecordInit(_lValue, _expr, _indent, _isDisabled, recType);
-					return;
+	protected void generateAssignment(String _lValue, TokenList _exprTokens, String _indent, boolean _isDisabled) {
+		int posBrace = _exprTokens.indexOf("{");
+		if (posBrace >= 0  && posBrace <= 1 && _exprTokens.endsWith("}") && _exprTokens.size() >= 3) {
+			if (posBrace == 1 && Syntax.isIdentifier(_exprTokens.get(0), false, null)) {
+				// Record initializer
+				String typeName = _exprTokens.get(0);
+				TypeMapEntry recType = this.typeMap.get(":"+typeName);
+				this.generateRecordInit(_lValue, _exprTokens, _indent, _isDisabled, recType);
+				return;
+			}
+			else {
+				// Array initializer
+				ArrayList<TokenList> items = Syntax.splitExpressionList(
+						_exprTokens.subSequence(1, _exprTokens.size()-1), ",");
+				// START KGU#732 2019-10-03: Issue #755
+				//this.generateArrayInit(_lValue, items.subSequence(0, items.count()-1), _indent, _isDisabled, null, false);
+				items.remove(items.size() - 1);
+				String expr = this.transformOrGenerateArrayInit(_lValue, items, _indent, _isDisabled, null, false);
+				if (expr != null) {
+					addCode(transform(_lValue) + " = " + expr + ";", _indent, _isDisabled);
 				}
-				else {
-					// Array initializer
-					StringList items = Element.splitExpressionList(pureExprTokens.subSequence(1, pureExprTokens.count()-1), ",", true);
-					// START KGU#732 2019-10-03: Issue #755
-					//this.generateArrayInit(_lValue, items.subSequence(0, items.count()-1), _indent, _isDisabled, null, false);
-					_expr = this.transformOrGenerateArrayInit(_lValue, items.subSequence(0, items.count()-1), _indent, _isDisabled, null, false);
-					if (_expr != null) {
-						addCode(transform(_lValue) + " = " + _expr + ";", _indent, _isDisabled);
-					}
-					// END KGU#732 2019-10-03
-					return;
-				}
+				// END KGU#732 2019-10-03
+				return;
 			}
 		}
 		// FIXME Array initializers must be handled recursively!
-		addCode(transform(_lValue + " <- " + _expr) + ";", _indent, _isDisabled);
+		addCode(transform(_lValue + " <- " + _exprTokens.getString()) + ";", _indent, _isDisabled);
 	}
 	
 	/**
@@ -3037,8 +3054,8 @@ public class CGenerator extends Generator {
 	 * 
 	 * @param _lValue - the left side of the assignment (without modifiers!), i.e.
 	 *    the array name
-	 * @param _arrayItems - the {@link StringList} of element expressions to be
-	 *    assigned (in index order)
+	 * @param _arrayItems - the {@link ArrayList} of tokenized element expressions
+	 *    to be assigned (in index order)
 	 * @param _indent - the current indentation level
 	 * @param _isDisabled - whether the code is commented out
 	 * @param _elemType - the {@link TypeMapEntry} of the element type is available
@@ -3046,9 +3063,9 @@ public class CGenerator extends Generator {
 	 * @return either the transformed array initializer string, or {@code null}
 	 *    (in the latter case the code was already generated)
 	 */
-	protected String transformOrGenerateArrayInit(String _lValue, StringList _arrayItems, String _indent, boolean _isDisabled, String _elemType, boolean _isDecl)
+	protected String transformOrGenerateArrayInit(String _lValue, ArrayList<TokenList> _arrayItems, String _indent, boolean _isDisabled, String _elemType, boolean _isDecl)
 	{
-		int nItems = _arrayItems.count();
+		int nItems = _arrayItems.size();
 		// START KGU#1061 2022-08-23: Issue #1068
 		// If the last item is an empty string then drop it
 		if (nItems > 0 && _arrayItems.get(nItems-1).isBlank()) {
@@ -3071,7 +3088,8 @@ public class CGenerator extends Generator {
 				if (i > 0) {
 					arrIni.append(", ");
 				}
-				arrIni.append(transform(_arrayItems.get(i)));
+				// FIXME don't descend to string level!
+				arrIni.append(transform(_arrayItems.get(i).getString()));
 				// END KGU#1061 2022-08-23
 			}
 			arrIni.append('}');

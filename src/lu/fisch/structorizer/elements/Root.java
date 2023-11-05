@@ -2138,7 +2138,10 @@ public class Root extends Element {
 		Subqueue oldChildren = (Subqueue)children.copy(); 
 		// START KGU#120 2016-01-02: Bugfix #85 - park my StringList attributes on the stack top
 		//oldChildren.setText(new StringList(this.text));
-		oldChildren.text = new ArrayList<TokenList>(this.text);
+		oldChildren.text = new ArrayList<TokenList>(this.text.size());
+		for (TokenList tokens: this.text) {
+			oldChildren.text.add(new TokenList(tokens));
+		}
 		oldChildren.setComment(new StringList(this.comment));
 		// END KGU#120 2016-01-02
 		// START KGU#363 2017-05-21: Enh. #372: Care for the new attributes
@@ -2273,7 +2276,7 @@ public class Root extends Element {
     public void undo(boolean redoable)
     {
     // END KGU#365 2017-03-19
-        if (undoList.size()>0)
+        if (!undoList.isEmpty())
         {
             // START KGU#137 2016-01-11: Bugfix #103 - rely on undoList level comparison 
             //this.hasChanged=true;
@@ -2281,19 +2284,24 @@ public class Root extends Element {
             // START KGU#365 2017-03-19: Enh. #380
             if (redoable) {
             // END KGU#365 2017-03-19
-                redoList.add((Subqueue)children.copy());
+                Subqueue redoSq = (Subqueue)children.copy();
+                redoList.add(redoSq);
                 // START KGU#120 2016-01-02: Bugfix #85 - park my StringList attributes in the stack top
                 //redoList.peek().setText(new StringList(this.text));
-                redoList.peek().setText(getText());
-                redoList.peek().setComment(new StringList(this.comment));
+                //redoList.peek().setText(this.getText());
+                redoSq.text = new ArrayList<TokenList>(this.text.size());
+                for (TokenList tokens: this.text) {
+                    redoSq.text.add(new TokenList(tokens));
+                }
+                redoSq.setComment(new StringList(this.comment));
                 // END KGU#120 2016-01-02
                 // START KGU#507 2018-03-15: Bugfix #523
                 if (this.includeList != null) {
-                    redoList.peek().diagramRefs = this.includeList.concatenate(",");
+                    redoSq.diagramRefs = this.includeList.concatenate(",");
                 }
                 // END KGU#507 2018-03-15
                 // START KGU#363 2018-09-12 
-                redoList.peek().modified = this.modified;
+                redoSq.modified = this.modified;
                 // END KGU#363 2018-09-12
             // START KGU#365 2017-03-19: Enh. #380
             }
@@ -2623,10 +2631,10 @@ public class Root extends Element {
 
     // START KGU 2015-10-16
     /* (non-Javadoc)
-     * @see lu.fisch.structorizer.elements.Element#addFullText(lu.fisch.utils.StringList, boolean)
+     * @see lu.fisch.structorizer.elements.Element#addFullText(ArrayList<TokenList>, boolean)
      */
     @Override
-    protected void addFullText(StringList _lines, boolean _instructionsOnly)
+    protected void addFullText(ArrayList<TokenList> _lines, boolean _instructionsOnly)
     {
     	// Whereas a subroutine diagram is likely to hold parameter declarations in the header,
     	// (such that we ought to deliver its header for the variable detection), this doesn't
@@ -2644,7 +2652,7 @@ public class Root extends Element {
     // END KGU 2015-10-16
     
     // START KGU#376 2017-07-02: Enh. #389
-    protected void addFullText(StringList _lines, boolean _instructionsOnly, HashSet<Root> _implicatedRoots)
+    protected void addFullText(ArrayList<TokenList> _lines, boolean _instructionsOnly, HashSet<Root> _implicatedRoots)
     {
     	if (!_implicatedRoots.contains(this)) {
     		// START KGU#676 2019-03-31: Enh. #696
@@ -2669,7 +2677,8 @@ public class Root extends Element {
     		}
     		if (this.isSubroutine() && !_instructionsOnly)
     		{
-    			_lines.add(this.getText());
+    			// Add text of the header as a single line
+    			_lines.add(TokenList.concatenate(this.getUnbrokenTokenText(), null));
     		}
     		this.children.addFullText(_lines, _instructionsOnly);
     	}
@@ -2727,11 +2736,14 @@ public class Root extends Element {
 
     // KGU 2016-03-29: Completely rewritten
     /**
-     * Gathers the names of all variables that are used by Element _ele in expressions:<br/>
-     * HYP 1: (?) &lt;- (?) &lt;used&gt; (?)<br/>
-     * HYP 2: (?)'['&lt;used&gt;']' &lt;- (?) &lt;used&gt; (?)<br/>
-     * HYP 3: output (?) &lt;used&gt; (?)<br/>
-     * Note: This works only if _ele is different from this.<br/>
+     * Gathers the names of all variables that are used by Element _ele in expressions:
+     * <ul>
+     * <li>HYP 1: (?) &lt;- (?) &lt;used&gt; (?)</li>
+     * <li>HYP 2: (?)'['&lt;used&gt;']' &lt;- (?) &lt;used&gt; (?)</li>
+     * <li>HYP 3: output (?) &lt;used&gt; (?)</li>
+     * </ul>
+     * Note: This works only if {@code _ele} is different from {@code this}.
+     * 
      * @param _ele - the element to be searched
      * @param _includeSelf - whether or not the own text of _ele is to be considered (otherwise only substructure)
      * @param _onlyEle - if true then only the text of _ele itself is searched (no substructure)
@@ -2745,16 +2757,16 @@ public class Root extends Element {
     	if (_ele != this)
     	{
     		// get body text
-    		StringList lines = new StringList();
+    		ArrayList<TokenList> lines = new ArrayList<TokenList>();
     		if (_onlyEle)
     		{
     			// START KGU#413 2017-09-13: Enh. #416 cope with user-defined line breaks 
     			//lines.add(_ele.getText());
-    			StringList unbrokenLines = _ele.getUnbrokenText();
+    			ArrayList<TokenList> unbrokenLines = _ele.getUnbrokenTokenText();
     			if (_ele instanceof Instruction) {
-    				for (int i = 0; i < unbrokenLines.count(); i++) {
-    					String line = unbrokenLines.get(i);
-    					if (!Instruction.isTypeDefinition(line)) {
+    				for (int i = 0; i < unbrokenLines.size(); i++) {
+    					TokenList line = unbrokenLines.get(i);
+    					if (!Instruction.isTypeDefinition(line, null)) {
     						lines.add(line);
     					}
     				}
@@ -2763,13 +2775,13 @@ public class Root extends Element {
     			//else {
     			else if (!(_ele instanceof Try)) {
     			// END KGU#686 2019-03-16
-    				lines.add(unbrokenLines);
+    				lines.addAll(unbrokenLines);
     			}
     			// END KGU#413 2017-09-13
     			// START KGU#163 2016-03-25: In case of Case the default line must be removed
-    			if (_ele instanceof Case && lines.count() > 1)
+    			if (_ele instanceof Case && lines.size() > 1)
     			{
-    				lines.delete(lines.count()-1);;
+    				lines.remove(lines.size()-1);;
     			}
     			// END KGU#163 2016-03-25
     		}
@@ -2781,16 +2793,17 @@ public class Root extends Element {
     			// END KGU#39 2015-10-16
     			if (!_includeSelf)
     			{
-    				for(int i=0; i<_ele.getUnbrokenText().count(); i++)
+    				// Remove as many lines as this very element has in its text
+    				for (int i = 0; i < _ele.getUnbrokenTokenText().size(); i++)
     				{
-    					lines.delete(0);
+    					lines.remove(0);
     				}
     			}
     			// START KGU#163 2016-03-25: The Case default line must be deleted
-    			else if (_ele instanceof Case && _ele.getText().count() > 1)
+    			else if (_ele instanceof Case && _ele.text.size() > 1)
     			{
     				// Remove the last line of the CASE element
-    				lines.delete(_ele.getText().count() - 1);
+    				lines.remove(_ele.text.size() - 1);
     			}
     			// END KGU#163 2016-03-25
     		}
@@ -2799,10 +2812,10 @@ public class Root extends Element {
     		String[] keywords = Syntax.getAllProperties();
     		StringList parts = new StringList();
     		
-    		for(int i=0; i<lines.count(); i++)
+    		for(int i = 0; i < lines.size(); i++)
     		{
     			// START KGU#375 2017-04-04: Enh. #388 method decomposed
-    			parts.addIfNew(getUsedVarNames(lines.get(i).trim(), keywords));
+    			parts.addIfNew(getUsedVarNames(lines.get(i), keywords));
     			// END KGU#375 2017-04-04
     		}
     		
@@ -2830,6 +2843,25 @@ public class Root extends Element {
 	 */
 	private StringList getUsedVarNames(String _line, String[] _keywords)
 	{
+		return getUsedVarNames(new TokenList(_line.trim()), _keywords);
+	}
+
+	/**
+	 * Gathers the names of all variables that are used in text line {@code tokens} in
+	 *     expressions (without being set or modified themselves):
+	 * <ul>
+	 * <li>HYP 1: (?) &lt;- (?) &lt;used&gt; (?)</li>
+	 * <li>HYP 2: (?)'['&lt;used&gt;']' &lt;- (?) &lt;used&gt; (?)</li>
+	 * <Li>HYP 3: output (?) &lt;used&gt; (?)</li>
+	 * <li>HYP 4: input (?)'['&lt;used&gt;']'</li>
+	 * </ul>
+	 * 
+	 * @param tokens - the tokenized element text line to be analysed
+	 * @param _keywords the set of parser keywords (if available)
+	 * @return StringList of used variable names according to the above specification
+	 */
+	private StringList getUsedVarNames(TokenList tokens, String[] _keywords)
+	{
 		if (_keywords == null) {
 			_keywords = Syntax.getAllProperties();
 		}
@@ -2854,10 +2886,8 @@ public class Root extends Element {
 		//_line = INC_PATTERN1.matcher(_line).replaceAll("$1 <- $1 + 1");
 		//_line = DEC_PATTERN2.matcher(_line).replaceAll("$1 <- $1 - $2");
 		//_line = DEC_PATTERN1.matcher(_line).replaceAll("$1 <- $1 - 1");
-		_line = transform_inc_dec(_line);
+		tokens = transform_inc_dec(tokens);
 		// END KGU#575 2018-09-17
-
-		TokenList tokens = new TokenList(_line.trim());
 
 		Syntax.unifyOperators(tokens, false);
 
@@ -2865,26 +2895,26 @@ public class Root extends Element {
 		// This replacement will be aware of the case sensitivity preference
 		for (int kw = 0; kw < _keywords.length; kw++)
 		{
-			if (_keywords[kw].trim().length() > 0)
+			if (_keywords[kw] != null && !_keywords[kw].isBlank())
 			{
 				TokenList keyTokens = splitKeywords.elementAt(kw);
-				int keyLength = keyTokens.size();
-				int pos = -1;
-				while ((pos = tokens.indexOf(keyTokens, pos + 1, !Syntax.ignoreCase)) >= 0)
+				int keySize = keyTokens.size();
+				int posKey = tokens.size() - keySize;
+				while (posKey >= 0 && (posKey = tokens.lastIndexOf(keyTokens, posKey, !Syntax.ignoreCase)) >= 0)
 				{
 					// FIXME might compromise gaps
-					tokens.set(pos, _keywords[kw]);
-					for (int j=1; j < keyLength; j++)
-					{
-						tokens.remove(pos+1);
-					}
+					tokens.set(posKey, _keywords[kw]);
+					tokens.remove(posKey + 1, posKey + keySize);
+					posKey -= keySize;
 				}
 			}
 		}
 
+		String token0 = "";
+		if (!tokens.isBlank()) token0 = tokens.get(0);
 		// Unify FOR-IN loops and FOR loops for the purpose of variable analysis
 		String postForIn = Syntax.getKeyword("postForIn");
-		if (!postForIn.trim().isEmpty())
+		if (!postForIn.isBlank() && token0.equals(Syntax.getKeyword("preForIn")))
 		{
 			//tokens.replaceAll(Syntax.getKeyword("postForIn"), "<-");
 			tokens.replaceAll(postForIn, "<-", true);
@@ -2892,8 +2922,6 @@ public class Root extends Element {
 		
 		// Here all the unification, alignment, reduction is done, now the actual analysis begins
 
-		String token0 = "";
-		if (!tokens.isBlank()) token0 = tokens.get(0);
 		int asgnPos = tokens.indexOf("<-");
 		if (asgnPos >= 0)
 		{
@@ -2915,7 +2943,7 @@ public class Root extends Element {
 			} else { s = ""; }
 
 			TokenList indices = new TokenList(s);
-			indices.addAll(tokens.subSequence(asgnPos+1, tokens.size()));
+			indices.addAll(tokens.subSequenceToEnd(asgnPos+1));
 			tokens = indices;
 		}
 		// START KGU#332/KGU#375 2017-01-17: Enh. #335 - ignore the content of uninitialized declarations
@@ -2937,7 +2965,7 @@ public class Root extends Element {
 		else if (token0.equals(Syntax.getKeyword("input")))
 		{
 			// START KGU#653 2019-02-16: Enh. #680 - with multiple variables we must decompose the list
-			StringList items = Instruction.getInputItems(_line);
+			StringList items = Instruction.getInputItems(tokens);
 			tokens.clear();
 			for (int j = 1; j < items.count(); j++) {
 				TokenList itemTokens = new TokenList(items.get(j));
@@ -2968,11 +2996,17 @@ public class Root extends Element {
 			// END KGU#653 2019-02-16
 		}
 
-		tokens.removePaddings();
+		//tokens.removePaddings();
 		// Eliminate all keywords
 		for (int kw = 0; kw < _keywords.length; kw++)
 		{
-			while (tokens.remove(_keywords[kw])){}
+			// START KGU#790 2023-11-05: Issue #800 be careful with empty strings
+			//while (tokens.remove(_keywords[kw])){}
+			String keyword = _keywords[kw];
+			if (keyword != null && !keyword.isBlank()) {
+				tokens.removeAll(keyword);
+			}
+			// END KGU#790 2023-11-05
 		}
 		for (int kw = 0; kw < this.operatorsAndLiterals.length; kw++)
 		{
@@ -3023,13 +3057,14 @@ public class Root extends Element {
 	/**
 	 * Recursively cuts off all irrelevant stuff of record initializers for
 	 *    {@link #getUsedVarNames(String, String[])}
+	 *    
 	 * @param tokens - the token list to be skimmed
 	 */
 	private void skimRecordInitializers(TokenList tokens) {
 		int posBrace = 0;
 		while ((posBrace = tokens.indexOf("{", posBrace+1)) > 0) {
 			if (Syntax.isIdentifier(tokens.get(posBrace-1), false, null)) {
-				HashMap<String, String> components = Syntax.splitRecordInitializer(tokens.subSequence(posBrace-1, tokens.size()), null);
+				HashMap<String, String> components = Syntax.splitRecordInitializer(tokens.subSequenceToEnd(posBrace-1), null);
 				if (components != null) {
 					// Remove all tokens from the type name on (they are in the HashMap now)
 					tokens.remove(posBrace-1, tokens.size());
@@ -3076,13 +3111,15 @@ public class Root extends Element {
     // KGU 2016-03-29 Rewritten based on tokens
     /**
      * Get the names of defined variables out of a bunch of text lines.<br/>
-     * Note: We DON'T force identifier syntax, the variables found here may contain
-     * language-specific characters etc.<br/>
-     * HYP 1: [const] [&lt;type&gt;] VARNAME &lt;- (?)<br/>
-     * HYP 2: [input] VARNAME, VARNAME, VARNAME<br/>
-     * HYP 3: for VARNAME &lt;- (?) ...<br/>
-     * HYP 4: foreach VARNAME in (?)<br/>
-     * In case of HYP 1 also registers the name as constant definition in constantDefs
+     * Note: We <b>DON'T</b> force identifier syntax, the variables found here may contain
+     * language-specific characters etc.
+     * <ul>
+     * <li>HYP 1: [const] [&lt;type&gt;] VARNAME &lt;- (?)</li>
+     * <li>HYP 2: [input] VARNAME, VARNAME, VARNAME</li>
+     * <li>HYP 3: for VARNAME &lt;- (?) ...</li>
+     * <li>HYP 4: foreach VARNAME in (?)</li>
+     * </ul>
+     * In case of HYP 1 also registers the name as constant definition in {@code constantDefs}
      * if the name hadn't been occurred earlier as variable or constant.
      * 
      * @param lines - the text lines extracted from one or more elements 
@@ -3090,7 +3127,7 @@ public class Root extends Element {
      * @return - the StringList of identified variable names
      * @see #constants
      */
-    public StringList getVarNames(StringList lines, HashMap<String, String> constantDefs)
+    public StringList getVarNames(ArrayList<TokenList> lines, HashMap<String, String> constantDefs)
     {
         StringList varNames = new StringList();
 
@@ -3103,9 +3140,9 @@ public class Root extends Element {
         }
         // END KGU#163 2016-03-25
 
-        for(int i=0; i<lines.count(); i++)
+        for(int i = 0; i < lines.size(); i++)
         {
-            String allText = lines.get(i);
+            TokenList tokens = lines.get(i);
             // modify "inc" and "dec" function (Pascal)
             // START KGU#575 2018-09-17: Issue #594 - replace obsolete 3rd-party Regex library
             //Regex r;
@@ -3113,10 +3150,8 @@ public class Root extends Element {
             //r = new Regex(BString.breakup("inc")+"[(](.*?)[)](.*?)","$1 <- $1 + 1"); allText=r.replaceAll(allText);
             //r = new Regex(BString.breakup("dec")+"[(](.*?)[,](.*?)[)](.*?)","$1 <- $1 - $2"); allText=r.replaceAll(allText);
             //r = new Regex(BString.breakup("dec")+"[(](.*?)[)](.*?)","$1 <- $1 - 1"); allText=r.replaceAll(allText);
-            allText = transform_inc_dec(allText);
+            tokens = transform_inc_dec(tokens);
             // END KGU#575 2018-09-17
-
-            TokenList tokens = new TokenList(allText);
 
             Syntax.unifyOperators(tokens, false);
 
@@ -3171,7 +3206,7 @@ public class Root extends Element {
                 // START KGU#375 2017-03-31: Enh. #388 collect constant definitions
                 // Register it as constant if marked as such and not having been declared before
                 if (tokens.get(0).equals("const") && wasNew && !constantDefs.containsKey(varName)) {
-                    constantDefs.put(varName, tokens.subSequence(asgnPos+1, tokens.size()).getString().trim());
+                    constantDefs.put(varName, tokens.subSequenceToEnd(asgnPos+1).getString().trim());
                 }
             }
 
@@ -3185,7 +3220,9 @@ public class Root extends Element {
                 inpPos++;
                 // START KGU#281 2016-12-23: Enh. #271 - allow comma between prompt and variable name
                 //while (inpPos < tokens.count() && (tokens.get(inpPos).trim().isEmpty() || tokens.get(inpPos).matches("^[\"\'].*[\"\']$")))
-                while (inpPos < tokens.size() && (tokens.get(inpPos).trim().isEmpty() || tokens.get(inpPos).trim().equals(",") || tokens.get(inpPos).matches("^[\"\'].*[\"\']$")))
+                while (inpPos < tokens.size() && (tokens.get(inpPos).trim().isEmpty()
+                        || tokens.get(inpPos).trim().equals(",")
+                        || tokens.get(inpPos).matches("^[\"\'].*[\"\']$")))
                 // END KGU#281 2016-12-23
                 {
                     inpPos++;
@@ -3193,7 +3230,7 @@ public class Root extends Element {
                 //String s = tokens.subSequence(inpPos, tokens.count()).concatenate().trim();
                 // END KGU#281 2016-10-12
                 // A mere splitting by comma would spoil function calls as indices etc.
-                ArrayList<TokenList> parts = Syntax.splitExpressionList(tokens.subSequence(inpPos, tokens.size()), ",");
+                ArrayList<TokenList> parts = Syntax.splitExpressionList(tokens.subSequenceToEnd(inpPos), ",");
                 for (int p = 0; p < parts.size()-1; p++)
                 {
                     varNames.addOrderedIfNew(extractVarName(parts.get(p).getString().trim()));
@@ -3314,23 +3351,23 @@ public class Root extends Element {
             }
 
             // get relevant text
-            StringList lines;
+            ArrayList<TokenList> lines;
             if (_onlyEle && !_onlyBody)
             {
                 // START KGU#388/KGU#413 2017-09-13: Enh. #416, #423
                 //lines = _ele.getText().copy();
-                lines = _ele.getUnbrokenText();
+                lines = _ele.getUnbrokenTokenText();
                 if (_ele instanceof Instruction) {
                 	// Get rid of lines that may not introduce variables
                 	int i = 0;
-                	while (i < lines.count()) {
-                		if (Instruction.isTypeDefinition(lines.get(i))) {
+                	while (i < lines.size()) {
+                		if (Instruction.isTypeDefinition(lines.get(i), null)) {
                 			// START KGU#542 2019-11-17: Enh. #739 We must extract enumerators here
                 			HashMap<String, String> constVals = this.extractEnumerationConstants(lines.get(i));
                 			if (constVals != null) {
                 				// We simply generate singular constant definition lines
                 				for (Entry<String, String> enumItem: constVals.entrySet()) {
-                					lines.insert("const " + enumItem.getKey() + " <- " + enumItem.getValue(), i++);
+                					lines.add(i++, new TokenList("const " + enumItem.getKey() + "<-" + enumItem.getValue()));
                 				}
                 			}
                 			// END KGU#542 2019-11-17
@@ -3348,17 +3385,11 @@ public class Root extends Element {
             }
             else if (_entireProg)
             {
-                // START KGU#39 2015-10-16: Use object methods now
-                //lines = getFullText();
                 lines = this.getFullText(_onlyBody);
-                // END KGU#39 2015-10-16
             }
             else
             {
-                // START KGU#39 2015-10-16: Use object methods now
-                //lines = getFullText(_ele);
                 lines = _ele.getFullText(true);
-                // START KGU#39 2015-10-16
             }
             
             varNames.add(getVarNames(lines, this.constants));
@@ -3376,18 +3407,18 @@ public class Root extends Element {
      * enumeration type list and returns their name-value map.<br/>
      * The associated values will be prefixed with {@code ":" + <typename> + "€"} and may be
      * constant expressions, particularly of kind {@code <something>+<number>}.
-     * @param _typeDefLine - the (unbroken) line of the enum type definition
+     * 
+     * @param tokens - the tokenized (unbroken) line of the enum type definition
      * @returns a map of the enumeration constants to their prefixed values strings or null
      */
-    public LinkedHashMap<String,String> extractEnumerationConstants(String _typeDefLine)
+    public LinkedHashMap<String,String> extractEnumerationConstants(TokenList tokens)
     {
     	LinkedHashMap<String,String> enumConstants = null;
-    	StringList tokens = Syntax.splitLexically(_typeDefLine, true, true);
     	if (!tokens.get(3).equalsIgnoreCase("enum")) {
     		return null;
     	}
     	String typename = tokens.get(1);
-    	String typeSpec = tokens.concatenate(null, 3, tokens.count()).trim();
+    	String typeSpec = tokens.subSequenceToEnd(3).getString().trim();
     	// Confirm that the syntax is okay
     	if (TypeMapEntry.MATCHER_ENUM.reset(typeSpec).matches()) {
     		enumConstants = new LinkedHashMap<String, String>();
@@ -3846,8 +3877,8 @@ public class Root extends Element {
 			StringList myVars = getVarNames(ele);
 
 			// START KGU#790 2021-12-04: Issue #800 Grammar-based check
-			if (check(31) && !eleClassName.equals("Parallel")) {
-				analyse_31(ele, _errors);
+			if (check(32) && !eleClassName.equals("Parallel")) {
+				analyse_32(ele, _errors);
 			}
 			// END KGU#790 2021-12-04
 
@@ -3936,10 +3967,10 @@ public class Root extends Element {
 				StringList initVars = new StringList(_vars);
 				// START KGU#423 2017-09-13: Enh. #416 - cope with user-defined line breaks
 				//for (int j = 0; j < ele.getText().count(); j++) {
-				StringList unbrokenText = ele.getUnbrokenText();
-				for (int j = 0; j < unbrokenText.count(); j++) {
+				ArrayList<TokenList> unbrokenText = ele.getUnbrokenTokenText();
+				for (int j = 0; j < unbrokenText.size(); j++) {
 				// END KGU#423 2017-09-13
-					String line = unbrokenText.get(j);
+					TokenList line = unbrokenText.get(j);
 					// START KGU#388 2017-09-13: Enh. #423
 					if (!Instruction.isTypeDefinition(line, _types)) {
 					// END KGU#388 2017-09-13
@@ -3948,7 +3979,9 @@ public class Root extends Element {
 						//analyse_3(ele, _errors, initVars, _uncertainVars, myUsed, -1);
 						//initVars.add(this.getVarNames(StringList.getNew(line), constantDefs));
 						analyse_3(ele, _errors, initVars, _uncertainVars, myUsed, j);
-						StringList asgdVars = this.getVarNames(StringList.getNew(line), constantDefs);
+						ArrayList<TokenList> singleLine = new ArrayList<TokenList>();
+						singleLine.add(line);
+						StringList asgdVars = this.getVarNames(singleLine, constantDefs);
 						initVars.add(asgdVars);
 						for (int k = 0; k < asgdVars.count(); k++) {
 							_uncertainVars.removeAll(asgdVars.get(k));
@@ -4784,7 +4817,7 @@ public class Root extends Element {
 	 */
 	private void analyse_3(Element _ele, Vector<DetectedError> _errors, StringList _vars, StringList _uncertainVars, StringList _myUsedVars, int _lineNo)
 	{
-			for (int j=0; j<_myUsedVars.count(); j++)
+			for (int j = 0; j < _myUsedVars.count(); j++)
 			{
 				String myUsed = _myUsedVars.get(j);
 				// START KGU#343 2017-02-07: Ignore pseudo-variables (markers)
@@ -4924,7 +4957,7 @@ public class Root extends Element {
 	{
 		// START KGU#413 2017-09-13: Enh. #416 cope with user-defined line breaks
 		//StringList test = ele.getText();
-		StringList test = ele.getUnbrokenText();
+		ArrayList<TokenList> test = ele.getUnbrokenTokenText();
 		// END KGU#413 2017-09-13
 
 		// CHECK: wrong multi-line instruction (#10)
@@ -4937,20 +4970,20 @@ public class Root extends Element {
 		// START KGU#388 2017-09-13: Enh. #423
 		boolean isTypedef = false;
 		// END KGU#388 2017-09-13
-		StringList inputTokens = Syntax.splitLexically(Syntax.getKeyword("input"), false);
-		StringList outputTokens = Syntax.splitLexically(Syntax.getKeyword("output"), false);
+		TokenList inputTokens = Syntax.getSplitKeyword("input");
+		TokenList outputTokens = Syntax.getSplitKeyword("output");
 		// START KGU#297 2016-11-22: Issue #295 - Instructions starting with the return keyword must be handled separately
-		StringList returnTokens = Syntax.splitLexically(Syntax.getKeyword("preReturn"), false);
+		TokenList returnTokens = Syntax.getSplitKeyword("preReturn");
 		// END KGU#297 2016-11-22
 
 		// Check every instruction line...
-		for(int lnr = 0; lnr < test.count(); lnr++)
+		for(int lnr = 0; lnr < test.size(); lnr++)
 		{
 			// CHECK: wrong assignment (#11 - new!)
 			//String myTest = test.get(l);
 
 			// START KGU#65/KGU#126 2016-01-06: More precise analysis, though expensive
-			StringList tokens = Syntax.splitLexically(test.get(lnr).trim(), true);
+			TokenList tokens = test.get(lnr);
 			Syntax.unifyOperators(tokens, false);
 			// START KGU#297 2016-11-22: Issue #295 - Instructions starting with the return keyword must be handled separately
 			//if (tokens.contains("<-"))
@@ -4970,7 +5003,7 @@ public class Root extends Element {
 				isOutput = true;
 			}
 			// START KGU#1063 2022-09-27: Bugfix #1071 too simple check 11
-			else if (tokens.count() > 2) {
+			else if (tokens.size() > 2) {
 				isProc = Syntax.isIdentifier(tokens.get(0), false, null) && tokens.get(1).equals("(");
 			}
 			// END KGU#1063 2022-09-27
@@ -5152,18 +5185,23 @@ public class Root extends Element {
 	{
 		// START KGU#1023 2022-01-04: Bugfix #1026 line continuation wasn't recognised
 		//StringList sl = ele.getText();
-		StringList sl = ele.getUnbrokenText();
+		ArrayList<TokenList> unbroken = ele.getUnbrokenTokenText();
 		// END KGU#1023 2022-01-04
 		String preReturn = Syntax.getKeywordOrDefault("preReturn", "return");
 		String preLeave = Syntax.getKeywordOrDefault("preLeave", "leave");
 		String preExit = Syntax.getKeywordOrDefault("preExit", "exit");
+		TokenList keyExit = Syntax.getSplitKeyword("preExit");
 		// START KGU#686 2019-03-18: Enh. #56
 		//String jumpKeywords = "«" + preLeave + "», «" + preReturn +	"», «" + preExit + "»";
 		String preThrow = Syntax.getKeywordOrDefault("preThrow", "throw");
 		String jumpKeywords = "«" + preLeave + "», «" + preReturn +	"», «" + preExit + "», «" + preThrow + "»";
 		// END KGU#686 2019-03-18
-		String line = sl.get(0).trim();
-		String lineComp = line;
+		TokenList line0tokens = new TokenList();
+		if (!unbroken.isEmpty()) {
+			// Just concentrate on the first line
+			line0tokens = unbroken.get(0);
+		}
+		String lineComp = line0tokens.getString().trim();
 
 		// Preparation
 		if (Syntax.ignoreCase) {
@@ -5173,7 +5211,7 @@ public class Root extends Element {
 			//String jumpKeywords = "«" + preLeave + "», «" + preReturn +	"», «" + preExit + "»";
 			preThrow = preThrow.toLowerCase();
 			// END KGU#686 2019-03-18
-			lineComp = line.toLowerCase();
+			lineComp = lineComp.toLowerCase();
 		}
 		boolean isReturn = ele.isReturn();
 		boolean isLeave = ele.isLeave();
@@ -5186,19 +5224,27 @@ public class Root extends Element {
 				lineComp.matches("break([\\W].*|$)");	// Also check hard-coded keywords
 		Element parent = ele.parent;
 		// START KGU#179 2022-01-04: Issue #161 similar check in multi-line case
-		if (sl.count() > 1
-				&& ((isReturn = Jump.isReturn(line))
-						|| (isLeave = Jump.isLeave(line))
-						|| (isExit = Jump.isExit(line))
-						|| (isThrow = Jump.isThrow(line)))
-				&& !sl.concatenate("", 1).trim().isEmpty()) {
-			//error = new DetectedError("Instruction isn't reachable after a JUMP!",((Subqueue)parent).getElement(pos+1)));
-			addError(_errors, new DetectedError(errorMsg(Menu.error16_7, ""), ele), 16);	
+		if (unbroken.size() > 1) {
+			String nonEmptyLine = null;
+			for (int i = 1; i < unbroken.size(); i++) {
+				if (!unbroken.get(i).isBlank()) {
+					nonEmptyLine = unbroken.get(i).getString();
+				}
+			}
+			if (nonEmptyLine != null
+					&& (isReturn = Jump.isReturn(line0tokens))
+						|| (isLeave = Jump.isLeave(line0tokens))
+						|| (isExit = Jump.isExit(line0tokens))
+						|| (isThrow = Jump.isThrow(line0tokens))) {
+				//error = new DetectedError("Instruction isn't reachable after a JUMP!",((Subqueue)parent).getElement(pos+1)));
+				addError(_errors, new DetectedError(errorMsg(Menu.error16_7, nonEmptyLine), ele), 16);	
+			}
 		}
 		// END KGU#179 2022-01-04
 		// START KGU#179 2016-04-12: Enh. #161 New check for unreachable instructions
 		int pos = -1;
-		if (parent instanceof Subqueue && (pos = ((Subqueue)parent).getIndexOf(ele)) < ((Subqueue)parent).getSize()-1)
+		if (parent instanceof Subqueue 
+				&& (pos = ((Subqueue)parent).getIndexOf(ele)) < ((Subqueue)parent).getSize()-1)
 		{
 			//error = new DetectedError("Instruction isn't reachable after a JUMP!",((Subqueue)parent).getElement(pos+1)));
 			addError(_errors, new DetectedError(errorMsg(Menu.error16_7, ""), ((Subqueue)parent).getElement(pos+1)), 16);	
@@ -5211,7 +5257,7 @@ public class Root extends Element {
 		boolean insideParallel = false;
 		
 		// CHECK: Incorrect Jump syntax?
-		if (sl.count() > 1 || !(isJump || isReturn || isThrow || line.isEmpty()))
+		if (unbroken.size() > 1 || !(isJump || isReturn || isThrow || line0tokens.isBlank()))
 		{
 			//error = new DetectedError("A JUMP element must contain exactly one of «exit n», «return <expr>», or «leave [n]»!",(Element) _node.getElement(i));
 			addError(_errors, new DetectedError(errorMsg(Menu.error16_1, jumpKeywords), ele), 16);
@@ -5219,10 +5265,11 @@ public class Root extends Element {
 		// CHECK: Correct usage of return (nearby check result mechanisms) (#13, #16)
 		if (isReturn)
 		{
+			// FIXME define over tokens
 			// START KGU#343 2017-02-07: Disabled to suppress the warnings - may there be side-effects?
 			//_resultFlags[0] = true;
 			//_myVars.addIfNew("result");	// FIXME: This caused warnings if e.g. "Result" is used somewhere else
-			if (!line.substring(preReturn.length()).trim().isEmpty()) {
+			if (!line0tokens.getString().substring(preReturn.length()).trim().isEmpty()) {
 				_resultFlags[0] = true;
 				_myVars.addIfNew("§ANALYSER§RETURNS");
 				// START KGU#78 2015-11-25: Different result mechanisms?
@@ -5265,8 +5312,9 @@ public class Root extends Element {
 				}
 			}
 		}
-		// CHECK: Exit argument ok?
-		else if (isExit && line.length() > preExit.length())
+		// CHECK: Exit argument ok? 
+		// FIXME define over tokens
+		else if (isExit && line0tokens.length() > preExit.length())
 		{
 			// START KGU 2017-04-14: Syntactical restriction loosened
 			//try
@@ -5278,8 +5326,8 @@ public class Root extends Element {
 			//	//error = new DetectedError("Wrong argument for this kind of JUMP (should be an integer constant)!",(Element) _node.getElement(i));
 			//	addError(_errors, new DetectedError(errorMsg(Menu.error16_6, ""), ele), 16);    					    							
 			//}
-			String expr = line.substring(preExit.length()).trim();
-			String exprType = Element.identifyExprType(this.getTypeInfo(), expr, true);
+			String exprType = Syntax.identifyExprType(this.getTypeInfo(),
+					line0tokens.subSequenceToEnd(keyExit.size()), true);
 			if (!exprType.equalsIgnoreCase("int")) {
 				// error = new DetectedError("Wrong argument for this kind of JUMP (should be an integer constant)!",(Element) _node.getElement(i));
 				addError(_errors, new DetectedError(errorMsg(Menu.error16_8, preExit), ele), 16);    					    							
@@ -5311,29 +5359,35 @@ public class Root extends Element {
 	{
 		// START KGU#1023 2022-01-04: Bugfix #1026 line continuation wasn't recognised
 		//StringList sl = ele.getText();
-		StringList sl = ele.getUnbrokenText();
+		ArrayList<TokenList> unbroken = ele.getUnbrokenTokenText();
 		// END KGU#1023 2022-01-04
 		String preReturn =  Syntax.getKeywordOrDefault("preReturn", "return").trim();
 		String preLeave = Syntax.getKeywordOrDefault("preLeave", "leave").trim();
 		String preExit = Syntax.getKeywordOrDefault("preExit", "exit").trim();
-		String patternReturn = Matcher.quoteReplacement(Syntax.ignoreCase ? preReturn.toLowerCase() : preReturn);
-		String patternLeave = Matcher.quoteReplacement(Syntax.ignoreCase ? preLeave.toLowerCase() : preLeave);
-		String patternExit = Matcher.quoteReplacement(Syntax.ignoreCase ? preExit.toLowerCase() : preExit);
+		//String patternReturn = Matcher.quoteReplacement(Syntax.ignoreCase ? preReturn.toLowerCase() : preReturn);
+		//String patternLeave = Matcher.quoteReplacement(Syntax.ignoreCase ? preLeave.toLowerCase() : preLeave);
+		//String patternExit = Matcher.quoteReplacement(Syntax.ignoreCase ? preExit.toLowerCase() : preExit);
+		TokenList keyReturn = Syntax.getSplitKeyword("preReturn");
 
-		for (int ls=0; ls < sl.count(); ls++)
+		for (int ls = 0; ls < unbroken.size(); ls++)
 		{
-			String line = sl.get(ls).trim().toLowerCase();
+			TokenList line = unbroken.get(ls);
 			// START KGU#78 2015-11-25: Make sure a potential result is following a return keyword
 			//if(line.toLowerCase().indexOf("return")==0)
-			if (Syntax.ignoreCase) line = line.toLowerCase();
-			boolean isReturn = line.matches(Matcher.quoteReplacement(patternReturn) + "([\\W].*|$)");
-			boolean isLeave = line.matches(Matcher.quoteReplacement(patternLeave) + "([\\W].*|$)");
-			boolean isExit = line.matches(Matcher.quoteReplacement(patternExit) + "([\\W].*|$)");
-			boolean isJump = isLeave || isExit ||
-					line.matches("exit([\\W].*|$)") ||	// Also check hard-coded keywords
-					line.matches("break([\\W].*|$)");	// Also check hard-coded keywords
-			if (isReturn && !line.substring(Syntax.getKeywordOrDefault("preReturn", "return").length()).isEmpty())
-				// END KGU#78 2015-11-25
+			//if (Syntax.ignoreCase) line = line.toLowerCase();
+			//boolean isReturn = line.matches(Matcher.quoteReplacement(patternReturn) + "([\\W].*|$)");
+			//boolean isLeave = line.matches(Matcher.quoteReplacement(patternLeave) + "([\\W].*|$)");
+			//boolean isExit = line.matches(Matcher.quoteReplacement(patternExit) + "([\\W].*|$)");
+			//boolean isJump = isLeave || isExit ||
+			//		line.matches("exit([\\W].*|$)") ||	// Also check hard-coded keywords
+			//		line.matches("break([\\W].*|$)");	// Also check hard-coded keywords
+			boolean isReturn = Jump.isReturn(line);
+			boolean isLeave = Jump.isLeave(line);
+			boolean isExit = Jump.isExit(line);
+			boolean isJump = isLeave || isExit;
+			//if (isReturn && !line.substring(Syntax.getKeywordOrDefault("preReturn", "return").length()).isEmpty())
+			// END KGU#78 2015-11-25
+			if (isReturn && !line.subSequenceToEnd(keyReturn.size()).isBlank())
 			{
 				_resultFlags[0] = true;
 				// START KGU#343 2017-02-07: This could cause case-related warnings if e.g. "Result" is used somewhere 
@@ -5353,7 +5407,7 @@ public class Root extends Element {
 			// very last instruction of the program or routine
 			if (!(ele instanceof Jump) && // Well, this is more or less clear...
 					(isJump || (isReturn && !(ele.parent.parent instanceof Root &&
-							ls == sl.count()-1 && _isLastElement)))
+							ls == unbroken.size()-1 && _isLastElement)))
 					)
 			{
 				if (isReturn) {
@@ -5604,16 +5658,17 @@ public class Root extends Element {
 		// START KGU#413 2017-09-17: Enh. #416 cope with user-inserted line breaks
 		//for (int i = 0; i < _instr.getText().count(); i++) {
 		//	String line = _instr.getText().get(i);
-		StringList unbrText = _instr.getUnbrokenText();
-		for (int i = 0; i < unbrText.count(); i++) {
+		//StringList unbrText = _instr.getUnbrokenText();
+		ArrayList<TokenList> unbrText = _instr.getUnbrokenTokenText();
+		for (int i = 0; i < unbrText.size(); i++) {
 			// FIXME Iterate over the TokenLists
-			String line = unbrText.get(i);
+			TokenList line = unbrText.get(i);
 		// END KGU#413 2017-09-17
 			// START KGU#388 2017-09-13: Enh. #423: Type checks
 			boolean isTypedef = Instruction.isTypeDefinition(line, _types);
 			// END KGU#413 2017-09-13
-			if (line.startsWith("const ")) {
-				StringList myUsedVars = getUsedVarNames(line.substring("const ".length()), keywords);
+			if (!line.isBlank() && line.get(0).equalsIgnoreCase("const")) {
+				StringList myUsedVars = getUsedVarNames(line.subSequenceToEnd(1), keywords);
 				StringList nonConst = new StringList();
 				for (int j = 0; j < myUsedVars.count(); j++)
 				{
@@ -5622,7 +5677,9 @@ public class Root extends Element {
 						nonConst.add(myUsed);
 					}
 				}
-				StringList myDefs = getVarNames(StringList.getNew(line), _definedConsts);
+				ArrayList<TokenList> singleLine = new ArrayList<TokenList>();
+				singleLine.add(line);
+				StringList myDefs = getVarNames(singleLine, _definedConsts);
 				if (myDefs.count() > 0 && nonConst.count() > 0) {
 					//error  = new DetectedError("The constant «"+myDefs.get(0)+"» depends on non-constant values: "+"!", _instr);
 					addError(_errors, new DetectedError(errorMsg(Menu.error22_1, new String[]{myDefs.get(0), nonConst.concatenate("», «")}), _instr), 22);
@@ -5632,16 +5689,17 @@ public class Root extends Element {
 				knownVars.add(myDefs);
 			}
 			// START KGU#388 2017-09-13: Enh. #423 - check type definitions
-			else if (line.toLowerCase().startsWith("type ") || isTypedef) {
+			else if (!line.isBlank() && line.get(0).equalsIgnoreCase("type ") || isTypedef) {
 				if (!isTypedef) {
 					//error  = new DetectedError("Type definition in line"+i+"is malformed!", _instr);
 					addError(_errors, new DetectedError(errorMsg(Menu.error24_1, String.valueOf(i)), _instr), 24);
 				}
 				else {
 					// Unfortunately we cannot be sure that isTypedef excludes all syntax errors
-					StringList tokens = Syntax.splitLexically(line, true);
+					//StringList tokens = Syntax.splitLexically(line, true);
+					TokenList tokens = new TokenList(line);	// Just a copy...
 					// START KGU#1090 2023-10-14: Bugfix #1096 There must be exactly one token before
-					tokens.removeAll(" ");
+					//tokens.removeAll(" ");
 					// END KGU1090 2023-10-14
 					int posDef = tokens.indexOf("=");
 					// START KGU#1090 2023-10-14: Issue #1096 There must be exactly one token before
@@ -5662,7 +5720,7 @@ public class Root extends Element {
 //						String tag = typeSpec.substring(0, posBrace).toLowerCase();
 //						if (tag.equals("enum")) {
 					String typename = "";
-					if (posDef != 2 || tokens.count() < 2
+					if (posDef != 2 || tokens.size() < 2
 							|| !Syntax.isIdentifier(typename = tokens.get(1), false, null)
 							|| _types.containsKey(typename)
 							|| _types.containsKey(":" + typename)) {
@@ -5700,21 +5758,16 @@ public class Root extends Element {
 								}
 							}
 						}
-						// START KGU#1090 2023-10-15: Bugfix #1096
-						//else {	// tag assumed to be "record" or "struct"
-						// END KGU#542 2019-11-17
-						//	extractDeclarationsFromList(typeSpec.substring(posBrace+1, typeSpec.length()-1), compNames, compTypes, null);
 						else if (tag.equals("record") || tag.equals("struct")) {	// tag assumed to be "record" or "struct"
 							int posBrace = tokens.indexOf("{");
-							if (posBrace != 1 || !tokens.get(tokens.count()-1).equals("}")) {
+							if (posBrace != 1 || !tokens.get(tokens.size()-1).equals("}")) {
 								//error  = new DetectedError("Type definition in line"+i+"is malformed!", _instr);
 								addError(_errors, new DetectedError(errorMsg(Menu.error24_1, String.valueOf(i)), _instr), 24);					
 							} else {
 								StringList compNames = new StringList();
 								StringList compTypes = new StringList();
-								extractDeclarationsFromList(tokens.concatenate(null, posBrace+1, tokens.count()-1),
+								extractDeclarationsFromList(tokens.subSequence(posBrace+1, tokens.size()-1),
 										compNames, compTypes, null);
-						// END KGU#1090 2023-10-15
 								for (int j = 0; j < compNames.count(); j++) {
 									String compName = compNames.get(j);
 									if (!Syntax.isIdentifier(compName, false, null) || compNames.subSequence(0, j-1).contains(compName)) {
@@ -5724,12 +5777,9 @@ public class Root extends Element {
 									String type = compTypes.get(j);
 									// Clear off array specifiers, but the check is still too restrictive...
 									if (type != null) {
-										// START KGU#1089 2023-10-14: Issue #980 more sophisticated check
-										//type = type.trim();
-										//checkArrayType(_instr, _errors, _types, typename, type);
-										StringList typeTokens = Syntax.splitLexically(type, true);
-										typeTokens.removeAll(" ");
-										checkArrayType_24_31(_instr, _errors, typeTokens, _definedConsts, _types, typename);
+										// Issue #980 more sophisticated check
+										checkArrayType_24_31(_instr, _errors, new TokenList(type, true),
+												_definedConsts, _types, typename);
 										// END KGU#1089 2023-10-14
 									}
 								}
@@ -5775,7 +5825,9 @@ public class Root extends Element {
 				//knownVars.add(getVarNames(StringList.getNew(line), _definedConsts));
 				Set<String> formerConstants = new HashSet<String>();
 				formerConstants.addAll(_definedConsts.keySet());
-				StringList myDefs = getVarNames(StringList.getNew(line), _definedConsts);
+				ArrayList<TokenList> singleLine = new ArrayList<TokenList>();
+				singleLine.add(line);
+				StringList myDefs = getVarNames(singleLine, _definedConsts);
 				for (int j = 0; j < myDefs.count(); j++) {
 					String varName = myDefs.get(j);
 					if (formerConstants.contains(varName)) {
@@ -5792,11 +5844,10 @@ public class Root extends Element {
 				// START KGU#388 2017-09-17: Enh. #423 Check the definition of type names and components
 				if (check(24)) {
 					// FIXME Might be obtained directly from the Tokentext
-					TokenList tokens = new TokenList(line, true);
 					//int nTokens = tokens.count();
 					int posBrace = 0;
 					String typeName = "";
-					while ((posBrace = tokens.indexOf("{", posBrace + 1)) > 1 && Syntax.isIdentifier((typeName = tokens.get(posBrace-1)), false, null)) {
+					while ((posBrace = line.indexOf("{", posBrace + 1)) > 1 && Syntax.isIdentifier((typeName = line.get(posBrace-1)), false, null)) {
 						TypeMapEntry recType = _types.get(":"+typeName);
 						if (recType == null || !recType.isRecord()) {
 							//error  = new DetectedError("There is no defined record type «"+typeName+"»!", _instr);
@@ -5805,7 +5856,7 @@ public class Root extends Element {
 						else {
 							// START KGU#559 2018-07-20: Enh. #563  more intelligent initializer evaluation
 							//HashMap<String, String> components = Element.splitRecordInitializer(tokens.concatenate("", posBrace));
-							HashMap<String, String> components = Syntax.splitRecordInitializer(tokens.subSequence(posBrace, tokens.size()), recType);
+							HashMap<String, String> components = Syntax.splitRecordInitializer(line.subSequenceToEnd(posBrace), recType);
 							// END KGU#559 2018-07-20
 							// START KGU#1021 2021-12-05: Bugfix #1024 components may be null!
 							if (components == null) {
@@ -5817,7 +5868,7 @@ public class Root extends Element {
 								for (String compName: compNames) {
 									if (!compName.startsWith("§") && !components.containsKey(compName)) {
 										//error  = new DetectedError("Record component «"+compName+"» will not be modified/initialized!", _instr);
-										addError(_errors, new DetectedError(errorMsg(Menu.error24_6, compName), _instr), 24);																					
+										addError(_errors, new DetectedError(errorMsg(Menu.error24_6, compName), _instr), 24);
 									}
 								}
 								for (String compName: components.keySet()) {
@@ -5832,7 +5883,7 @@ public class Root extends Element {
 						}
 					}
 					// START KGU#388 2017-09-29: Enh. #423 (KGU#514 2018-04-03: extracted for bugfix #528)
-					analyse_24_tokens(_instr, _errors, _types, tokens);
+					analyse_24_tokens(_instr, _errors, _types, line);
 					// END KGU#388 2017-09-29
 
 				}
@@ -5885,13 +5936,13 @@ public class Root extends Element {
 			StringList _vars, StringList _uncertainVars, HashMap<String, String> _definedConsts,
 			TypeRegistry _types)
 	{
+		// FIXME CHECK 31 is to be reformulated and integrated
 		StringList knownVars = new StringList(_vars);
-		String[] keywords = Syntax.getAllProperties();
-		StringList unbrText = _instr.getUnbrokenText();
+		ArrayList<TokenList> unbrText = _instr.getUnbrokenTokenText();
 		StringList problems = new StringList();
 		Set<String> formerConstants = new HashSet<String>();
 		formerConstants.addAll(_definedConsts.keySet());
-		for (int i = 0; i < unbrText.count(); i++) {
+		for (int i = 0; i < unbrText.size(); i++) {
 			Line line = getParsedLine(i);
 		// END KGU#413 2017-09-17
 			// START KGU#388 2017-09-13: Enh. #423: Type checks
@@ -5962,7 +6013,7 @@ public class Root extends Element {
 						}
 						Type compType = ((RecordType)defType).getComponentType(compName);
 						if (compType == null) {
-							//error  = new DetectedError("Type name «" + type + "» is illegal or unknown.", _instr);
+							//error  = new DetectedError("Underlying Type «" + type + "» is illegal or unknown.", _instr);
 							addError(_errors, new DetectedError(errorMsg(Menu.error24_4, compName), _instr), 24);
 						}
 					}
@@ -5970,11 +6021,17 @@ public class Root extends Element {
 				break;
 			}
 			case LT_RAW:
-				if (unbrText.get(i).startsWith("type ")) {
+			{
+				TokenList tokens = unbrText.get(i);
+				if (tokens.get(0).equals("type")) {
 					//error  = new DetectedError("Type definition in line"+i+"is malformed!", _instr);
 					addError(_errors, new DetectedError(errorMsg(Menu.error24_1, String.valueOf(i)), _instr), 24);
 				}
+				else if (Instruction.isDeclaration(tokens)) {
+					this.analyse_31(_instr, _errors, tokens, i, _vars, _uncertainVars, _definedConsts, typeMap);
+				}
 				break;
+			}
 			case LT_ASSIGNMENT:
 			case LT_VAR_INIT:
 				if (check(24) && line.getExprCount() >= 1) {
@@ -6107,8 +6164,8 @@ public class Root extends Element {
 	 *     defined (for recursive structures), or {@code null}
 	 */
 	private void checkArrayType_24_31(Instruction _instr, Vector<DetectedError> _errors,
-			StringList _tokens, HashMap<String, String> _constants, HashMap<String, TypeMapEntry> _types, String _definedRecTypeId) {
-		StringList tokens = _tokens.copy();
+			TokenList _tokens, HashMap<String, String> _constants, HashMap<String, TypeMapEntry> _types, String _definedRecTypeId) {
+		TokenList tokens = new TokenList(_tokens);	// better make a copy
 		String typeSpec;
 		StringList defective = new StringList();
 		StringList badSizes = new StringList();
@@ -6122,12 +6179,12 @@ public class Root extends Element {
 						complain = true;
 					}
 					else {
-						StringList indexRanges = Element.splitExpressionList(tokens.subSequence(2, posOf), ",", true);
-						if (!indexRanges.get(indexRanges.count()-1).equals("]")) {
+						ArrayList<TokenList> indexRanges = Syntax.splitExpressionList(tokens.subSequence(2, posOf), ",");
+						if (!indexRanges.get(indexRanges.size()-1).getString().trim().equals("]")) {
 							complain = true;
 						}
-						for (int i = 0; i < indexRanges.count()-1; i++) {
-							String[] minmax = indexRanges.get(i).split("\\.\\.\\.?", -1);
+						for (int i = 0; i < indexRanges.size()-1; i++) {
+							String[] minmax = indexRanges.get(i).getString().split("\\.\\.\\.?", -1);
 							if (minmax.length > 2) {
 								complain = true;
 							}
@@ -6157,17 +6214,17 @@ public class Root extends Element {
 					}
 				}
 				if (complain) {
-					defective.add(tokens.concatenate(null, 1, posOf));
+					defective.add(tokens.subSequence(1, posOf).getString());
 				}
 			}
-			else if (tokens.count() == 1) {
+			else if (tokens.size() == 1) {
 				// A stand-alone "array" will be accepted
 				tokens.set(0, "int");	// This just averts further complaints
 			}
 			else {
 				// Missing "of" - obviously defective.
-				defective.add(tokens.concatenate(null));
-				posOf = tokens.count()-1;
+				defective.add(tokens.getString());
+				posOf = tokens.size()-1;
 			}
 			// Go ahead to array element type specification (might again be an array)
 			tokens.remove(0, posOf + 1);
@@ -6186,18 +6243,18 @@ public class Root extends Element {
 			//error  = new DetectedError("Type specification: %! is illegal here or an unknown type", _instr);
 			addError(_errors, new DetectedError(errorMsg(errorText, typeSpec), _instr), 31);
 		}
-		if (tokens.count() > 1) {
+		if (tokens.size() > 1) {
 			// Now C-like dimension sizes might follow
 			tokens.remove(0);
 			while (!tokens.isEmpty() && tokens.get(0).equals("[")) {
-				StringList dimSizes = Element.splitExpressionList(tokens.subSequence(1, tokens.count()), ",", true);
-				if (!dimSizes.get(dimSizes.count()-1).startsWith("]")) {
-					defective.add(tokens.concatenate(null));
+				ArrayList<TokenList> dimSizes = Syntax.splitExpressionList(tokens.subSequenceToEnd(1), ",");
+				if (!dimSizes.get(dimSizes.size()-1).startsWith("]")) {
+					defective.add(tokens.getString());
 					tokens.clear();
 				}
 				else {
-					for (int j = 0; j < dimSizes.count()-1; j++) {
-						String dim = dimSizes.get(j);
+					for (int j = 0; j < dimSizes.size()-1; j++) {
+						String dim = dimSizes.get(j).getString();
 						if (_constants.containsKey(dim)) {
 							dim = _constants.get(dim);
 						}
@@ -6209,7 +6266,10 @@ public class Root extends Element {
 						}
 					}
 				}
-				tokens = Syntax.splitLexically(dimSizes.get(dimSizes.count()-1).substring(1), true);
+				tokens = dimSizes.get(dimSizes.size()-1);
+				if (!tokens.isBlank()) {
+					tokens = tokens.subSequenceToEnd(1);
+				}
 			}
 		}
 		if (!defective.isEmpty()) {
@@ -6790,7 +6850,7 @@ public class Root extends Element {
 		String aNonNumber = null;
 		// cf. checkValues
 		for (int i = 1; i < text.count(); i++) {
-			StringList items = Element.splitExpressionList(text.get(i), ",");
+			StringList items = Syntax.splitExpressionList(text.get(i), ",");
 			for (int j = 0; j < items.count(); j++) {
 				int val = 0;
 				String item = items.get(j);
@@ -6870,7 +6930,7 @@ public class Root extends Element {
 			}
 		}
 		for (int i = 1; i < caseText.count() - 1; i++) {
-			StringList items = Element.splitExpressionList(caseText.get(i), ",");
+			StringList items = Syntax.splitExpressionList(caseText.get(i), ",");
 			Line sels = _case.getParsedLine(i);
 			if (sels.getType() == Line.LineType.LT_SELECTOR && sels.getExprCount() > 0) {
 				for (int j = 0; j < sels.getExprCount(); j++) {
@@ -6979,8 +7039,8 @@ public class Root extends Element {
 	 */
 	private void analyse_29(Case _case, Vector<DetectedError> _errors, HashMap<String, TypeMapEntry> _types)
 	{
-		StringList text = _case.getUnbrokenText();
-		String typeStr = Root.identifyExprType(_types, text.get(0), true);
+		ArrayList<TokenList> unbroken = _case.getUnbrokenTokenText();
+		String typeStr = Syntax.identifyExprType(_types, unbroken.get(0), true);
 		boolean isStructured = typeStr.startsWith("@") || typeStr.startsWith("$");
 		if (!isStructured && Syntax.isIdentifier(typeStr, false, null)) {
 			// Do another test
@@ -6989,7 +7049,7 @@ public class Root extends Element {
 		}
 		if (isStructured) {
 			//error  = new DetectedError("The discriminator (%) is structured - which is unsuited for CASE!", _case);
-			addError(_errors, new DetectedError(errorMsg(Menu.error29, text.get(0)), _case), 29);
+			addError(_errors, new DetectedError(errorMsg(Menu.error29, unbroken.get(0).getString()), _case), 29);
 		}
 	}
 	// END KGU#928 2021-02-08
@@ -7006,7 +7066,7 @@ public class Root extends Element {
 		Type discrType = line.getOrInferDataType(_dataTypes);
 		if (discrType != null && discrType.isStructured()) {
 			//error  = new DetectedError("The discriminator (%) is structured - which is unsuited for CASE!", _case);
-			addError(_errors, new DetectedError(errorMsg(Menu.error29, text.get(0).getString()), _case), 29);
+			addError(_errors, new DetectedError(errorMsg(Menu.error29, _case.getUnbrokenText().get(0)), _case), 29);
 		}
 	}
 	
@@ -7020,11 +7080,11 @@ public class Root extends Element {
 		if (!check(30)) {
 			return;
 		}
-		StringList unbrokenLines = _ele.getUnbrokenText();
-		for (int i = 0; i < unbrokenLines.count(); i++) {
-			StringList tokens = Syntax.splitLexically(unbrokenLines.get(i), true);
+		ArrayList<TokenList> unbrokenLines = _ele.getUnbrokenTokenText();
+		for (int i = 0; i < unbrokenLines.size(); i++) {
+			TokenList tokens = unbrokenLines.get(i);
 			Stack<Character> brackets = new Stack<Character>();
-			for (int j = 0; j < tokens.count(); j++) {
+			for (int j = 0; j < tokens.size(); j++) {
 				String token = tokens.get(j);
 				if (token.equals("(")) {
 					brackets.push(')');
@@ -7062,7 +7122,7 @@ public class Root extends Element {
 	 * @param ele - element to be checked
 	 * @param _errors - global error list
 	 */
-	private void analyse_31(Element _ele, Vector<DetectedError> _errors) {
+	private void analyse_32(Element _ele, Vector<DetectedError> _errors) {
 		if (_ele.parsedLines != null) {
 			// The parsing has already taken place - just check for stored error messages
 			for (int i = 0; i < _ele.parsedLines.length; i++) {
@@ -7097,7 +7157,7 @@ public class Root extends Element {
 	 * 
 	 * @param _instr - {@link Instruction} to be analysed
 	 * @param _errors - global error list
-	 * @param _line - current instruction line
+	 * @param _tokens - tokenized current instruction line
 	 * @param _lineNo - number of the obtained line {@code _line} within {@code _instr} text
 	 * @param _vars - variables with certain initialisation
 	 * @param _uncertainVars - variables with uncertain initialisation (e.g. in a branch)
@@ -7105,17 +7165,15 @@ public class Root extends Element {
 	 * @param _types - type definitions and declarations
 	 */
 	private void analyse_31(Instruction _instr, Vector<DetectedError> _errors,
-			String _line, int _lineNo,
+			TokenList _tokens, int _lineNo,
 			StringList _vars, StringList _uncertainVars, HashMap<String, String> _constants,
 			HashMap<String, TypeMapEntry> _types)
 	{
 		StringList declItems = null;
-		StringList tokens = Syntax.splitLexically(_line, true);
-		tokens.removeAll(" ");
-		if (tokens.indexOf("var", false) == 0 || tokens.indexOf("dim", false) == 0) {
-			int posCol = tokens.indexOf(":");
-			if (posCol < 0 && (posCol = tokens.indexOf("as", false)) < 0) {
-				String token0 = tokens.get(0);
+		if (_tokens.indexOf("var", false) == 0 || _tokens.indexOf("dim", false) == 0) {
+			int posCol = _tokens.indexOf(":");
+			if (posCol < 0 && (posCol = _tokens.indexOf("as", false)) < 0) {
+				String token0 = _tokens.get(0);
 				String prefCol = token0.equalsIgnoreCase("var") ? ":" : "as";
 				if (token0.equals(token0.toUpperCase())) {
 					prefCol = prefCol.toUpperCase();
@@ -7124,10 +7182,14 @@ public class Root extends Element {
 				addError(_errors, new DetectedError(errorMsg(Menu.error31_1, new String[] {token0, prefCol}), _instr), 31);
 				return;
 			}
-			boolean isInit = Instruction.isAssignment(_line);
+			boolean isInit = Instruction.isAssignment(_tokens);
 
 			// Check the declaration items (should be new variable identifiers)
-			declItems = Element.splitExpressionList(tokens.subSequence(1, posCol), ",", true);
+			ArrayList<TokenList> declItemTokens = Syntax.splitExpressionList(_tokens.subSequence(1, posCol), ",");
+			declItems = new StringList();
+			for (int i = 0; i < declItemTokens.size(); i++) {
+				declItems.add(declItemTokens.get(i).getString());
+			}
 			if (!declItems.get(declItems.count()-1).isBlank()) {
 				//error  = new DetectedError("Unexpected character sequence % in the list of declared variables", _instr);
 				addError(_errors, new DetectedError(errorMsg(Menu.error31_2, declItems.get(declItems.count()-1)), _instr), 31);
@@ -7143,23 +7205,23 @@ public class Root extends Element {
 			}
 
 			// Check the type structure
-			tokens.remove(0, posCol + 1);
+			_tokens.remove(0, posCol + 1);
 			String typeSpec = "";
-			if (tokens.isEmpty() || ILLEGAL_SUBTYPES.contains(tokens.get(0), false)) {
-				if (!tokens.isEmpty()) {
-					typeSpec = tokens.get(0) + "{...}";
+			if (_tokens.isEmpty() || ILLEGAL_SUBTYPES.contains(_tokens.get(0), false)) {
+				if (!_tokens.isEmpty()) {
+					typeSpec = _tokens.get(0) + "{...}";
 				}
 				//error  = new DetectedError("Illegal or defective type specification: %!", _instr);
 				addError(_errors, new DetectedError(errorMsg(Menu.error31_6, typeSpec), _instr), 31);
 			}
 			else {
-				checkArrayType_24_31(_instr, _errors, tokens, _constants, _types, null);
+				checkArrayType_24_31(_instr, _errors, _tokens, _constants, _types, null);
 			}
 		}
-		else if (Instruction.isAssignment(_line)
-				&& (declItems = Instruction.getDeclaredVariables(tokens)).count() > 0) {
+		else if (Instruction.isAssignment(_tokens)
+				&& (declItems = Instruction.getDeclaredVariables(_tokens)).count() > 0) {
 			// C/Java-style declaration
-			if (tokens.indexOf(declItems.get(0)) > 0) {
+			if (_tokens.indexOf(declItems.get(0)) > 0) {
 				analyse_31_declared_ids(_instr, _errors, declItems, _vars, _uncertainVars, _types);
 			}
 			if (declItems.count() != 1) {
@@ -7170,13 +7232,13 @@ public class Root extends Element {
 				// Let's check the index lists now
 				StringList defective = new StringList();
 				StringList badSizes = new StringList();
-				Syntax.unifyOperators(tokens, true);
-				tokens.remove(tokens.indexOf("<-"), tokens.count());
-				tokens = Element.coagulateSubexpressions(tokens);
-				for (int j = 0; j < tokens.count(); j++) {
-					String token = tokens.get(j);
+				Syntax.unifyOperators(_tokens, true);
+				_tokens.remove(_tokens.indexOf("<-"), _tokens.size());
+				_tokens = Syntax.coagulateSubexpressions(_tokens);
+				for (int j = 0; j < _tokens.size(); j++) {
+					String token = _tokens.get(j);
 					if (token.startsWith("[")) {
-						StringList sizes = Element.splitExpressionList(token.substring(1), ",", true);
+						StringList sizes = Syntax.splitExpressionList(token.substring(1), ",");
 						if (!"]".equals(sizes.get(sizes.count()-1))) {
 							defective.add(token);
 						}
@@ -7204,6 +7266,124 @@ public class Root extends Element {
 				}
 			}
 		}
+	}
+	
+	/**
+	 * CHECK #31: Variable declaration and initialisation syntax
+	 * (that it is a declaration has to be checked before)
+	 * 
+	 * @param _instr - {@link Instruction} to be analysed
+	 * @param _errors - global error list
+	 * @param _tokens - tokenized current instruction line
+	 * @param _lineNo - number of the obtained line {@code _line} within {@code _instr} text
+	 * @param _vars - variables with certain initialisation
+	 * @param _uncertainVars - variables with uncertain initialisation (e.g. in a branch)
+	 * @param _constants - incremental constant definition map
+	 * @param _types - the current temporary tye registry
+	 */
+	private void analyse_31(Instruction _instr, Vector<DetectedError> _errors,
+			TokenList _tokens, int _lineNo,
+			StringList _vars, StringList _uncertainVars, HashMap<String, String> _constants,
+			TypeRegistry _types)
+	{
+		// TODO
+//		StringList declItems = null;
+//		if (_tokens.indexOf("var", false) == 0 || _tokens.indexOf("dim", false) == 0) {
+//			int posCol = _tokens.indexOf(":");
+//			if (posCol < 0 && (posCol = _tokens.indexOf("as", false)) < 0) {
+//				String token0 = _tokens.get(0);
+//				String prefCol = token0.equalsIgnoreCase("var") ? ":" : "as";
+//				if (token0.equals(token0.toUpperCase())) {
+//					prefCol = prefCol.toUpperCase();
+//				}
+//				//error  = new DetectedError("A declaration starting with %1 must contain a symbol %2, followed be a type specification!", _instr);
+//				addError(_errors, new DetectedError(errorMsg(Menu.error31_1, new String[] {token0, prefCol}), _instr), 31);
+//				return;
+//			}
+//			boolean isInit = Instruction.isAssignment(_tokens);
+//
+//			// Check the declaration items (should be new variable identifiers)
+//			ArrayList<TokenList> declItemTokens = Syntax.splitExpressionList(_tokens.subSequence(1, posCol), ",");
+//			declItems = new StringList();
+//			for (int i = 0; i < declItemTokens.size(); i++) {
+//				declItems.add(declItemTokens.get(i).getString());
+//			}
+//			if (!declItems.get(declItems.count()-1).isBlank()) {
+//				//error  = new DetectedError("Unexpected character sequence % in the list of declared variables", _instr);
+//				addError(_errors, new DetectedError(errorMsg(Menu.error31_2, declItems.get(declItems.count()-1)), _instr), 31);
+//			}
+//			// Remove the (possibly empty) tail
+//			declItems.remove(declItems.count()-1);
+//			
+//			analyse_31_declared_ids(_instr, _errors, declItems, _vars, _uncertainVars, _types);
+//			
+//			if (isInit && declItems.count() != 1) {
+//				//error  = new DetectedError("For an initialization, the declaration list must contain exactly ONE variable, not %!", _instr);
+//				addError(_errors, new DetectedError(errorMsg(Menu.error31_5, Integer.toString(declItems.count())), _instr), 31);
+//			}
+//
+//			// Check the type structure
+//			_tokens.remove(0, posCol + 1);
+//			String typeSpec = "";
+//			if (_tokens.isEmpty() || ILLEGAL_SUBTYPES.contains(_tokens.get(0), false)) {
+//				if (!_tokens.isEmpty()) {
+//					typeSpec = _tokens.get(0) + "{...}";
+//				}
+//				//error  = new DetectedError("Illegal or defective type specification: %!", _instr);
+//				addError(_errors, new DetectedError(errorMsg(Menu.error31_6, typeSpec), _instr), 31);
+//			}
+//			else {
+//				checkArrayType_24_31(_instr, _errors, _tokens, _constants, _types, null);
+//			}
+//		}
+//		else if (Instruction.isAssignment(_tokens)
+//				&& (declItems = Instruction.getDeclaredVariables(_tokens)).count() > 0) {
+//			// C/Java-style declaration
+//			if (_tokens.indexOf(declItems.get(0)) > 0) {
+//				analyse_31_declared_ids(_instr, _errors, declItems, _vars, _uncertainVars, _types);
+//			}
+//			if (declItems.count() != 1) {
+//				//error  = new DetectedError("For an initialization, the declaration list must contain exactly ONE variable, not %!", _instr);
+//				addError(_errors, new DetectedError(errorMsg(Menu.error31_5, Integer.toString(declItems.count())), _instr), 31);
+//			}
+//			else {
+//				// Let's check the index lists now
+//				StringList defective = new StringList();
+//				StringList badSizes = new StringList();
+//				Syntax.unifyOperators(_tokens, true);
+//				_tokens.remove(_tokens.indexOf("<-"), _tokens.size());
+//				_tokens = Syntax.coagulateSubexpressions(_tokens);
+//				for (int j = 0; j < _tokens.size(); j++) {
+//					String token = _tokens.get(j);
+//					if (token.startsWith("[")) {
+//						StringList sizes = Syntax.splitExpressionList(token.substring(1), ",");
+//						if (!"]".equals(sizes.get(sizes.count()-1))) {
+//							defective.add(token);
+//						}
+//						for (int k = 0; k < sizes.count(); k++) {
+//							String dim = sizes.get(k);
+//							if (_constants.containsKey(dim)) {
+//								dim = this.getConstValueString(dim);
+//							}
+//							try {
+//								Integer.parseUnsignedInt(dim);
+//							}
+//							catch (NumberFormatException ex) {
+//								badSizes.add(dim);
+//							}
+//						}
+//					}
+//				}
+//				if (!defective.isEmpty()) {
+//					//error  = new DetectedError("Illegal or defective dimension specifications: %!", _instr);
+//					addError(_errors, new DetectedError(errorMsg(Menu.error24_9, defective.concatenate("», «")), _instr), 31);
+//				}
+//				if (!badSizes.isEmpty()) {
+//					//error  = new DetectedError("At least one invalid array dimension size (must be integer constant): %!", _instr);
+//					addError(_errors, new DetectedError(errorMsg(Menu.error24_10, badSizes.concatenate("», «")), _instr), 31);
+//				}
+//			}
+//		}
 	}
 	
 	// START KGU#1090 2023-10-17: Issue #1096
@@ -7868,8 +8048,13 @@ public class Root extends Element {
     	String resultType = null;
     	if (this.isSubroutine())	// KGU 2015-12-20: Types more rigorously discarded if this is a program
     	{
-    		String rootText = getText().getLongString();
-    		StringList tokens = Syntax.splitLexically(rootText, true);
+    		//String rootText = getText().getLongString();
+    		//StringList tokens = Syntax.splitLexically(rootText, true);
+    		ArrayList<TokenList> unbrText = getUnbrokenTokenText();
+    		TokenList tokens = unbrText.get(0);
+    		for (int i = 1; i < unbrText.size(); i++) {
+    			tokens.addAll(unbrText.get(i));
+    		}
     		//tokens.removeAll(" ");
     		int posOpenParenth = tokens.indexOf("(");
     		int posCloseParenth = tokens.indexOf(")");
@@ -7877,13 +8062,12 @@ public class Root extends Element {
     		if (posOpenParenth >= 0 && posOpenParenth < posCloseParenth)
     		{
     			// First attempt: Something after parameter list and "as" or ":"
-    			if (tokens.count() > posCloseParenth + 1) {
-    				StringList right = tokens.subSequence(posCloseParenth + 1, tokens.count());
-    				right.removeBlanks();
-    				if (right.count() > 0 && (right.get(0).toLowerCase().equals("as") || right.get(0).equals(":"))) {
+    			if (tokens.size() > posCloseParenth + 1) {
+    				TokenList right = tokens.subSequenceToEnd(posCloseParenth + 1);
+    				if (right.size() > 0 && (right.get(0).equalsIgnoreCase("as") || right.get(0).equals(":"))) {
     					// START KGU#135 2016-01-08: It was not meant to be split to several lines.
     					//resultType = tokens.getText(posCloseParenth + 2);
-    					resultType = tokens.concatenate("", tokens.indexOf(right.get(0), posCloseParenth + 1)+1).trim();
+    					resultType = tokens.subSequenceToEnd(tokens.indexOf(right.get(0), posCloseParenth + 1)+1).getString().trim();
     					// END KGU#135 2016-01-06
     				}
     			}
@@ -7891,21 +8075,20 @@ public class Root extends Element {
     			// START KGU#61 2016-03-22: Method outsourced
     			//else if (posOpenParenth > 1 && testidentifier(tokens.get(posOpenParenth-1)))
     			if ((resultType == null || resultType.isEmpty()) && posOpenParenth > 1) {
-    				StringList left = tokens.subSequence(0, posOpenParenth);
-    				left.removeBlanks();
-    				if (left.count() > 1 && Syntax.isIdentifier(left.get(left.count()-1), false, null))
+    				TokenList left = tokens.subSequence(0, posOpenParenth);
+    				if (left.size() > 1 && Syntax.isIdentifier(left.get(left.size()-1), false, null))
     			// END KGU#61 2016-03-22
     				{
     					// We assume that the last token is the procedure name, the previous strings
     					// may be the type
-    					resultType = left.concatenate(" ", 0, left.count()-1);
+    					resultType = left.subSequence(0, left.size()-1).getString();
     				}	
     			}
     		}
     		else if (posColon != -1)
     		{
     			// Third attempt: In case of an omitted parenthesis, the part behind the colon may be the type 
-    			resultType = tokens.concatenate(null, posColon+1).trim();
+    			resultType = tokens.subSequenceToEnd(posColon+1).getString().trim();
     		}
     	}
     	
@@ -7983,6 +8166,7 @@ public class Root extends Element {
         // END KGU#253 2016-09-22
         if (this.isSubroutine())
         {
+        	TokenList rootTokens = TokenList.concatenate(this.getUnbrokenTokenText(), null);
         	// START KGU#371 2019-03-07: Enh. #385 Use cached values if available, otherwise fill cache
         	if (parameterList != null) {
         		synchronized(this) {
@@ -8001,9 +8185,8 @@ public class Root extends Element {
         		// Nothing more to do here
         		// START KGU#836 2020-03-29: Bugfix #841
         		//return true;
-        		String rootText = this.getText().getLongString();
-        		int posPar1 = rootText.indexOf("(");
-        		return posPar1 >= 0 && rootText.indexOf(")", posPar1+1) >= 0;
+        		int posPar0 = rootTokens.indexOf("(");
+        		return posPar0 >= 0 && rootTokens.indexOf(")", posPar0+1) >= 0;
         		// END KGU#836 2020-03-29
         	}
         	// Compute the parameter list from scratch, make sure all three lists exist
@@ -8019,8 +8202,7 @@ public class Root extends Element {
         	// END KGU#371 2019-03-07
         	try
         	{
-        		String rootText = this.getText().getText();
-        		hasParamList = extractMethodParamDecls(rootText, paramNames, paramTypes, paramDefaults);
+        		hasParamList = extractMethodParamDecls(rootTokens, paramNames, paramTypes, paramDefaults);
         		// START KGU#371 2019-03-07: Enh. #395 Use cached values if available, otherwise fill cache
         		parameterList = new ArrayList<Param>(paramNames.count());
         		synchronized(this) {
@@ -8058,33 +8240,34 @@ public class Root extends Element {
 	 * 
 	 * @see #getMethodName(String, DiagramType, boolean)
 	 */
-	protected static boolean extractMethodParamDecls(String rootText, StringList paramNames, StringList paramTypes,
+	protected static boolean extractMethodParamDecls(TokenList rootText, StringList paramNames, StringList paramTypes,
 			StringList paramDefaults) {
 		boolean hasParamList = false;
 		// START KGU#580 2018-09-24: Bugfix #605 we must not mutilate identifiers ending with "var".
 		//rootText = rootText.replace("var ", "");
-		Matcher varMatcher = VAR_PATTERN.matcher(rootText);
-		if (varMatcher.matches()) {
-			rootText = varMatcher.replaceAll("$1$2");
-		}
-		// END KGU#580
-		if (rootText.indexOf("(") >= 0)
+		//Matcher varMatcher = VAR_PATTERN.matcher(rootText);
+		//if (varMatcher.matches()) {
+		//	rootText = varMatcher.replaceAll("$1$2");
+		//}
+		// END KGU#580 2018-09-24
+		int posPar0 = rootText.indexOf("(");
+		int posPar1 = rootText.lastIndexOf(")");
+		// START KGU#222 2016-07-28: If there is no parenthesis then we shouldn't add anything...
+		if (posPar0 >= 0 && posPar1 > posPar0)
 		{
 			// FIXME: This is getting too simple now!
-			rootText = rootText.substring(rootText.indexOf("(")+1).trim();
-			rootText = rootText.substring(0,rootText.lastIndexOf(")")).trim();
-			// START KGU#253 2016-09-22: Enh. #249 - seems to be a parameter list
+			//rootText = rootText.substring(posPar0+1);
+			//rootText = rootText.substring(0,rootText.lastIndexOf(")")).trim();
+			rootText = rootText.subSequence(posPar0 + 1, posPar1);
+			// START KGU#580 2023-11-05: Bugfix #605 we must still get rid of "var".
+			rootText.removeAll("var");	// FIXME should work case-ignorantly
+			// START KGU#253 2023-11-05: Enh. #249 - seems to be a parameter list
 			hasParamList = true;
 			// END KGU#253 2016-09-22
-		}
-		// START KGU#222 2016-07-28: If there is no parenthesis then we shouldn't add anything...
-		else
-		{
-			rootText = "";
+			extractDeclarationsFromList(rootText, paramNames, paramTypes, paramDefaults);
 		}
 		// END KGU#222 2016-07-28
 
-		extractDeclarationsFromList(rootText, paramNames, paramTypes, paramDefaults);
 		return hasParamList;
 	}
 	// END KGU#408 2021-02-26

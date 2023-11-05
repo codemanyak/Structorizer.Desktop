@@ -19,6 +19,8 @@
  */
 package lu.fisch.structorizer.elements;
 
+import java.util.ArrayList;
+
 /******************************************************************************************************
  *
  *      Author:         Kay Gürtzig
@@ -82,6 +84,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.BString;
 import lu.fisch.utils.StringList;
 
@@ -453,12 +456,12 @@ public class TypeMapEntry {
 		{
 			String descr = this.typeDescriptor.replaceAll("\\]\\s*\\[", ",");
 			descr = descr.replace("???", "§§§");	// "???" would be broken
-			StringList tokens = Syntax.splitLexically(descr, true);
+			TokenList tokens = new TokenList(descr, true);
 			tokens.removeAll(" ");
 			this.indexRanges = new Vector<int[]>();
 			while (!tokens.isEmpty() && tokens.get(0).equalsIgnoreCase("array")) {
 				int posOf = tokens.indexOf("of", false);
-				if (tokens.count() == 1) {
+				if (tokens.size() == 1) {
 					this.indexRanges.add(new int[]{0, -1});
 					// Nothing will follow, not even an element type name, so we are done
 					tokens.clear();
@@ -466,7 +469,7 @@ public class TypeMapEntry {
 					break;
 				}
 				if (posOf < 0) {
-					posOf = tokens.count();
+					posOf = tokens.size();
 				}
 				boolean hasBrackets = tokens.get(1).equals("[");
 				if (hasBrackets) {
@@ -477,9 +480,9 @@ public class TypeMapEntry {
 					this.indexRanges.add(new int[]{0, -1});
 				}
 				// We ignore potential syntactic errors at the end...
-				StringList dimRanges = Element.splitExpressionList(tokens.subSequence(1, posOf), ",", false);
-				for (int i = 0; i < dimRanges.count(); i++) {
-					addIndexRange(dimRanges.get(i), constProvider);
+				ArrayList<TokenList> dimRanges = Syntax.splitExpressionList(tokens.subSequence(1, posOf), ",");
+				for (int i = 0; i < dimRanges.size()-1; i++) {
+					addIndexRange(dimRanges.get(i).getString(), constProvider);
 				}
 				tokens.remove(0, posOf+1);
 			}
@@ -490,7 +493,7 @@ public class TypeMapEntry {
 				StringList elTypeTokens = StringList.getNew(tokens.get(0));
 				// Fetch all successive words/parts that might form the element type
 				int pos = 1;
-				while (pos < tokens.count() &&
+				while (pos < tokens.size() &&
 						(Syntax.isIdentifier(token = tokens.get(pos), false, null)
 								||
 								token.equals("*")
@@ -501,11 +504,11 @@ public class TypeMapEntry {
 				this.elementType = elTypeTokens.concatenate(null).replace("§§§", "???");
 				tokens.remove(0, pos);
 				while (!tokens.isEmpty() && tokens.get(0).equals("[")) {
-					StringList dimRanges = Element.splitExpressionList(tokens.subSequence(1, tokens.count()), ",", true);
-					for (int i = 0; i < dimRanges.count()-1; i++) {
-						addIndexRange(dimRanges.get(i), constProvider);
+					ArrayList<TokenList> dimRanges = Syntax.splitExpressionList(tokens.subSequenceToEnd(1), ",");
+					for (int i = 0; i < dimRanges.size()-1; i++) {
+						addIndexRange(dimRanges.get(i).getString(), constProvider);
 					}
-					tokens = Syntax.splitLexically(dimRanges.get(dimRanges.count()-1), true);
+					tokens = dimRanges.get(dimRanges.size()-1);
 					if (!tokens.isEmpty() && tokens.get(0).equals("]")) {
 						// drop ], another bracket may follow, otherwise we will stop then
 						tokens.remove(0);

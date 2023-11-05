@@ -20,6 +20,8 @@
 
 package lu.fisch.structorizer.generators;
 
+import java.util.ArrayList;
+
 /******************************************************************************************************
  *
  *      Author:         Simon Sobisch
@@ -610,7 +612,7 @@ public class COBOLGenerator extends Generator {
 		// START KGU#375 2017-04-12: Enh. #388: Might be an imported constant
 		// Enumeration constants will be exported together by generateTypeDef(...);
 		else if (constValue != null && !_root.constants.get(_name).contains("€")) {
-			String type = Element.identifyExprType(typeMap, constValue, false);
+			String type = Syntax.identifyExprType(typeMap, new TokenList(constValue), false);
 			if (!type.isEmpty()) {
 				types = StringList.getNew(transformType(type, "int"));
 				// We place a faked workaround entry
@@ -826,22 +828,22 @@ public class COBOLGenerator extends Generator {
 	{
 		if (!appendAsComment(_inst, _indent)) {
 			boolean isDisabled = _inst.isDisabled(false);
-			StringList text = _inst.getUnbrokenText();
+			ArrayList<TokenList> text = _inst.getUnbrokenTokenText();
 			appendComment(_inst, _indent);
-			for (int i = 0; i < text.count(); i++) {
-				String line = text.get(i);
-				if (line.isEmpty() || Instruction.isMereDeclaration(line)) {
+			for (int i = 0; i < text.size(); i++) {
+				TokenList tokens = text.get(i);
+				if (tokens.isBlank() || Instruction.isMereDeclaration(tokens)) {
 					continue;
 				}
-				StringList tokens = Syntax.splitLexically(line, true, true);
 				Syntax.unifyOperators(tokens, false);
-				String transfLine = transform(line);
+				// FIXME Don't descend to string level
+				String transfLine = transform(tokens.getString());
 				// Input and output should work via standard transformation...
-				if (Instruction.isAssignment(line)) {
+				if (Instruction.isAssignment(tokens)) {
 					int posAsgn = tokens.indexOf("<-");
 					// FIXME Somehow we must find out what data type is transferred... -> #800
 					String varName = transform(Instruction.getAssignedVarname(tokens, false));
-					StringList exprTokens = tokens.subSequence(posAsgn+1, tokens.count());
+					TokenList exprTokens = tokens.subSequenceToEnd(posAsgn+1);
 					boolean isVar = isVariable(exprTokens, true, typeMap);
 					if (varNames.contains(varName)) {
 						String target = Instruction.getAssignedVarname(tokens, true);
@@ -849,17 +851,18 @@ public class COBOLGenerator extends Generator {
 						// FIXME This is all awful without syntax trees (#800)
 						if (varType != null && (varType.isArray() || varType.isRecord())) {
 							if (isVar) {
-								transfLine = "MOVE " + transform(exprTokens.concatenate(null)) + " CORRESPONDING TO " + transform(target);
+								// FIXME Don't descend to string level
+								transfLine = "MOVE " + transform(exprTokens.getString()) + " CORRESPONDING TO " + transform(target);
 							}
 							else if (exprTokens.contains("{") && exprTokens.contains("}")) {
 								// Should be an initializer - so we will have to decompose it
 								// The code below was basically copied from CGenerator
 								int posBrace = exprTokens.indexOf("{");
 								// FIXME This code is incomplete and not ready
-								if (posBrace >= 0 && posBrace <= 1 && exprTokens.get(exprTokens.count()-1).equals("}")) {
+								if (posBrace >= 0 && posBrace <= 1 && exprTokens.get(exprTokens.size()-1).equals("}")) {
 									String transfExpr = null;
-									if (posBrace == 1 && exprTokens.count() >= 3 && Syntax.isIdentifier(exprTokens.get(0), false, null)) {
-										String typeName = exprTokens.get(0);							
+									if (posBrace == 1 && exprTokens.size() >= 3 && Syntax.isIdentifier(exprTokens.get(0), false, null)) {
+										String typeName = exprTokens.get(0);
 										TypeMapEntry recType = this.typeMap.get(":"+typeName);
 										if (recType != null && recType.isRecord()) {
 											// transforms the Structorizer record initializer into a C-conform one
@@ -871,7 +874,7 @@ public class COBOLGenerator extends Generator {
 										/* (The alternative would have been to fake an initialized array declaration
 										 * in the data section and to  
 										 */
-										StringList items = Element.splitExpressionList(exprTokens.subSequence(1, exprTokens.count()), ",", true);
+										ArrayList<TokenList> items = Syntax.splitExpressionList(exprTokens.subSequenceToEnd(1), ",");
 										String elemType = null;
 										if (varType.isArray()) {
 											elemType = varType.getCanonicalType(true, false);
@@ -880,10 +883,10 @@ public class COBOLGenerator extends Generator {
 											}
 											// START KGU #784 2019-12-02: varName is only part of the left side, there may be indices, so reduce the type if so
 											int posIdx = tokens.indexOf(varName)+1;
-											StringList indices = tokens.subSequence(posIdx, posAsgn);
+											TokenList indices = tokens.subSequence(posIdx, posAsgn);
 											while (elemType.startsWith("@") && indices.indexOf("[") == 0) {
 												elemType = elemType.substring(1);
-												StringList indexList = Element.splitExpressionList(indices.subSequence(1, indices.count()), ",", true);
+												StringList indexList = Syntax.splitExpressionList(indices.subSequenceToEnd(1).getString(), ",");
 												indexList.remove(0); // Drop first index expression (has already been handled)
 												// Are there perhaps more indices within the same bracket pair (comma-separated list)?
 												while (indexList.count() > 1 && elemType.startsWith("@")) {
@@ -895,12 +898,14 @@ public class COBOLGenerator extends Generator {
 												}
 												else if (indexList.get(0).trim().startsWith("]")) {
 													// This should be the tail
-													indices = Syntax.splitLexically(indexList.get(0).substring(1), true);
+													indices = new TokenList(indexList.get(0).substring(1), true);
 												}
 											}
 											// END KGU #784 2019-12-02
 										}
-										transfExpr = this.transformOrGenerateArrayInit(line, items.subSequence(0, items.count()-1), _indent, isDisabled, elemType);
+										items.remove(items.size()-1);	// Get rid of tail
+										// FIXME Still not implemented!
+										transfExpr = this.transformOrGenerateArrayInit(varName, items, _indent, isDisabled, elemType);
 										if (transfExpr == null) {
 											break;	// FIXME FIXME FIXME
 										}
@@ -918,24 +923,37 @@ public class COBOLGenerator extends Generator {
 	}
 	
 	/**
-	 * @param line
-	 * @param subSequence
-	 * @param _indent
-	 * @param isDisabled
-	 * @param elemType
-	 * @return
+	 * Either composes and returns a syntax-conform array initializer expression
+	 * (if possible and allowed) or directly generates code that decomposes an array
+	 * initializer into a series of element assignments if there is no compact
+	 * translation. In the latter case {@code null} will be returned.
+	 * 	 * 
+	 * @param _lValue - the target variable for the array initialisation
+	 * @param _arrayItems - list of the tokenized item expressions
+	 * @param _indent - the current indentation
+	 * @param _isDisabled - whether the originating element is disabled
+	 * @param _elemType - the element type description
+	 * @return either a transformed array initialisation string or {@code null} if the
+	 *     respective initialisation has immediately been appended to the code.
+	 *     
+	 * @see CGenerator#transformOrGenerateArrayInit(String, ArrayList, String, boolean, String, boolean)
 	 */
-	private String transformOrGenerateArrayInit(String line, StringList subSequence, String _indent, boolean isDisabled,
-			String elemType) {
+	private String transformOrGenerateArrayInit(String _lValue, ArrayList<TokenList> _arrayItems,
+			String _indent, boolean _isDisabled, String _elemType) {
 		// TODO Auto-generated method stub
 		return null;
 	}
 	/**
-	 * @param exprTokens
-	 * @param recType
-	 * @return
+	 * Returns a target-language expression replacing the Structorizer record
+	 * initializer - as far as it can be handled within one line
+	 * 
+	 * @param exprTokens - the tokenized Structorizer record initializer
+	 * @param recType - the TypeMapEntry describing the record type
+	 * @return the equivalent target code as expression string, or {@code null}
+	 * 
+	 * @see CGenerator#transformRecordInit(TokenList, TypeMapEntry)
 	 */
-	private String transformRecordInit(StringList exprTokens, TypeMapEntry recType) {
+	private String transformRecordInit(TokenList exprTokens, TypeMapEntry recType) {
 		// TODO Auto-generated method stub
 		return null;
 	}
@@ -1085,10 +1103,15 @@ public class COBOLGenerator extends Generator {
 	}
 
 	/**
-	 * @param _sq
-	 * @param _bodyName
-	 * @param _indent
-	 * @param _isDisabled
+	 * Generates the code for the algorithm represented by {@link Subqueue} {@code _sq}
+	 * immediately if procedure name {@code _procName} is empty. Otherwise postpones the
+	 * code generation by adding the task to {@link #postponedProcedures}.
+	 * 
+	 * @param _sq - the {@link Subqueue} representing the body of the procedure
+	 * @param _procName - name of the procedure to generate (if so), or an empty string
+	 *     for inline code generation
+	 * @param _indent - current indentation level (for inline code generation)
+	 * @param _isDisabled - whether or not the originating element is disabled
 	 */
 	private void processProcedure(Subqueue _sq, String _procName, String _indent, boolean _isDisabled) {
 		if (_procName.isEmpty()) {
@@ -1098,6 +1121,7 @@ public class COBOLGenerator extends Generator {
 		}
 		else {
 			// In fixed format it may be better to place the body as procedure
+			// FIXME no matter if disabled?
 			postponedProcedures.put(_procName, _sq);
 		}
 	}
@@ -1129,16 +1153,15 @@ public class COBOLGenerator extends Generator {
 		 * whether we are handling the Root or a Call.
 		 */
 		boolean isDisabled = _call.isDisabled(false);
-		StringList lines = _call.getUnbrokenText();
+		ArrayList<TokenList> lines = _call.getUnbrokenTokenText();
 		appendComment(_call, _indent);
 		Root owningRoot = Element.getRoot(_call);
 		
-		//addCode("CALL STILL NOT IMPLEMENTED!", _indent, true);
-		for (int i = 0; i < lines.count(); i++) {
-			String line = lines.get(i);
+		for (int i = 0; i < lines.size(); i++) {
+			TokenList tokens = lines.get(i);
 			Function called = _call.getCalledRoutine(i);
 			if (called == null) {
-				appendComment(line, _indent);
+				appendComment(tokens.getString(), _indent);
 			}
 			else {
 				StringList paramTypes = new StringList();
@@ -1149,10 +1172,9 @@ public class COBOLGenerator extends Generator {
 				 * function without being interested in its result (see method
 				 * top comment).
 				 */
-				boolean isFct = Call.isAssignment(line);
+				boolean isFct = Call.isAssignment(tokens);
 				String target = null;
 				if (isFct) {
-					StringList tokens = Syntax.splitLexically(line, true, true);
 					target = transform(Call.getAssignedVarname(tokens, true));
 				}
 				if (routinePool != null) {

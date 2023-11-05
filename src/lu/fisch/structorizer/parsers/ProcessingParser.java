@@ -65,6 +65,7 @@ import lu.fisch.structorizer.elements.Instruction;
 import lu.fisch.structorizer.elements.Jump;
 import lu.fisch.structorizer.elements.Root;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.StringList;
 
 /**
@@ -295,20 +296,26 @@ public class ProcessingParser extends JavaParser {
 	@Override
 	protected String translateContent(String _content)
 	{
+		final TokenList mathTokens = new TokenList("Math.");
 		String output = getKeyword("output");
 		String[] outputTokens = new String[] {"println", "printArray", "print"};
 		// An input conversion is not feasible.
 		//String input = getKeyword("input");
 		
-		StringList tokens = Syntax.splitLexically(_content, true);
+		TokenList tokens = new TokenList(_content, true);
 		for (int i = 0; i < outputTokens.length; i++) {
 			tokens.replaceAll(outputTokens[i], output);
 		}
 
 		// Rather not necessary, but who knows...
-		tokens.removeAll(StringList.explode("Math,.", ","), true);
+		//tokens.removeAll(StringList.explode("Math,.", ","), true);
+		int ix = -1;
+		while ((ix = tokens.indexOf(mathTokens, ix + 1, false)) >= 0) {
+			tokens.remove(ix, ix + mathTokens.size());
+		}
 
-		return _content.trim();
+		//return _content.trim();
+		return tokens.getString().trim();
 	}
 	
 

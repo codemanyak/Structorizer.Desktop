@@ -20,6 +20,8 @@
 
 package lu.fisch.structorizer.elements;
 
+import java.util.ArrayList;
+
 /*
  ******************************************************************************************************
  *
@@ -148,7 +150,7 @@ public class Parallel extends Element
     // START KGU#227 2016-07-31: Enh. #128 new helper method
     private String getGenericText()
     {
-        return getClass().getSimpleName() + "(" + this.text.get(0) + ")";
+        return getClass().getSimpleName() + "(" + this.text.get(0).getString() + ")";
     }
     // END KGU#227 2016-07-31
 
@@ -192,7 +194,7 @@ public class Parallel extends Element
     	//text = _textList;
     	super.setText(_textList);
 
-    	if(qs == null)
+    	if (qs == null)
     	{
     		qs = new Vector<Subqueue>();
     	}
@@ -201,16 +203,17 @@ public class Parallel extends Element
     	if (!text.isEmpty())
     	{
     		int count = 10;
+    		String content = text.get(0).getString().trim(); 
     		try
     		{
     			// retrieve the number of parallel tasks
-    			count = Integer.valueOf(text.get(0).trim());
+    			count = Integer.valueOf(content);
     		}
     		catch (java.lang.NumberFormatException e)
     		{
     			count = 10;
     			JOptionPane.showMessageDialog(null,
-    					"Unknown number <" + text.get(0).trim() +
+    					"Unknown number <" + content +
     					">.\nSetting number of tasks to " + count + "!",
     					"Error", JOptionPane.ERROR_MESSAGE);
     			//text = StringList.getNew(Integer.toString(count));
@@ -219,14 +222,14 @@ public class Parallel extends Element
     		}
 
     		// add subqueues
-    		while(count>qs.size())
+    		while (count > qs.size())
     		{
-    			s=new Subqueue();
-    			s.parent=this;
+    			s = new Subqueue();
+    			s.parent = this;
     			qs.add(s);
     		}
     		// remove subqueues
-    		while(count<qs.size())
+    		while (count < qs.size())
     		{
     			qs.removeElementAt(qs.size()-1);
     		}
@@ -692,23 +695,23 @@ public class Parallel extends Element
 	 * @see lu.fisch.structorizer.elements.Element#addFullText(lu.fisch.utils.StringList, boolean)
 	 */
 	@Override
-    protected void addFullText(StringList _lines, boolean _instructionsOnly)
-    {
+	protected void addFullText(ArrayList<TokenList> _lines, boolean _instructionsOnly)
+	{
 		// Under no circumstances, the text may contain an instruction or even variable declaration (it's just the number of threads) 
 //		if (!_instructionsOnly)
 //		{
 //			_lines.add(this.getText());
 //		}
-    	if (qs!= null && !this.isDisabled(false))
-    	{
-    		for (int i = 0; i < qs.size(); i++)
-    		{
-    			qs.get(i).addFullText(_lines, _instructionsOnly);
-    		}
-    	}		
-    }
-    // END KGU 2015-10-16
-    
+		if (qs!= null && !this.isDisabled(false))
+		{
+			for (int i = 0; i < qs.size(); i++)
+			{
+				qs.get(i).addFullText(_lines, _instructionsOnly);
+			}
+		}		
+	}
+	// END KGU 2015-10-16
+
 	// START KGU#199 2016-07-07: Enh. #188 - ensure Call elements for known subroutines
 	/* (non-Javadoc)
 	 * @see lu.fisch.structorizer.elements.Element#convertToCalls(lu.fisch.utils.StringList)

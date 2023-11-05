@@ -63,12 +63,14 @@ package lu.fisch.structorizer.elements;
 import java.awt.Color;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.util.ArrayList;
 
 import javax.swing.ImageIcon;
 
 import lu.fisch.graphics.*;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.*;
 
 /**
@@ -384,24 +386,28 @@ public class Repeat extends Element implements ILoop {
 	
 	// START KGU 2015-10-16
 	/* (non-Javadoc)
-	 * @see lu.fisch.structorizer.elements.Element#addFullText(lu.fisch.utils.StringList, boolean)
+	 * @see lu.fisch.structorizer.elements.Element#addFullText(ArrayList<List>, boolean)
 	 */
 	@Override
-    protected void addFullText(StringList _lines, boolean _instructionsOnly)
-    {
+	protected void addFullText(ArrayList<TokenList> _lines, boolean _instructionsOnly)
+	{
 		if (!this.isDisabled(false)) {
 			// The own text contains just a condition (i.e. a logical expression), not an instruction
 			if (!_instructionsOnly)
 			{
 				// START KGU#413 2017-06-09: Enh. #416: Cope with user-inserted line breaks
 				//_lines.add(this.getText());
-				_lines.add(this.getUnbrokenText().getLongString());
+				ArrayList<TokenList> unbroken = this.getUnbrokenTokenText();
+				if (!unbroken.isEmpty()) {
+					// Add text of the condition as a single line
+					_lines.add(TokenList.concatenate(unbroken, null));
+				}
 				// END KGU#413 2017-06-09
 			}
 			this.q.addFullText(_lines, _instructionsOnly);
 		}
-    }
-    // END KGU 2015-10-16
+	}
+	// END KGU 2015-10-16
 	
 	// START KGU 2015-11-30
 	@Override

@@ -111,7 +111,6 @@ public class TokenList implements Comparable<TokenList>{
 	 * The total text length of the string represented by this token list
 	 */
 	private int len = 0;
-	
 
 	/**
 	 * Creates an empty token list
@@ -604,6 +603,42 @@ public class TokenList implements Comparable<TokenList>{
 	}
 	
 	/**
+	 * Concatenates the token lists held in collection {@code tokenLists} into a single token
+	 * list according to the order of the token lists in {@code tokenLists} , possibly inserting
+	 * the tokens and whitespace emerging from {@code separator} between them unless
+	 * {@code separator} is {@code null}.
+	 * 
+	 * @param tokenLists - a collection of {@link TokenList}s
+	 * @param separator - if it contains only whitespace then this amount of blanks will be
+	 *    garanteed between the original token lists, otherwise (and if not {@code null}) the
+	 *    token sequence derived from {@code separator} will be inserted between the token lists
+	 *    contained in {@code tokenLists}. If {@code tokenLists} is empty then {@code separator}
+	 *    will not be used.
+	 * 
+	 * @return the composed concatenation from {@code tokenLists} and {@code separator}
+	 */
+	public static TokenList concatenate(Collection<? extends TokenList> tokenLists, String separator)
+	{
+		TokenList total = new TokenList();
+		int i = 0;
+		for (TokenList tokens: tokenLists) {
+			if (i > 0 && separator != null) {
+				if (separator.isBlank()) {
+					if (!separator.isEmpty() && !total.isBlank()) {
+						total.setPadding(total.size()-1, -1, separator.length());
+					}
+				}
+				else {
+					total.add(separator);
+				}
+			}
+			total.addAll(tokens);
+			i++;
+		}
+		return total;
+	}
+	
+	/**
 	 * Restores the text line represented by this token list as string
 	 * including the padding whitespace between the tokens.
 	 * 
@@ -618,6 +653,30 @@ public class TokenList implements Comparable<TokenList>{
 		}
 		sb.append(" ".repeat(paddings.get(tokens.size())));
 		return sb.toString();
+	}
+	
+	/**
+	 * Returns the tokens as {@link StringList} either without gaps or with
+	 * whitespace elements according to the paddings between the tokens.
+	 * 
+	 * @param withGaps - if {@code false} then teh result will only contain
+	 *    the (non-blank) tokens, otherwise ({@code true}) the paddings will
+	 *    be inserted as space strings between them.
+	 * @return the composed {@link StringList}
+	 */
+	public StringList getTokens(boolean withGaps)
+	{
+		StringList tokStrings = new StringList();
+		for (int i = 0; i < tokens.size(); i++) {
+			if (withGaps) {
+				tokStrings.add(" ".repeat(paddings.get(i)));
+			}
+			tokStrings.add(tokens.get(i));
+		}
+		if (withGaps) {
+			tokStrings.add(" ".repeat(paddings.get(tokens.size())));
+		}
+		return tokStrings;
 	}
 	
 	/**
@@ -657,6 +716,36 @@ public class TokenList implements Comparable<TokenList>{
 	 */
 	public String get(int index) {
 		return tokens.get(index);
+	}
+	
+	/**
+	 * @return the very first token of this token list (if it has got one).
+	 * 
+	 * @throws IndexOutOfBoundsException if this token list does not contain
+	 *     any token (i.e. {@code isBlank() == true})
+	 * 
+	 * @see #get(int)
+	 * @see #getLast()
+	 * @see #getPadding(int)
+	 */
+	public String getFirst()
+	{
+		return tokens.get(0);
+	}
+
+	/**
+	 * @return the very last token of this token list (if it has got one).
+	 * 
+	 * @throws IndexOutOfBoundsException if this token list does not contain
+	 *     any token (i.e. {@code isBlank() == true})
+	 * 
+	 * @see #get(int)
+	 * @see #getFirst()
+	 * @see #getPadding(int)
+	 */
+	public String getLast()
+	{
+		return tokens.get(tokens.size() - 1);
 	}
 
 	/**
@@ -845,22 +934,45 @@ public class TokenList implements Comparable<TokenList>{
 	 * @return a copy of the specified range within this list
 
 	 * @throws IndexOutOfBoundsException for an illegal endpoint index value
-	 *    (fromIndex < 0 || toIndex > size ||fromIndex > toIndex)
+	 *    ({@code fromIndex < 0 || toIndex > size || fromIndex > toIndex})
 	 * @throws IllegalArgumentException if the endpoint indices are out of
-	 *    order (fromIndex > toIndex).
+	 *    order ({@code fromIndex > toIndex}).
 	 * 
+	 * @see #subSequenceToEnd(int)
 	 * @see #remove(int, int)
 	 */
 	public TokenList subSequence(int fromIndex, int toIndex)
 	{
 		TokenList part = new TokenList();
 		part.tokens.addAll(tokens.subList(fromIndex, toIndex));
-		part.paddings.addAll(1, paddings.subList(fromIndex+1, toIndex));
-		part.paddings.add(0);
+		if (fromIndex < toIndex) {
+			part.paddings.addAll(1, paddings.subList(fromIndex+1, toIndex));
+			part.paddings.add(0);
+		}
 		for (int i = 0; i < part.tokens.size(); i++) {
 			part.len += part.tokens.get(i).length() + part.paddings.get(i);
 		}
 		return part;
+	}
+
+	/**
+	 * Returns a copy of the portion of this token list from the specified
+	 * {@code fromIndex}, inclusive, towards the end. If {@code fromIndex}
+	 * equals the number of tokens ({@code fromIndex = size()} then the returned
+	 * token list will not contain any token.
+	 *
+	 * @param fromIndex - low endpoint (inclusive) of the subList
+	 * @return a copy of the specified range within this list
+
+	 * @throws IndexOutOfBoundsException for an illegal start index value
+	 *    ({@code fromIndex < 0 || fromIndex > size()})
+	 * 
+	 * @see #subSequence(int, int)
+	 * @see #remove(int, int)
+	 */
+	public TokenList subSequenceToEnd(int fromIndex)
+	{
+		return subSequence(fromIndex, tokens.size());
 	}
 
 	/**
@@ -962,6 +1074,45 @@ public class TokenList implements Comparable<TokenList>{
 		return indexOf(subList, 0, matchCase) >= 0;
 	}
 
+	/**
+	 * Counts the exact occurrences of the given string {@code token} among
+	 * the tokens of this list
+	 *
+	 * @param token - the string to search for
+	 * @return the number of occurrences
+	 *
+	 * @see #count(String, boolean)
+	 */
+	public int count(String token) {
+		return count(token, true);
+	}
+
+	/**
+	 * Counts the (exact or case-ignorant) occurrences of the given string
+	 * {@code token} among the tokens of this list
+	 *
+	 * @param token - the string to search for
+	 * @param matchCase - whether upper/lower case should make a difference
+	 * @return the number of occurrences
+	 */
+	public int count(String token, boolean matchCase) {
+		int cnt = 0;
+		if (matchCase) {
+			for (int i = 0; i < tokens.size(); i++) {
+				if (tokens.get(i).equals(token)) {
+					cnt++;
+				}
+			}
+		} else {
+			for (int i = 0; i < tokens.size(); i++) {
+				if (tokens.get(i).equalsIgnoreCase(token)) {
+					cnt++;
+				}
+			}
+		}
+		return cnt;
+	}
+	
 	/**
 	 * Returns an array containing all the tokens of this list in proper
 	 * sequence (from first to last element).<br/>
@@ -1282,30 +1433,41 @@ public class TokenList implements Comparable<TokenList>{
 	 * @return {@code true} if at least one token could be added.
 	 */
 	public boolean addAll(int index, TokenList other) {
-		boolean done = false;
 		synchronized (this) {
 			int pad0 = other.paddings.get(0);
 			int padI = paddings.get(index);
+			// We split the padding at the insertion position into halves
 			int pad1 = padI/2 + pad0;
 			int pad2 = padI/2 + padI%2;
+			// Don't eliminate a previous pre-token padding
 			if (pad1 > 0) {
 				len += pad1 - paddings.set(index, pad1);
 			}
+			else {
+				pad1 = padI;
+			}
+			/*
+			 * As an invariant for this loop: The padding before the next token
+			 * to be inserted (i) will already have been handled andwill have
+			 * length pad1, the post-token padding is to be prepared within the
+			 * loop (for the next cycle) and will have to be cached in pad1 again.
+			 */
 			for (int i = 0; i < other.size(); i++) {
 				String otherToken = other.tokens.get(i);
 				tokens.add(index + i, otherToken);
-				pad0 = other.paddings.get(i+1);
-				paddings.add(index + i+1, pad0);
-				len += pad0 + otherToken.length();
+				// post-token padding
+				pad1 = other.paddings.get(i+1);
+				paddings.add(index + i+1, pad1);
+				len += pad1 + otherToken.length();
 			}
-			// The other half of the split padding at index
+			// The other half of the split padding at index; don't eliminate a former padding
 			if (pad2 > 0) {
-				len += pad2 - paddings.set(index + other.size(), pad2);
+				len += pad1 + pad2 - paddings.set(index + other.size(), pad1 + pad2);
 			}
 			ensureGap(index-1);
 			ensureGap(index-1 + other.size());
 		}
-		return done;
+		return !other.isEmpty();
 	}
 
 	/**
@@ -1388,6 +1550,31 @@ public class TokenList implements Comparable<TokenList>{
 	}
 
 	/**
+	 * Replaces all occurrences of string {@code toFind} as token by String
+	 * {@code subst} and returns the number of replacements.
+	 * 
+	 * @param toFind - an assumed token to be replaced by {@code subst}
+	 * @param subst - a string to replace in tokenized form all occurrences
+	 *     of {@code toFind}
+	 * @param matchCase - if {@code true} then case will make a difference
+	 *    in the comparison, otherwise it won't.
+	 * @param fromIndex - index of first element to be affected
+	 * @param toIndex - index beyond the last element to be affected
+	 * @return the number of substitutions
+	 */
+	public int replaceAllBetween(String toFind, String subst, boolean matchCase,
+			int fromIndex, int toIndex) {
+		int found = toIndex;
+		int replaced = 0;
+		while ((found = lastIndexOf(toFind, found-1, matchCase)) >= fromIndex) {
+			this.remove(found);
+			this.add(found, subst);
+			replaced++;
+		}
+		return replaced;
+	}
+
+	/**
 	 * Replaces all occurrences of sub-Tokenlist {@code toFind} by {@link
 	 * TokenList} {@code subst} and returns the number of replacements.
 	 * 
@@ -1413,7 +1600,25 @@ public class TokenList implements Comparable<TokenList>{
 		return replaced;
 	}
 
-//	/**
+	// START AS 2021-03-25: Enh. #967 (for ARMGenerator)
+	/**
+	 * Replaces substring {@code stringOld} by {@code stringNew} in all tokens.
+	 *
+	 * @param stringOld - the searched substring
+	 * @param stringNew - the string to replace occurrences of {@code _stringOld}
+	 * 
+	 * @see #replaceAll(String, String)
+	 * @see #replaceAll(String, String, boolean)
+	 */
+	public void replaceInTokens(String stringOld, String stringNew) {
+		for (int i = 0; i < tokens.size(); i++) {
+			String c = tokens.get(i).replace(stringOld, stringNew);
+			tokens.set(i, c);
+		}
+	}
+	// END AS 2021-03-25
+
+	//	/**
 //	 * Removes from this list all of its elements that are contained in the
 //	 * specified collection.
 //	 * 
@@ -1783,12 +1988,12 @@ public class TokenList implements Comparable<TokenList>{
 	 */
 	public int lastIndexOf(TokenList subList, int backFrom, boolean caseSensitive) {
 		// TODO There is a well-known faster algorithm (for substring search)...
-		backFrom = Math.min(backFrom, tokens.size()-1);
+		backFrom = Math.min(backFrom, tokens.size()-subList.size());
 		if (subList.isBlank()) {
 			return backFrom;
 		}
 		String token0 = subList.get(0);
-		for (int i = backFrom - subList.size(); i >= 0; i--) {
+		for (int i = backFrom; i >= 0; i--) {
 			String token1 = tokens.get(i);
 			if (!caseSensitive && token1.equalsIgnoreCase(token0)
 					|| token1.equals(token0)) {

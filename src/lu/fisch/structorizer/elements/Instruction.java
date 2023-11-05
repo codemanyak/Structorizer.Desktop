@@ -90,6 +90,7 @@ import java.awt.Color;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.geom.AffineTransform;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Vector;
@@ -104,6 +105,7 @@ import lu.fisch.structorizer.gui.IconLoader;
 import lu.fisch.structorizer.gui.SelectedSequence;
 import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.structorizer.syntax.TypeRegistry;
 //import lu.fisch.structorizer.gui.IconLoader;
 import lu.fisch.utils.*;
@@ -147,6 +149,11 @@ public class Instruction extends Element {
 		//setText(_strings);
 	}
 	
+	public Instruction(ArrayList<TokenList> _tokenizedLines)
+	{
+		super(_tokenizedLines);
+	}
+
 	// START KGU#199 2016-07-07: Enh. #188 - also serves subclasses for "up-casting"
 	public Instruction(Instruction instr)
 	{
@@ -500,7 +507,7 @@ public class Instruction extends Element {
 
 	public Element copy()
 	{
-		Element ele = new Instruction(new StringList(this.getText()));
+		Element ele = new Instruction(text);
 		// START KGU#199 2016-07-06: Enh. #188 specific conversions enabled
 		return copyDetails(ele, false, false);
 	}
@@ -524,17 +531,17 @@ public class Instruction extends Element {
 
 	// START KGU 2015-10-16
 	/* (non-Javadoc)
-	 * @see lu.fisch.structorizer.elements.Element#addFullText(lu.fisch.utils.StringList, boolean)
+	 * @see lu.fisch.structorizer.elements.Element#addFullText(ArrayList<TokenList>, boolean)
 	 */
 	@Override
-	protected void addFullText(StringList _lines, boolean _instructionsOnly)
+	protected void addFullText(ArrayList<TokenList> _lines, boolean _instructionsOnly)
 	{
 		if (!this.isDisabled(false)) {
-			StringList myLines = this.getUnbrokenText();
-			for (int i = 0; i < myLines.count(); i++) {
-				String line = myLines.get(i);
+			ArrayList<TokenList> myLines = this.getUnbrokenTokenText();
+			for (int i = 0; i < myLines.size(); i++) {
+				TokenList line = myLines.get(i);
 				// if (!isTypeDefinition(line, null)) {
-				if (!isTypeDefinition(line)) {
+				if (!isTypeDefinition(line, null)) {
 					// START KGU#1090 2023-10-15: Bugfix #1096
 					// In case of a C-type declaration remove the type specification
 					line = removeCDeclType(line);
@@ -549,7 +556,7 @@ public class Instruction extends Element {
 						// FIXME If this interferes then we might generate singular constant definition lines
 						//this.constants.putAll(constVals);
 						for (Entry<String, String> enumItem: constVals.entrySet()) {
-							_lines.add("const " + enumItem.getKey() + " <- " + enumItem.getValue());
+							_lines.add(new TokenList("const " + enumItem.getKey() + " <- " + enumItem.getValue()));
 						}
 					}
 				}
@@ -569,29 +576,28 @@ public class Instruction extends Element {
 	 * @param line - the instruction line
 	 * @return a mutilated line (in the example: "{@code var_name <- array_initialiser}")
 	 */
-	public static String removeCDeclType(String line) {
-		if (isDeclaration(line)
-				&& !line.toLowerCase().startsWith("var ")
-				&& !line.toLowerCase().startsWith("dim ")) {
+	public static TokenList removeCDeclType(TokenList tokens) {
+		if (isDeclaration(tokens)
+				&& !tokens.get(0).equalsIgnoreCase("var")
+				&& !tokens.get(0).equalsIgnoreCase("dim")) {
 			// Must be C-type declaration, so drop all confusing type prefix
-			StringList tokens = Syntax.splitLexically(line, true);
-			tokens.removeBlanks();
 			String varName = getAssignedVarname(tokens, false);
 			int posVar = tokens.indexOf(varName);
 			// FIXME: What to do in case of varName = null?
 			if (posVar > 0) {
 				int posAsgn = tokens.indexOf("<-");
 				if (posAsgn > posVar) {
+					tokens = new TokenList(tokens);
 					tokens.remove(posVar+1, posAsgn);
 				}
-				line = tokens.concatenate(null, posVar).trim();
+				tokens = tokens.subSequenceToEnd(posVar);
 			}
 			else if (varName == null) {
 				// Ambiguous initialisation? Wipe all off.
-				line = "";
+				tokens = new TokenList();
 			}
 		}
-		return line;
+		return tokens;
 	}
 	// END KGU#1090 2023-10-15
 
@@ -622,95 +628,186 @@ public class Instruction extends Element {
 	// START KGU#199 2016-07-06: Enh. #188 - new classification methods.
 	// There is always a pair of a static and an instance method, the former for
 	// a single line, the latter for the element as a whole.
-	/** @return true iff the given line contains an assignment symbol */
+	/**
+	 * @return true iff the given line contains an assignment symbol
+	 * 
+	 * @deprecated prefer {@link #isAssignment(TokenList)}
+	 */
 	public static boolean isAssignment(String line)
 	{
-		StringList tokens = Syntax.splitLexically(line, true);
+		return isAssignment(new TokenList(line, true));
+	}
+	
+	/** @return true iff the given tokenized line {@code tokens} contains an assignment symbol */
+	public static boolean isAssignment(TokenList tokens)
+	{
 		Syntax.unifyOperators(tokens, true);
 		// START KGU#689 2019-03-21: Issue #706 we should better cope with named parameter assignment
 		//return tokens.contains("<-");
 		boolean isAsgnmt = tokens.contains("<-");
 		if (isAsgnmt) {
 			// First eliminate all index expressions, function arguments etc.
-			tokens = coagulateSubexpressions(tokens);
+			tokens = Syntax.coagulateSubexpressions(tokens);
 			// Now try again
 			isAsgnmt = tokens.contains("<-");
 		}
 		return isAsgnmt;
 		// END KGU#689 2019-03-21
 	}
-	
-	/** @return true if this element consists of exactly one instruction line and the line complies to {@link #isAssignment(String)} */
+
+	/** @return true if this element consists of exactly one instruction line and the line
+	 *    complies to {@link #isAssignment(String)}
+	 * 
+	 * @see #isDeclaration()
+	 * @see #isInput()
+	 * @see #isOutput()
+	 * @see #isProcedureCall(boolean)
+	 * @see #isFunctionCall(boolean)
+	 * @see #isJump()
+	 * @see #isTypeDefinition()
+	 * @see #isAssignment(TokenList)
+	 */
 	public boolean isAssignment()
 	{
 		// START KGU#413 2017-06-09: Enh. #416 cope with user-defined line breaks
 		//return this.text.count() == 1 && Instruction.isAssignment(this.text.get(0));
-		StringList lines = this.getUnbrokenText();
-		return lines.count() == 1 && Instruction.isAssignment(lines.get(0));
+		ArrayList<TokenList> lines = this.getUnbrokenTokenText();
+		return lines.size() == 1 && Instruction.isAssignment(lines.get(0));
 		// END KGU#413 2017-06-09
 	}
 	
-	/** @return true iff the given {@code line} starts with one of the configured EXIT keywords */
+	/**
+	 * @return true iff the given {@code line} starts with one of the configured EXIT keywords
+	 * 
+	 * @deprecated prefer {@link #isJump(TokenList)}
+	 */
 	public static boolean isJump(String line)
 	{
-		StringList tokens = Syntax.splitLexically(line, true);
-		// FIXME: These tests might be too simple if the keywords don't comply with identifier syntax
-		return (tokens.indexOf(Syntax.getKeyword("preReturn"), !Syntax.ignoreCase) == 0 ||
-				tokens.indexOf(Syntax.getKeyword("preLeave"), !Syntax.ignoreCase) == 0 ||
+		return isJump(new TokenList(line, false));
+	}
+	/**
+	 * @return true iff the given tokenized line {@code tokens} starts with one of the
+	 *    configured EXIT keywords
+	 */
+	public static boolean isJump(TokenList tokens)
+	{
+		// FIXME: These splitting of tokens might be incompatible with that of the keywords
+		return (tokens.indexOf(Syntax.getSplitKeyword("preReturn"), !Syntax.ignoreCase) == 0 ||
+				tokens.indexOf(Syntax.getSplitKeyword("preLeave"), !Syntax.ignoreCase) == 0 ||
 				// START KGU#686 2019-03-18: Enh. #56 new flavour, for try/catch
-				tokens.indexOf(Syntax.getKeyword("preThrow"), !Syntax.ignoreCase) == 0 ||
+				tokens.indexOf(Syntax.getSplitKeyword("preThrow"), !Syntax.ignoreCase) == 0 ||
 				// END KGU#686 2019-03-18
-				tokens.indexOf(Syntax.getKeyword("preExit"), !Syntax.ignoreCase) == 0
+				tokens.indexOf(Syntax.getSplitKeyword("preExit"), !Syntax.ignoreCase) == 0
 				);
 	}
-	/** @return true if this element is empty or consists of exactly one line and the line complies to {@link #isJump(String)} */
+	/**
+	 * @return true if this element is empty or consists of exactly one line and the line
+	 *     complies to {@link #isJump(String)}
+	 * 
+	 * @see #isAssignment()
+	 * @see #isDeclaration()
+	 * @see #isInput()
+	 * @see #isOutput()
+	 * @see #isProcedureCall(boolean)
+	 * @see #isFunctionCall(boolean)
+	 * @see #isTypeDefinition()
+	 * @see #isJump(TokenList)
+	 */
 	public boolean isJump()
 	{
 		// START KGU#413 2017-06-09: Enh. #416 cope with user-defined line breaks
 		//return this.text.count() == 0 || this.text.count() == 1 && Instruction.isJump(this.text.get(0));
-		StringList lines = this.getUnbrokenText();
-		return lines.isEmpty() || lines.count() == 1 && Instruction.isJump(lines.get(0));
+		ArrayList<TokenList> lines = this.getUnbrokenTokenText();
+		return lines.isEmpty() || lines.size() == 1 && Instruction.isJump(lines.get(0));
 		// END KGU#413 2017-06-09
 	}
 	
 	/**
 	 * Checks whether the given {@code line} consists of a procedure call (or method
 	 * invocation without result assignment).
+	 * 
+	 * @param line - a text line to be checked
 	 * @param withQualifiers - whether a qualified procedure name is also to be accepted.
-	 * @return true iff the given {@code line} has the syntax of a procedure invocation */
+	 * @return {@code true} iff the given {@code line} has the syntax of a procedure
+	 *    invocation
+	 * 
+	 * @see #isFunctionCall(String, boolean)
+	 * 
+	 * @deprecated prefer {@link #isProcedureCall(TokenList, boolean)}
+	 */
 	public static boolean isProcedureCall(String line, boolean withQualifiers)
+	{
+		return isProcedureCall(new TokenList(line), withQualifiers);
+	}
+	/**
+	 * Checks whether the given tokenized line {@code tokens} consists of a procedure call
+	 * (or method invocation without result assignment).
+	 * 
+	 * @param tokens - the tokenized line
+	 * @param withQualifiers - whether a qualified procedure name is also to be accepted.
+	 * @return {@code true} iff the given {@code tokens} have the syntax of a procedure
+	 *     invocation
+	 * 
+	 * @see #isFunctionCall(TokenList, boolean)
+	 */
+	public static boolean isProcedureCall(TokenList tokens, boolean withQualifiers)
 	{
 		// START KGU#298 2016-11-22: Bugfix #296 - unawareness had led to wrong transmutations
 		//Function fct = new Function(line);
 		//return fct.isFunction();
 		// START KGU#959 2021-03-05: Bugfix #961 allow method checks
 		//return !isJump(line) && !isOutput(line) && Function.isFunction(line);
-		return !isJump(line) && !isOutput(line) && Function.isFunction(line, withQualifiers);
+		return !isJump(tokens) && !isOutput(tokens) && Function.isFunction(tokens, withQualifiers);
 		// END KGU#959 2021-03-05
 		// END KGU#298 2016-11-22
 	}
 	/**
-	 * Checks whether this element logically consists a single procedure call line.
+	 * Checks whether this element logically consists of a single procedure call line.
+	 * 
 	 * @param withQualifiers - whether qualified names are also to be accepted.
 	 * @return true iff {@code this} has exactly one instruction line and the line complies
-	 *  to {@link #isProcedureCall(String, boolean)} */
+	 *    to {@link #isProcedureCall(String, boolean)}
+	 *  
+	 * @see #isFunctionCall(boolean)
+	 * @see #isAssignment()
+	 * @see #isDeclaration()
+	 * @see #isInput()
+	 * @see #isOutput()
+	 * @see #isJump()
+	 * @see #isTypeDefinition()
+	 * @see #isProcedureCall(TokenList, boolean)
+	 */
 	public boolean isProcedureCall(boolean withQualifiers)
 	{
 		// START KGU#413 2017-06-09: Enh. #416 cope with user-defined line breaks
 		//return this.text.count() == 1 && Instruction.isProcedureCall(this.text.get(0));
-		StringList lines = this.getUnbrokenText();
+		ArrayList<TokenList> lines = this.getUnbrokenTokenText();
 		// START KGU#959 2021-03-05: Bugfix #961 allow method checks
 		//return lines.count() == 1 && Instruction.isProcedureCall(lines.get(0));
-		return lines.count() == 1 && Instruction.isProcedureCall(lines.get(0), withQualifiers);
+		return lines.size() == 1 && Instruction.isProcedureCall(lines.get(0), withQualifiers);
 		// END KGU#959 2021-03-05
 		// END KGU#413 2017-06-09
 	}
 
 	// START #274 2016-10-16 (KGU): Improved support for Code export
-	/** @return true iff the given {@code line} contains a {@code forward}, {@code backward}, {@code fd}, or {@code bk} procedure call */
+	/**
+	 * @return {@code true} iff the given {@code line} contains a {@code forward}, {@code backward},
+	 *    {@code fd}, or {@code bk} procedure call
+	 * 
+	 * @deprecated prefer  #isTurtleizerMove(TokenList)
+	 */
 	public static boolean isTurtleizerMove(String line)
 	{
 		Function fct = new Function(line);
+		return fct.isFunction() && TURTLEIZER_MOVERS.contains(fct.getName(), false) && fct.paramCount() == 1;
+	}
+	/**
+	 * @return {@code true} iff the given tokenized line {@code tokens} contains a {@code forward},
+	 *    {@code backward}, {@code fd}, or {@code bk} procedure call
+	 */
+	public static boolean isTurtleizerMove(TokenList tokens)
+	{
+		Function fct = new Function(tokens);
 		return fct.isFunction() && TURTLEIZER_MOVERS.contains(fct.getName(), false) && fct.paramCount() == 1;
 	}
 	// END #274 2016-10-16
@@ -718,21 +815,43 @@ public class Instruction extends Element {
 	/**
 	 * Checks whether the given {@code line} is an assignment with a function or method
 	 * invocation as expression.
+	 * 
+	 * @param line - an instruction line
 	 * @param withQualifiers - if {@code true} then qualified function names will also be
-	 * accepted (otherwise not)
+	 *    accepted (otherwise not)
 	 * @return {@code true} iff the given {@code line} is an assignment with a function
-	 * invocation as expression */
+	 *    invocation as expression
+	 * 
+	 * @see #isProcedureCall(String, boolean)
+	 * 
+	 * @deprecated prefer {@link #isFunctionCall(TokenList, boolean)}
+	 */
 	public static boolean isFunctionCall(String line, boolean withQualifiers)
 	{
+		return isFunctionCall(new TokenList(line), withQualifiers);
+	}
+	/**
+	 * Checks whether the given tokenized line {@code tokens} is an assignment with a
+	 * function or method invocation as expression.
+	 * 
+	 * @param tokens - a TokenList representing a line
+	 * @param withQualifiers - if {@code true} then qualified function names will also be
+	 *    accepted (otherwise not)
+	 * @return {@code true} iff the given {@code line} is an assignment with a function
+	 *    invocation as expression
+	 * 
+	 * @see #isProcedureCall(TokenList, boolean)
+	 */
+	public static boolean isFunctionCall(TokenList tokens, boolean withQualifiers)
+	{
 		boolean isFunc = false;
-		StringList tokens = Syntax.splitLexically(line, true);
 		Syntax.unifyOperators(tokens, true);
 		int asgnPos = tokens.indexOf("<-");
 		if (asgnPos > 0)
 		{
 			// START KGU#959 2021-03-05: Bugfix #961 allow method checks
 			//isFunc = Function.isFunction(tokens.concatenate("", asgnPos+1));
-			isFunc = Function.isFunction(tokens.concatenate("", asgnPos+1), withQualifiers);
+			isFunc = Function.isFunction(tokens.subSequenceToEnd(asgnPos+1), withQualifiers);
 			// END KGU#959 2021-03-05
 		}
 		return isFunc;
@@ -740,28 +859,66 @@ public class Instruction extends Element {
 	/**
 	 * Checks whether this element contains exactly one line and that assigns the value
 	 * of a function (or method) call to the target variable.
+	 * 
 	 * @param withQualifiers - whether qualified names are also to be accepted.
-	 * @return true iff {@code this} consists of exactly one instruction line and this
-	 * line complies to {@link #isFunctionCall(String, boolean)} */
+	 * @return {@code true} iff {@code this} consists of exactly one instruction line and
+	 *    this line complies to {@link #isFunctionCall(String, boolean)}
+	 * 
+	 * @see #isProcedureCall(boolean)
+	 * @see #isAssignment()
+	 * @see #isDeclaration()
+	 * @see #isInput()
+	 * @see #isOutput()
+	 * @see #isJump()
+	 * @see #isTypeDefinition()
+	 * @see #isFunctionCall(TokenList, boolean)
+	 */
 	public boolean isFunctionCall(boolean withQualifiers)
 	{
-		StringList lines = this.getUnbrokenText();
-		return lines.count() == 1 && Instruction.isFunctionCall(lines.get(0), withQualifiers);
+		ArrayList<TokenList> lines = this.getUnbrokenTokenText();
+		return lines.size() == 1 && Instruction.isFunctionCall(lines.get(0), withQualifiers);
 	}
 	// END KGU#199 2016-07-06
 	
 	// START KGU#236 2016-08-10: Issue #227: New classification for input and output
-	/** @return true iff the given {@code line} represents an output instruction */
+	/**
+	 * @return {@code true} iff the given {@code line} represents an output instruction
+	 * 
+	 * @see #isInput(String)
+	 * 
+	 * @deprecated prefer {@link #isOutput(TokenList)}
+	 */
 	public static boolean isOutput(String line)
 	{
-		StringList tokens = Syntax.splitLexically(line, true);
+		return isOutput(new TokenList(line, true));
+	}
+	/**
+	 * @return {@code true} iff the given tokenized line {@code tokens} represents an
+	 *    output instruction
+	 * 
+	 * @see #isInput(TokenList)
+	 */
+	public static boolean isOutput(TokenList tokens)
+	{
 		return (tokens.indexOf(Syntax.getKeyword("output"), !Syntax.ignoreCase) == 0);
 	}
-	/** @return true if at least one of the instruction lines of {@code this} complies to {@link #isOutput(String)} */
+	/**
+	 * @return true if at least one of the instruction lines of {@code this} complies
+	 * to {@link #isOutput(String)}
+	 * 
+	 * @see #isAssignment()
+	 * @see #isDeclaration()
+	 * @see #isInput()
+	 * @see #isJump()
+	 * @see #isFunctionCall(boolean)
+	 * @see #isProcedureCall(boolean)
+	 * @see #isTypeDefinition()
+	 * @see #isOutput(TokenList)
+	 */
 	public boolean isOutput()
 	{
-		StringList lines = this.getUnbrokenText();
-		for (int i = 0; i < lines.count(); i++)
+		ArrayList<TokenList> lines = this.getUnbrokenTokenText();
+		for (int i = 0; i < lines.size(); i++)
 		{
 			if (isOutput(lines.get(i)))
 			{
@@ -778,21 +935,42 @@ public class Instruction extends Element {
 	 * target variables (the first variable description will be at index 1, the resulting
 	 * StringList of an empty input instruction will have length 1). Otherwise the result
 	 * will be null.
+	 * 
 	 * @param line - the instruction line (assumed to have been trimmed)
-	 * @return a {@link StringList} containing the input items (prompt + variables) or null
+	 * @return a {@link StringList} containing the input items (prompt + variables), or
+	 *    {@code null}
+	 * 
 	 * @see #isInput(String)
 	 * @see #isEmptyInput(String)
+	 * 
+	 * @deprecated prefer {@link #getInputItems(TokenList)}
 	 */
 	public static StringList getInputItems(String line)
 	{
+		return getInputItems(new TokenList(line, true));
+	}
+	/**
+	 * Checks whether the given tokenized instruction line {@code tokens} represents an
+	 * input instruction. If so, decomposes it into the specified input prompt (may be empty)
+	 * and the expressions identifying the target variables (the first variable description
+	 * will be at index 1, the resulting StringList of an empty input instruction will have
+	 * length 1). Otherwise the result will be {@code null}.
+	 * 
+	 * @param tokens - the instruction line as {@link TokenList}
+	 * 
+	 * @return a {@link StringList} containing the input items (prompt + variables) or null
+	 * 
+	 * @see #isInput(TokenList)
+	 * @see #isEmptyInput(TokenList)
+	 */
+	public static StringList getInputItems(TokenList tokens)
+	{
 		StringList inputItems = null;
-		StringList tokens = Syntax.splitLexically(line, true);
-		StringList keyTokens = Syntax.splitLexically(Syntax.getKeyword("input"), false);
+		TokenList keyTokens = Syntax.getSplitKeyword("input");
 		if (tokens.indexOf(keyTokens, 0, !Syntax.ignoreCase) == 0) {
 			// It is an input instruction
 			inputItems = new StringList();
-			tokens.remove(0, keyTokens.count());	// Remove the keyword
-			tokens.removeBlanks();					// remove whitespace
+			tokens = tokens.subSequenceToEnd(1);	// Skip the keyword
 			// Identify the prompt if any
 			if (tokens.isEmpty()) {
 				inputItems.add(""); 
@@ -803,7 +981,7 @@ public class Instruction extends Element {
 						(token0.startsWith("\"") && token0.endsWith("\"") || token0.startsWith("'") && token0.endsWith("'"))) {
 					inputItems.add(token0);
 					tokens.remove(0);
-					if (tokens.count() > 0 && tokens.get(0).equals(",")) {
+					if (!tokens.isBlank() && tokens.get(0).equals(",")) {
 						tokens.remove(0);
 					}
 				}
@@ -813,23 +991,50 @@ public class Instruction extends Element {
 				}
 			}
 			// Now extract the target variables
-			StringList exprs = Element.splitExpressionList(tokens, ",", false);
+			tokens.removePaddings();
+			StringList exprs = Syntax.splitExpressionList(tokens.getString(), ",");
 			exprs.removeAll("");
 			inputItems.add(exprs);
 		}
 		return inputItems;
 	}
 	
-	/** @return true iff the given {@code line} is an input instruction */
+	/**
+	 * @return {@code true} iff the given {@code line} is an input instruction
+	 * 
+	 * @deprecated prefer {@link #isInput(TokenList)}
+	 */
 	public static boolean isInput(String line)
 	{
 		return getInputItems(line) != null;
 	}
-	/** @return true if at least one instruction line of {@code this} complies to {@link #isInput(String)} */
+	/**
+	 * @return {@code true} iff the given tokenized line {@code tokens} represents
+	 *    an input instruction
+	 * 
+	 * @see #isOutput(TokenList)
+	 */
+	public static boolean isInput(TokenList tokens)
+	{
+		return getInputItems(tokens) != null;
+	}
+	/** @return {@code true} if at least one instruction line of {@code this} complies
+	 *    to {@link #isInput(String)}
+	 * 
+	 * @see #isEmptyInput()
+	 * @see #isAssignment()
+	 * @see #isDeclaration()
+	 * @see #isOutput()
+	 * @see #isJump()
+	 * @see #isFunctionCall(boolean)
+	 * @see #isProcedureCall(boolean)
+	 * @see #isTypeDefinition()
+	 * @see #isInput(TokenList)
+	 */
 	public boolean isInput()
 	{
-		StringList lines = this.getUnbrokenText();
-		for (int i = 0; i < lines.count(); i++)
+		ArrayList<TokenList> lines = this.getUnbrokenTokenText();
+		for (int i = 0; i < lines.size(); i++)
 		{
 			if (isInput(lines.get(i)))
 			{
@@ -839,11 +1044,25 @@ public class Instruction extends Element {
 		return false;
 	}
 
-	/** @return true iff the given instruction {@code line} is an input instruction without target variables */
+	/** 
+	 * @return {@code true} iff the given instruction {@code line} is an input
+	 *    instruction without target variables
+	 * 
+	 * @see #isEmptyInput(TokenList)
+	 */
 	public static boolean isEmptyInput(String line)
 	{
-		StringList tokens = getInputItems(line);
-		return tokens != null && tokens.count() <= 1;
+		StringList items = getInputItems(line);
+		return items != null && items.count() <= 1;
+	}
+	/** 
+	 * @return {@code true} iff the given tokenized instruction line {@code tokens}
+	 * represents an input instruction without target variables
+	 */
+	public static boolean isEmptyInput(TokenList tokens)
+	{
+		StringList items = getInputItems(tokens);
+		return items != null && items.count() <= 1;
 	}
 	/** @return true if at least on of the instruction lines of {@code this} complies to {@link #isEmptyInput(String)} */
 	public boolean isEmptyInput()
@@ -866,14 +1085,29 @@ public class Instruction extends Element {
 	 * one of the following types:<br/>
 	 * a) var &lt;id&gt; {, &lt;id&gt;} : &lt;type&gt; [&lt;- &lt;expr&gt;]<br/>
 	 * b) dim &lt;id&gt; {, &lt;id&gt;} as &lt;type&gt; [&lt;- &lt;expr&gt;]<br/>
-	 * c) &lt;type&gt; &lt;id&gt; &lt;- &lt;expr&gt;
+	 * c) &lt;type&gt; &lt;id&gt;{[&lt;expr&gt;]} &lt;- &lt;expr&gt;
 	 * 
 	 * @param line - String comprising one line of code
 	 * @return {@code true} iff line is of one of the forms a), b), c)
+	 * 
+	 * @deprecated prefer {@link #isDeclaration(TokenList)}
 	 */
 	public static boolean isDeclaration(String line)
 	{
-		StringList tokens = Syntax.splitLexically(line, true);
+		return isDeclaration(new TokenList(line, true));
+	}
+	/**
+	 * Returns {@code true} if the given tokenized line of code is a variable
+	 * declaration of one of the following types:<br/>
+	 * a) var &lt;id&gt; {, &lt;id&gt;} : &lt;type&gt; [&lt;- &lt;expr&gt;]<br/>
+	 * b) dim &lt;id&gt; {, &lt;id&gt;} as &lt;type&gt; [&lt;- &lt;expr&gt;]<br/>
+	 * c) &lt;type&gt; &lt;id&gt;{[&lt;expr&gt;]} &lt;- &lt;expr&gt;
+	 * 
+	 * @param tokens - {@link TokenList} representing one line of code
+	 * @return {@code true} iff line is of one of the forms a), b), c)
+	 */
+	public static boolean isDeclaration(TokenList tokens)
+	{
 		Syntax.unifyOperators(tokens, true);
 		// START KGU#1089 2023-10-12: Bugfix #980 Accept uppercase, too
 		//boolean typeA = tokens.indexOf("var") == 0 && tokens.indexOf(":") > 1;
@@ -885,7 +1119,6 @@ public class Instruction extends Element {
 		boolean typeC = false;
 		if (posAsgn > 1) {
 			tokens = tokens.subSequence(0, posAsgn);
-			tokens.removeBlanks();
 //			int posLBrack = tokens.indexOf("[");
 //			// START KGU#1009 2021-11-02: Bugfix #1014: We must handle java array types, too
 //			//if (posLBrack > 0 && posLBrack < tokens.lastIndexOf("]")) {
@@ -940,14 +1173,21 @@ public class Instruction extends Element {
 //					typeC = true;
 //			}
 //			// END KGU#1090 2023-10-15
-			typeC = !Instruction.getDeclaredVariables(tokens).isEmpty();
+			typeC = !getDeclaredVariables(tokens).isEmpty();
 		}
 		return typeA || typeB || typeC;
 	}
 	/**
 	 * @return true if all non-empty lines are declarations
 	 * 
-	 * @see #isDeclaration(String)
+	 * @see #isAssignment()
+	 * @see #isInput()
+	 * @see #isOutput()
+	 * @see #isJump()
+	 * @see #isFunctionCall(boolean)
+	 * @see #isProcedureCall(boolean)
+	 * @see #isTypeDefinition()
+	 * @see #isDeclaration(TokenList)
 	 */
 	public boolean isDeclaration()
 	{
@@ -957,10 +1197,10 @@ public class Instruction extends Element {
 		//	String line = this.text.get(i).trim();
 		//	isDecl = line.isEmpty() || isDeclaration(line);
 		//}
-		StringList lines = this.getUnbrokenText();
-		for (int i = 0; isDecl && i < lines.count(); i++) {
-			String line = lines.get(i);
-			isDecl = line.isEmpty() || isDeclaration(line);
+		ArrayList<TokenList> lines = this.getUnbrokenTokenText();
+		for (int i = 0; isDecl && i < lines.size(); i++) {
+			TokenList line = lines.get(i);
+			isDecl = line.isBlank() || isDeclaration(line);
 		}
 		// END KGU#413 2017-06-09
 		return isDecl;
@@ -979,10 +1219,10 @@ public class Instruction extends Element {
 		//	String line = this.text.get(i).trim();
 		//	hasDecl = !line.isEmpty() && isDeclaration(line);
 		//}
-		StringList lines = this.getUnbrokenText();
-		for (int i = 0; !hasDecl && i < lines.count(); i++) {
-			String line = lines.get(i);
-			hasDecl = !line.isEmpty() && isDeclaration(line);
+		ArrayList<TokenList> lines = this.getUnbrokenTokenText();
+		for (int i = 0; !hasDecl && i < lines.size(); i++) {
+			TokenList line = lines.get(i);
+			hasDecl = !line.isBlank() && isDeclaration(line);
 		}
 		// END KGU#413 2017-06-09
 		return hasDecl;
@@ -1014,26 +1254,26 @@ public class Instruction extends Element {
 	 *     a declaration, <b>must be blank-free!</b>
 	 * @return a list of variable names, possibly empty.
 	 */
-	public static StringList getDeclaredVariables(StringList _tokens)
+	public static StringList getDeclaredVariables(TokenList _tokens)
 	{
 		StringList declVars = new StringList();
+		// Pascal or Basic syntax?
 		if (_tokens.indexOf("var", false) == 0 || _tokens.indexOf("dim", false) == 0) {
 			int posColon = _tokens.indexOf(":", 2);
 			if (posColon > 1 || (posColon = _tokens.indexOf("as", false)) > 1) {
-				declVars = Element.splitExpressionList(_tokens.subSequence(1, posColon), ",", true);
-				int nVars = declVars.count()-1;
-				if (!declVars.get(nVars).isEmpty()) {
+				ArrayList<TokenList> declVarList = Syntax.splitExpressionList(_tokens.subSequence(1, posColon), ",");
+				int nVars = declVarList.size()-1;
+				if (!declVarList.get(nVars).isEmpty()) {
 					// Syntax error
-					declVars.clear();
 					nVars = 0;
 				}
 				else {
-					declVars.remove(nVars);
+					declVarList.remove(nVars);
 				}
-				for (int i = nVars - 1; i >= 0; i--) {
-					if (!Syntax.isIdentifier(declVars.get(i), false, null)) {
-						declVars.remove(i);
-						nVars--;
+				for (int i = 0; i < nVars; i++) {
+					String declVar = declVarList.get(i).getString();
+					if (Syntax.isIdentifier(declVar, false, null)) {
+						declVars.add(declVar);
 					}
 				}
 			}
@@ -1041,12 +1281,12 @@ public class Instruction extends Element {
 		else {
 			int posAsgn = _tokens.indexOf("<-");
 			if (posAsgn < 0 && (posAsgn = _tokens.indexOf(":=")) < 0) {
-				posAsgn = _tokens.count();
+				posAsgn = _tokens.size();
 			}
 			// It takes at least two tokens to form a C/Java-style declaration
 			if (posAsgn > 1) {
-				_tokens = Element.coagulateSubexpressions(_tokens.subSequence(0, posAsgn));
-				int i = _tokens.count()-1;
+				_tokens = Syntax.coagulateSubexpressions(_tokens.subSequence(0, posAsgn));
+				int i = _tokens.size()-1;
 				while (i > 0) {
 					// Possible declared variable, something like an id, possibly
 					// followed by index specifications
@@ -1132,6 +1372,8 @@ public class Instruction extends Element {
 	 * @see #isTypeDefinition(String, Typeregistry)
 	 * @see #isTypeDefinition()
 	 * @see #isEnumTypeDefinition(String)
+	 * 
+	 * @deprecated prefer {@link #isTypeDefinition(TokenList, HashMap)}
 	 */
 	public static boolean isTypeDefinition(String line)
 	{
@@ -1164,11 +1406,36 @@ public class Instruction extends Element {
 	 */
 	public static boolean isTypeDefinition(String line, HashMap<String, TypeMapEntry> typeMap)
 	{
-		StringList tokens = Syntax.splitLexically(line.trim(), true);
-		// START KGU#1090 2023-10-15: Bugfix #1096
-		tokens.removeBlanks();
-		// END KGU#1090 2023-10-15
-		if (tokens.isEmpty() || !tokens.get(0).equalsIgnoreCase("type")) {
+		return isTypeDefinition(new TokenList(line.trim()), typeMap);
+	}
+	
+	/**
+	 * Returns true if the given {@code line} of code is a type definition (with possibly registered type, see argument {@code typeMap})<br/>
+	 * a) type &lt;id&gt; = &lt;record&gt;{ &lt;id&gt; {, &lt;id&gt;} &lt;as&gt; &lt;type&gt; {; &lt;id&gt; {, &lt;id&gt;} &lt;as&gt; &lt;type&gt;} };<br>
+	 * b) type &lt;id&gt; = &lt;record&gt;{ &lt;type&gt; &lt;id&gt; {, &lt;id&gt;}; {; &lt;type&gt; &lt;id&gt; {, &lt;id&gt;}} };<br>
+	 * c) type &lt;id&gt; = enum{ &lt;id&gt [ = &lt;value&gt; ] {, &lt;id&gt [ = &lt;value&gt; ]} };<br/>
+	 * d) type &lt;id&gt; = &lt;typeid&gt;<br/>
+	 * e) type &lt;id&gt; = array [...] of &lt;type&gt;;<br/>
+	 * f) type &lt;id&gt; = &lt;typeid&gt[...].<br/>
+	 * where<br/>
+	 * &lt;record&gt; ::= record | struct<br/>
+	 * &lt;as&gt; ::= ':' | as | AS<br/>
+	 * Type names and descriptions &lt;type&gt; are checked against existing types in {@code typeMap} if given.
+	 * 
+	 * @param tokens - {@link TokenList} representing one line of code
+	 * @param typeMap - if given then the type name must have been registered in typeMap in order to be accepted (otherwise
+	 *    an appropriate syntax is sufficient).
+	 * @return true iff line is of one of the forms a) through e)
+	 * 
+	 * @see #isTypeDefinition(String)
+	 * @see #isTypeDefinition(HashMap, boolean)
+	 * @see #isTypeDefinition()
+	 * 
+	 * @deprecated Check type of parsed Line instead
+	 */
+	public static boolean isTypeDefinition(TokenList tokens, HashMap<String, TypeMapEntry> typeMap)
+	{
+		if (tokens.isBlank() || !tokens.get(0).equalsIgnoreCase("type")) {
 			return false;
 		}
 		Syntax.unifyOperators(tokens, true);
@@ -1176,16 +1443,16 @@ public class Instruction extends Element {
 		// START KGU#1090 2023-10-15: Bugfix #1096
 		//if (posDef < 2 || posDef == tokens.count()-1) {
 		// The second condition checks that a type specification still follows
-		if (posDef != 2 || posDef == tokens.count()-1) {
+		if (posDef != 2 || posDef == tokens.size()-1) {
 		// END KGU#1090 2023-10-15
 			return false;
 		}
 		// START KGU#1090 2023-10-15: Bugfix #1096
 		String typename = tokens.get(1);
 		// END KGU#1090 2023-10-15
-		tokens = tokens.subSequence(posDef+1, tokens.count());
+		tokens = tokens.subSequenceToEnd(posDef+1);
 		// START KGU#1081 2023-09-28: Enh. #1091 Accept array type definitions
-		String typeDescr = tokens.concatenate().trim();
+		String typeDescr = tokens.getString().trim();
 		boolean isArray = typeDescr.matches("\\w+\\s*\\[.*\\].*")
 				|| typeDescr.equalsIgnoreCase("array")
 				|| typeDescr.matches("^" + BString.breakup("array", false) + "((\\s*(\\[.*?\\]\\s*)+)|\\s+)" + BString.breakup("of", false) + "\\W.*");
@@ -1201,12 +1468,12 @@ public class Instruction extends Element {
 				// START KGU#542 2019-11-17: Enh. #739 - also consider enumeration types
 				//((tag.equals("record") || tag.equals("struct")) && tokens.get(1).equals("{") && tokens.get(tokens.count()-1).equals("}")
 				((tag.equalsIgnoreCase("record") || tag.equalsIgnoreCase("struct") || tag.equalsIgnoreCase("enum"))
-						&& tokens.get(1).equals("{") && tokens.get(tokens.count()-1).equals("}")
+						&& tokens.get(1).equals("{") && tokens.get(tokens.size()-1).equals("}")
 				// END KGU#542 2019-11-17
 				// START KGU#1081 2023-09-28 Enh. #1091 also accept array type definitions
 				//|| tokens.count() == 1 && (typeMap != null && typeMap.containsKey(":" + tag) || typeMap == null && Function.testIdentifier(tag, false, null)));
 				|| isArray
-				|| tokens.count() == 1 && (typeMap != null && (typeMap.containsKey(":" + tag) || TypeMapEntry.isStandardType(tag)) || typeMap == null && Syntax.isIdentifier(tag, false, null)));
+				|| tokens.size() == 1 && (typeMap != null && (typeMap.containsKey(":" + tag) || TypeMapEntry.isStandardType(tag)) || typeMap == null && Syntax.isIdentifier(tag, false, null)));
 				// END KGU#1081 2023-09-28
 	}
 	/** @return true if all non-empty lines comply to {@link #isTypeDefinition(String)} */
@@ -1219,26 +1486,27 @@ public class Instruction extends Element {
 	 * Determines if this element contains valid type definitions
 	 * 
 	 * @param typeMap - a type map for verification of types
-	 * @param allLines - if the result should only be true if all lines are type definitions
-	 * @return true if this element contains type definitions
+	 * @param allLines - if the result should only be {@code true} if all lines are type
+	 *     definitions
+	 * @return {@code true} if this element contains type definitions
 	 * 
 	 * @see #isTypeDefinition(String, HashMap)
 	 */
 	public boolean isTypeDefinition(HashMap<String, TypeMapEntry> typeMap, boolean allLines)
 	{
 		boolean isTypeDef = false;
-		StringList lines = this.getUnbrokenText();
+		ArrayList<TokenList> lines = this.getUnbrokenTokenText();
 		if (allLines) {
 			isTypeDef = true;
-			for (int i = 0; isTypeDef && i < lines.count(); i++) {
-				String line = lines.get(i).trim();
-				isTypeDef = line.isEmpty() || isTypeDefinition(line, typeMap);
+			for (int i = 0; isTypeDef && i < lines.size(); i++) {
+				TokenList line = lines.get(i);
+				isTypeDef = line.isBlank() || isTypeDefinition(line, typeMap);
 			}
 		}
 		else {
-			for (int i = 0; !isTypeDef && i < lines.count(); i++) {
-				String line = lines.get(i);
-				isTypeDef = !line.isEmpty() && isTypeDefinition(line, typeMap);
+			for (int i = 0; !isTypeDef && i < lines.size(); i++) {
+				TokenList line = lines.get(i);
+				isTypeDef = !line.isBlank() && isTypeDefinition(line, typeMap);
 			}
 		}
 		return isTypeDef;
@@ -1267,6 +1535,23 @@ public class Instruction extends Element {
 		}
 		return isEnum;
 	}
+	/**
+	 * Returns true if the given {@code line} of code is a type definition of the following form:<br>
+	 * type &lt;id&gt; = enum{ &lt;id&gt [ = &lt;value&gt; ] {, &lt;id&gt [ = &lt;value&gt; ]} }.<br/>
+	 * @param line - String comprising one line of code
+	 * @return true iff line is of one of the forms a) through e)
+	 * @see #isTypeDefinition(String, HashMap)
+	 * @see #isTypeDefinition()
+	 */
+	public static boolean isEnumTypeDefinition(TokenList tokens)
+	{
+		boolean isEnum = isTypeDefinition(tokens, null);
+		if (isEnum) {
+			int posEq = tokens.indexOf("=");
+			isEnum = posEq > 0 && TypeMapEntry.MATCHER_ENUM.reset(tokens.subSequenceToEnd(posEq+1).getString().trim()).matches();
+		}
+		return isEnum;
+	}
 	// END KGU#542 2019-11-17
 	
 	// START KGU#47 2017-12-06: Enh. #487 - compound check for hidable content
@@ -1278,27 +1563,48 @@ public class Instruction extends Element {
 	public boolean isMereDeclaratory()
 	{
 		boolean isHideable = true;
-		StringList lines = this.getUnbrokenText();
-		for (int i = 0; isHideable && i < lines.count(); i++) {
-			String line = lines.get(i);
-			isHideable = line.isEmpty() || isMereDeclaration(line);
+		ArrayList<TokenList> lines = this.getUnbrokenTokenText();
+		for (int i = 0; isHideable && i < lines.size(); i++) {
+			TokenList tokens = lines.get(i);
+			isHideable = tokens.isBlank() || isMereDeclaration(tokens);
 		}
 		return isHideable;
 	}
 	// END KGU#477 2017-12-06
 	// START KGU#772 2019-11-24: We want to be able to suppress expression of code for mere declarations
 	/**
-	 * Checks whether the given {@code _line} of code is either a type definition or
+	 * Checks whether the given {@code line} of code is either a type definition or
 	 * a variable declaration without initialization.
+	 * 
 	 * @param line - instruction line
-	 * @return true if the line is a mere declaration
+	 * @return {@code true} if the line is a mere declaration
+	 * 
+	 * @see #isMereDeclaration(TokenList)
 	 * @see #isTypeDefinition(String)
 	 * @see #isDeclaration(String)
 	 * @see #isAssignment(String)
+	 * 
+	 * @deprecated prefer {@link #isMereDeclaration(TokenList)}
 	 */
 	public static boolean isMereDeclaration(String line)
 	{
 		return isTypeDefinition(line) || (isDeclaration(line) && !isAssignment(line));
+	}
+	/**
+	 * Checks whether the given tokenized line {@code tokens} of code is either a type
+	 * definition or a variable declaration without initialization.
+	 * 
+	 * @param tokens - tokenized instruction line
+	 * @return {@code true} if the line is a mere declaration
+	 * 
+	 * @see #isMereDeclaration(String)
+	 * @see #isTypeDefinition(TokenList)
+	 * @see #isDeclaration(TokenList)
+	 * @see #isAssignment(TokenList)
+	 */
+	public static boolean isMereDeclaration(TokenList tokens)
+	{
+		return isTypeDefinition(tokens, null) || (isDeclaration(tokens) && !isAssignment(tokens));
 	}
 	// END KGU#772 2019-11-24
 
@@ -1315,7 +1621,7 @@ public class Instruction extends Element {
 	 * @see #isProcedureCall(boolean)
 	 */
 	public Function getCalledRoutine() {
-		if (this.getUnbrokenText().count() == 1) {
+		if (this.getUnbrokenTokenText().size() == 1) {
 			return getCalledRoutine(0);
 		}
 		return null;
@@ -1327,19 +1633,18 @@ public class Instruction extends Element {
 		Function called = null;
 		// START KGU#413 2017-06-09: Enh. #416 cope with user-defined line breaks
 		//StringList lines = this.text;
-		StringList lines = this.getUnbrokenText();
+		ArrayList<TokenList> lines = this.getUnbrokenTokenText();
 		// END KGU#413 2017-06-09
-		if (lines.count() > 0 && lineNo < lines.count())
+		if (lines.size() > 0 && lineNo < lines.size())
 		{
-			String potentialCall = lines.get(lineNo);
-			StringList tokens = Syntax.splitLexically(potentialCall, true);
+			TokenList tokens = lines.get(lineNo);
 			Syntax.unifyOperators(tokens, true);
 			int asgnPos = tokens.indexOf("<-");
 			if (asgnPos > 0)
 			{
-				potentialCall = tokens.concatenate("", tokens.indexOf("<-")+1);		
+				tokens.remove(0, asgnPos+1);		
 			}
-			called = new Function(potentialCall);
+			called = new Function(tokens);
 			if (!called.isFunction())
 			{
 				called = null;
@@ -1353,8 +1658,11 @@ public class Instruction extends Element {
 	/**
 	 * Checks if this element contains a function or procedure call matching one of the given
 	 * subroutine signatures.
-	 * @param _signatures - a {@link StringList} of symbolic subroutine signatures {@code "<name>#<argcount>"}
-	 * @return true if this contains a call matching one of the signatures given.
+	 * 
+	 * @param _signatures - a {@link StringList} of symbolic subroutine signatures
+	 *    {@code "<name>#<argcount>"}
+	 * @return {@code true} if this contains a call matching one of the signatures given.
+	 * 
 	 * @see #getCalledRoutine()
 	 * @see #isFunctionCall(boolean)
 	 * @see #isProcedureCall(boolean)
@@ -1398,8 +1706,8 @@ public class Instruction extends Element {
 		//for (int i = 0; i < this.getText().count(); i++) {
 		//	updateTypeMapFromLine(typeMap, this.getText().get(i), i);
 		//}
-		StringList lines = this.getUnbrokenText();
-		for (int i = 0; i < lines.count(); i++) {
+		ArrayList<TokenList> lines = this.getUnbrokenTokenText();
+		for (int i = 0; i < lines.size(); i++) {
 			updateTypeMapFromLine(typeMap, lines.get(i), i);
 		}
 		// END KGU#413 2017-06-09
@@ -1417,7 +1725,20 @@ public class Instruction extends Element {
 	 */
 	public void updateTypeMapFromLine(HashMap<String, TypeMapEntry> typeMap, String line, int lineNo)
 	{
-		StringList tokens = Syntax.splitLexically(line, true, true);
+		updateTypeMapFromLine(typeMap, new TokenList(line), lineNo);
+	}
+	/**
+	 * Adds type map entries for the variable declarations contained in the given
+	 * line to the passed-in type map (varname -> typeinfo).
+	 * 
+	 * @param typeMap - the type map to be used and extended
+	 * @param tokens - the tokenized (unbroken) line to be processed
+	 * @param lineNo - number of the (unbroken) {@code line} within the element text
+	 * 
+	 * @deprecated Fetch the types from parsedLines
+	 */
+	public void updateTypeMapFromLine(HashMap<String, TypeMapEntry> typeMap, TokenList tokens, int lineNo)
+	{
 		String varName = null;
 		String typeSpec = "";
 		boolean isAssigned = false;
@@ -1430,9 +1751,9 @@ public class Instruction extends Element {
 		int posColon = tokens.indexOf(token0.equals("dim") ? "as" : ":", false);
 		int posAsgnmt = tokens.indexOf("<-");
 		// First we try to extract a type description from a Pascal-style variable declaration
-		if (tokens.count() > 3 && (token0.equals("var") || token0.equals("dim") || token0.equals("const")) && posColon >= 2) {
+		if (tokens.size() > 3 && (token0.equals("var") || token0.equals("dim") || token0.equals("const")) && posColon >= 2) {
 			isAssigned = posAsgnmt > posColon;
-			typeSpec = tokens.concatenate(" ", posColon+1, (isAssigned ? posAsgnmt : tokens.count()));
+			typeSpec = tokens.subSequence(posColon+1, (isAssigned ? posAsgnmt : tokens.size())).getString();
 			// There may be more than one variable name between "var" and ':' if there is no assignment
 			// START KGU#1089 2023-10-12: Issue #980 - This was for the discarded idea of array specifiers
 			//StringList varTokens = tokens.subSequence(1, posColon);
@@ -1443,10 +1764,11 @@ public class Instruction extends Element {
 			//		addToTypeMap(typeMap, varTokens.get(i), typeSpec, lineNo, isAssigned, true);
 			//	}
 			//}
-			StringList varList = Element.splitExpressionList(tokens.subSequence(1, posColon), ",", false);
-			if (!isAssigned || varList.count() == 1) {
-				for (int i = 0; i < varList.count(); i++) {
-					String var = varList.get(i).trim();
+			ArrayList<TokenList> varList = Syntax.splitExpressionList(tokens.subSequence(1, posColon), ",");
+			int nVars = varList.size()-1;
+			if (!isAssigned || nVars == 1) {
+				for (int i = 0; i < nVars; i++) {
+					String var = varList.get(i).getString();
 					// The following part addressed a mixed list of scalar and array declarations
 					//StringList dims = new StringList();
 					//int posBrack = var.indexOf('[');
@@ -1488,8 +1810,8 @@ public class Instruction extends Element {
 				posAsgnmt--;
 			}
 			// EMD KGU#375 2017-09-20
-			StringList leftSide = tokens.subSequence(0, posAsgnmt);
-			StringList rightSide = tokens.subSequence(posAsgnmt+1, tokens.count());
+			TokenList leftSide = tokens.subSequence(0, posAsgnmt);
+			TokenList rightSide = tokens.subSequenceToEnd(posAsgnmt+1);
 			isAssigned = !rightSide.isEmpty();
 			// Isolate the variable name from the left-hand side of the assignment
 			varName = getAssignedVarname(leftSide, false);
@@ -1554,22 +1876,22 @@ public class Instruction extends Element {
 			if (varName != null && !varName.contains(".")) {
 				int pos = leftSide.indexOf(varName);
 				// C-style type specification left of the (first) variable name?
-				typeSpec = leftSide.concatenate(null, 0, pos);
+				typeSpec = leftSide.subSequence(0, pos).getString().trim();
 				// Check for array declaration (or array element access)
 				leftSide.remove(0, pos);
 				// If there are several comma-separated zones (should be if declVars.count() > 1)
-				StringList declZones = Element.splitExpressionList(leftSide, ",", true);
+				ArrayList<TokenList> declZones = Syntax.splitExpressionList(leftSide, ",");
 				for (int i = 0; i < declVars.count(); i++) {
 					isDeclared = true;
 					String typeSpec1 = typeSpec;
 					String declVar = declVars.get(i);
-					if (!typeSpec.isEmpty() && i < declZones.count() && (pos = declZones.get(i).indexOf("[")) > 0) {
+					if (!typeSpec.isEmpty() && i < declZones.size() && (pos = declZones.get(i).indexOf("[")) > 0) {
 						// Left side should end with a closing bracket now
-						int posRBrace = declZones.get(i).lastIndexOf(']') + 1;
+						int posRBrace = declZones.get(i).lastIndexOf("]") + 1;
 						if (posRBrace < 1) {
 							posRBrace = declZones.get(i).length();
 						}
-						typeSpec1 = "array " + declZones.get(i).substring(pos, posRBrace) + " of " + typeSpec;
+						typeSpec1 = "array " + declZones.get(i).subSequence(pos, posRBrace).getString() + " of " + typeSpec;
 					}
 					if (typeSpec1.isEmpty() && !typeMap.containsKey(declVar) && !rightSide.isEmpty()) {
 						// Doesn't seem to be a declaration but an assignment
@@ -1579,19 +1901,19 @@ public class Instruction extends Element {
 						if (typeSpec1.isEmpty()) {
 							typeSpec1 = "???";
 						}
-						StringList declZone = Syntax.splitLexically(declZones.get(i), true);
+						TokenList declZone = declZones.get(i);
 						// Maybe it's a multidimensional array, then reformulate it as "array of [array of ...]"
 						// Don't mistake an index as a size, so better don't specify size
 						while ((pos = declZone.indexOf("[")) == 1) {
 							// There might be more than one index in the bracket
-							StringList indices = Element.splitExpressionList(declZone.subSequence(2, declZone.count()), ",", true);
-							if (indices.get(indices.count()-1).startsWith("]")) {
+							ArrayList<TokenList> indices = Syntax.splitExpressionList(declZone.subSequenceToEnd(2), ",");
+							if (indices.get(indices.size()-1).startsWith("]")) {
 								declZone.remove(0, declZone.indexOf("]"));
 							}
 							else {
 								declZone.clear();
 							}
-							typeSpec1 = "array of ".repeat(indices.count()-1) + typeSpec1;
+							typeSpec1 = "array of ".repeat(indices.size()-1) + typeSpec1;
 						}
 					}
 					if (declVar != null) {
@@ -1602,16 +1924,16 @@ public class Instruction extends Element {
 			}
 		}
 		// START KU#388 2017-08-07: Enh. #423
-		else if (isTypeDefinition(line, typeMap)) {
+		else if (isTypeDefinition(tokens, typeMap)) {
 			// START KGU#542 2019-11-17: Enh. #739
 			boolean isEnum = tokens.get(3).equalsIgnoreCase("enum");
 			// END KGU#542 2019-11-17
 			// FIXME: In future, array type definitions will also have to be handled...
 			String typename = tokens.get(1);
 			// Because of possible C-style declarations we must not glue the tokens together with "".
-			typeSpec = tokens.concatenate(null, 3, tokens.count()).trim();
+			typeSpec = tokens.subSequenceToEnd(3).getString().trim();
 			int posBrace = typeSpec.indexOf("{");
-			if (posBrace > 0 && tokens.get(tokens.count()-1).equals("}")) {
+			if (posBrace > 0 && tokens.get(tokens.size()-1).equals("}")) {
 				// START KGU#542 2019-11-17: Enh. #739 Handle enumeration tapes
 				if (isEnum) {
 					// first make sure the syntax is okay
@@ -1620,7 +1942,7 @@ public class Instruction extends Element {
 						if (root != null) {
 							TypeMapEntry enumType = new TypeMapEntry(typeSpec, typename, typeMap, this, lineNo, false, false);
 							typeMap.put(":" + typename, enumType);
-							HashMap<String, String> enumItems = root.extractEnumerationConstants(line);
+							HashMap<String, String> enumItems = root.extractEnumerationConstants(tokens);
 							if (enumItems != null) {
 								for (String constName: enumItems.keySet()) {
 									typeMap.put(constName, enumType);
@@ -1679,10 +2001,10 @@ public class Instruction extends Element {
 	 * @return the extracted variable name/specification or {@code null}
 	 */
 	// KGU#686 2019-03-17: Enh. #56 - made static to facilitate implementation of Try
-	public static String getAssignedVarname(StringList tokens, boolean entireTarget) {
+	public static String getAssignedVarname(TokenList tokens, boolean entireTarget) {
 		String varName = null;
 		// START KGU#689 2019-03-21: Issue #706 - get along with named parameter calls
-		tokens = coagulateSubexpressions(new StringList(tokens));		
+		tokens = Syntax.coagulateSubexpressions(new TokenList(tokens));		
 		// END KGU689 2019-03-21
 		int posAsgn = tokens.indexOf("<-");
 		if (posAsgn > 0) {
@@ -1714,7 +2036,7 @@ public class Instruction extends Element {
 			tokens.remove(0);
 			isDecl = true;
 		}
-		if (isDecl && tokens.count() != 1) {
+		if (isDecl && tokens.size() != 1) {
 			// Too few or too many variables
 			return null;
 		}
@@ -1722,8 +2044,8 @@ public class Instruction extends Element {
 		// END KGU#1089 2023-10-13
 
 		// The last sequence of dot-separated identifiers should be the target variable designator
-		if (tokens.count() > 0) {
-			int i = tokens.count()-1;
+		if (tokens.size() > 0) {
+			int i = tokens.size()-1;
 			varName = tokens.get(i);
 			// START KGU#780 2019-12-01: Bugfix - endstanding index access was erroneously returned
 			// FIXME But it might be even more complicated, e.g. foo[i].bar[j]!
@@ -1818,7 +2140,7 @@ public class Instruction extends Element {
 			}
 			// END KGU#1090 2023-10-15
 			if (entireTarget && !isDecl) {
-				varName = tokens.concatenate(null, i);
+				varName = tokens.subSequenceToEnd(i).getString();
 			}
 			// START KGU#944 2021-02-26: Bugfix #946
 			else if (forgetVarname) {
@@ -1839,15 +2161,15 @@ public class Instruction extends Element {
 	 * @param knownTypes - the typeMap as filled so far (won't be changed here)
 	 * @return a type specification, an empty string (no clue), or "???" (ambiguous)
 	 */
-	protected String getTypeFromAssignedValue(StringList rightSide, HashMap<String, TypeMapEntry> knownTypes)
+	protected String getTypeFromAssignedValue(TokenList rightSide, HashMap<String, TypeMapEntry> knownTypes)
 	{
 		String typeSpec = "";
 		// Check for array initializer expression
-		if (rightSide.count() >= 2 && rightSide.get(0).equals("{") && rightSide.get(rightSide.count()-1).equals("}")) {
-			StringList items = Element.splitExpressionList(rightSide.subSequence(1, rightSide.count()-1), ",", false);
+		if (rightSide.size() >= 2 && rightSide.get(0).equals("{") && rightSide.get(rightSide.size()-1).equals("}")) {
+			ArrayList<TokenList> items = Syntax.splitExpressionList(rightSide.subSequence(1, rightSide.size()-1), ",");
 			// Try to identify the element type(s)
-			for (int i = 0; !typeSpec.contains("???") && i < items.count(); i++) {
-				String itemType = identifyExprType(knownTypes, items.get(i), false);
+			for (int i = 0; !typeSpec.contains("???") && i < items.size()-1; i++) {
+				String itemType = Syntax.identifyExprType(knownTypes, items.get(i), false);
 				if (typeSpec.isEmpty()) {
 					typeSpec = itemType;
 				}
@@ -1858,11 +2180,11 @@ public class Instruction extends Element {
 			if (typeSpec.isEmpty()) {
 				typeSpec = "???";
 			}
-			typeSpec += "[" + items.count() + "]";
+			typeSpec += "[" + items.size() + "]";
 		}
 		else {
 			// START KGU#542 2019-11-17: Enh. #739 Check for enumerator constant
-			if (rightSide.count() == 1 && Syntax.isIdentifier(rightSide.get(0), false, null)) {
+			if (rightSide.size() == 1 && Syntax.isIdentifier(rightSide.get(0), false, null)) {
 				Root root = getRoot(this);
 				if (root != null) {
 					String constVal = root.constants.get(rightSide.get(0));
@@ -1873,7 +2195,7 @@ public class Instruction extends Element {
 			}
 			// END KGU#542 2019-11-17
 			// Try to derive the type from the expression
-			typeSpec = identifyExprType(knownTypes, rightSide.concatenate(" "), false);
+			typeSpec = Syntax.identifyExprType(knownTypes, rightSide, false);
 		}
 		return typeSpec;
 	}
@@ -1886,12 +2208,12 @@ public class Instruction extends Element {
 	 * @param knownTypes - the typeMap as filled so far (won't be changed here)
 	 * @return a type specification, an empty string (no clue), or "???" (ambiguous)
 	 */
-	protected String getTypeFromTypeDefinition(StringList rightSide, HashMap<String, TypeMapEntry> knownTypes)
+	protected String getTypeFromTypeDefinition(TokenList typeDef, HashMap<String, TypeMapEntry> knownTypes)
 	{
 		String typeSpec = "";
 		
 		// Try to derive the type from the expression
-		typeSpec = identifyExprType(knownTypes, rightSide.concatenate(" "), false);
+		typeSpec = Syntax.identifyExprType(knownTypes, typeDef, false);
 		return typeSpec;
 	}
 	// END KGU#388 2017-08-07

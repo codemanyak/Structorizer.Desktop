@@ -64,6 +64,7 @@ import lu.fisch.structorizer.elements.Root;
 import lu.fisch.structorizer.elements.Subqueue;
 import lu.fisch.structorizer.elements.While;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.StringList;
 
 /**
@@ -168,11 +169,11 @@ public class SbdImporter implements INSDImporter {
 		try {
 			String content = "";
 			content = new String(Files.readAllBytes(file.toPath()));
-			StringList tokens = Syntax.splitLexically(content, true).trim();
+			TokenList tokens = new TokenList(content, true);
 			int posBrace = -1;
 			if (tokens.get(0).equals("{") && (posBrace = tokens.indexOf("}", 1)) > 0) {
 				root = new Root();
-				root.setText(tokens.concatenate("", 1, posBrace).trim());
+				root.setText(tokens.subSequence(1, posBrace).getString().trim());
 				tokens.remove(0, posBrace+1);
 				while (!tokens.isEmpty() && tokens.get(0).equals("{")) {
 					String unexpected = parseElement(tokens, root.children, file);
@@ -206,7 +207,7 @@ public class SbdImporter implements INSDImporter {
 	 * @param filepath - path of the sbide file to be imported
 	 * @return Either {@code null} (if parsing succeeded) or the unexpected token
 	 */
-	private String parseElement(StringList tokens, Subqueue node, File file) {
+	private String parseElement(TokenList tokens, Subqueue node, File file) {
 		int posBrace = tokens.indexOf("}");
 		if (!tokens.get(0).equals("{") || posBrace < 1) {
 			// Syntax error
@@ -225,17 +226,17 @@ public class SbdImporter implements INSDImporter {
 			switch (typeCode) {
 			case 1:	// Instruction
 			{
-				StringList content = tokens.subSequence(3, posBrace);
+				TokenList content = tokens.subSequence(3, posBrace);
 				content.replaceAll("∧", "and");
 				content.replaceAll("∨", "or");
-				content.replaceInElements("↵", "\\n");	// Should only occur within String literals
+				content.replaceInTokens("↵", "\\n");	// Should only occur within String literals
 				content.replaceAll("[", "[(");
 				content.replaceAll("]", ")-1]");
 				content.replaceAllBetween("output", Syntax.getKeyword("output"), true, 0, 1);
 				content.replaceAllBetween("Ausgabe", Syntax.getKeyword("output"), true, 0, 1);
 				content.replaceAllBetween("input", Syntax.getKeyword("input"), true, 0, 1);
 				content.replaceAllBetween("Eingabe", Syntax.getKeyword("input"), true, 0, 1);
-				Instruction instr = new Instruction(content.concatenate(""));
+				Instruction instr = new Instruction(content.getString());
 				if (refersToArray(content)) {
 					instr.setComment(ARRAY_INDEX_WARNING);
 				}
@@ -245,13 +246,13 @@ public class SbdImporter implements INSDImporter {
 			case 2:	// Alternative
 			{
 				posBrace = tokens.indexOf("{", 1); // start of first branch
-				StringList cond = tokens.subSequence(3, posBrace);
+				TokenList cond = tokens.subSequence(3, posBrace);
 				cond.replaceAll("∧", "and");
 				cond.replaceAll("∨", "or");
-				cond.replaceInElements("↵", "\\n");	// Should only occur within String literals
+				cond.replaceInTokens("↵", "\\n");	// Should only occur within String literals
 				cond.replaceAll("[", "[(");
 				cond.replaceAll("]", ")-1]");
-				Alternative alt = new Alternative(cond.concatenate(""));
+				Alternative alt = new Alternative(cond.getString());
 				if (refersToArray(cond)) {
 					alt.setComment(ARRAY_INDEX_WARNING);
 				}
@@ -308,13 +309,13 @@ public class SbdImporter implements INSDImporter {
 			{
 				ILoop loop = null;
 				posBrace = tokens.indexOf("{", 1); // start of body
-				StringList cond = tokens.subSequence(3, posBrace);
+				TokenList cond = tokens.subSequence(3, posBrace);
 				cond.replaceAll("∧", "and");
 				cond.replaceAll("∨", "or");
-				cond.replaceInElements("↵", "\\n");	// Should only occur within String literals
+				cond.replaceInTokens("↵", "\\n");	// Should only occur within String literals
 				cond.replaceAll("[", "[(");
 				cond.replaceAll("]", ")-1]");
-				String condStr = cond.concatenate("");
+				String condStr = cond.getString();
 				if (typeCode == 4) {
 					loop = new While(condStr);
 				}
@@ -363,9 +364,9 @@ public class SbdImporter implements INSDImporter {
 					// Seems to be a vector, cut off the "v" prefix and get the size
 					comment = ARRAY_INDEX_WARNING;
 					// FIXME The size information may be an expression, without blanks
-					StringList sizeTokens = tokens.subSequence(5, posBrace);
-					String sizeStr = sizeTokens.concatenate();
-					if (sizeTokens.count() == 1) {
+					TokenList sizeTokens = tokens.subSequence(5, posBrace);
+					String sizeStr = sizeTokens.getString();
+					if (sizeTokens.size() == 1) {
 						try {
 							int size = Integer.parseInt(sizeStr);
 							sizeStr = Integer.toString(size-1);
@@ -381,7 +382,7 @@ public class SbdImporter implements INSDImporter {
 						}
 						try {
 							sizeTokens.replaceAll("mod", "%");
-							Object sizeObj = interpreter.eval(sizeTokens.concatenate());
+							Object sizeObj = interpreter.eval(sizeTokens.getString());
 							if (sizeObj instanceof Integer) {
 								int size = ((Integer)sizeObj);
 								sizeStr = Integer.toString(size - 1);
@@ -422,7 +423,7 @@ public class SbdImporter implements INSDImporter {
 	 * @return {@code true} iff the token list contains the name of a variable that
 	 * was declared as array or a pair of brackets.
 	 */
-	private boolean refersToArray(StringList tokens) {
+	private boolean refersToArray(TokenList tokens) {
 		if (tokens.contains("[(") && tokens.contains(")-1]")) {
 			for (int i = 0; i < arrayVariables.count(); i++) {
 				if (tokens.contains(arrayVariables.get(i))) {

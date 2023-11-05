@@ -20,6 +20,8 @@
 
 package lu.fisch.structorizer.elements;
 
+import java.util.ArrayList;
+
 /*
  ******************************************************************************************************
  *
@@ -1042,13 +1044,13 @@ public class Case extends Element implements IFork
 	 * @see lu.fisch.structorizer.elements.Element#addFullText(lu.fisch.utils.StringList, boolean)
 	 */
 	@Override
-	protected void addFullText(StringList _lines, boolean _instructionsOnly)
+	protected void addFullText(ArrayList<TokenList> _lines, boolean _instructionsOnly)
 	{
 		if (!this.isDisabled(false)) {
 			if (!_instructionsOnly) {
 				// START KGU#453 2017-11-01
 				//_lines.add(this.getText());
-				_lines.add(this.getUnbrokenText());	// Text of the discriminator and all selectors
+				_lines.addAll(this.getUnbrokenTokenText());	// Text of the discriminator and all selectors
 				// END KGU#453 2017-11-01
 			}
 			if (qs != null)

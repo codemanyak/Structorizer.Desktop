@@ -20,6 +20,8 @@
 
 package lu.fisch.structorizer.generators;
 
+import java.util.ArrayList;
+
 /******************************************************************************************************
  *
  *      Author:         Bob Fisch
@@ -451,7 +453,7 @@ public class BasGenerator extends Generator
 		{
 			// Replace commas by semicolons to avoid tabulation
 			StringList expressions = 
-					Element.splitExpressionList(_input.substring(Syntax.getKeyword("output").trim().length()), ",");
+					Syntax.splitExpressionList(_input.substring(Syntax.getKeyword("output").trim().length()), ",");
 			_input = Syntax.getKeyword("output").trim() + " " + expressions.getText().replace("\n", "; ");
 		}
 		// END KGU#101 2015-12-19
@@ -567,13 +569,12 @@ public class BasGenerator extends Generator
 			// START KGU#779 2019-12-01: Bugfix #790 (enh. #416)
 			//for(int i=0; i<_inst.getText().count(); i++)
 			Root root = Element.getRoot(_inst);
-			StringList lines = _inst.getUnbrokenText();
-			for (int i = 0; i < lines.count(); i++)
+			ArrayList<TokenList> lines = _inst.getUnbrokenTokenText();
+			for (int i = 0; i < lines.size(); i++)
 			// END KGU#779 2019-12-01
 			{
 				// START KGU#779 2019-12-01: Bugfix #790 (enh. #416)
-				String line = lines.get(i);
-				StringList tokens = Syntax.splitLexically(line, true);
+				TokenList tokens = lines.get(i);
 				Syntax.unifyOperators(tokens, false);
 				boolean isRecordInit = false;
 				// END KGU#779 2019-12-01
@@ -585,7 +586,8 @@ public class BasGenerator extends Generator
 				// END KGU#171 2016-03-31 / KGU#779 2019-12-01
 				{
 					// START KGU#779 2019-12-01
-					if (Instruction.isTypeDefinition(line)) {
+					// FIXME: Could we provide the typemap or isn't it worth the trouble?
+					if (Instruction.isTypeDefinition(tokens, null)) {
 						generateTypeDef(tokens, root, _indent, disabled);
 						continue;
 					}
@@ -595,44 +597,44 @@ public class BasGenerator extends Generator
 					int asgnPos = tokens.indexOf("<-");
 					if (asgnPos >= 0)
 					{
-						StringList leftSide = tokens.subSequence(0, asgnPos);
-						leftSide.removeBlanks();
+						TokenList leftSide = tokens.subSequence(0, asgnPos);
 						String varName = Instruction.getAssignedVarname(leftSide, false);
 						// START KGU#1089 2023-10-17: Issue #980 Suppress defective initialisations
 						if (varName == null) {
-							this.appendComment("***ILLEGAL LINE SKIPPED: " + line, _indent);
+							this.appendComment("***ILLEGAL LINE SKIPPED: " + tokens.getString(), _indent);
 							continue;
 						}
 						// END KGU#1089 2023-10-17: Issue #980
-						StringList exprTokens = tokens.subSequence(asgnPos+1, tokens.count()).trim();
-						isArrayInit = !exprTokens.isEmpty() && exprTokens.get(0).equals("{") && exprTokens.get(exprTokens.count()-1).equals("}");
+						TokenList exprTokens = tokens.subSequenceToEnd(asgnPos+1);
+						isArrayInit = !exprTokens.isEmpty() && exprTokens.get(0).equals("{") 
+								&& exprTokens.get(exprTokens.size()-1).equals("}");
 						// START KGU#780 2019-12-01 - trouble with complicated left sides fixed
 						int posColon = leftSide.indexOf(":");
 						int posAs = leftSide.indexOf("as", false);
 						if (posColon > 0) {
 							leftSide = leftSide.subSequence(0, posColon);
 						}
-						if (posAs > 0 && posAs < leftSide.count()) {
+						if (posAs > 0 && posAs < leftSide.size()) {
 							leftSide = leftSide.subSequence(0, posAs);
 						}
-						String target = leftSide.concatenate(null);
+						String target = leftSide.getString();
 						varName = transform(target.substring(target.indexOf(varName)));
 						// END KGU#780 2019-12-01
 						if (isArrayInit)
 						{
 							generateArrayInit(varName, exprTokens, _indent, disabled);
 						}
-						StringList compList = null;
-						isRecordInit = !isArrayInit && exprTokens.count() > 2 && Syntax.isIdentifier(exprTokens.get(0), false, null)
-								&& exprTokens.get(exprTokens.count()-1).equals("}")
-								&& !(compList = exprTokens.subSequence(1, exprTokens.count()).trim()).isEmpty()
+						TokenList compList = null;
+						isRecordInit = !isArrayInit && exprTokens.size() > 2 && Syntax.isIdentifier(exprTokens.get(0), false, null)
+								&& exprTokens.get(exprTokens.size()-1).equals("}")
+								&& !(compList = exprTokens.subSequenceToEnd(1)).isBlank()
 								&& compList.get(0).equals("{");
 						if (isRecordInit) {
 							TypeMapEntry type = root.getTypeInfo(routinePool).get(":" + exprTokens.get(0));
 							if (type != null && Syntax.isIdentifier(varName, false, null) && !this.wasDefHandled(root, varName, true)) {
 								addCode(transformKeyword("DIM ") + varName + transformKeyword(" AS ") + type.typeName, _indent, disabled);
 							}
-							this.generateRecordInit(varName, exprTokens.concatenate(), _indent, disabled, type);
+							this.generateRecordInit(varName, exprTokens.getString(), _indent, disabled, type);
 						}
 					}
 				}
@@ -641,13 +643,13 @@ public class BasGenerator extends Generator
 				// END KGU#100 2016-01-22
 					// START KGU#277/KGU#284 2016-10-13/16: Enh. #270 + Enh. #274
 					//code.add(this.getLineNumber() + _indent + transform(_inst.getText().get(i)));
-					String codeLine = transform(line);
-					if (Instruction.isTurtleizerMove(line)) {
+					String codeLine = transform(tokens.getString());
+					if (Instruction.isTurtleizerMove(tokens)) {
 						codeLine += " : " + this.commentSymbolLeft() + " color = " + _inst.getHexColor();
 					}
 					// START KGU#993 2021-10-04: Bugfix #993 We suppress unused declarations
 					//addCode(codeLine, _indent, disabled);
-					if (!Instruction.isMereDeclaration(line)) {
+					if (!Instruction.isMereDeclaration(tokens)) {
 						addCode(codeLine, _indent, disabled);
 					}
 					// END KGU#993 2021-10-04
@@ -665,9 +667,9 @@ public class BasGenerator extends Generator
 	 * @param _indent
 	 * @param _disabled
 	 */
-	private void generateArrayInit(String _targetVar, StringList _exprTokens, String _indent, boolean _disabled) {
-		StringList elements = Element.splitExpressionList(
-				_exprTokens.concatenate(null, 1), ",");
+	private void generateArrayInit(String _targetVar, TokenList _exprTokens, String _indent, boolean _disabled) {
+		ArrayList<TokenList> elements = Syntax.splitExpressionList(
+				_exprTokens.subSequenceToEnd(1), ",");
 		if (this.optionCodeLineNumbering()) {
 			// In order to be consistent with possible index access
 			// at other positions in code, we use the standard Java
@@ -679,20 +681,20 @@ public class BasGenerator extends Generator
 			//code.add(this.getLineNumber() + _indent + "LET indexBase = 0");
 			addCode(transformKeyword("LET") + " indexBase = 0", _indent, _disabled);
 			// END KGU#277 2016-10-13
-			for (int el = 0; el < elements.count(); el++)
+			for (int el = 0; el < elements.size(); el++)
 			{
 				// START KGU#277 2016-10-13: Enh. #270
 				//code.add(this.getLineNumber() + _indent + "LET " + varName + 
 				//		"(indexBase + " + el + ") = " + 
 				//		transform(elements.get(el)));
 				addCode(transformKeyword("LET ") + _targetVar + "(indexBase + " + el + ") = " + 
-						transform(elements.get(el)), _indent, _disabled);
+						transform(elements.get(el).getString()), _indent, _disabled);
 				// END KGU#277 2016-10-13
 			}
 		}
 		else {
 			addCode(transformKeyword("LET ") + _targetVar + " = " + 
-					transform(_exprTokens.concatenate(null)), _indent, _disabled);
+					transform(_exprTokens.getString()), _indent, _disabled);
 		}
 	}
 
@@ -705,8 +707,7 @@ public class BasGenerator extends Generator
 	 * @param _indent - the current indentation level
 	 * @param _disabled - whether the element is disabled
 	 */
-	private boolean generateTypeDef(StringList _tokens, Root _root, String _indent, boolean _disabled) {
-		_tokens.removeBlanks();
+	private boolean generateTypeDef(TokenList _tokens, Root _root, String _indent, boolean _disabled) {
 		String typeName = _tokens.get(1);
 		String typeKey = ":" + typeName;
 		TypeMapEntry type = _root.getTypeInfo(routinePool).get(typeKey);
@@ -736,7 +737,7 @@ public class BasGenerator extends Generator
 		else if (type.isEnum()) {
 			StringList enumItems = type.getEnumerationInfo();
 			if (this.optionCodeLineNumbering()) {
-				appendComment(_tokens.concatenate(null).replace("==", "="), _indent);
+				appendComment(_tokens.getString().replace("==", "="), _indent);
 				// In vintage BASIC, we will just generate separate variable definitions
 				int offset = 0;
 				String lastVal = "";

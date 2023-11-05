@@ -20,6 +20,8 @@
 
 package lu.fisch.structorizer.elements;
 
+import java.util.ArrayList;
+
 /******************************************************************************************************
  *
  *      Author:         Bob Fisch
@@ -76,6 +78,7 @@ import java.awt.Point;
 import java.awt.Rectangle;
 
 import lu.fisch.graphics.*;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.*;
 
 /**
@@ -587,10 +590,10 @@ public class Subqueue extends Element implements IElementSequence {
 
 	// START KGU 2015-10-16
 	/* (non-Javadoc)
-	 * @see lu.fisch.structorizer.elements.Element#addFullText(lu.fisch.utils.StringList, boolean)
+	 * @see Element#addFullText(ArrayList<TokenList>, boolean)
 	 */
 	@Override
-	protected void addFullText(StringList _lines, boolean _instructionsOnly)
+	protected void addFullText(ArrayList<TokenList> _lines, boolean _instructionsOnly)
 	{
 		// No own text is to be considered here
 		for(int i = 0; i < children.size(); i++)
