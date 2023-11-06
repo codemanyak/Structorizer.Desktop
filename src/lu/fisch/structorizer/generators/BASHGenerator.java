@@ -99,6 +99,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig         2021-11-02      Bugfix #1014: Declarations in C and Java style hadn't been processed correctly
  *      Kay Gürtzig         2022-08-23      Issue #1068: transformIndexLists() inserted in transformTokens()
  *      Kay Gürtzig         2023-10-16      Bugfx #1096: transformTokens revised for mixed C / Java declarations
+ *      Kay Gürtzig         2023-11-06      Issue #800: First bugfixing after code revision towards TokenList
  *
  ******************************************************************************************************
  *
@@ -553,6 +554,9 @@ public class BASHGenerator extends Generator {
 		// START KGU#129 2016-01-08: Bugfix #96 - variable name processing
 		// We must of course identify variable names and prefix them with $ unless being an lvalue
 		int posAsgnOpr = tokens.indexOf("<-");
+		// START KGU#790 2023-11-06: Issue #800 this must be done before the arguments get transformed
+		Function fct = new Function(tokens.subSequenceToEnd(posAsgnOpr+1));
+		// END KGU#790 2023-11-06
 		// START KGU#388 2017-10-24: Enh. #335, #389, #423
 		if (posAsgnOpr > 0) {
 			// FIXME: Consider using lValueToTypeNameIndexComp(String) rather than reinventing all
@@ -619,8 +623,7 @@ public class BASHGenerator extends Generator {
 				}
 			}
 			// END KGU#388 2017-10-05
-			origExpr = tokens.subSequenceToEnd(posAsgnOpr + 1).getString();
-			origExpr.trim();
+			origExpr = tokens.subSequenceToEnd(posAsgnOpr + 1).getString().trim();
 		}
 		// END KGU#388 2017-10-24
 		// START KGU#161 2016-03-24: Bugfix #135/#92 - variables in read instructions must not be prefixed!
@@ -695,7 +698,9 @@ public class BASHGenerator extends Generator {
 		String expr = tokens.getString();
 		// If the expression is a function call, then convert it to shell syntax
 		// (i.e. drop the parentheses and dissolve the argument list)
-		Function fct = new Function(expr);
+		// START KGU#790 2023-11-06: Issue #800 this test is too late here (expr already transformed)
+		//Function fct = new Function(expr);
+		// END KGU#790 2023-11-06
 		// START KGU#388 2017-10-24: Enh. #423
 		HashMap<String, String> recordIni = null;
 		// END KGU#388 2017-10-24
@@ -718,6 +723,21 @@ public class BASHGenerator extends Generator {
 			//}
 			expr = transformExpression(fct);
 			// END KGU#405 2017-05-19
+			// START KGU#790 2023-11-06: Now we have to catch up on the postponed argument transformation
+			TokenList exprTokens = new TokenList(expr);
+			exprTokens.replaceAll("div", "/", false);
+			exprTokens.replaceAll("false", "0", false);
+			exprTokens.replaceAll("true", "1", false);
+			for (int i = 0; i < varNames.count(); i++)
+			{
+				String var = varNames.get(i);
+				//System.out.println("Looking for " + varName + "...");	// FIXME (KGU): Remove after Test!
+				//_input = _input.replaceAll("(.*?[^\\$])" + varName + "([\\W$].*?)", "$1" + "\\$" + varName + "$2");
+				// Transform the expression right of the assignment symbol
+				transformVariableAccess(var, exprTokens, 0, exprTokens.size());
+			}
+			expr = exprTokens.getString();
+			// END KGU#790 2023-11-06
 			//if (posAsgnOpr > 0)
 			boolean isRoutine = this.routinePool != null 
 					&& !this.routinePool.findRoutinesBySignature(fct.getName(), fct.paramCount(), null, false).isEmpty();
@@ -1387,12 +1407,12 @@ public class BASHGenerator extends Generator {
 			// START KGU#755 2019-11-08: Bugfix #769 - more precise splitting necessary
 			//addCode(this.getIndent() + unbrokenText.get(i+1).trim().replace(",", "|") + ")", _indent, disabled);
 			StringList items = Syntax.splitExpressionList(unbrokenText.get(i+1).trim(), ",");
-			addCode(this.getIndent() + items.concatenate("|") + ")", _indent, disabled);
+			addCode(this.getIndent() + items.concatenate("|", 0, items.count() - 1) + ")", _indent, disabled);
 			// END KGU#755 2019-11-08
 			// END KGU#453 2017-11-02
 			// END KGU#277 2016-10-14
 			// START KGU#15 2015-11-02
-			generateCode((Subqueue) _case.qs.get(i),_indent+this.getIndent()+this.getIndent()+this.getIndent());
+			generateCode((Subqueue) _case.qs.get(i), _indent+this.getIndent()+this.getIndent()+this.getIndent());
 			addCode(";;", _indent + this.getIndent(), disabled);
 		}
 		
@@ -1440,11 +1460,27 @@ public class BASHGenerator extends Generator {
 				// Convert a comma-separated list to a space-separated sequence
 				else if (valueList.contains(","))
 				{
-					items = Syntax.splitExpressionList(valueList, ",");				
+					items = Syntax.splitExpressionList(valueList, ",");
 				}
 				if (items != null)
 				{
-					valueList = transform(items.getLongString());
+					// Don't involve the tail (though an eventual trim(9 would have solved it, too.
+					//valueList = transform(items.getLongString());
+					items.remove(items.count()-1);
+					// START KGU 2023-11-06: Ensure that items get individually transformed ...
+					for (int i = 0; i < items.count(); i++) {
+						String item = transform(items.get(i).trim(), false);
+						// ... and don't fall apart 
+						if (item.contains(" ")
+								// String literal syntax should be checked more meticulously
+								&& !(item.startsWith("\"") && item.endsWith("\""))
+								&& !(item.startsWith("'") && item.endsWith("'"))
+								&& !(item.startsWith("${") && item.endsWith(")"))) {
+							items.set(i, "\"" + item + "\"");
+						}
+					}
+					valueList = items.getLongString();
+					// END KGU 2023-11-06
 				}
 				else if (varNames.contains(valueList))
 				{
@@ -1688,7 +1724,7 @@ public class BASHGenerator extends Generator {
 								}
 							}
 							if (!done) {
-								addCode(transform(tokens.subSequence(0, tokens.indexOf("<-")+1) + source),
+								addCode(transform(tokens.subSequence(0, tokens.indexOf("<-")+1).getString() + source),
 										_indent, disabled);
 							}
 						}

@@ -812,8 +812,12 @@ public class TexGenerator extends Generator {
 				if (!params.isEmpty()) {
 					code.add(indent2 + "\\begin{declaration}[Parameters:]");
 					for (Param param: params) {
+						String pType = param.getType(true);
+						if (pType == null) {
+							pType = "???";
+						}
 						code.add(indent3 + "\\description{\\pVar{"+transform(param.getName())+
-								"}}{type: \\("+ transform(param.getType(true)) +"\\)}");
+								"}}{type: \\("+ transform(pType) +"\\)}");
 					}
 					code.add(indent2 + "\\end{declaration}");
 				}

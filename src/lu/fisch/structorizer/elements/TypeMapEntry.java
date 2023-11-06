@@ -488,7 +488,7 @@ public class TypeMapEntry {
 			}
 			// We have to expect types like "unsigned int" or pointer types, e.g. "int*" or "ref int" (after import)?
 			String token = "";
-			if (!tokens.isEmpty() && (Syntax.isIdentifier(token = tokens.get(0), false, null)
+			if (!tokens.isBlank() && (Syntax.isIdentifier(token = tokens.get(0), false, null)
 					|| token.equals("§§§"))) {
 				StringList elTypeTokens = StringList.getNew(tokens.get(0));
 				// Fetch all successive words/parts that might form the element type

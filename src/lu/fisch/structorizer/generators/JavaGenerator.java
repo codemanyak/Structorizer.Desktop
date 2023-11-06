@@ -601,7 +601,7 @@ public class JavaGenerator extends CGenerator
 		// This is practically identical to C#
 		// START KGU#559 2018-07-20: Enh. #563 - smarter record initialization
 		//HashMap<String, String> comps = Instruction.splitRecordInitializer(constValue);
-		HashMap<String, String> comps = Instruction.splitRecordInitializer(constValue, typeInfo);
+		HashMap<String, String> comps = Syntax.splitRecordInitializer(constValue, typeInfo);
 		// END KGU#559 2018-07-20
 		LinkedHashMap<String, TypeMapEntry> compInfo = typeInfo.getComponentInfo(true);
 		String recordInit = "new " + typeInfo.typeName + "(";

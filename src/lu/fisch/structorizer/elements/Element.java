@@ -135,6 +135,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2022-05-31      Bugfix #1037 in getHighlightUnits()
  *      Kay Gürtzig     2022-07-07      Issue #653: Consistency with Colors.defaultColors ensured
  *      Kay Gürtzig     2022-08-22      Bugfix #1068: Type inference failure for array initialisers mended
+ *      Kay Gürtzig     2023-11-06      Issue #800: First bugfixing after code revision towards TokenList
  *
  ******************************************************************************************************
  *
@@ -3292,90 +3293,90 @@ public abstract class Element {
 	 * @param _typeInfo - the type map entry for the corresponding record type if available
 	 * @return the component map (or null if there are no braces).
 	 * 
-	 * @deprecated prefer {@link #splitRecordInitializer(TokenList, TypeMapEntry)}
+	 * @deprecated prefer {@link Syntax#splitRecordInitializer(TokenList, TypeMapEntry)}
 	 */
 	public static HashMap<String, String> splitRecordInitializer(String _text, TypeMapEntry _typeInfo)
 	{
-		return splitRecordInitializer(new TokenList(_text), _typeInfo);
+		return Syntax.splitRecordInitializer(new TokenList(_text), _typeInfo);
 	}
-	/**
-	 * Decomposes the interior of a record initializer of the form<br/>
-	 * [typename]{compname1: value1, compname2: value2, ...}<br/>
-	 * into a hash table mapping the component names to the corresponding value
-	 * strings.<br/>
-	 * If there is text following the closing brace it will be mapped to key "§TAIL§".
-	 * If the typename is given then it will be provided mapped to key "§TYPENAME§".
-	 * If {@code _typeInfo} is given and either {@code typename} was omitted or matches
-	 * name of {@code _typeInfo} then unprefixed component values will be associated
-	 * to the component names of the type in order of occurrence unless an explicit
-	 * component name prefix occurs.<br/>
-	 * If {@code _typeInfo} is null and {@code generateDummyCompNames} is {@code true}
-	 * then generic component names of form {@code "FIXME_<typename>_<i>"} may be
-	 * provided for components with missing names in the {@code _text}.
-	 * 
-	 * @param _tokens - the tokenized initializer expression with or without typename
-	 *    but with braces.
-	 * @param _typeInfo - the type map entry for the corresponding record type if available
-	 * @return the component map (or null if there are no braces).
-	 */
-	public static HashMap<String, String> splitRecordInitializer(TokenList _tokens, TypeMapEntry _typeInfo)
-	{
-		// START KGU#526 2018-08-01: Enh. #423 - effort to make the component order more stable (at higher costs, though)
-		//HashMap<String, String> components = new HashMap<String, String>();
-		HashMap<String, String> components = new LinkedHashMap<String, String>();
-		// END KGU#526 2018-08-01
-		int posBrace = _tokens.indexOf("{");
-		if (posBrace < 0) {
-			return null;
-		}
-		String typename = _tokens.subSequence(0, posBrace).getString().trim();
-		if (!typename.isEmpty()) {
-			components.put("§TYPENAME§", typename);
-		}
-		ArrayList<TokenList> parts = Syntax.splitExpressionList(_tokens.subSequenceToEnd(posBrace+1), ",");
-		TokenList tail = parts.get(parts.size()-1);
-		if (!tail.startsWith("}")) {
-			return null;
-		}
-		else if (tail.size() > 1) {
-			components.put("§TAIL§", tail.subSequence(1, tail.size()).getString().trim());
-		}
-		// START KGU#559 2018-07-20: Enh. #563 In case of a given type, we may guess the target fields
-		boolean guessComponents = _typeInfo != null && _typeInfo.isRecord()
-				&& (typename.isEmpty() || typename.equals(_typeInfo.typeName));
-		String[] compNames = null;
-		if (guessComponents) {
-			Set<String> keys = _typeInfo.getComponentInfo(true).keySet();
-			compNames = keys.toArray(new String[keys.size()]);
-		}
-		// END KGU#559 2018-07-20
-		for (int i = 0; i < parts.size()-1; i++) {
-			TokenList tokens = parts.get(i);
-			int posColon = tokens.indexOf(":");
-			if (posColon >= 0) {
-				String name = tokens.subSequence(0, posColon).getString().trim();
-				String expr = tokens.subSequenceToEnd(posColon + 1).getString().trim();
-				if (Syntax.isIdentifier(name, false, null)) {
-					components.put(name, expr);
-					// START KGU#559 2018-07-20: Enh. #563 Stop associating from type as soon as an explicit name is given
-					guessComponents = false;
-					// END KGU#559 2018-07-20
-				}
-			}
-			// START KGU#559 2018-07-20: Enh. #563
-			else if (guessComponents && i < compNames.length) {
-				components.put(compNames[i], parts.get(i).getString());
-			}
-			// END KGU#559 2018-07-20
-			// START KGU#711 2019-11-24: Bugfix #783 workaround for missing type info
-			else if (compNames == null && !typename.isEmpty()) {
-				components.put("FIXME_" + typename + "_" + i, parts.get(i).getString());
-			}
-			// END KGU#711 2019-11-24
-		}
-		return components;
-	}
-	// END KGU#388 2017-09-13
+//	/**
+//	 * Decomposes the interior of a record initializer of the form<br/>
+//	 * [typename]{compname1: value1, compname2: value2, ...}<br/>
+//	 * into a hash table mapping the component names to the corresponding value
+//	 * strings.<br/>
+//	 * If there is text following the closing brace it will be mapped to key "§TAIL§".
+//	 * If the typename is given then it will be provided mapped to key "§TYPENAME§".
+//	 * If {@code _typeInfo} is given and either {@code typename} was omitted or matches
+//	 * name of {@code _typeInfo} then unprefixed component values will be associated
+//	 * to the component names of the type in order of occurrence unless an explicit
+//	 * component name prefix occurs.<br/>
+//	 * If {@code _typeInfo} is null and {@code generateDummyCompNames} is {@code true}
+//	 * then generic component names of form {@code "FIXME_<typename>_<i>"} may be
+//	 * provided for components with missing names in the {@code _text}.
+//	 * 
+//	 * @param _tokens - the tokenized initializer expression with or without typename
+//	 *    but with braces.
+//	 * @param _typeInfo - the type map entry for the corresponding record type if available
+//	 * @return the component map (or null if there are no braces).
+//	 */
+//	public static HashMap<String, String> splitRecordInitializer(TokenList _tokens, TypeMapEntry _typeInfo)
+//	{
+//		// START KGU#526 2018-08-01: Enh. #423 - effort to make the component order more stable (at higher costs, though)
+//		//HashMap<String, String> components = new HashMap<String, String>();
+//		HashMap<String, String> components = new LinkedHashMap<String, String>();
+//		// END KGU#526 2018-08-01
+//		int posBrace = _tokens.indexOf("{");
+//		if (posBrace < 0) {
+//			return null;
+//		}
+//		String typename = _tokens.subSequence(0, posBrace).getString().trim();
+//		if (!typename.isEmpty()) {
+//			components.put("§TYPENAME§", typename);
+//		}
+//		ArrayList<TokenList> parts = Syntax.splitExpressionList(_tokens.subSequenceToEnd(posBrace+1), ",");
+//		TokenList tail = parts.get(parts.size()-1);
+//		if (!tail.startsWith("}")) {
+//			return null;
+//		}
+//		else if (tail.size() > 1) {
+//			components.put("§TAIL§", tail.subSequence(1, tail.size()).getString().trim());
+//		}
+//		// START KGU#559 2018-07-20: Enh. #563 In case of a given type, we may guess the target fields
+//		boolean guessComponents = _typeInfo != null && _typeInfo.isRecord()
+//				&& (typename.isEmpty() || typename.equals(_typeInfo.typeName));
+//		String[] compNames = null;
+//		if (guessComponents) {
+//			Set<String> keys = _typeInfo.getComponentInfo(true).keySet();
+//			compNames = keys.toArray(new String[keys.size()]);
+//		}
+//		// END KGU#559 2018-07-20
+//		for (int i = 0; i < parts.size()-1; i++) {
+//			TokenList tokens = parts.get(i);
+//			int posColon = tokens.indexOf(":");
+//			if (posColon >= 0) {
+//				String name = tokens.subSequence(0, posColon).getString().trim();
+//				String expr = tokens.subSequenceToEnd(posColon + 1).getString().trim();
+//				if (Syntax.isIdentifier(name, false, null)) {
+//					components.put(name, expr);
+//					// START KGU#559 2018-07-20: Enh. #563 Stop associating from type as soon as an explicit name is given
+//					guessComponents = false;
+//					// END KGU#559 2018-07-20
+//				}
+//			}
+//			// START KGU#559 2018-07-20: Enh. #563
+//			else if (guessComponents && i < compNames.length) {
+//				components.put(compNames[i], parts.get(i).getString());
+//			}
+//			// END KGU#559 2018-07-20
+//			// START KGU#711 2019-11-24: Bugfix #783 workaround for missing type info
+//			else if (compNames == null && !typename.isEmpty()) {
+//				components.put("FIXME_" + typename + "_" + i, parts.get(i).getString());
+//			}
+//			// END KGU#711 2019-11-24
+//		}
+//		return components;
+//	}
+//	// END KGU#388 2017-09-13
 
 	
 //	// START KGU#1057 2022-08-20: Enh. #1066 Interactive input assistent

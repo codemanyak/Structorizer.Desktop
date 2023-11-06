@@ -454,6 +454,7 @@ public class BasGenerator extends Generator
 			// Replace commas by semicolons to avoid tabulation
 			StringList expressions = 
 					Syntax.splitExpressionList(_input.substring(Syntax.getKeyword("output").trim().length()), ",");
+			expressions.remove(expressions.count()-1);	// Get rid of line tail
 			_input = Syntax.getKeyword("output").trim() + " " + expressions.getText().replace("\n", "; ");
 		}
 		// END KGU#101 2015-12-19
@@ -681,7 +682,7 @@ public class BasGenerator extends Generator
 			//code.add(this.getLineNumber() + _indent + "LET indexBase = 0");
 			addCode(transformKeyword("LET") + " indexBase = 0", _indent, _disabled);
 			// END KGU#277 2016-10-13
-			for (int el = 0; el < elements.size(); el++)
+			for (int el = 0; el < elements.size()-1; el++)
 			{
 				// START KGU#277 2016-10-13: Enh. #270
 				//code.add(this.getLineNumber() + _indent + "LET " + varName + 
@@ -775,6 +776,7 @@ public class BasGenerator extends Generator
 	/**
 	 * Generates code that decomposes a record initializer into separate component assignments if
 	 * necessary or converts it into the appropriate target language.
+	 * 
 	 * @param _lValue - the left side of the assignment (without modifiers!)
 	 * @param _recordValue - the record initializer according to Structorizer syntax
 	 * @param _indent - current indentation level (as String)
@@ -1141,7 +1143,7 @@ public class BasGenerator extends Generator
 			// END KGU 2014-11-16
 			Root owningRoot = Element.getRoot(_call);
 			StringList lines = _call.getUnbrokenText();
-			for (int i=0; i < lines.count(); i++)
+			for (int i = 0; i < lines.count(); i++)
 			{
 				// START KGU#2 2015-12-18: Enh. #9 This may require a CALL command prefix
 				//code.add(_indent+transform(_call.getText().get(i)));
@@ -1149,9 +1151,14 @@ public class BasGenerator extends Generator
 				//String line = transform(_call.getText().get(i));
 				String line = lines.get(i);
 				boolean isAsgnmt = Instruction.isAssignment(line);
-				if (i == 0 && this.getOverloadingLevel() == OverloadingLevel.OL_NO_OVERLOADING && (routinePool != null)
+				//START KGU#790 2023-11-06: Only to convert the first call is unproportional
+				//if (i == 0 && this.getOverloadingLevel() == OverloadingLevel.OL_NO_OVERLOADING && (routinePool != null)
+				//		&& line.endsWith(")")) {
+				//	Function call = _call.getCalledRoutine();
+				if (this.getOverloadingLevel() == OverloadingLevel.OL_NO_OVERLOADING && (routinePool != null)
 						&& line.endsWith(")")) {
-					Function call = _call.getCalledRoutine();
+					Function call = _call.getCalledRoutine(i);
+				// END KGU#2023-11-06
 					// START KGU#877 2020-10-16: Bugfix #874 name extraction may fail (e.g. non-ASCII letters)
 					if (call != null) {
 					// END KGU#877 2020-10-16

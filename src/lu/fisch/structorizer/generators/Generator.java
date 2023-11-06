@@ -125,6 +125,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig     2022-08-14      Issues #441, #1047: usesTurtleizer must be reset at the beginning of exportCode
  *      Kay Gürtzig     2022-08-23      Issue #1068: Auxiliary method transformIndexLists(StringList) added
  *      Kay Gürtzig     2023-09-28      Bugfix #1092: Sensible export of alias type definitions enabled
+ *      Kay Gürtzig     2023-11-06      Issue #800: First bugfixing after code revision towards TokenList
  *
  ******************************************************************************************************
  *
@@ -2448,11 +2449,13 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	// START KGU#109/KGU#141 2016-01-16: New for ease of fixing #61 and #112
 	/**
 	 * Decomposes the left-hand side of an assignment passed in as _lval
-	 * into four strings:<br/>
-	 * [0] - type specification (a sequence of tokens, may be empty)<br/>
-	 * [1] - variable name (a single token supposed to be the identifier)<br/>
-	 * [2] - index expression (if _lval is an indexed variable, else empty)<br/>
-	 * [3] - component path (if _lval is a record component of an indexed variable, else empty)
+	 * into four strings:
+	 * <ul>
+	 * <li>[0] - type specification (a sequence of tokens, may be empty)</li>
+	 * <li>[1] - variable name (a single token supposed to be the identifier)</li>
+	 * <li>[2] - index expression (if _lval is an indexed variable, else empty)</li>
+	 * <li>[3] - component path (if _lval is a record component of an indexed variable, else empty)</li>
+	 * </ul>
 	 * @param _lval - a string found on the left-hand side of an assignment operator
 	 * @return String array of [0] type, [1] name, [2] index, [3] component path; all but [1] may be empty
 	 */
@@ -2466,11 +2469,13 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	}
 	/**
 	 * Decomposes the left-hand side of an assignment passed in as _lval
-	 * into four strings:<br/>
-	 * [0] - type specification (a sequence of tokens, may be empty)<br/>
-	 * [1] - variable name (a single token supposed to be the identifier)<br/>
-	 * [2] - index expression (if _lval is an indexed variable, else empty)<br/>
-	 * [3] - component path (if _lval is a record component of an indexed variable, else empty)
+	 * into four strings:
+	 * <ul>
+	 * <li>[0] - type specification (a sequence of tokens, may be empty)</li>
+	 * <li>[1] - variable name (a single token supposed to be the identifier)</li>
+	 * <li>[2] - index expression (if _lval is an indexed variable, else empty)</li>
+	 * <li>[3] - component path (if _lval is a record component of an indexed variable, else empty)</li>
+	 * </ul>
 	 * @param tokens - a string found on the left-hand side of an assignment operator
 	 * @return String array of [0] type, [1] name, [2] index, [3] component path; all but [1] may be empty
 	 */
@@ -2487,11 +2492,11 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		//int posR = _lval.lastIndexOf("]");
 		TokenList name = new TokenList();
 		TokenList after = new TokenList();
-		tokens.removeAll(" ");
+		//tokens.removeAll(" ");
 		int posColon = -1;
 		if ((tokens.indexOf("var", false) == 0 || tokens.indexOf("dim", false) == 0)
 				&& ((posColon = tokens.indexOf(":")) > 0 || (posColon = tokens.indexOf("as", false)) > 0 )) {
-			type = tokens.subSequence(posColon+1, tokens.size()).getString().trim();
+			type = tokens.subSequenceToEnd(posColon+1).getString().trim();
 			tokens.remove(posColon, tokens.size());
 			tokens.remove(0);
 			tokens.trim();
@@ -2599,13 +2604,17 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		//String[] typeNameIndexPath = {type, name, index, comp};
 		// END KGU#1090 2023-101-15
 		//StringList nameParts = StringList.explode(name.getString(), " ");
-		if (type.isEmpty() || name.size() > 1) {
-			type += " " + name.subSequence(0, name.size()-1).getString().trim() + " ";
+		// START KGU#790 2023-11-06: Don't tear apart a component access path
+		//if (type.isEmpty() || name.size() > 1) {
+		name.removePaddings();
+		if ((type.isEmpty() || name.size() > 1) && !Syntax.isIdentifier(name.getString(), false, ".")) {
+		// END KGU#790 2023-11-06
+			type += " " + name.remove(0, name.size()-1).getString().trim() + " ";
 			if (type.isBlank()) {
 				type = "";
 			}
 		}
-		String[] typeNameIndexPath = {type, name.get(name.size()-1), index, comp};
+		String[] typeNameIndexPath = {type.trim(), name.getString(), index, comp};
 		return typeNameIndexPath;
 		// END KGU#388 2017-09-27
 	}
@@ -2641,6 +2650,12 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		{
 			items = Syntax.splitExpressionList(valueList, " ");
 		}
+		// START KGU#790 2023-11-06: After the code revision of the splitting we always get the tail
+		if (items != null) {
+			// Get rid of the line tail
+			items.remove(items.count()-1);
+		}
+		// END KGU#790 2023-11-06
 		return items;
 	}
 	// END KGU#61 2016-03-23

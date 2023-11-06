@@ -225,7 +225,6 @@ import java.util.Hashtable;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.swing.ImageIcon;
@@ -317,9 +316,6 @@ public class Root extends Element {
 	private final static Pattern INDEX_PATTERN = Pattern.compile("(.*?)[\\[](.*?)[\\]](.*?)");
 	private final static Pattern INDEX_PATTERN_GREEDY = java.util.regex.Pattern.compile("(.*?)[\\[](.*)[\\]](.*?)");
 	// END KGU#575 2018-09-17
-	// START KGU#580 2018-09-24: Bugfix #605
-	private final static Pattern VAR_PATTERN = Pattern.compile("(^|.*?\\W)var\\s(.*?)");
-	// END KGU#580 2018-09-24
 	// START KGU#1090 2023-10-15: Bugfix #1096
 	private final static StringList ILLEGAL_SUBTYPES = StringList.explode("record,struct,enum", ",");
 	// END KGU#1090 2023-10-15
@@ -2831,21 +2827,6 @@ public class Root extends Element {
     }
 
 	// START KGU#375 2017-04-04: Enh. #388 getUsedVarNames decomposed on occasion of analyse_22_24
-	/**
-	 * Gathers the names of all variables that are used in text line _line in expressions:<br/>
-	 * HYP 1: (?) &lt;- (?) &lt;used&gt; (?)<br/>
-	 * HYP 2: (?)'['&lt;used&gt;']' &lt;- (?) &lt;used&gt; (?)<br/>
-	 * HYP 3: output (?) &lt;used&gt; (?)<br/>
-	 * HYP 4: input (?)'['&lt;used&gt;']'
-	 * @param _line - the element text line to be analysed
-	 * @param _keywords the set of parser keywords (if available)
-	 * @return StringList of used variable names according to the above specification
-	 */
-	private StringList getUsedVarNames(String _line, String[] _keywords)
-	{
-		return getUsedVarNames(new TokenList(_line.trim()), _keywords);
-	}
-
 	/**
 	 * Gathers the names of all variables that are used in text line {@code tokens} in
 	 *     expressions (without being set or modified themselves):
@@ -5689,7 +5670,7 @@ public class Root extends Element {
 				knownVars.add(myDefs);
 			}
 			// START KGU#388 2017-09-13: Enh. #423 - check type definitions
-			else if (!line.isBlank() && line.get(0).equalsIgnoreCase("type ") || isTypedef) {
+			else if (!line.isBlank() && line.get(0).equalsIgnoreCase("type") || isTypedef) {
 				if (!isTypedef) {
 					//error  = new DetectedError("Type definition in line"+i+"is malformed!", _instr);
 					addError(_errors, new DetectedError(errorMsg(Menu.error24_1, String.valueOf(i)), _instr), 24);
@@ -5856,7 +5837,7 @@ public class Root extends Element {
 						else {
 							// START KGU#559 2018-07-20: Enh. #563  more intelligent initializer evaluation
 							//HashMap<String, String> components = Element.splitRecordInitializer(tokens.concatenate("", posBrace));
-							HashMap<String, String> components = Syntax.splitRecordInitializer(line.subSequenceToEnd(posBrace), recType);
+							HashMap<String, String> components = Syntax.splitRecordInitializer(line.subSequenceToEnd(posBrace-1), recType);
 							// END KGU#559 2018-07-20
 							// START KGU#1021 2021-12-05: Bugfix #1024 components may be null!
 							if (components == null) {
@@ -7279,7 +7260,7 @@ public class Root extends Element {
 	 * @param _vars - variables with certain initialisation
 	 * @param _uncertainVars - variables with uncertain initialisation (e.g. in a branch)
 	 * @param _constants - incremental constant definition map
-	 * @param _types - the current temporary tye registry
+	 * @param _types - the current temporary type registry
 	 */
 	private void analyse_31(Instruction _instr, Vector<DetectedError> _errors,
 			TokenList _tokens, int _lineNo,

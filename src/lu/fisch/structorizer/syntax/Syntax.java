@@ -1468,6 +1468,7 @@ public class Syntax {
 	public static TokenList coagulateSubexpressions(TokenList tokens) {
 		final StringList starters = StringList.explode("(,[,{", ",");
 		final StringList stoppers = StringList.explode("),],}", ",");
+		
 		tokens = new TokenList(tokens);	// Avoid side effects to the argument
 		int ix = 0;
 		int ixLastStart = -1;
@@ -1502,36 +1503,7 @@ public class Syntax {
 
 	/**
 	 * Decomposes the interior of a record initializer of the form<br/>
-	 * {@code [typename]}{{@code compname1: value1, compname2: value2, ...}}<br/>
-	 * into a hash table mapping the component names to the corresponding value
-	 * strings.<br/>
-	 * If there is text following the closing brace it will be mapped to key "§TAIL§".<br/>
-	 * If the {@code typename} is given then it will be provided mapped to key
-	 * "§TYPENAME§".
-	 * If {@code _typeInfo} is given and either {@code typename} was omitted or matches
-	 * the name of {@code _typeInfo} then unprefixed component values will be associated
-	 * to the component names of the type in order of occurrence unless an explicit
-	 * component name prefix occurs.<br/>
-	 * If {@code _typeInfo} is {@code null} then generic component names of form
-	 * {@code "FIXME_<typename>_<i>"} will be provided for components with missing
-	 * names in the {@code _text}.
-	 * 
-	 * @param _text - the initializer expression with or without preceding
-	 *     {@code typename} but with braces.
-	 * @param _typeInfo - the type map entry for the corresponding record type if
-	 *     available, otherwise {@code null}
-	 * 
-	 * @return the component map (or null if there are no braces).
-	 */
-	public static HashMap<String, String> splitRecordInitializer(String _text, TypeMapEntry _typeInfo, boolean _generateDummyCompNames)
-	{
-		return splitRecordInitializer(new TokenList(_text), _typeInfo);
-	}
-	// END KGU#388 2017-09-13
-
-	/**
-	 * Decomposes the interior of a record initializer of the form<br/>
-	 * {@code [typename]}{{@code compname1: value1, compname2: value2, ...}}<br/>
+	 * {@code typename}{{@code compname1: value1, compname2: value2, ...}}<br/>
 	 * into a hash table mapping the component names to the corresponding value
 	 * strings.<br/>
 	 * If there is text following the closing brace it will be mapped to key "§TAIL§".<br/>
@@ -1545,8 +1517,8 @@ public class Syntax {
 	 * {@code "FIXME_<typename>_<i>"} will be provided for components with missing
 	 * names in the {@link TokenList} {@code _tokens}.
 	 * 
-	 * @param _tokens - tokenized initializer expression with or without preceding
-	 *    {@code typename} but with braces.
+	 * @param _tokens - tokenized initializer expression with preceding {@code typename}
+	 *    and with braces.
 	 * @param _typeInfo - the type map entry for the corresponding record type if
 	 *    available, otherwise {@code null}
 	 * @return {@code true} if {@code _components} could be filled consistently,
@@ -1557,7 +1529,7 @@ public class Syntax {
 		//HashMap<String, String> components = new HashMap<String, String>();
 		HashMap<String, String> components = new LinkedHashMap<String, String>();
 		// END KGU#526 2018-08-01
-			int posBrace = _tokens.indexOf("{");
+		int posBrace = _tokens.indexOf("{");
 		if (posBrace != 1) {
 			return null;
 		}

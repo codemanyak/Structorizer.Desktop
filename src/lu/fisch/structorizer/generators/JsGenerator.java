@@ -281,7 +281,7 @@ public class JsGenerator extends CGenerator {
 		//HashMap<String, String> comps = Instruction.splitRecordInitializer(constValue);
 		// START KGU#771 2019 11-24: Bugfix #783 - precaution against unknown type
 		//HashMap<String, String> comps = Instruction.splitRecordInitializer(constValue, typeInfo);
-		HashMap<String, String> comps = Instruction.splitRecordInitializer(constValue, typeInfo);
+		HashMap<String, String> comps = Syntax.splitRecordInitializer(constValue, typeInfo);
 		// END KGU#771 2019-11-24
 		// END KGU#559 2018-07-20
 		LinkedHashMap<String, TypeMapEntry> compInfo;

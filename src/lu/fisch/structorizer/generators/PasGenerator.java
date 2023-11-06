@@ -983,7 +983,7 @@ public class PasGenerator extends Generator
 	//	HashMap<String, String> components = Instruction.splitRecordInitializer(_expr);
 	private void generateRecordInit(String _varName, TokenList _exprTokens, String _indent, boolean _forConstant, boolean _isDisabled, TypeMapEntry _typeEntry)
 	{
-		HashMap<String, String> components = Instruction.splitRecordInitializer(_exprTokens, _typeEntry);
+		HashMap<String, String> components = Syntax.splitRecordInitializer(_exprTokens, _typeEntry);
 	// END KGU#559 2018-07-20
 		// START KGU#1021 2021-12-05: Bugfix #1024 Instruction might be defective
 		if (components == null) {

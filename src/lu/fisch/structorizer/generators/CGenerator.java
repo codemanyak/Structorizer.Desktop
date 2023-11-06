@@ -125,6 +125,7 @@ import java.util.ArrayList;
  *      Kay Gürtzig             2023-10-15      Bugfix #1096 Handles complicated C-/Java-style declarations
  *      Kay Gürtzig             2023-10-17      Bugfix #1099: Constants defined by an external routine call no longer moved
  *                                              to top (to change execution order could severely compromise the algorithm!)
+ *      Kay Gürtzig             2023-11-06      Issue #800: First bugfixing after code revision towards TokenList
  *
  ******************************************************************************************************
  *
@@ -871,7 +872,7 @@ public class CGenerator extends Generator {
 	protected String transformRecordInit(TokenList constValue, TypeMapEntry typeInfo) {
 		// START KGU#559 2018-07-20: Enh. #563 - smarter initializer evaluation
 		//HashMap<String, String> comps = Instruction.splitRecordInitializer(constValue);
-		HashMap<String, String> comps = Instruction.splitRecordInitializer(constValue, typeInfo);
+		HashMap<String, String> comps = Syntax.splitRecordInitializer(constValue, typeInfo);
 		// END KGU#559 2018-07-20
 		LinkedHashMap<String, TypeMapEntry> compInfo = typeInfo.getComponentInfo(true);
 		StringBuilder recordInit = new StringBuilder("{");
@@ -1205,7 +1206,8 @@ public class CGenerator extends Generator {
 		// 2.2 as variable
 		// 3. type definition
 		// 4. Input / output
-		boolean isDisabled = _inst.isDisabled(false); 
+		boolean isDisabled = _inst.isDisabled(false);
+		boolean isTypeDef = Instruction.isTypeDefinition(tokens, this.typeMap);
 		// START KGU#796 2020-02-10: Bugfix #808
 		Syntax.unifyOperators(tokens, false);
 		// END KGU#796 2020-02-10
@@ -1541,7 +1543,7 @@ public class CGenerator extends Generator {
 			}
 		} // if (!this.suppressTransformation && (isDecl || exprTokens != null))
 		// START KGU#388 2017-09-25: Enh. #423
-		else if (!this.suppressTransformation && Instruction.isTypeDefinition(tokens, typeMap)) {
+		else if (!this.suppressTransformation && isTypeDef) {
 			// Attention! The following condition must not be combined with the above one! 
 			if (this.isInternalDeclarationAllowed()) {
 				// START KGU#878 2020-10-16: Bugfix #873 - collateral damage of bugfix #808 mended
@@ -1777,7 +1779,7 @@ public class CGenerator extends Generator {
 			//StringList constants = StringList.explode(lines.get(i + 1), ",");
 			StringList constants = Syntax.splitExpressionList(lines.get(i + 1), ",");
 			// END KGU#755 2019-11-08
-			for (int j = 0; j < constants.count(); j++) {
+			for (int j = 0; j < constants.count() - 1; j++) {
 				addCode("case " + constants.get(j).trim() + ":", _indent, isDisabled);
 			}
 			// END KGU#15 2015-10-21
@@ -2982,7 +2984,7 @@ public class CGenerator extends Generator {
 			return;
 		}
 		// END KGU#771 2019-11-24
-		HashMap<String, String> comps = Instruction.splitRecordInitializer(_recordValue, _typeEntry);
+		HashMap<String, String> comps = Syntax.splitRecordInitializer(_recordValue, _typeEntry);
 	// END KGU#559 2018-07-20
 		// START KGU#1021 2021-12-05: Bugfix #1024 Instruction might be defective
 		if (comps == null) {
