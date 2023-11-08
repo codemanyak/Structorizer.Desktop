@@ -20,8 +20,6 @@
 
 package lu.fisch.structorizer.generators;
 
-import java.util.ArrayList;
-
 /******************************************************************************************************
  *
  *      Author:         Bob Fisch
@@ -76,6 +74,7 @@ import java.util.ArrayList;
  *      Kay Gürtzig         2021-10-03/04   Bugfix #993: Wrong handling of constant parameters, array types, and mere declarations
  *      Kay Gürtzig         2021-12-05      Bugfix #1024: Precautions against defective record initializers
  *      Kay Gürtzig         2023-10-04      Bugfix #1093 Undue final return 0 on function diagrams
+ *      Kay Gürtzig         2023-11-08      Bugfix #1109 Insufficient handling of rethrow
  *
  ******************************************************************************************************
  *
@@ -92,6 +91,7 @@ import java.util.ArrayList;
  *
  ******************************************************************************************************///
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -449,6 +449,7 @@ public class BasGenerator extends Generator
 	protected String transform(String _input)
 	{
 		// START KGU#101 2015-12-19: Enh. #54 - support lists of output expressions
+		// FIXME: Fails if there is no gap between then keyword and the firts expression.
 		if (_input.matches("^" + getKeywordPattern(Syntax.getKeyword("output").trim()) + "[ ](.*?)"))
 		{
 			// Replace commas by semicolons to avoid tabulation
@@ -950,7 +951,7 @@ public class BasGenerator extends Generator
 		boolean done = false;
 		String var = _for.getCounterVar();
 		String valueList = _for.getValueList();
-		StringList items = this.extractForInListItems(_for);
+		ArrayList<TokenList> items = _for.getValueListItems();
 		// START KGU#277 2016-10-13: Enh. #270
 		boolean disabled = _for.isDisabled(false);
 		// END KGU#277 2016-10-13
@@ -963,14 +964,15 @@ public class BasGenerator extends Generator
 			// do if items are heterogenous? We will just try four types: boolean,
 			// integer, real and string, where we can only test literals.
 			// If none of them match then we add a TODO comment.
-			int nItems = items.count();
+			int nItems = items.size();
 			boolean allBoolean = true;
 			boolean allInt = true;
 			boolean allReal = true;
 			boolean allString = true;
+			StringList itemStrings = new StringList();
 			for (int i = 0; i < nItems; i++)
 			{
-				String item = items.get(i);
+				String item = items.get(i).getString().trim();
 				if (allBoolean)
 				{
 					if (!item.equalsIgnoreCase("true") && !item.equalsIgnoreCase("false"))
@@ -1004,7 +1006,7 @@ public class BasGenerator extends Generator
 							!item.substring(1, item.length()-1).contains("\"");
 				}
 				// START KGU#368 2017-03-15: Bugfix #382
-				items.set(i, transform(item));
+				itemStrings.add(transform(item));
 				// END KGU#368 2017-03-15
 			}
 			
@@ -1029,7 +1031,7 @@ public class BasGenerator extends Generator
 			//code.add(this.getLineNumber() + _indent + "DIM " + arrayName + "() AS " + itemType + " = {" + 
 			//		items.concatenate(", ") + "}");
 			addCode(transformKeyword("DIM ") + arrayName + "() " + transformKeyword("AS ") + itemType + " = {" + 
-					items.concatenate(", ") + "}", _indent, disabled);
+					itemStrings.concatenate(", ") + "}", _indent, disabled);
 			// END KGU#277 2016-10-13
 			valueList = arrayName;
 		}
@@ -1248,12 +1250,37 @@ public class BasGenerator extends Generator
 				}
 				// START KGU#686 2019-03-18: Enh. #56
 				else if (Jump.isThrow(line)) {
+					// START KGU#1102 2023-11-08: Bugfix #1109 Rethrow not correctly handled
+					String arg = line.substring(preThrow.length()).trim();
+					// END KGU#1102 2023-11-08
 					if (this.optionCodeLineNumbering()) {
 						appendComment("FIXME: Only a number is allowed as parameter:", _indent);
-						addCode("ERROR " + line.substring(preThrow.length()).trim(), _indent, disabled);
+						// START KGU#1102 2023-11-08: Bugfix #1109 Rethrow not correctly handled
+						//addCode("ERROR " + line.substring(preThrow.length()).trim(), _indent, disabled);
+						addCode ("ERROR " + arg, _indent, disabled);
+						// END KGU#1102 2023-11-08
 					}
 					else {
-						addCode("Throw New Exception(" + line.substring(preThrow.length()).trim() + ")", _indent, disabled);
+						// START KGU#1102 2023-11-08: Bugfix #1109 Rethrow not correctly handled
+						//addCode("Throw New Exception(" + line.substring(preThrow.length()).trim() + ")", _indent, disabled);
+						if (arg.isEmpty()) {
+							// Could be a rethrow - look for a catch context
+							Element parent = _jump;
+							while ((parent = parent.parent) != null) {
+								Element grandPa = null;
+								if (parent instanceof Subqueue
+										&& (grandPa = parent.parent) instanceof Try
+										&& parent == ((Try)grandPa).qCatch) {
+									arg = "ex" + Integer.toHexString(((Try)grandPa).hashCode());
+									break;
+								}
+							}
+						}
+						else {
+							arg = "New Exception(" + arg + ")";
+						}
+						addCode("Throw " + arg, _indent, disabled);
+						// END KGU#1102 2023-11-08
 					}
 				}
 				// END KGU#686 2019-03-18

@@ -223,6 +223,7 @@ package lu.fisch.structorizer.executor;
  *                                      method getEvalErrorMessage() generated.
  *      Kay Gürtzig     2023-10-16      Bugfix #980/#1096: Simple but effective workaround for complicated C-style
  *                                      initialisation (declaration + assignment) case where setVar used to fail.
+ *      Kay Gürtzig     2023-11-07      Issue #800: Fundamental revision of stepForIn()
  *
  ******************************************************************************************************
  *
@@ -7951,12 +7952,25 @@ public class Executor implements Runnable
 		// START KGU#307 2016-12-12: Issue #307 - prepare warnings on loop variable manipulations
 		int forLoopLevel = context.forLoopVars.count();
 		// END KGU#307 2016-12-12
-		TokenList valueListTokens = new TokenList(element.getValueList());
 		String iterVar = element.getCounterVar();
 		Object[] valueList = null;
 		String problem = "";	// Gathers exception descriptions for analysis purposes
 		Object value = null;
 		boolean valueNoArray = false;
+		// START KGU#790 2023-11-07_ Issue #800 Part of the code revision: Use For decomposer
+		//TokenList valueListTokens = new TokenList(element.getValueList());
+		ArrayList<TokenList> valueTokenList = element.getValueListItems();
+		TokenList valueListTokens = null;
+		if (valueTokenList != null) {
+			valueListTokens = TokenList.concatenate(valueTokenList, ",");
+			valueListTokens.add("}");
+			valueListTokens.add(0, "{");
+		}
+		else {
+			valueListTokens = new TokenList(element.getValueList());
+		}
+		// END KGU#790 2023-11-07
+		valueListTokens.trim();
 		// START KGU#417 2017-06-30: Enh. #424 - Turtleizer functions must be evaluated each time
 		try {
 			valueListTokens = this.evaluateDiagramControllerFunctions(valueListTokens);
@@ -7981,6 +7995,7 @@ public class Executor implements Runnable
 		if (valueListTokens.size() >= 2 
 				&& valueListTokens.get(0).equals("{") && valueListTokens.getLast().equals("}"))
 		{
+			// It was a list or array literal, so evaluate it as an object array
 			try
 			{
 				// START KGU#439 2017-10-13: Issue #436
@@ -7989,6 +8004,15 @@ public class Executor implements Runnable
 				//context.interpreter.unset("tmp20160321kgu");
 				value = this.evaluateExpression(valueListTokens, true, false);
 				// END KGU#439 2017-10-13
+				// START KGU#429/KGU#790 2023-11-07: Issue #800 Part taken from below
+				// In case it was a variable or function, it MUST contain or return an array to be acceptable
+				if (value != null
+						&& /*!(value instanceof Object[]) &&*/ !(value instanceof ArrayList<?>)
+						&& !(value instanceof String)) {
+					valueNoArray = true;
+					problem += valueListTokens.getString() + " = " + prepareValueForDisplay(value, context.dynTypeMap);
+				}
+				// END KGU#429/KGU#790 2023-11-07
 			}
 			catch (EvalError ex)
 			{
@@ -8007,120 +8031,123 @@ public class Executor implements Runnable
 			}
 		}
 		
-		// External function calls are not allowed at this position but there of course some
-		// functions that yield an array (split) or a string (copy, insert, delete, uppercase,
-		// lowercase. The latter ones might even be concatenated. Nevertheless it's relatively
-		// safe to evaluate this as content of an array initializer. If the comma was what we
-		// assumed (separator of an item enumeration) then the resulting array (i.e. ArrayList)
-		// MUST contain more than one element. (If the comma IS an argument separator of a
-		// function call then either the function will be an element of the value list or
-		// we obtain a single element - or some syntax trouble.)
-		if (value == null && valueListTokens.contains(","))
-		{
-			try
-			{
-				// START KGU#439 2017-10-13: Issue #436
-				//this.evaluateExpression("Object[] tmp20160321kgu = {" + valueListString + "}", false, false);
-				//value = context.interpreter.get("tmp20160321kgu");
-				//context.interpreter.unset("tmp20160321kgu");
-				//value = this.evaluateExpression("{" + valueListTokens + "}", true, false);
-				TokenList tempTokens = new TokenList(valueListTokens);
-				tempTokens.add(0, "{");
-				tempTokens.add("}");
-				value = this.evaluateExpression(tempTokens, true, false);
-				// END KGU#439 2017-10-13
-				// START KGU#856 2020-04-23: Bugfix #858 - there ARE functions returning an array or string
-				if (value instanceof ArrayList && ((ArrayList<?>)value).size() == 1) {
-					/* If the array contains only a single element then we must have
-					 * misinterpreted the comma (may have been a separator in a function
-					 * parameter list. So the element is certainly the array or string
-					 * we need
-					 */
-					value = ((ArrayList<?>)value).get(0);
-				}
-				// END KGU#856 2020-04-23
-			}
-			catch (EvalError ex)
-			{
-				// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
-				//problem += "\n" + ex.getMessage();
-				// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
-				//String exMessage = ex.getRawMessage();
-				//int pilcrowPos = -1;
-				//if (exMessage != null && (pilcrowPos = exMessage.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-				//	exMessage = exMessage.substring(0, pilcrowPos);
-				//}
-				String exMessage = getEvalErrorMessage(ex);
-				// END KGU#1058 2022-09-29
-				problem += "\n" + exMessage;
-				// END KGU#1024 2022-01-05
-			}
-		}
-		// Might be a function or variable otherwise evaluable
-		if (value == null)
-		{
-			try
-			{
-				value = this.evaluateExpression(valueListTokens, false, false);
-				// START KGU#429 2017-10-08
-				// In case it was a variable or function, it MUST contain or return an array to be acceptable
-				if (value != null
-						&& /*!(value instanceof Object[]) &&*/ !(value instanceof ArrayList<?>)
-						&& !(value instanceof String)) {
-					valueNoArray = true;
-					problem += valueListTokens.getString() + " = " + prepareValueForDisplay(value, context.dynTypeMap);
-				}
-				// END KGU#429 2017-10-08
-			}
-			catch (EvalError ex)
-			{
-				// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
-				//problem += "\n" + ex.getMessage();
-				// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
-				//String exMessage = ex.getRawMessage();
-				//int pilcrowPos = -1;
-				//if (exMessage != null && (pilcrowPos = exMessage.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-				//	exMessage = exMessage.substring(0, pilcrowPos);
-				//}
-				String exMessage = getEvalErrorMessage(ex);
-				// END KGU#1058 2022-09-29
-				problem += "\n" + exMessage;
-				// END KGU#1024 2022-01-05
-			}
-		}
-		if (value == null && valueListTokens.size() > 1 && valueListTokens.getPadding() > 0)
-		{
-			// Rather desperate attempt to compose an array from loose strings (like in shell scripts)
-			ArrayList<TokenList> exprTokens = Syntax.splitExpressionList(valueListTokens, " ");
-			try
-			{
-				// START KGU#439 2017-10-13: Issue #436
-				//this.evaluateExpression("Object[] tmp20160321kgu = {" + tokens.concatenate(",") + "}", false, false);
-				//value = context.interpreter.get("tmp20160321kgu");
-				//context.interpreter.unset("tmp20160321kgu");
-				//value = this.evaluateExpression("{" + tokens.concatenate(",") + "}", true, false);
-				TokenList tempTokens = TokenList.concatenate(exprTokens.subList(0, exprTokens.size()-1), ",");
-				tempTokens.add(0, "{");
-				tempTokens.add("}");
-				value = this.evaluateExpression(tempTokens, true, false);
-				// END KGU#439 2017-10-13
-			}
-			catch (EvalError ex)
-			{
-				// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
-				//problem += "\n" + ex.getMessage();
-				// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
-				//String exMessage = ex.getRawMessage();
-				//int pilcrowPos = -1;
-				//if (exMessage != null && (pilcrowPos = exMessage.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-				//	exMessage = exMessage.substring(0, pilcrowPos);
-				//}
-				String exMessage = getEvalErrorMessage(ex);
-				// END KGU#1058 2022-09-29
-				problem += "\n" + exMessage;
-				// END KGU#1024 2022-01-05
-			}
-		}
+// START KGU#790 2023-11-07 Issue #800 This probing should have become obsolete now
+//		// External function calls are not allowed at this position but there of course some
+//		// functions that yield an array (split) or a string (copy, insert, delete, uppercase,
+//		// lowercase. The latter ones might even be concatenated. Nevertheless it's relatively
+//		// safe to evaluate this as content of an array initializer. If the comma was what we
+//		// assumed (separator of an item enumeration) then the resulting array (i.e. ArrayList)
+//		// MUST contain more than one element. (If the comma IS an argument separator of a
+//		// function call then either the function will be an element of the value list or
+//		// we obtain a single element - or some syntax trouble.)
+//		if (value == null && valueListTokens.contains(","))
+//		{
+//			try
+//			{
+//				// START KGU#439 2017-10-13: Issue #436
+//				//this.evaluateExpression("Object[] tmp20160321kgu = {" + valueListString + "}", false, false);
+//				//value = context.interpreter.get("tmp20160321kgu");
+//				//context.interpreter.unset("tmp20160321kgu");
+//				//value = this.evaluateExpression("{" + valueListTokens + "}", true, false);
+//				TokenList tempTokens = new TokenList(valueListTokens);
+//				tempTokens.add(0, "{");
+//				tempTokens.add("}");
+//				value = this.evaluateExpression(tempTokens, true, false);
+//				// END KGU#439 2017-10-13
+//				// START KGU#856 2020-04-23: Bugfix #858 - there ARE functions returning an array or string
+//				if (value instanceof ArrayList && ((ArrayList<?>)value).size() == 1) {
+//					/* If the array contains only a single element then we must have
+//					 * misinterpreted the comma (may have been a separator in a function
+//					 * parameter list. So the element is certainly the array or string
+//					 * we need
+//					 */
+//					value = ((ArrayList<?>)value).get(0);
+//				}
+//				// END KGU#856 2020-04-23
+//			}
+//			catch (EvalError ex)
+//			{
+//				// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
+//				//problem += "\n" + ex.getMessage();
+//				// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+//				//String exMessage = ex.getRawMessage();
+//				//int pilcrowPos = -1;
+//				//if (exMessage != null && (pilcrowPos = exMessage.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+//				//	exMessage = exMessage.substring(0, pilcrowPos);
+//				//}
+//				String exMessage = getEvalErrorMessage(ex);
+//				// END KGU#1058 2022-09-29
+//				problem += "\n" + exMessage;
+//				// END KGU#1024 2022-01-05
+//			}
+//		}
+//		
+//		// Might be a function or variable otherwise evaluable
+//		if (value == null)
+//		{
+//			try
+//			{
+//				value = this.evaluateExpression(valueListTokens, false, false);
+//				// START KGU#429 2017-10-08
+//				// In case it was a variable or function, it MUST contain or return an array to be acceptable
+//				if (value != null
+//						&& /*!(value instanceof Object[]) &&*/ !(value instanceof ArrayList<?>)
+//						&& !(value instanceof String)) {
+//					valueNoArray = true;
+//					problem += valueListTokens.getString() + " = " + prepareValueForDisplay(value, context.dynTypeMap);
+//				}
+//				// END KGU#429 2017-10-08
+//			}
+//			catch (EvalError ex)
+//			{
+//				// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
+//				//problem += "\n" + ex.getMessage();
+//				// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+//				//String exMessage = ex.getRawMessage();
+//				//int pilcrowPos = -1;
+//				//if (exMessage != null && (pilcrowPos = exMessage.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+//				//	exMessage = exMessage.substring(0, pilcrowPos);
+//				//}
+//				String exMessage = getEvalErrorMessage(ex);
+//				// END KGU#1058 2022-09-29
+//				problem += "\n" + exMessage;
+//				// END KGU#1024 2022-01-05
+//			}
+//		}
+//		if (value == null && valueListTokens.size() > 1 && valueListTokens.getPadding() > 0)
+//		{
+//			// Rather desperate attempt to compose an array from loose strings (like in shell scripts)
+//			ArrayList<TokenList> exprTokens = Syntax.splitExpressionList(valueListTokens, " ");
+//			try
+//			{
+//				// START KGU#439 2017-10-13: Issue #436
+//				//this.evaluateExpression("Object[] tmp20160321kgu = {" + tokens.concatenate(",") + "}", false, false);
+//				//value = context.interpreter.get("tmp20160321kgu");
+//				//context.interpreter.unset("tmp20160321kgu");
+//				//value = this.evaluateExpression("{" + tokens.concatenate(",") + "}", true, false);
+//				TokenList tempTokens = TokenList.concatenate(exprTokens.subList(0, exprTokens.size()-1), ",");
+//				tempTokens.add(0, "{");
+//				tempTokens.add("}");
+//				value = this.evaluateExpression(tempTokens, true, false);
+//				// END KGU#439 2017-10-13
+//			}
+//			catch (EvalError ex)
+//			{
+//				// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
+//				//problem += "\n" + ex.getMessage();
+//				// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+//				//String exMessage = ex.getRawMessage();
+//				//int pilcrowPos = -1;
+//				//if (exMessage != null && (pilcrowPos = exMessage.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+//				//	exMessage = exMessage.substring(0, pilcrowPos);
+//				//}
+//				String exMessage = getEvalErrorMessage(ex);
+//				// END KGU#1058 2022-09-29
+//				problem += "\n" + exMessage;
+//				// END KGU#1024 2022-01-05
+//			}
+//		}
+// END KGU#790 2023-11-07
 		if (value != null)
 		{
 			// Shouldn't occur anymore
@@ -8142,6 +8169,7 @@ public class Executor implements Runnable
 			// END KGU#429 2017-10-08
 			else if (!valueNoArray)
 			{
+				// FIXME Is this case still imaginable?
 				valueList = new Object[1];
 				valueList[0] = value;
 			}

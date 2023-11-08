@@ -1039,14 +1039,16 @@ public class TexAlgGenerator extends Generator {
 			int endIndex = 2;
 			if (_for.isForInLoop()) {
 				endIndex = 4;
-				StringList items = this.extractForInListItems(_for);
+				ArrayList<TokenList> items = _for.getValueListItems();
 				String valueList = "";
 				if (items == null) {
-					valueList = _for.getValueList();
+					//valueList = _for.getValueList();
+					valueList = "\\ " + transform(_for.getValueList());
 				}
 				else {
-					valueList = items.concatenate(", ");
-					if (items.count() != 1 || !isStringLiteral(items.get(0)) && !Syntax.isIdentifier(items.get(0), false, null)) {
+					valueList = TokenList.concatenate(items, ", ").getString();
+					if (items.size() != 1 || !isStringLiteral(items.get(0))
+							&& !Syntax.isIdentifier(items.get(0).getString().trim(), false, null)) {
 						valueList = "\\{" + transform(valueList) + "\\}";
 					}
 					else {
@@ -1098,9 +1100,12 @@ public class TexAlgGenerator extends Generator {
 		}
 	}
 	
-	/** tests whether the given value list item {@code _item} is a string literal */
-	private boolean isStringLiteral(String _item) {
-		return _item.length() >= 2 && _item.charAt(0) == '"' && _item.charAt(_item.length()-1) == '"';
+	/** tests whether the given tokenized expression {@code _item} is a string literal */
+	private boolean isStringLiteral(TokenList _tokens) {
+		String token;
+		return _tokens.size() == 1
+				&& (token = _tokens.get(0)).length() >= 2
+				&& token.charAt(0) == '"' && token.charAt(token.length()-1) == '"';
 	}
 
 	@Override

@@ -830,10 +830,10 @@ public class PythonGenerator extends Generator
 		if (_for.isForInLoop())
 		{
 			valueList = _for.getValueList();
-			StringList items = this.extractForInListItems(_for);
+			ArrayList<TokenList> items = _for.getValueListItems();
 			if (items != null)
 			{
-				valueList = "[" + transform(items.concatenate(", "), false) + "]";
+				valueList = "[" + transform(TokenList.concatenate(items, ", ").getString(), false) + "]";
 			}
 		}
 		// START KGU#934 2021-02-13: Bugfix #935 NullPointerException...

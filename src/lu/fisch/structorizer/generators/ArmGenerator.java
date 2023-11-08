@@ -922,15 +922,15 @@ public class ArmGenerator extends Generator {
                 }
             }
             // END KGU#1001 2021-11-10
-            StringList items = this.extractForInListItems(_for);
+            ArrayList<TokenList> items = _for.getValueListItems();
             if (items != null) {
                 // START KGU#1001 2021-10-28: Bugfix #1005
                 //c = "[" + transform(items.concatenate(", "), false) + "]";
                 valList = getAvailableRegister();
-                String init = "word " + valList + " <- {" + transform(items.concatenate(", "), false) + "}";
+                String init = "word " + valList + " <- {" + transform(TokenList.concatenate(items, ", ").getString(), false) + "}";
                 this.generateArrayInitialization(init, isDisabled, _for);
                 mVariables.put(valList, TEMP_REGISTER_TAG);
-                endValueStr = "#" + Integer.toString((items.count()-1));
+                endValueStr = "#" + Integer.toString((items.size()-1));
                 endValueComplex = false;
                 // END KGU#1001 2021-10-28
             }

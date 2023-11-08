@@ -3247,14 +3247,14 @@ public abstract class Element {
 						}
 					}
 					//System.out.println("Adding parameter: " + vars.get(j).trim());
-					if (declNames != null) declNames.add(decl.getString());
+					if (declNames != null) declNames.add(decl.getString().trim());
 					// Enh. #388 Care for constant declarations
 					if (declTypes != null){
 						if (!prefix.isEmpty() || type != null) {
-							declTypes.add(prefix + type.getString());
+							declTypes.add(prefix + type.getString().trim());
 						}
 						else {
-							// type must be null but we cannot add it directly, because it is not a String
+							// type must be null but we cannot add it directly, because null is not a String
 							String dummy = null;
 							declTypes.add(dummy);
 						}
@@ -3265,6 +3265,7 @@ public abstract class Element {
 							declDefaults.add(deflt.getString().trim());
 						}
 						else {
+							// default must be null but we cannot add it directly, because null is not a String
 							String dummy = null;
 							declDefaults.add(dummy);
 						}

@@ -20,6 +20,8 @@
 
 package lu.fisch.structorizer.generators;
 
+import java.util.ArrayList;
+
 /******************************************************************************************************
  *
  *      Author:         Kay Gürtzig
@@ -288,7 +290,7 @@ public class CPlusPlusGenerator extends CGenerator {
 		{
 			StringList expressions = 
 					Syntax.splitExpressionList(_input.substring(outputKey.length()), ",");
-			_input = outputKey + " " + expressions.concatenate(" << ");
+			_input = outputKey + " " + expressions.subSequence(0, expressions.count()-1).concatenate(" << ");
 		}
 		// END KGU#101 2015-12-11
 		
@@ -434,10 +436,10 @@ public class CPlusPlusGenerator extends CGenerator {
 		boolean done = false;
 		String var = _for.getCounterVar();
 		String valueList = _for.getValueList();
-		StringList items = this.extractForInListItems(_for);
+		ArrayList<TokenList> items = _for.getValueListItems();
 		if (items != null)
 		{
-			valueList = "{" + items.concatenate(", ") + "}";
+			valueList = "{" + TokenList.concatenate(items, ", ").getString() + "}";
 		}
 
 		// Creation of the loop header

@@ -72,6 +72,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2021-02-01      Bugfix #923: Type retrieval for value lists was too weak
  *      Kay Gürtzig     2021-10-09      Bugfix #997: Inconsistent blank handling between forms and text
  *      Kay Gürtzig     2022-08-15      Bugfix #997: Collateral damage of previous bugfix version mended.
+ *      Kay Gürtzig     2023-11-07      Issue #800 Method getValueListItems() fundamentally revised
  *
  ******************************************************************************************************
  *
@@ -84,6 +85,7 @@ import java.awt.Point;
 import java.awt.Rectangle;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Vector;
 
 import javax.swing.ImageIcon;
@@ -91,7 +93,10 @@ import javax.swing.ImageIcon;
 import lu.fisch.graphics.*;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
+import lu.fisch.structorizer.syntax.Expression;
+import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.SyntaxException;
 import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.*;
 
@@ -626,10 +631,9 @@ public class For extends Element implements ILoop {
 		ArrayList<TokenList> valueItems = null;
 		String valueListString = this.getValueList();
 		if (valueListString != null) {
+			boolean isComplexObject = Function.isFunction(valueListString, false)
+					|| Syntax.isIdentifier(valueListString, false, ".");
 			TokenList valueListTokens = new TokenList(valueListString, true);
-			boolean hadBraces = !valueListTokens.isBlank()
-					&& valueListTokens.get(0).equals("{")
-					&& valueListTokens.get(valueListTokens.size()-1).equals("}");
 			/* There are of course built-in functions with more than one argument (such
 			 * that commas may occur within expressions) but method splitExpressionList
 			 * is structure-aware such that it's relatively safe to decompose an item
@@ -640,30 +644,62 @@ public class For extends Element implements ILoop {
 			 * parentheses then it will be safe. (That syntax variant should be declared
 			 * deprecated.)
 			 */
-			if (valueListTokens.contains(",")) {
-				if (hadBraces)
-				{
-					valueListTokens = valueListTokens.subSequenceToEnd(1);
-				}
+			boolean hadBraces = !valueListTokens.isBlank()
+					&& valueListTokens.get(0).equals("{")
+					&& valueListTokens.get(valueListTokens.size()-1).equals("}");
+			if (hadBraces)
+			{
+				valueListTokens = valueListTokens.subSequenceToEnd(1);
 				valueItems = Syntax.splitExpressionList(valueListTokens, ",");
 			}
-			else if (valueListTokens.contains(" ")) {
-				valueItems = Syntax.splitExpressionList(valueListTokens, " ");
+			else if (!isComplexObject) {
+				valueItems = Syntax.splitExpressionList(valueListTokens, ",");
+				if (valueItems.size() == 2 && valueListString.contains(" ")) {
+					/* The commas must have been inside some expression - seems to be
+					 * a single expression, but try with blanks, too
+					 */
+					// START KGU#790 2023-11-07: Issue 800 Rather parse the content
+					//ArrayList<TokenList> tempItems = Syntax.splitExpressionList(valueListTokens, " ");
+					//if (tempItems.size() > 2) {
+					//	valueItems = tempItems;
+					//}
+					try {
+						LinkedList<Expression> expressions = Expression.parse(valueListTokens, null, (short)0);
+						if (expressions != null) {
+							valueItems = new ArrayList<TokenList>();
+							for (Expression expr: expressions) {
+								valueItems.add(expr.asTokenList());
+							}
+							valueItems.add(new TokenList());	// Just a dummy tail
+						}
+					} catch (SyntaxException exc) {
+						// Last desperate approach
+						ArrayList<TokenList> tempItems = Syntax.splitExpressionList(valueListTokens, " ");
+						if (tempItems.size() > 2) {
+							valueItems = tempItems;
+						}
+					}
+					// END KGU#790 2023-11-07
+				}
 			}
-			// Note that valueItems always contains the tail as last element (even if empty),
-			// hence a size of 2 means a single element.
-			if (valueItems != null && valueItems.size() == 2
-					&& !hadBraces && Syntax.isIdentifier(valueItems.get(0).getString(), false, ".")) {
-				// Now we get into trouble: It ought to be an array variable, which we 
-				// cannot evaluate here So what do we return?
-				// We just return null to avoid misunderstandings
-				valueItems = null;
+			// The split result always contains the tail as last element, so drop it now
+			if (valueItems != null) {
+				valueItems.remove(valueItems.size() - 1);
+				for (int i = 0; i < valueItems.size(); i++) {
+					valueItems.get(i).trim();
+				}
+				if (valueItems.size() == 1 && !hadBraces) {
+					// Now we get into trouble: It ought to be an array variable, which we 
+					// cannot evaluate here So what do we return?
+					// We just return null to avoid misunderstandings
+					valueItems = null;
+				}
 			}
 		}
 		return valueItems;
 	}
 	// END KGU 2017-04-14
-    
+	
 	/**
 	 * @param counterVar - the counterVar to set
 	 */

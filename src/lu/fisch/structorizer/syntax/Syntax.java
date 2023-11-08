@@ -175,7 +175,6 @@ public class Syntax {
 		UNIFICATION_MAP.put("and", "&&");
 		UNIFICATION_MAP.put("or", "||");
 		UNIFICATION_MAP.put("not", "!");
-		UNIFICATION_MAP.put("not", "!");
 		UNIFICATION_MAP.put("xor", "^");
 		UNIFICATION_MAP.put("\u2260", "!=");
 		UNIFICATION_MAP.put("\u2264", "<=");

@@ -1105,7 +1105,7 @@ public class OberonGenerator extends Generator {
 	{
 		boolean done = false;
 		String var = _for.getCounterVar();
-		StringList items = this.extractForInListItems(_for);
+		ArrayList<TokenList> items = _for.getValueListItems();
 		// Create some generic and unique variable names
 		String postfix = Integer.toHexString(_for.hashCode());
 		String arrayName = "array" + postfix;
@@ -1119,7 +1119,7 @@ public class OberonGenerator extends Generator {
 			// do if items are heterogenous? We will just try five types: boolean,
 			// common enum type, integer, real and string, where we can only test literals.
 			// If none of them match then we add a TODO comment.
-			int nItems = items.count();
+			int nItems = items.size();
 			// START KGU#542 2019-11-21: Enh. #739
 			String allEnum = "";
 			// END KGU#542 2019-11-21
@@ -1129,7 +1129,7 @@ public class OberonGenerator extends Generator {
 			boolean allString = true;
 			for (int i = 0; i < nItems; i++)
 			{
-				String item = items.get(i);
+				String item = items.get(i).getString().trim();
 				// START KGU#542 2019-11-21: Enh. #739
 				TypeMapEntry tme = this.typeMap.get(item);
 				// END KGU#542 2019-11-21
@@ -1149,7 +1149,7 @@ public class OberonGenerator extends Generator {
 					{
 						// START KGU#542 2019-11-21: Enh. #739 enum type support - it might be an enumerator constant
 						//allInt = false;
-						allInt = tme !=  null && tme.isEnum();
+						allInt = tme != null && tme.isEnum();
 						// END KGU#542 2019-11-21
 					}
 				}
@@ -1212,7 +1212,7 @@ public class OberonGenerator extends Generator {
 			{
 				// START KGU#369 2017-03-15: Bugfix #382 item transformation had been missing
 				//addCode(arrayName + "[" + i + "] := " + items.get(i) + ";",
-				addCode(arrayName + "[" + i + "] := " + transform(items.get(i)) + ";",
+				addCode(arrayName + "[" + i + "] := " + transform(items.get(i).getString().trim()) + ";",
 				// END KGU#369 2017-03-15
 						_indent, isDisabled);
 			}

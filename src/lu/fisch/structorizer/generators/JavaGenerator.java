@@ -477,6 +477,7 @@ public class JavaGenerator extends CGenerator
 			{
 				StringList expressions = 
 						Syntax.splitExpressionList(_input.substring(outputKey.length()), ",");
+				expressions.remove(expressions.count()-1);	// Get rid of the tail
 				// Some of the expressions might be sums, so better put parentheses around them
 				if (expressions.count() > 1) {
 					_input = outputKey + " (" + expressions.concatenate(") + (") + ")";

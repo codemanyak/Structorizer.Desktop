@@ -1901,8 +1901,9 @@ public class CGenerator extends Generator {
 		if (items != null)
 		{
 			// Good question is: how do we guess the element type and what do we
-			// do if items are heterogeneous? We will make use of the typeMap and
-			// hope to get sensible information. Otherwise we add a TODO comment.
+			// do if items are heterogeneous? We will scan literals and make use
+			// of the typeMap hoping to get sensible information.
+			// Otherwise we add a TODO comment.
 			int nItems = items.size();
 			boolean allChar = true;	// KGU#782 2019-12-02: We now also detect char elements
 			boolean allInt = true;
@@ -1934,7 +1935,7 @@ public class CGenerator extends Generator {
 			else if (allInt) itemType = "int";
 			else if (allDouble) itemType = "double";
 			else if (allString) itemType = "char*";
-			String arrayLiteral = "{" + TokenList.concatenate(items, ", ").getString() + "}";
+			String arrayLiteral = "{" + TokenList.concatenate(items, ", ").getString().trim() + "}";
 
 			// Start an extra block to encapsulate the additional definitions
 			addCode("{", _indent, isDisabled);
@@ -1970,15 +1971,23 @@ public class CGenerator extends Generator {
 					// END KGU#355 2017-03-30
 					this.appendComment("TODO: Prepare the elements of the array according to defined type (or conversely).", indent);
 				}
+				// We define a fixed array here
+				addCode(itemType + " " + arrayName +  "[" + nItems + "] = "
+						+ transform(arrayLiteral, false) + ";", indent, isDisabled);
+				
+				endValStr = Integer.toString(nItems);
+				// START KGU#640 2019-01-21: Bugfix #669
+				isLoopConverted = true;
+				// END KGU#640 2019-01-21
 			}
-			// We define a fixed array here
-			addCode(itemType + " " + arrayName +  "[" + nItems + "] = "
-					+ transform(arrayLiteral, false) + ";", indent, isDisabled);
-			
-			endValStr = Integer.toString(nItems);
-			// START KGU#640 2019-01-21: Bugfix #669
-			isLoopConverted = true;
-			// END KGU#640 2019-01-21
+			// START KGU#790 2023-11-07 Issue #800
+			else {
+				addCode(itemType + " " + arrayName +  "[] = "
+						+ transform(arrayLiteral, false) + ";", indent, isDisabled);
+				endValStr = Integer.toString(nItems);
+				isLoopConverted = true;
+			}
+			// END KGU#790 2023-11-07
 		}
 		else if (typeInfo != null && typeInfo.isArray()) {
 			String limitName = "count" + nameSuffix;

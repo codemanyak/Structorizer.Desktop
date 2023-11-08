@@ -851,11 +851,11 @@ public class PerlGenerator extends Generator {
 		if (_for.isForInLoop())
 		{
 			String valueList = _for.getValueList();
-			StringList items = this.extractForInListItems(_for);
+			ArrayList<TokenList> items = _for.getValueListItems();
 			if (items != null)
 			{
 				valueList = "@array" + Integer.toHexString(_for.hashCode());
-				addCode("my " + valueList + " = (" + transform(items.concatenate(", "), false) + ")",
+				addCode("my " + valueList + " = (" + transform(TokenList.concatenate(items, ", ").getString(), false) + ")",
 						_indent, isDisabled);
 			}
 			else

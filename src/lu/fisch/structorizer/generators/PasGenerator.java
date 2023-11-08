@@ -606,15 +606,15 @@ public class PasGenerator extends Generator
 		// but this seemed too expensive here.
 		tokens.replaceAll("==", "=", true);
 		tokens.replaceAll("!=","<>", true);
-		tokens.replaceAll("%"," mod ", true);
-		tokens.replaceAll("&&"," and ", true);
-		tokens.replaceAll("||"," or ", true);
-		tokens.replaceAll("!"," not ", true);
-		tokens.replaceAll("&"," and ", true);
-		tokens.replaceAll("|"," or ", true);
-		tokens.replaceAll("~"," not ", true);
-		tokens.replaceAll("<<"," shl ", true);
-		tokens.replaceAll(">>"," shr ", true);
+		tokens.replaceAll("%","mod", true);
+		tokens.replaceAll("&&","and", true);
+		tokens.replaceAll("||","or", true);
+		tokens.replaceAll("!","not", true);
+		tokens.replaceAll("&","and", true);
+		tokens.replaceAll("|","or", true);
+		tokens.replaceAll("~","not", true);
+		tokens.replaceAll("<<","shl", true);
+		tokens.replaceAll(">>","shr", true);
 		tokens.replaceAll("<-", ":=", true);
 		// START KGU#311 2016-12-26: Enh. #314 - Support for File API
 		//if (this.usesFileAPI) {	// KGU#832 2020-03-23: Bugfix #840 transform even for disabled elements

@@ -143,10 +143,12 @@ public class Expression {
 	}};
 	
 	/**
-	 * A set of unambiguous numerical operator symbols, for type inference
+	 * A set of integer operator symbols, for type inference
+	 * 
+	 * @see #OPERATOR_SET_NUMERIC
 	 */
 	@SuppressWarnings("serial")
-	private static final HashSet<String> OPERATOR_SET_NUM1 = new HashSet<String>()
+	private static final HashSet<String> OPERATOR_SET_INTEGRAL = new HashSet<String>()
 	{{
 		add("%");
 		add("div");
@@ -164,10 +166,12 @@ public class Expression {
 	}};
 	// "-,*,/,+1,-1"
 	/**
-	 * A set of possible numerical operator symbols, for type inference
+	 * A set of unambiguously numerical operator symbols (without integer symbols), for type inference
+	 * 
+	 * @see #OPERATOR_SET_INTEGRAL
 	 */
 	@SuppressWarnings("serial")
-	private static final HashSet<String> OPERATOR_SET_NUM2 = new HashSet<String>()
+	private static final HashSet<String> OPERATOR_SET_NUMERIC = new HashSet<String>()
 	{{
 		add("-");
 		add("*");
@@ -1138,7 +1142,7 @@ public class Expression {
 						dType = floatEntry;
 					}
 				}
-				else if (OPERATOR_SET_NUM1.contains(text.toLowerCase())) {
+				else if (OPERATOR_SET_INTEGRAL.contains(text.toLowerCase())) {
 					if (allSame && allNumeric && floatEntry == null) {
 						// Should actually better be integer
 						dType = operandTypes[0];
@@ -1148,7 +1152,7 @@ public class Expression {
 						dType = TypeRegistry.getStandardType("int");
 					}
 				}
-				else if (OPERATOR_SET_NUM2.contains(text) && allNumeric) {
+				else if (OPERATOR_SET_NUMERIC.contains(text) && allNumeric) {
 					if (allNumeric) {
 						if (allSame) {
 							dType = operandTypes[0];

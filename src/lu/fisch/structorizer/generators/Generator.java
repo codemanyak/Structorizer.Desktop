@@ -2620,45 +2620,45 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	}
 	// END KGU#109/KGU#141 2016-01-16
 	
-	// START KGU#61 2016-03-23: Enh. #84 (FOR-IN loop infrastructure)
-	/**
-	 * In case of a FOR-IN loop tries to extract the value list items
-	 * if explicitly given in the loop text (literal syntax).<br/>
-	 * If the value list is represented by a variable then null will be
-	 * returned instead.<br/>
-	 * Utility routine that may be used in {@link #generateCode(For, String)}.
-	 * 
-	 * @param _for - the For loop of FOR-IN style to be analysed
-	 * @return a StringList where every element contains one item (as string), or {@code null}
-	 * 
-	 * @deprecated use {@link For#getValueListItems()} instead
-	 */
-	protected StringList extractForInListItems(For _for)
-	{
-		String valueList = _for.getValueList();
-		StringList items = null;
-		boolean isComplexObject = Function.isFunction(valueList, false) || this.varNames.contains(valueList);
-		if (valueList.startsWith("{") && valueList.endsWith("}"))
-		{
-			items = Syntax.splitExpressionList(valueList.substring(1, valueList.length()-1), ",");
-		}
-		else if (valueList.contains(","))
-		{
-			items = Syntax.splitExpressionList(valueList, ",");
-		}
-		else if (!isComplexObject && valueList.contains(" "))
-		{
-			items = Syntax.splitExpressionList(valueList, " ");
-		}
-		// START KGU#790 2023-11-06: After the code revision of the splitting we always get the tail
-		if (items != null) {
-			// Get rid of the line tail
-			items.remove(items.count()-1);
-		}
-		// END KGU#790 2023-11-06
-		return items;
-	}
-	// END KGU#61 2016-03-23
+//	// START KGU#61 2016-03-23: Enh. #84 (FOR-IN loop infrastructure)
+//	/**
+//	 * In case of a FOR-IN loop tries to extract the value list items
+//	 * if explicitly given in the loop text (literal syntax).<br/>
+//	 * If the value list is represented by a variable then null will be
+//	 * returned instead.<br/>
+//	 * Utility routine that may be used in {@link #generateCode(For, String)}.
+//	 * 
+//	 * @param _for - the For loop of FOR-IN style to be analysed
+//	 * @return a StringList where every element contains one item (as string), or {@code null}
+//	 * 
+//	 * @deprecated use {@link For#getValueListItems()} instead
+//	 */
+//	protected StringList extractForInListItems(For _for)
+//	{
+//		String valueList = _for.getValueList();
+//		StringList items = null;
+//		boolean isComplexObject = Function.isFunction(valueList, false) || this.varNames.contains(valueList);
+//		if (valueList.startsWith("{") && valueList.endsWith("}"))
+//		{
+//			items = Syntax.splitExpressionList(valueList.substring(1, valueList.length()-1), ",");
+//		}
+//		else if (valueList.contains(","))
+//		{
+//			items = Syntax.splitExpressionList(valueList, ",");
+//		}
+//		else if (!isComplexObject && valueList.contains(" "))
+//		{
+//			items = Syntax.splitExpressionList(valueList, " ");
+//		}
+//		// START KGU#790 2023-11-06: After the code revision of the splitting we always get the tail
+//		if (items != null) {
+//			// Get rid of the line tail
+//			items.remove(items.count()-1);
+//		}
+//		// END KGU#790 2023-11-06
+//		return items;
+//	}
+//	// END KGU#61 2016-03-23
 	
 	// START KGU#178 2016-07-19: Enh. #160
 	/**

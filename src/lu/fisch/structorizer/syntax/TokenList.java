@@ -40,6 +40,7 @@ import lu.fisch.utils.StringList;
  *      Author          Date            Description
  *      ------          ----            -----------
  *      Kay Gürtzig     2023-10-19      First Issue
+ *      Kay Gürtzig     2023-11-07      Several corrections, set of methods extended
  *
  ******************************************************************************************************
  *
@@ -63,9 +64,9 @@ import lu.fisch.utils.StringList;
  *
  * If no such object exists, the list should be "wrapped" using the
  * {@link Collections#synchronizedList Collections.synchronizedList}
- * method.  This is best done at creation time, to prevent accidental
- * unsynchronized access to the list:<pre>
- *   List list = Collections.synchronizedList(new TokenList(...));</pre>
+ * method. This is best done at creation time, to prevent accidental
+ * unsynchronized access to the list:
+ * <pre>List list = Collections.synchronizedList(new TokenList(...));</pre>
  *   
  * @author Kay Gürtzig
  *
@@ -91,7 +92,7 @@ public class TokenList implements Comparable<TokenList>{
 			"+=", "-=", "*=", "/=", "%=", "&=", "|=", "<<=", ">>=",
 			"\\\\"};
 	private static final StringList LEX_SYMBOL_LIST = new StringList(LEX_SYMBOLS);
-	private static final String SYMBOL_CONTINUATORS = ".+-<>=:&|\\";
+	private static final String SYMBOL_CONTINUATIONS = ".+-<>=:&|\\";
 	private static final String SPEC_OPR_SYMBOLS = "\u2260\u2264\u2265";
 
 	/**
@@ -529,7 +530,7 @@ public class TokenList implements Comparable<TokenList>{
 				break;
 			case LX_SYMBOL:
 				// Lets's see if there is some possible combination
-				if (SYMBOL_CONTINUATORS.indexOf(cp) >= 0) {
+				if (SYMBOL_CONTINUATIONS.indexOf(cp) >= 0) {
 					// May belong to the symbol,
 					int oldLen = sbToken.length();
 					sbToken.appendCodePoint(cp);
@@ -804,16 +805,14 @@ public class TokenList implements Comparable<TokenList>{
 		if (left >= 0) {
 			growth += left - paddings.set(index, left);
 			if (index > 0 && paddings.get(index) == 0
-					&& (new TokenList(tokens.get(index-1) + tokens.get(index))).size() == 1) {
-				paddings.set(index, 1);
+					&& this.ensureGap(index-1)) {
 				growth++;
 			}
 		}
 		if (right >= 0) {
 			growth += right - paddings.set(index + 1, right);
 			if (index+1 < tokens.size() && paddings.get(index + 1) == 0
-					&& (new TokenList(tokens.get(index) + tokens.get(index+1))).size() == 1) {
-				paddings.set(index, 1);
+				&& this.ensureGap(index)) {
 				growth++;
 			}
 		}
@@ -1355,6 +1354,22 @@ public class TokenList implements Comparable<TokenList>{
 	}
 
 	/**
+	 * Removes the first token equal to the specified string from this list. Shifts
+	 * any subsequent elements to the left (subtracts one from their indices).
+	 * 
+	 * @param token - the token to be removed
+	 * @return the element that was removed from the list
+	 */
+	public boolean removeLast(String token) {
+		int index = tokens.lastIndexOf(token);
+		if (index >= 0) {
+			this.remove(index);
+			return true;
+		}
+		return false;
+	}
+
+	/**
 	 * Removes all tokens equal to the specified string from this list. Shifts
 	 * any subsequent elements to the left (subtracts one from their indices).<br/>
 	 * Automatically ensures necessary gaps between tokens that might otherwise
@@ -1540,10 +1555,18 @@ public class TokenList implements Comparable<TokenList>{
 		int found = -1;
 		int replaced = 0;
 		while ((found = indexOf(toFind, found+1, matchCase)) >= 0) {
+			// By removing a token between words, paddings could conjure up - so avoid inflation
+			int[] oldPaddings = this.getPadding(found);
 			this.remove(found);
 			int oldSize = tokens.size();
 			this.add(found, subst);
+			if (!subst.startsWith(" ")) {
+				this.setPadding(found, oldPaddings[0], -1);
+			}
 			found += tokens.size() - oldSize;	// Avoid recursive replacement
+			if (!subst.endsWith(" ")) {
+				this.setPadding(found-1, -1, oldPaddings[1]);
+			}
 			replaced++;
 		}
 		return replaced;
@@ -1567,8 +1590,17 @@ public class TokenList implements Comparable<TokenList>{
 		int found = toIndex;
 		int replaced = 0;
 		while ((found = lastIndexOf(toFind, found-1, matchCase)) >= fromIndex) {
+			// By removing a token between words, paddings could conjure up - so avoid inflation
+			int[] paddings = this.getPadding(found);
 			this.remove(found);
+			int oldSize = tokens.size();
 			this.add(found, subst);
+			if (!subst.startsWith(" ")) {
+				this.setPadding(found, paddings[0], -1);
+			}
+			if (!subst.endsWith(" ")) {
+				this.setPadding(found + tokens.size() - oldSize - 1, -1, paddings[1]);
+			}
 			replaced++;
 		}
 		return replaced;
@@ -1577,24 +1609,37 @@ public class TokenList implements Comparable<TokenList>{
 	/**
 	 * Replaces all occurrences of sub-Tokenlist {@code toFind} by {@link
 	 * TokenList} {@code subst} and returns the number of replacements.
+	 * If token list {@code toFind} is blank (i.e. contains no tokens) then
+	 * no replacement will be done.
 	 * 
 	 * @param toFind - the sub-TokenList to be replaced by {@code subst}
 	 * @param subst - a TokenList to substitute each occurrence of {@code
 	 *    toFind}
 	 * @param matchCase - if {@code true} then case will make a difference
 	 *    in the comparison, otherwise it won't.
-	 * @return the number of formal substitutions (i.e. there is no check for
-	 *    equivalence {@code subst.equals(toFind)})
+	 * @return the number of formal substitutions (i.e. there is <b>no check for
+	 *    equivalence<b/> {@code subst.equals(toFind)})
 	 */
 	public int replaceAll(TokenList toFind, TokenList subst, boolean matchCase) {
 		int size1 = toFind.size();
 		int size2 = subst.size();
 		int found = -1;
 		int replaced = 0;
+		if (size1 == 0) {
+			return 0;
+		}
 		while ((found = indexOf(toFind, found+1, matchCase)) >= 0) {
+			int oldPadding0 = paddings.get(found);
+			int oldPadding1 = paddings.get(found + size1);
 			this.remove(found, found + size1);
 			this.addAll(found, subst);
+			if (subst.paddings.get(0) == 0) {
+				setPadding(found, oldPadding0, -1);
+			}
 			found += size2-1;	// Avoid recursive replacement
+			if (subst.paddings.get(size2) == 0) {
+				setPadding(found, -1, oldPadding1);
+			}
 			replaced++;
 		}
 		return replaced;
@@ -1915,10 +1960,10 @@ public class TokenList implements Comparable<TokenList>{
 	public int indexOf(TokenList subList, int from, boolean matchCase) {
 		// TODO There is a well-known faster algorithm (for substring search)...
 		if (subList.isBlank()) {
-			return from >= tokens.size() ? -1 : 0;
+			return from >= tokens.size() ? -1 : from;
 		}
 		String token0 = subList.get(0);
-		for (int i = from; i < tokens.size() - subList.size(); i++) {
+		for (int i = from; i <= tokens.size() - subList.size(); i++) {
 			String token1 = tokens.get(i);
 			if (!matchCase && token1.equalsIgnoreCase(token0)
 					|| token1.equals(token0)) {
