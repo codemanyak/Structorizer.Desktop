@@ -1265,15 +1265,8 @@ public class BasGenerator extends Generator
 						//addCode("Throw New Exception(" + line.substring(preThrow.length()).trim() + ")", _indent, disabled);
 						if (arg.isEmpty()) {
 							// Could be a rethrow - look for a catch context
-							Element parent = _jump;
-							while ((parent = parent.parent) != null) {
-								Element grandPa = null;
-								if (parent instanceof Subqueue
-										&& (grandPa = parent.parent) instanceof Try
-										&& parent == ((Try)grandPa).qCatch) {
-									arg = "ex" + Integer.toHexString(((Try)grandPa).hashCode());
-									break;
-								}
+							if (Try.findEnclosingTry(_jump, true) == null) {
+								arg = "New Exception(\"FIXME - missing argument!\")";
 							}
 						}
 						else {

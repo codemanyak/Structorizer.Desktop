@@ -100,6 +100,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig         2022-08-23      Issue #1068: transformIndexLists() inserted in transformTokens()
  *      Kay Gürtzig         2023-10-16      Bugfx #1096: transformTokens revised for mixed C / Java declarations
  *      Kay Gürtzig         2023-11-06      Issue #800: First bugfixing after code revision towards TokenList
+ *      Kay Gürtzig         2023-11-08      Bugfix #1109: Code generation for throw suppressed
  *
  ******************************************************************************************************
  *
@@ -1760,6 +1761,11 @@ public class BASHGenerator extends Generator {
 						addCode("return 0", _indent, disabled);
 					}
 				}
+				// START KGU#1102 2023-11-07: Bugfix #1109 There is such thing as try/catch/throw in bash
+				else if (Jump.isThrow(line)) {
+					appendComment(line + " (FIXME!)", _indent);
+				}
+				// END KGU#1102 2023-11-07
 				else
 				// END KGU#803 2020-02-16
 				// START KGU#277 2016-10-14: Enh. #270

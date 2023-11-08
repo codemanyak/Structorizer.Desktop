@@ -93,6 +93,7 @@ import java.util.ArrayList;
  *      Kay Gürtzig             2023-09-29      Issues #1091, #1092: Alias and array type defs now simply suppressed
  *      Kay Gürtzig             2023-10-04      Bugfix #1093 Undue final return 0 on function diagrams eliminated
  *      Kay Gürtzig             2023-10-12/18   Issue #980 Code generation for multi-variable and array declarations revised
+ *      Kay Gürtzig             2023-11-08      Bugfix #1109: generateCode(Jump) revised for throw
  *
  ******************************************************************************************************
  *
@@ -526,6 +527,7 @@ public class PythonGenerator extends Generator
 	/* (non-Javadoc)
 	 * @see lu.fisch.structorizer.generators.Generator#transformOutput(java.lang.String)
 	 */
+	@Override
 	protected String transformOutput(String _interm)
 	{
 		String transf = super.transformOutput(_interm);
@@ -738,6 +740,7 @@ public class PythonGenerator extends Generator
 		}
 	}
 
+	@Override
 	protected void generateCode(Alternative _alt, String _indent)
 	{
 		boolean isDisabled = _alt.isDisabled(false);
@@ -768,6 +771,7 @@ public class PythonGenerator extends Generator
 		// END KGU#54 2015-10-19
 	}
 
+	@Override
 	protected void generateCode(Case _case, String _indent)
 	{
 		boolean isDisabled = _case.isDisabled(false);
@@ -817,6 +821,7 @@ public class PythonGenerator extends Generator
 		// END KGU#54 2015-10-19
 	}
 
+	@Override
 	protected void generateCode(For _for, String _indent)
 	{
 		boolean isDisabled = _for .isDisabled(false);
@@ -874,6 +879,7 @@ public class PythonGenerator extends Generator
 		// END KGU#54 2015-10-19
 	}
 
+	@Override
 	protected void generateCode(While _while, String _indent)
 	{
 		boolean isDisabled = _while.isDisabled(false);
@@ -899,6 +905,7 @@ public class PythonGenerator extends Generator
 		// END KGU#54 2015-10-19
 	}
 
+	@Override
 	protected void generateCode(Repeat _repeat, String _indent)
 	{
 		boolean isDisabled = _repeat.isDisabled(false);
@@ -923,6 +930,7 @@ public class PythonGenerator extends Generator
 		// END KGU#54 2015-10-19
 	}
 
+	@Override
 	protected void generateCode(Forever _forever, String _indent)
 	{
 		boolean isDisabled = _forever.isDisabled(false);
@@ -941,6 +949,7 @@ public class PythonGenerator extends Generator
 		// END KGU#54 2015-10-19
 	}
 
+	@Override
 	protected void generateCode(Call _call, String _indent)
 	{
 		if(!appendAsComment(_call, _indent))
@@ -960,6 +969,7 @@ public class PythonGenerator extends Generator
 		}
 	}
 
+	@Override
 	protected void generateCode(Jump _jump, String _indent)
 	{
 		if(!appendAsComment(_jump, _indent))
@@ -1010,7 +1020,20 @@ public class PythonGenerator extends Generator
 				}
 				// START KGU#686 2019-03-21: Enh. #56
 				else if (Jump.isThrow(line)) {
-					this.addCode("raise Exception(" + line.substring(preThrow.length()) + ")", _indent, isDisabled);
+					// START KGU#1102 2023-11-08: Bugfix #1109
+					//this.addCode("raise Exception(" + line.substring(preThrow.length()) + ")", _indent, isDisabled);
+					String arg = line.substring(preThrow.length()).trim();
+					if (arg.isEmpty()) {
+						// Could be a rethrow - look for a catch context
+						if (Try.findEnclosingTry(_jump, true) == null) {
+							arg = "Exception(\"FIXME - missing argument!\")";
+						}
+					}
+					else {
+						arg = "Exception(" + arg + ")";
+					}
+					this.addCode("raise " + arg, _indent, isDisabled);
+					// END KGU#1102 2023-11-08
 				}
 				// END KGU#686 2019-03-21
 				else if (!isEmpty)
