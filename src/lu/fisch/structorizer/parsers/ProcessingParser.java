@@ -42,6 +42,7 @@ package lu.fisch.structorizer.parsers;
  *                                      not defined.
  *      Kay Gürtzig     2021-05-12      Issue #932: Processing standard definitions separated from main
  *      Kay Gürtzig     2021-05-12      Bugfix #974: A severe and an annoying typo in the ProcessingStandardDefinitions
+ *      Kay Gürtzig     2023-11-08      Bugfix #1110 method translateContent() returned the argument instead of the result
  *
  ******************************************************************************************************
  *
@@ -285,14 +286,6 @@ public class ProcessingParser extends JavaParser {
 	}
 	// END KGU#959 2021-03-05
 
-	/**
-	 * Helper method to retrieve and compose the text of the given reduction,
-	 * combine it with previously assembled string _content and adapt it to
-	 * syntactical conventions of Structorizer. Finally return the text phrase.
-	 * @param _content - A string already assembled, may be used as prefix,
-	 *   ignored or combined in another way 
-	 * @return composed and translated text.
-	 */
 	@Override
 	protected String translateContent(String _content)
 	{
@@ -314,8 +307,10 @@ public class ProcessingParser extends JavaParser {
 			tokens.remove(ix, ix + mathTokens.size());
 		}
 
+		// START KGU#1098 2023-11-08: Bugfix #1110 Methodwas ineffective
 		//return _content.trim();
 		return tokens.getString().trim();
+		// END KGU#1098 2023-11-08
 	}
 	
 
