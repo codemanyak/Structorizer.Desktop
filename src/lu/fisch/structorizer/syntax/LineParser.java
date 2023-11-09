@@ -550,10 +550,10 @@ public class LineParser /*extends CodeParser*/
 	 * @param _element - the owning NSD element
 	 * @param _lineNo - the line index
 	 * @param _unifyOprs - whether to unify all operators (otherwise only "not" will be
-	 *  replaced by "!", due to some parser difficulties)
-	 * @return the preprocessed line as string
+	 *     replaced by "!", due to some parser difficulties)
+	 * @return the preprocessed line as token list
 	 */
-	public String preprocessLine(String _line, Element _element, int _lineNo, boolean _unifyOprs)
+	public TokenList preprocessLine(String _line, Element _element, int _lineNo, boolean _unifyOprs)
 	{
 		String className = _element.getClass().getSimpleName();
 		TokenList tokens = new TokenList(_line, true);
@@ -566,7 +566,7 @@ public class LineParser /*extends CodeParser*/
 		if (className.equals("Alternative")
 				|| className.equals("While")
 				|| className.equals("Repeat")) {
-			Syntax.removeDecorators(tokens);
+			Syntax.removeSplitDecorators(tokens);
 			tokens.add(0, "§COND§");
 		}
 		else if (className.equals("Call")) {
@@ -601,16 +601,16 @@ public class LineParser /*extends CodeParser*/
 			tokens.add(0, "§CATCH§");
 		}
 		else {
-			if (_element instanceof For) {
+			if (className.equals("For")) {
 				String[] keys;
 				String[] markers;
 				if (((For)_element).isForInLoop()) {
 					keys = FOR_IN_KEYS;
-					markers = new String[]{"§FOREACH§", "§IN§"};
+					markers = new String[] {"§FOREACH§", "§IN§"};
 				}
 				else {
 					keys = FOR_KEYS;
-					markers = new String[]{"§FOR§", "§TO§", "§STEP§"};
+					markers = new String[] {"§FOR§", "§TO§", "§STEP§"};
 				}
 				for (int i = 0; i < keys.length; i++) {
 					String keyWord = Syntax.getKeyword(keys[i]);
@@ -649,10 +649,101 @@ public class LineParser /*extends CodeParser*/
 		}
 		else {
 			// Grammar does not cope with "not" tokens in front of identifiers
-			tokens.replaceAll(new TokenList("not"), new TokenList("!"), false);
+			tokens.replaceAll("not", "!", false);
 		}
-		_line = tokens.getString();
-		return _line;
+		return tokens;
+	}
+
+	/**
+	 * Preprocesses the given element line for the parser, i.e. replaces configured
+	 * keywords by grammar-defined ones, inserts classifying prefixes where needed
+	 * and unifies operator symbols.
+	 * @param _line - the element line to be parsed or checked
+	 * @param _element - the owning NSD element
+	 * @param _lineNo - the line index
+	 * @param _unifyOprs - whether to unify all operators (otherwise only "not" will be
+	 *     replaced by "!", due to some parser difficulties)
+	 * @return the preprocessed line as token list
+	 */
+	public TokenList preprocessLine(TokenList tokens, Element _element, int _lineNo, boolean _unifyOprs)
+	{
+		String className = _element.getClass().getSimpleName();
+		//StringList tokens1 = Syntax.splitLexically(_line, true, false);
+		//if (tokens.indexOf(tokens1, 0, true) != 0) {
+		//	System.err.println("Splitting differs for: " + _line);
+		//	System.out.println(tokens);
+		//	System.out.println(tokens1);
+		//}
+		if (className.equals("Alternative")
+				|| className.equals("While")
+				|| className.equals("Repeat")) {
+			Syntax.removeDecorators(tokens);
+			tokens.add(0, "§COND§");
+		}
+		else if (className.equals("Call")) {
+			tokens.add(0, "§CALL§");
+		}
+		else if (className.equals("Case")) {
+			if (_lineNo == 0) {
+				Syntax.removeDecorators(tokens);
+				tokens.add(0, "§CASE§");
+			}
+			else {
+				tokens.add(0, "§SELECT§");
+			}
+		}
+		else if (className.equals("Jump")) {
+			if (tokens.isBlank()) {
+				tokens.trim();
+				tokens.add("§LEAVE§");
+			}
+			else {
+				tokens.replaceAll("§PRELEAVE§", "§LEAVE§");
+				tokens.replaceAll("§PRERETURN§", "§RETURN§");
+				tokens.replaceAll("§PREEXIT§", "§EXIT§");
+				tokens.replaceAll("§PRETHROW§", "§THROW§");
+			}
+		}
+		else if (className.equals("Try")) {
+			tokens.add(0, "§CATCH§");
+		}
+		else if (className.equals("For")){
+			String[] keys;
+			String[] markers;
+			if (((For)_element).isForInLoop()) {
+				keys = FOR_IN_KEYS;
+				markers = new String[] {"§FOREACH§", "§IN§"};
+			}
+			else {
+				keys = FOR_KEYS;
+				markers = new String[] {"§FOR§", "§TO§", "§STEP§"};
+			}
+			for (int i = 0; i < keys.length; i++) {
+				String key = keys[i];
+				int posKey = tokens.indexOf("§" + key.toUpperCase() +"§");
+				if (posKey == 0) {
+					// Just replace the marker
+					tokens.set(0, markers[i]);
+				}
+			}
+		}
+		else if (className.equals("Instruction")) {
+			if (Instruction.isTypeDefinition(tokens, null)) {
+				// FIXME ugly workaround for type definitions: we suppress operator unification
+				_unifyOprs = false;
+			}
+			else {
+				tokens.replaceAll("§PRERETURN§", "§RETURN§");
+			}
+		}		
+		if (_unifyOprs) {
+			Syntax.unifyOperators(tokens, false);
+		}
+		else {
+			// Grammar does not cope with "not" tokens in front of identifiers
+			tokens.replaceAll("not", "!", false);
+		}
+		return tokens;
 	}
 	
 	//----------------------------- Postprocessor ----------------------------
@@ -681,10 +772,11 @@ public class LineParser /*extends CodeParser*/
 		
 	/**
 	 * Checks the syntax of the given Element line {@code _lineToCheck}
+	 * 
 	 * @param _lineToCheck - the preprocessed source line to be checked against the
-	 * line grammar
+	 *    line grammar
 	 * @return an error description with the syntax position marked in the source
-	 * line
+	 *    line
 	 * 
 	 * @see #preprocessLine(String, Element, int, boolean)
 	 * @see #parse(String, Element, int, TypeRegistry)
@@ -713,7 +805,7 @@ public class LineParser /*extends CodeParser*/
 	 * @param _types - a {@link TypeRegistry} or {@code null}
 	 * @return The composed {@link Line} object, or {@code null} in case of an error or
 	 *     lacking implementation
-	 *         
+	 * 
 	 * @see #preprocessLine(String, Element, int, boolean)
 	 * @see #check(String)
 	 */
@@ -725,7 +817,7 @@ public class LineParser /*extends CodeParser*/
 		ArrayList<Expression> expressions = new ArrayList<Expression>();
 //		synchronized(this) {
 			if (_element != null) {
-				_textToParse = preprocessLine(_textToParse, _element, _lineNo, true);
+				_textToParse = preprocessLine(_textToParse, _element, _lineNo, true).getString();
 			}
 			boolean parsedWithoutError = parser.parseSourceStatements(_textToParse);
 			Type dataType = null;

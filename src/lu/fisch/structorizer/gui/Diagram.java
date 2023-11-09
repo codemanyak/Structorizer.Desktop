@@ -242,11 +242,16 @@ package lu.fisch.structorizer.gui;
  *      Kay Gürtzig     2022-08-18      Enh. #1066: text auto-completion mechanism in showInputBox()
  *      Kay Gürtzig     2022-08-25      Enh. #1066: Infinity literal added to auto-complete words.
  *      Kay Gürtzig     2023-09-12      Bugfix #1086: Defective arrangement on source import with two routines
+ *      Kay Gürtzig     2023-11-09      Issue #800: Obsolete refactoring support (#253) removed/disabled
  *
  ******************************************************************************************************
  *
  *      Comment:		/
  *      
+ *      2023-11-09 Issues #253 / #800 (Kay Gürtzig)
+ *      - Refactoring as introduced with #253 is beeing made superfluous by internally storing fix marker
+ *        symbols like §PREFOR§ in the text tokens instead of holding user-specific keywords. This way,
+ *        only on display and editing a translation is required but nowhere else.
  *      2021-04-16 (Kay Gürtzig, #967 = ARM code export)
  *      - Alessandro Simonetta had added a Dialog menu item to switch among two ARM code syntax versions
  *        (GNU/KEIL). As this is not a diagram property, the mechanism was replaced by a plugin-specific
@@ -2518,11 +2523,13 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 				errorMessage = null;
 				// END KGU#111 2015-12-16
 
-				// START KGU#362 2017-03-28: Issue #370
-				if (root.storedParserPrefs != null) {
-					this.handleKeywordDifferences(false);
-				}
-				// END KGU#362 2017-03-28
+				// START KGU#1097 2023-11-08: Issue #800 Became obsolete
+//				// START KGU#362 2017-03-28: Issue #370
+//				if (root.storedParserPrefs != null) {
+//					this.handleKeywordDifferences(false);
+//				}
+//				// END KGU#362 2017-03-28
+				// END KGU#1097 2023-11-08
 				// START KGU#705 2019-09-23: Enh. #738
 				this.updateCodePreview();
 				// END KGU#705 2019-09-23
@@ -2562,96 +2569,98 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		// END KGU#444/KGU#618 2018-12-18
 	}
 
-	// START KGU#362 2017-03-28: Issue #370
-	private boolean handleKeywordDifferences(boolean isChangeRequest) {
-		TokenList ignoreCaseInfo = root.storedParserPrefs.get("ignoreCase");
-		boolean wasCaseIgnored = ignoreCaseInfo != null && ignoreCaseInfo.getString().equals("true");
-		TokenList replacements = new TokenList();
-		for (HashMap.Entry<String, TokenList> entry : root.storedParserPrefs.entrySet()) {
-			String storedValue = entry.getValue().getString();
-			// START KGU#288 2016-11-06: Issue #279 - Method getOrDefault() missing in OpenJDK
-			//String newValue = CodeParser.getKeywordOrDefault(entry.getKey(), "");
-			String currentValue = (entry.getKey().equals("ignoreCase"))
-					? Boolean.toString(Syntax.ignoreCase)
-					: Syntax.getKeywordOrDefault(entry.getKey(), "");
-			// END KGU#288 2016-11-06
-			if (!storedValue.equals(currentValue)) {
-				replacements.add("   " + entry.getKey() + ": \"" + storedValue + "\"  ≠  \"" + currentValue + "\"");
-			}
-		}
-		String[] options = {
-				Menu.lblRefactorNow.getText(),
-				(isChangeRequest ? Menu.lblAllowChanges : Menu.lblAdoptPreferences).getText(),
-				Menu.lblLeaveAsIs.getText()
-		};
-		String[] optionTexts = {
-				Menu.msgRefactorNow.getText(),
-				(isChangeRequest ? Menu.msgAllowChanges : Menu.msgAdoptPreferences).getText(),
-				Menu.msgLeaveAsIs.getText()
-		};
-		String menuText = "";
-		for (int i = 0; i < optionTexts.length; i++) {
-			menuText += (char) ('a' + i) + ") " + optionTexts[i] + (i + 1 < optionTexts.length ? "," : ".") + "\n";
-		}
-		int answer = JOptionPane.showOptionDialog(this.getFrame(),
-				Menu.msgKeywordsDiffer.getText().replace("%1", "\n" + replacements.getString() + "\n").replace("%2", menuText),
-				Menu.msgTitleQuestion.getText(), JOptionPane.OK_CANCEL_OPTION,
-				JOptionPane.QUESTION_MESSAGE,
-				null,
-				options, options[0]);
-		boolean goAhead = false;
-		switch (answer) {
-		case 0: // Refactor the current diagram
-		{
-			HashMap<String, TokenList> storedParserPrefs = root.storedParserPrefs;
-			root.storedParserPrefs = null;
-			refactorDiagrams(storedParserPrefs, false, wasCaseIgnored);
-			goAhead = true;
-		}
-		break;
-		case 1:
-			if (isChangeRequest) {
-				// drop the old keyword information
-				root.storedParserPrefs = null;
-			} else {
-				// Refactor all the other diagrams
-				// Cache the current parser preferences
-				HashMap<String, TokenList> splitPrefs = new HashMap<String, TokenList>();
-				// and adopt the stored preferences of the diagram
-				for (String key: Syntax.keywordSet()) {
-					splitPrefs.put(key, new TokenList(Syntax.getKeywordOrDefault(key, ""), false));
-					TokenList stored = root.storedParserPrefs.get(key);
-					if (stored != null) {
-						Syntax.setKeyword(key, stored.getString());
-					}
-				}
-				boolean tmpIgnoreCase = Syntax.ignoreCase;
-				Syntax.ignoreCase = wasCaseIgnored;
-				try {
-					Ini.getInstance().save();
-				} catch (Exception ex) {
-					logger.log(Level.SEVERE, "Ini.getInstance().save()", ex);
-				}
-				// Refactor the diagrams
-				refactorDiagrams(splitPrefs, true, tmpIgnoreCase);
-				root.storedParserPrefs = null;
-				if (Arranger.hasInstance()) {
-					Arranger.getInstance().redraw();
-				}
-
-				offerStructPrefAdaptation(splitPrefs);
-			}
-			goAhead = true;
-			break;
-		case 2:
-			if (!isChangeRequest) {
-				goAhead = true;
-			}
-			break;
-		}
-		return goAhead;
-	}
-	// END KGU#362 2017-03-28
+	// START KGU#1097 2023-11-08: Issue #800 Now obsolete
+//	// START KGU#362 2017-03-28: Issue #370
+//	private boolean handleKeywordDifferences(boolean isChangeRequest) {
+//		TokenList ignoreCaseInfo = root.storedParserPrefs.get("ignoreCase");
+//		boolean wasCaseIgnored = ignoreCaseInfo != null && ignoreCaseInfo.getString().equals("true");
+//		TokenList replacements = new TokenList();
+//		for (HashMap.Entry<String, TokenList> entry : root.storedParserPrefs.entrySet()) {
+//			String storedValue = entry.getValue().getString();
+//			// START KGU#288 2016-11-06: Issue #279 - Method getOrDefault() missing in OpenJDK
+//			//String newValue = CodeParser.getKeywordOrDefault(entry.getKey(), "");
+//			String currentValue = (entry.getKey().equals("ignoreCase"))
+//					? Boolean.toString(Syntax.ignoreCase)
+//					: Syntax.getKeywordOrDefault(entry.getKey(), "");
+//			// END KGU#288 2016-11-06
+//			if (!storedValue.equals(currentValue)) {
+//				replacements.add("   " + entry.getKey() + ": \"" + storedValue + "\"  ≠  \"" + currentValue + "\"");
+//			}
+//		}
+//		String[] options = {
+//				Menu.lblRefactorNow.getText(),
+//				(isChangeRequest ? Menu.lblAllowChanges : Menu.lblAdoptPreferences).getText(),
+//				Menu.lblLeaveAsIs.getText()
+//		};
+//		String[] optionTexts = {
+//				Menu.msgRefactorNow.getText(),
+//				(isChangeRequest ? Menu.msgAllowChanges : Menu.msgAdoptPreferences).getText(),
+//				Menu.msgLeaveAsIs.getText()
+//		};
+//		String menuText = "";
+//		for (int i = 0; i < optionTexts.length; i++) {
+//			menuText += (char) ('a' + i) + ") " + optionTexts[i] + (i + 1 < optionTexts.length ? "," : ".") + "\n";
+//		}
+//		int answer = JOptionPane.showOptionDialog(this.getFrame(),
+//				Menu.msgKeywordsDiffer.getText().replace("%1", "\n" + replacements.getString() + "\n").replace("%2", menuText),
+//				Menu.msgTitleQuestion.getText(), JOptionPane.OK_CANCEL_OPTION,
+//				JOptionPane.QUESTION_MESSAGE,
+//				null,
+//				options, options[0]);
+//		boolean goAhead = false;
+//		switch (answer) {
+//		case 0: // Refactor the current diagram
+//		{
+//			HashMap<String, TokenList> storedParserPrefs = root.storedParserPrefs;
+//			root.storedParserPrefs = null;
+//			refactorDiagrams(storedParserPrefs, false, wasCaseIgnored);
+//			goAhead = true;
+//		}
+//		break;
+//		case 1:
+//			if (isChangeRequest) {
+//				// drop the old keyword information
+//				root.storedParserPrefs = null;
+//			} else {
+//				// Refactor all the other diagrams
+//				// Cache the current parser preferences
+//				HashMap<String, TokenList> splitPrefs = new HashMap<String, TokenList>();
+//				// and adopt the stored preferences of the diagram
+//				for (String key: Syntax.keywordSet()) {
+//					splitPrefs.put(key, new TokenList(Syntax.getKeywordOrDefault(key, ""), false));
+//					TokenList stored = root.storedParserPrefs.get(key);
+//					if (stored != null) {
+//						Syntax.setKeyword(key, stored.getString());
+//					}
+//				}
+//				boolean tmpIgnoreCase = Syntax.ignoreCase;
+//				Syntax.ignoreCase = wasCaseIgnored;
+//				try {
+//					Ini.getInstance().save();
+//				} catch (Exception ex) {
+//					logger.log(Level.SEVERE, "Ini.getInstance().save()", ex);
+//				}
+//				// Refactor the diagrams
+//				refactorDiagrams(splitPrefs, true, tmpIgnoreCase);
+//				root.storedParserPrefs = null;
+//				if (Arranger.hasInstance()) {
+//					Arranger.getInstance().redraw();
+//				}
+//
+//				offerStructPrefAdaptation(splitPrefs);
+//			}
+//			goAhead = true;
+//			break;
+//		case 2:
+//			if (!isChangeRequest) {
+//				goAhead = true;
+//			}
+//			break;
+//		}
+//		return goAhead;
+//	}
+//	// END KGU#362 2017-03-28
+	// END KGU#1097 2023-11-08
 
 	// START KGU#289 2016-11-15: Enh. #290 (Aranger file support
 	private void loadArrangement(File arrFile) {
@@ -3573,13 +3582,15 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 	 * @throws CancelledException
 	 */
 	public void addUndoNSD(boolean _isRoot) throws CancelledException {
-		if (!_isRoot && root.storedParserPrefs != null) {
-			// This is an un-refactored Root!
-			// So care for consistency
-			if (!this.handleKeywordDifferences(true)) {
-				throw new CancelledException();
-			}
-		}
+		// START KGU#1097 2023-11-08: Issu #800 - Became obsolete
+//		if (!_isRoot && root.storedParserPrefs != null) {
+//			// This is an un-refactored Root!
+//			// So care for consistency
+//			if (!this.handleKeywordDifferences(true)) {
+//				throw new CancelledException();
+//			}
+//		}
+		// END KGU#1097 2023-11-08
 		root.addUndo(_isRoot);
 		// START KGU#684 2019-06-13: Bugfix #728
 		if (this.findDialog != null) {
@@ -4052,6 +4063,9 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 					String text = Element.replaceControllerAliases(data.text.getText(), false, false);
 					Element ele = new Instruction(text);
 					// END KGU#480 2018-01-21
+					// START #1097 2023-11-09: Issue #800 Now replace the user-defined keys
+					ele.encodeKeywords(null, Syntax.ignoreCase);
+					// END KGU#1097 2023-11-09
 					ele.setComment(data.comment.getText());
 					// START KGU#43 2015-10-17
 					if (data.breakpoint) {
@@ -4178,6 +4192,9 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 						//element.setText(data.text.getText());
 						element.setAliasText(data.text.getText());
 						// END KGU#480 2018-01-21
+						// START #1097 2023-11-09: Issue #800 Now replace the user-defined keys
+						element.encodeKeywords(null, Syntax.ignoreCase);
+						// END KGU#1097 2023-11-09
 					}
 					element.setComment(data.comment.getText());
 					// START KGU#43 2015-10-12
@@ -4553,6 +4570,9 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 					//_ele.setText(data.text.getText());
 					_ele.setAliasText(data.text.getText());
 					// END KGU#480 2018-01-21
+					// START #1097 2023-11-09: Issue #800 Now replace the user-defined keys
+					_ele.encodeKeywords(null, Syntax.ignoreCase);
+					// END KGU#1097 2023-11-09
 				}
 				_ele.setComment(data.comment.getText());
 				// START KGU 2015-10-17
@@ -8254,8 +8274,8 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 			// START KGU#258 2016-09-26: Enh. #253 - prepare the old settings for a refactoring
 			HashMap<String, TokenList> oldKeywordMap = null;
 			boolean wasCaseIgnored = Syntax.ignoreCase;
-			boolean considerRefactoring = root.children.getSize() > 0
-					|| isArrangerOpen() && Arranger.getInstance().getAllRoots().size() > 0;
+			//boolean considerRefactoring = root.children.getSize() > 0
+			//		|| isArrangerOpen() && Arranger.getInstance().getAllRoots().size() > 0;
 			//if (considerRefactoring)
 			//{
 				oldKeywordMap = new LinkedHashMap<String, TokenList>();
@@ -8305,34 +8325,41 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 			// save fields to ini-file
 			Syntax.saveToINI();
 
-			// START KGU#258 2016-09-26: Enh. #253 - now try a refactoring if specified
-			boolean redrawn = false;
-			if (considerRefactoring && offerRefactoring(oldKeywordMap)) {
-				boolean refactorAll = oldKeywordMap.containsKey("refactorAll");
-				redrawn = refactorDiagrams(oldKeywordMap, refactorAll, wasCaseIgnored);
-			}
-			// END KGU#258 2016-09-26
+// START KGU#1079 2023-11-09: Issue #800 Refactoring became obsolete ...
+//			// START KGU#258 2016-09-26: Enh. #253 - now try a refactoring if specified
+//			boolean redrawn = false;
+//			if (considerRefactoring && offerRefactoring(oldKeywordMap)) {
+//				boolean refactorAll = oldKeywordMap.containsKey("refactorAll");
+//				redrawn = refactorDiagrams(oldKeywordMap, refactorAll, wasCaseIgnored);
+//			}
+//			// END KGU#258 2016-09-26
+// END KGU#1097 2023-11-09 ... but we must always redraw (without analysis, though)
+
 
 			// START KGU#362 2017-03-28: Issue #370
 			offerStructPrefAdaptation(oldKeywordMap);
 			// END KGU#362 2017-03-28
 
 			// START KGU#136 2016-03-31: Bugfix #97 - cached bounds may have to be invalidated
-			if (Element.E_VARHIGHLIGHT && !redrawn) {
+			// START KGU#1079 2023-11-09: Issue #800 Refactoring became obsolete ...
+			//if (Element.E_VARHIGHLIGHT && !redrawn) {
+			// END KGU#1097 2023-11-09 ... but we must always redraw (without analysis, though)
 				// Parser keyword changes may have an impact on the text width ...
 				this.resetDrawingInfo();
-				// START KGU#258 2016-09-26: Bugfix #253 ... and Jumps and loops
-				analyse();
+				// START KGU#258 2016-09-26: Bugfix #253 ... and Jumps and loops / KGU#197 no obsolete
+				//analyse();
 				// END KGU#258 2016-09-26
 
 				// redraw diagram
 				redraw();
-			}
-			// END KGU#136 2016-03-31
-
-			// START KGU#705 2019-09-29: Enh. #738
-			updateCodePreview();
-			// END KGU#705 2019-09-29
+			// START KGU#1097 2023-11-09: Issue #800 made this obsolete here
+			//}
+			//// END KGU#136 2016-03-31
+			//
+			//// START KGU#705 2019-09-29: Enh. #738
+			//updateCodePreview();
+			//// END KGU#705 2019-09-29
+			// END KGU#1097 22023-11-09
 		}
 	}
 
@@ -8618,86 +8645,88 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 	}
 	// END KGU#735 2019-09-29
 
-	/**
-	 * Replaces used parser keywords in the specified diagrams by the keywords
-	 * associated to them in the keyword map {@code refactoringData}, which also
-	 * contains the specification whether all open diagrams are to be refactored
-	 * in this way or just {@link #root}.
-	 *
-	 * @param refactoringData - maps old keywords to new keywords and may
-	 * contain keys "refactorAll" and "ignoreCase" as mere flags.
-	 */
-	public void refactorNSD(HashMap<String, TokenList> refactoringData) {
-		if (refactoringData != null) {
-			refactorDiagrams(refactoringData,
-					refactoringData.containsKey("refactorAll"),
-					refactoringData.containsKey("ignoreCase")
-					);
-		}
-	}
-
-	private boolean refactorDiagrams(HashMap<String, TokenList> oldKeywordMap, boolean refactorAll, boolean wasCaseIgnored) {
-		boolean redrawn = false;
-		if (oldKeywordMap != null && !oldKeywordMap.isEmpty()) {
-			final class Refactorer implements IElementVisitor {
-
-				public HashMap<String, TokenList> oldMap = null;
-				boolean ignoreCase = false;
-
-				@Override
-				public boolean visitPreOrder(Element _ele) {
-					_ele.refactorKeywords(oldMap, ignoreCase);
-					return true;
-				}
-
-				@Override
-				public boolean visitPostOrder(Element _ele) {
-					return true;
-				}
-
-				Refactorer(HashMap<String, TokenList> _keyMap, boolean _caseIndifferent) {
-					oldMap = _keyMap;
-					ignoreCase = _caseIndifferent;
-				}
-			};
-			// START KGU#362 2017-03-28: Issue #370 avoid frozen diagrams
-			//root.addUndo();
-			//root.traverse(new Refactorer(oldKeywordMap, wasCaseIgnored));
-			if (root.storedParserPrefs == null) {
-				root.addUndo();
-				root.traverse(new Refactorer(oldKeywordMap, wasCaseIgnored));
-			}
-			// END KGU#362 2017-03-28
-			if (refactorAll && isArrangerOpen()) {
-				// Well, we hope that the roots won't change the hash code on refactoring...
-				for (Root aRoot : Arranger.getInstance().getAllRoots()) {
-					// START KGU#362 2017-03-28: Issue #370 avoid frozen diagrams
-					//if (root != aRoot) {
-					if (root != aRoot && aRoot.storedParserPrefs == null) {
-					// END KGU#362 2017-03-28
-						aRoot.addUndo();
-						aRoot.traverse(new Refactorer(oldKeywordMap, wasCaseIgnored));
-					}
-				}
-			}
-
-			// Parser keyword changes may have an impact on the text width ...
-			this.resetDrawingInfo();
-
-			// START KGU#258 2016-09-26: Bugfix #253 ... and Jumps and loops
-			analyse();
-			// END KGU#258 2016-09-26
-
-			doButtons();
-
-			// redraw diagram
-			redraw();
-
-			redrawn = true;
-		}
-		return redrawn;
-	}
-	// END KGU#258 2016-09-26
+// START KGU#1097 2023-11-08: Issue #800 No longer necessary
+//	/**
+//	 * Replaces used parser keywords in the specified diagrams by the keywords
+//	 * associated to them in the keyword map {@code refactoringData}, which also
+//	 * contains the specification whether all open diagrams are to be refactored
+//	 * in this way or just {@link #root}.
+//	 *
+//	 * @param refactoringData - maps old keywords to new keywords and may
+//	 * contain keys "refactorAll" and "ignoreCase" as mere flags.
+//	 */
+//	public void refactorNSD(HashMap<String, TokenList> refactoringData) {
+//		if (refactoringData != null) {
+//			refactorDiagrams(refactoringData,
+//					refactoringData.containsKey("refactorAll"),
+//					refactoringData.containsKey("ignoreCase")
+//					);
+//		}
+//	}
+//
+//	private boolean refactorDiagrams(HashMap<String, TokenList> oldKeywordMap, boolean refactorAll, boolean wasCaseIgnored) {
+//		boolean redrawn = false;
+//		if (oldKeywordMap != null && !oldKeywordMap.isEmpty()) {
+//			final class Refactorer implements IElementVisitor {
+//
+//				public HashMap<String, TokenList> oldMap = null;
+//				boolean ignoreCase = false;
+//
+//				@Override
+//				public boolean visitPreOrder(Element _ele) {
+//					_ele.refactorKeywords(oldMap, ignoreCase);
+//					return true;
+//				}
+//
+//				@Override
+//				public boolean visitPostOrder(Element _ele) {
+//					return true;
+//				}
+//
+//				Refactorer(HashMap<String, TokenList> _keyMap, boolean _caseIndifferent) {
+//					oldMap = _keyMap;
+//					ignoreCase = _caseIndifferent;
+//				}
+//			};
+//			// START KGU#362 2017-03-28: Issue #370 avoid frozen diagrams
+//			//root.addUndo();
+//			//root.traverse(new Refactorer(oldKeywordMap, wasCaseIgnored));
+//			if (root.storedParserPrefs == null) {
+//				root.addUndo();
+//				root.traverse(new Refactorer(oldKeywordMap, wasCaseIgnored));
+//			}
+//			// END KGU#362 2017-03-28
+//			if (refactorAll && isArrangerOpen()) {
+//				// Well, we hope that the roots won't change the hash code on refactoring...
+//				for (Root aRoot : Arranger.getInstance().getAllRoots()) {
+//					// START KGU#362 2017-03-28: Issue #370 avoid frozen diagrams
+//					//if (root != aRoot) {
+//					if (root != aRoot && aRoot.storedParserPrefs == null) {
+//					// END KGU#362 2017-03-28
+//						aRoot.addUndo();
+//						aRoot.traverse(new Refactorer(oldKeywordMap, wasCaseIgnored));
+//					}
+//				}
+//			}
+//
+//			// Parser keyword changes may have an impact on the text width ...
+//			this.resetDrawingInfo();
+//
+//			// START KGU#258 2016-09-26: Bugfix #253 ... and Jumps and loops
+//			analyse();
+//			// END KGU#258 2016-09-26
+//
+//			doButtons();
+//
+//			// redraw diagram
+//			redraw();
+//
+//			redrawn = true;
+//		}
+//		return redrawn;
+//	}
+//	// END KGU#258 2016-09-26
+// END KGU#1097 2023-11-08
 
 	/**
 	 * Opens the Arranger Preferences dialog and processes configuration changes

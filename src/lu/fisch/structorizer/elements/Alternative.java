@@ -104,7 +104,7 @@ public class Alternative extends Element implements IFork {
 	// END KGU#227 2016-07-31
 
 	// START KGU#258 2016-09-26: Enh. #253
-	private static final String[] relevantParserKeys = {"preAlt", "postAlt"};
+	private static final String[] relevantParserKeys = {"^preAlt", "$postAlt"};
 	// END KGU#258 2016-09-25
 	
 	public Alternative()

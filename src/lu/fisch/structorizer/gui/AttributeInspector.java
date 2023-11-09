@@ -39,6 +39,7 @@ package lu.fisch.structorizer.gui;
  *      Kay Gürtzig     2019-03-24      Enh. #56: Try elements and Throw flavour of Jump elements introduced
  *      Kay Gürtzig     2020-08-12      Enh. #800: CodeParser references replaced by Syntax
  *      Kay Gürtzig     2021-01-26      Issue #400: Some Components had not reacted to Esc and Shift/Ctrl-Enter
+ *      Kay Gürtzig     2023-11-09      Issue #800: Refactoring support removed (obsolete)
  *
  ******************************************************************************************************
  *
@@ -48,7 +49,6 @@ package lu.fisch.structorizer.gui;
  ******************************************************************************************************///
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Container;
 import java.awt.Frame;
 import java.awt.GridBagConstraints;
@@ -67,7 +67,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.HashMap;
-import java.util.Map.Entry;
 
 import javax.swing.JButton;
 import javax.swing.JComboBox;
@@ -110,7 +109,9 @@ public class AttributeInspector extends LangDialog implements WindowListener {
 	private JPanel pnButtonBar;
 	protected final JPanel pnStatistics = new JPanel();
 	protected final JPanel pnCopyrights = new JPanel();
-	protected final JPanel pnKeywordSet = new JPanel();
+	// START KGU#1097 2023-11-09: Issue #800 Became obsolete
+	//protected final JPanel pnKeywordSet = new JPanel();
+	// END KGU#1097 2023-11-09
 	protected final JPanel pnButtons = new JPanel();
 	
 	protected final JLabel lblRoot = new JLabel();
@@ -658,64 +659,66 @@ public class AttributeInspector extends LangDialog implements WindowListener {
 			// TODO: Add some software complexity measures!
 		}
 
-		//================= KEYWORD SET =================
-
-		gbcDialog.gridy++;
-
-		gbcDialog.gridx = 1;
-		gbcDialog.gridwidth = 4;
-		gbcDialog.gridheight = 1;
-		gbcDialog.fill = GridBagConstraints.BOTH;
-		gbcDialog.weightx = 4;
-		gbcDialog.weighty = 1;
-		gbcDialog.anchor = GridBagConstraints.NORTH;
-		gblDialog.setConstraints(pnKeywordSet, gbcDialog);
-		pnDialogPane.add(pnKeywordSet);
-
-		{
-			JComponent[] keyComponents = new JComponent[] {
-					this.btnParserPrefs, this.lblPrefsPre,	this.lblPrefsPost,	this.lblPrefsMore,
-					this.lblPrefsAlt,	this.txtAltPre,		this.txtAltPost,	null,
-					this.lblPrefsCase,	this.txtCasePre,	this.txtCasePost,	null,
-					this.lblPrefsFor,	this.txtForPre,		this.txtForPost,	this.txtForStep,
-					this.lblPrefsForIn,	this.txtForInPre,	this.txtForInPost,	null,
-					this.lblPrefsWhile,	this.txtWhilePre,	this.txtWhilePost,	null,
-					this.lblPrefsRepeat,this.txtRepeatPre,	this.txtRepeatPost,	null,
-					// START KGU#686 2019-03-24: Enh. #56 - This had to be reorganised for throw
-					//this.lblPrefsJump, 	this.lblPrefsLeave,	this.lblPrefsReturn,	this.lblPrefsExit,
-					//null, 				this.txtJumpLeave,	this.txtJumpReturn,	this.txtJumpExit,
-					this.lblPrefsJump, 	this.txtJumpLeave,	this.lblPrefsLeave,	null,
-					null,				this.txtJumpReturn,	this.lblPrefsReturn,	null,
-					null, 				this.txtJumpExit,	this.lblPrefsExit,	null,
-					null,				this.txtJumpThrow,	this.lblPrefsThrow,	null,
-					// END KGU#686 2019-03-24
-					this.lblPrefsIO,	this.txtInput,		this.txtOutput,		null
-			};
-
-			pnKeywordSet.setLayout(new GridLayout(0, 4, 5, 0));
-			pnKeywordSet.setBorder(new TitledBorder("Cached differing keyword set"));
-
-			this.btnParserPrefs.addActionListener(new ActionListener() {
-				public void actionPerformed(ActionEvent evt) {
-					parserPrefsButtonActionPerformed(evt);
-				}
-			});
-
-			for (JComponent comp: keyComponents) {
-				if (comp == null) {
-					pnKeywordSet.add(new JLabel(""));
-				}
-				else {
-					if (comp instanceof JTextField) {
-						comp.setEnabled(false);
-						//((JTextField)comp).setEditable(false);
-					}
-					pnKeywordSet.add(comp);
-				}
-			}
-			this.updateKeywordDisplay();
-
-		}
+// START KGU#1097 2023-11-09: Issue #800 Now obsolete
+//		//================= KEYWORD SET =================
+//
+//		gbcDialog.gridy++;
+//
+//		gbcDialog.gridx = 1;
+//		gbcDialog.gridwidth = 4;
+//		gbcDialog.gridheight = 1;
+//		gbcDialog.fill = GridBagConstraints.BOTH;
+//		gbcDialog.weightx = 4;
+//		gbcDialog.weighty = 1;
+//		gbcDialog.anchor = GridBagConstraints.NORTH;
+//		gblDialog.setConstraints(pnKeywordSet, gbcDialog);
+//		pnDialogPane.add(pnKeywordSet);
+//
+//		{
+//			JComponent[] keyComponents = new JComponent[] {
+//					this.btnParserPrefs, this.lblPrefsPre,	this.lblPrefsPost,	this.lblPrefsMore,
+//					this.lblPrefsAlt,	this.txtAltPre,		this.txtAltPost,	null,
+//					this.lblPrefsCase,	this.txtCasePre,	this.txtCasePost,	null,
+//					this.lblPrefsFor,	this.txtForPre,		this.txtForPost,	this.txtForStep,
+//					this.lblPrefsForIn,	this.txtForInPre,	this.txtForInPost,	null,
+//					this.lblPrefsWhile,	this.txtWhilePre,	this.txtWhilePost,	null,
+//					this.lblPrefsRepeat,this.txtRepeatPre,	this.txtRepeatPost,	null,
+//					// START KGU#686 2019-03-24: Enh. #56 - This had to be reorganised for throw
+//					//this.lblPrefsJump, 	this.lblPrefsLeave,	this.lblPrefsReturn,	this.lblPrefsExit,
+//					//null, 				this.txtJumpLeave,	this.txtJumpReturn,	this.txtJumpExit,
+//					this.lblPrefsJump, 	this.txtJumpLeave,	this.lblPrefsLeave,	null,
+//					null,				this.txtJumpReturn,	this.lblPrefsReturn,	null,
+//					null, 				this.txtJumpExit,	this.lblPrefsExit,	null,
+//					null,				this.txtJumpThrow,	this.lblPrefsThrow,	null,
+//					// END KGU#686 2019-03-24
+//					this.lblPrefsIO,	this.txtInput,		this.txtOutput,		null
+//			};
+//
+//			pnKeywordSet.setLayout(new GridLayout(0, 4, 5, 0));
+//			pnKeywordSet.setBorder(new TitledBorder("Cached differing keyword set"));
+//
+//			this.btnParserPrefs.addActionListener(new ActionListener() {
+//				public void actionPerformed(ActionEvent evt) {
+//					parserPrefsButtonActionPerformed(evt);
+//				}
+//			});
+//
+//			for (JComponent comp: keyComponents) {
+//				if (comp == null) {
+//					pnKeywordSet.add(new JLabel(""));
+//				}
+//				else {
+//					if (comp instanceof JTextField) {
+//						comp.setEnabled(false);
+//						//((JTextField)comp).setEditable(false);
+//					}
+//					pnKeywordSet.add(comp);
+//				}
+//			}
+//			this.updateKeywordDisplay();
+//
+//		}
+// END KGU#1097 2023-11-09
 
 		//================= BUTTON BAR =================
 
@@ -748,80 +751,82 @@ public class AttributeInspector extends LangDialog implements WindowListener {
 		
 	}
 
-	private void updateKeywordDisplay() {
-		if (root.storedParserPrefs != null) {
-			// The keys to retrieve the reserved words are defined in CodeParser.keywordMap.
-			for (Entry<String, JTextField> entry: keyFieldMap.entrySet()) {
-				TokenList keyTokens = root.storedParserPrefs.get(entry.getKey());
-				String text = "";
-				if (keyTokens != null) { text = keyTokens.getString(); }
-				entry.getValue().setText(text);
-				if (!Syntax.getKeywordOrDefault(entry.getKey(), "").equals(text)) {
-					entry.getValue().setForeground(Color.RED);
-					entry.getValue().setEditable(false);
-					entry.getValue().setEnabled(true);
-				}
-			}
-		}
-	}
-
-	protected void parserPrefsButtonActionPerformed(ActionEvent evt) {
-		ParserPreferences parserPreferences = new ParserPreferences(frame);
-		parserPreferences.setTitle(parserPreferences.getTitle() + " for comparison / to adopt");
-		// set fields
-		parserPreferences.edtAltPre.setText(Syntax.getKeyword("preAlt"));
-		parserPreferences.edtAltPost.setText(Syntax.getKeyword("postAlt"));
-		parserPreferences.edtCasePre.setText(Syntax.getKeyword("preCase"));
-		parserPreferences.edtCasePost.setText(Syntax.getKeyword("postCase"));
-		parserPreferences.edtForPre.setText(Syntax.getKeyword("preFor"));
-		parserPreferences.edtForPost.setText(Syntax.getKeyword("postFor"));
-		parserPreferences.edtForStep.setText(Syntax.getKeyword("stepFor"));
-		parserPreferences.edtForInPre.setText(Syntax.getKeyword("preForIn"));
-		parserPreferences.edtForInPost.setText(Syntax.getKeyword("postForIn"));
-		parserPreferences.edtWhilePre.setText(Syntax.getKeyword("preWhile"));
-		parserPreferences.edtWhilePost.setText(Syntax.getKeyword("postWhile"));
-		parserPreferences.edtRepeatPre.setText(Syntax.getKeyword("preRepeat"));
-		parserPreferences.edtRepeatPost.setText(Syntax.getKeyword("postRepeat"));
-		parserPreferences.edtJumpLeave.setText(Syntax.getKeyword("preLeave"));
-		parserPreferences.edtJumpReturn.setText(Syntax.getKeyword("preReturn"));
-		parserPreferences.edtJumpExit.setText(Syntax.getKeyword("preExit"));
-		// START KGU#686 2019-03-24: Enh. #56
-		parserPreferences.edtJumpThrow.setText(Syntax.getKeyword("preThrow"));
-		// END KGU#686 2019-03-24
-		parserPreferences.edtInput.setText(Syntax.getKeyword("input"));
-		parserPreferences.edtOutput.setText(Syntax.getKeyword("output"));
-		parserPreferences.chkIgnoreCase.setSelected(Syntax.ignoreCase);
-
-		parserPreferences.edtAltPre.setEnabled(false);
-		parserPreferences.edtAltPost.setEnabled(false);
-		parserPreferences.edtCasePre.setEnabled(false);
-		parserPreferences.edtCasePost.setEnabled(false);
-		parserPreferences.edtForPre.setEnabled(false);
-		parserPreferences.edtForPost.setEnabled(false);
-		parserPreferences.edtForStep.setEnabled(false);
-		parserPreferences.edtForInPre.setEnabled(false);
-		parserPreferences.edtForInPost.setEnabled(false);
-		parserPreferences.edtWhilePre.setEnabled(false);
-		parserPreferences.edtWhilePost.setEnabled(false);
-		parserPreferences.edtRepeatPre.setEnabled(false);
-		parserPreferences.edtRepeatPost.setEnabled(false);
-		parserPreferences.edtJumpLeave.setEnabled(false);
-		parserPreferences.edtJumpReturn.setEnabled(false);
-		parserPreferences.edtJumpExit.setEnabled(false);
-		// START KGU#686 2019-03-24: Enh. #56
-		parserPreferences.edtJumpThrow.setEnabled(false);
-		// END KGU#686 2019-03-24
-		parserPreferences.edtInput.setEnabled(false);
-		parserPreferences.edtOutput.setEnabled(false);
-		parserPreferences.chkIgnoreCase.setEnabled(false);
-		// START KGU#307 2019-03-05: Enh. #327
-		parserPreferences.btnFromLocale.setEnabled(false);
-		// END KGU#307 2019-03-05
-
-		parserPreferences.pack();
-		parserPreferences.setVisible(true);
-
-	}
+	// START KGU#1097 2023-11-09: Issue #800 No longer needed
+//	private void updateKeywordDisplay() {
+//		if (root.storedParserPrefs != null) {
+//			// The keys to retrieve the reserved words are defined in CodeParser.keywordMap.
+//			for (Entry<String, JTextField> entry: keyFieldMap.entrySet()) {
+//				TokenList keyTokens = root.storedParserPrefs.get(entry.getKey());
+//				String text = "";
+//				if (keyTokens != null) { text = keyTokens.getString(); }
+//				entry.getValue().setText(text);
+//				if (!Syntax.getKeywordOrDefault(entry.getKey(), "").equals(text)) {
+//					entry.getValue().setForeground(Color.RED);
+//					entry.getValue().setEditable(false);
+//					entry.getValue().setEnabled(true);
+//				}
+//			}
+//		}
+//	}
+//
+//	protected void parserPrefsButtonActionPerformed(ActionEvent evt) {
+//		ParserPreferences parserPreferences = new ParserPreferences(frame);
+//		parserPreferences.setTitle(parserPreferences.getTitle() + " for comparison / to adopt");
+//		// set fields
+//		parserPreferences.edtAltPre.setText(Syntax.getKeyword("preAlt"));
+//		parserPreferences.edtAltPost.setText(Syntax.getKeyword("postAlt"));
+//		parserPreferences.edtCasePre.setText(Syntax.getKeyword("preCase"));
+//		parserPreferences.edtCasePost.setText(Syntax.getKeyword("postCase"));
+//		parserPreferences.edtForPre.setText(Syntax.getKeyword("preFor"));
+//		parserPreferences.edtForPost.setText(Syntax.getKeyword("postFor"));
+//		parserPreferences.edtForStep.setText(Syntax.getKeyword("stepFor"));
+//		parserPreferences.edtForInPre.setText(Syntax.getKeyword("preForIn"));
+//		parserPreferences.edtForInPost.setText(Syntax.getKeyword("postForIn"));
+//		parserPreferences.edtWhilePre.setText(Syntax.getKeyword("preWhile"));
+//		parserPreferences.edtWhilePost.setText(Syntax.getKeyword("postWhile"));
+//		parserPreferences.edtRepeatPre.setText(Syntax.getKeyword("preRepeat"));
+//		parserPreferences.edtRepeatPost.setText(Syntax.getKeyword("postRepeat"));
+//		parserPreferences.edtJumpLeave.setText(Syntax.getKeyword("preLeave"));
+//		parserPreferences.edtJumpReturn.setText(Syntax.getKeyword("preReturn"));
+//		parserPreferences.edtJumpExit.setText(Syntax.getKeyword("preExit"));
+//		// START KGU#686 2019-03-24: Enh. #56
+//		parserPreferences.edtJumpThrow.setText(Syntax.getKeyword("preThrow"));
+//		// END KGU#686 2019-03-24
+//		parserPreferences.edtInput.setText(Syntax.getKeyword("input"));
+//		parserPreferences.edtOutput.setText(Syntax.getKeyword("output"));
+//		parserPreferences.chkIgnoreCase.setSelected(Syntax.ignoreCase);
+//
+//		parserPreferences.edtAltPre.setEnabled(false);
+//		parserPreferences.edtAltPost.setEnabled(false);
+//		parserPreferences.edtCasePre.setEnabled(false);
+//		parserPreferences.edtCasePost.setEnabled(false);
+//		parserPreferences.edtForPre.setEnabled(false);
+//		parserPreferences.edtForPost.setEnabled(false);
+//		parserPreferences.edtForStep.setEnabled(false);
+//		parserPreferences.edtForInPre.setEnabled(false);
+//		parserPreferences.edtForInPost.setEnabled(false);
+//		parserPreferences.edtWhilePre.setEnabled(false);
+//		parserPreferences.edtWhilePost.setEnabled(false);
+//		parserPreferences.edtRepeatPre.setEnabled(false);
+//		parserPreferences.edtRepeatPost.setEnabled(false);
+//		parserPreferences.edtJumpLeave.setEnabled(false);
+//		parserPreferences.edtJumpReturn.setEnabled(false);
+//		parserPreferences.edtJumpExit.setEnabled(false);
+//		// START KGU#686 2019-03-24: Enh. #56
+//		parserPreferences.edtJumpThrow.setEnabled(false);
+//		// END KGU#686 2019-03-24
+//		parserPreferences.edtInput.setEnabled(false);
+//		parserPreferences.edtOutput.setEnabled(false);
+//		parserPreferences.chkIgnoreCase.setEnabled(false);
+//		// START KGU#307 2019-03-05: Enh. #327
+//		parserPreferences.btnFromLocale.setEnabled(false);
+//		// END KGU#307 2019-03-05
+//
+//		parserPreferences.pack();
+//		parserPreferences.setVisible(true);
+//
+//	}
+	// END KGU#1097 2023-11-09
 
 	protected void clearOrgButtonActionPerformed(ActionEvent evt) {
 		this.txtOrigin.setText("");
@@ -1030,16 +1035,18 @@ public class AttributeInspector extends LangDialog implements WindowListener {
 		return committed;
 	}
 	
-	@Override
-	public void setVisible(boolean b)
-	{
-		if (b) {
-//			this.updateLicenseChoice();
-//			this.updateKeywordDisplay();
-			pnKeywordSet.setVisible(root.storedParserPrefs != null);
-		}
-		super.setVisible(b);
-	}
+// START KGU#1097 2023-11-09: Issue #800 No longer necessary
+//	@Override
+//	public void setVisible(boolean b)
+//	{
+//		if (b) {
+////			this.updateLicenseChoice();
+////			this.updateKeywordDisplay();
+//			pnKeywordSet.setVisible(root.storedParserPrefs != null);
+//		}
+//		super.setVisible(b);
+//	}
+// END KGU#1097 2023-11-09
 	
 	/* (non-Javadoc)
 	 * @see lu.fisch.structorizer.locales.LangDialog#adjustLangDependentComponents()

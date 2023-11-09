@@ -132,12 +132,17 @@ package lu.fisch.structorizer.gui;
  *      Kay Gürtzig     2021-10-05      Enh. #992: Messages for new Analyser check 30 against bracket faults
  *      Kay Gürtzig     2021-12-04      Enh. #800: Message for new grammar-based Analyser check 31
  *      Kay Gürtzig     2023-10-06      Issue #311: Parts of the "Diagram" menu moved to a new "View" menu
- *      Kay Gürtzig     2023-10-13      Issue #980: New messages for declaration syntax check (error31_*) 
+ *      Kay Gürtzig     2023-10-13      Issue #980: New messages for declaration syntax check (error31_*)
+ *      Kay Gürtzig     2023-11-09      Issue #800: Obsolete refactoring support (#253) removed/disabled
  *
  ******************************************************************************************************
  *
  *      Comment:		/
  *      
+ *      2023-11-09 Issues #253 / #800 (Kay Gürtzig)
+ *      - Refactoring as introduced with #253 is beeing made superfluous by internally storing fix marker
+ *        symbols like §PREFOR§ in the text tokens instead of holding user-specific keywords. This way,
+ *        only on display and editing a translation is required but nowhere else.
  *      2021-04-15 Enh. #967 - ARMGenerator (Kay Gürtzig)
  *      - Alessandro Simonetta (AS) introduced a new checkbox menu item in the Diagram menu to switch
  *        among Gnu and Keil assembler syntax for ARM code export. While there is no Executor support
@@ -172,7 +177,6 @@ import lu.fisch.structorizer.locales.Locales;
 import lu.fisch.structorizer.locales.Translator;
 import lu.fisch.structorizer.parsers.*;
 import lu.fisch.structorizer.syntax.Syntax;
-import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.BString;
 import lu.fisch.utils.StringList;
 
@@ -1829,8 +1833,8 @@ public class Menu extends LangMenuBar implements NSDController, LangEventListene
 						// load some data from the INI file
 						Ini ini = Ini.getInstance();
 
-						// START KGU#258 2016-09-26: Enh. #253
-						HashMap<String, TokenList> refactoringData = fetchRefactoringData();
+						// START KGU#258 2016-09-26: Enh. #253 / KGU#1097 2023-11-09: Issue #800 -> obsolete
+						//HashMap<String, TokenList> refactoringData = fetchRefactoringData();
 						// END KGU#258 2016-09-26
 
 						// START KGU#721 2019-08-06: Enh. #740 produce a backup to keep safe
@@ -1849,12 +1853,12 @@ public class Menu extends LangMenuBar implements NSDController, LangEventListene
 						ini.save();
 						NSDControl.loadFromINI();
 
-						// START KGU#258 2016-09-26: Enh. #253
-						if (diagram.offerRefactoring(refactoringData))
-						{
-							// (Refactoring involves redrawing)
-							diagram.refactorNSD(refactoringData);
-						}
+						// START KGU#258 2016-09-26: Enh. #253 / KGU#1097 2023-11-09 issue #800 -> obsolete
+						//if (diagram.offerRefactoring(refactoringData))
+						//{
+						//	// (Refactoring involves redrawing)
+						//	diagram.refactorNSD(refactoringData);
+						//}
 						// END KGU#258 2016-09-26
 					}
 					catch (Exception ex)
@@ -1875,15 +1879,19 @@ public class Menu extends LangMenuBar implements NSDController, LangEventListene
 				String trouble = null;
 				try {
 					Ini ini = Ini.getInstance();
-					HashMap<String, TokenList> refactoringData = fetchRefactoringData();
+					// START KGU#1097 2023-11-09: Issue #800 Now obsolete
+					//HashMap<String, TokenList> refactoringData = fetchRefactoringData();
+					// END KGU#1097 2023-11-09
 					done = ini.restore();
 					ini.save();
 					NSDControl.loadFromINI();
-					if (diagram.offerRefactoring(refactoringData))
-					{
-						// (Refactoring involves redrawing)
-						diagram.refactorNSD(refactoringData);
-					}
+					// START KGU#1097 2023-11-09: Issue #800 Now obsolete
+					//if (diagram.offerRefactoring(refactoringData))
+					//{
+					//	// (Refactoring involves redrawing)
+					//	diagram.refactorNSD(refactoringData);
+					//}
+					// END KGU#1097 2023-11-09
 				} catch (Exception ex) {
 					logger.log(Level.WARNING, "Error restoring the configuration backup ...", ex);
 					trouble = ex.getMessage();
@@ -2655,34 +2663,36 @@ public class Menu extends LangMenuBar implements NSDController, LangEventListene
 	}
 	// END KGU#386 2017-04-26
 
-	// START KGU#258 2016-09-26: Enh. #253 (KGU#721 2019-08-06: Enh. #740 - extracted as method)
-	/**
-	 * Collects the current parser preferences in lexically split form for comparison
-	 * with modified parser preferences
-	 * @return a {@link HashMap} associating parser tags with lexically split keywords
-	 */
-	private HashMap<String, TokenList> fetchRefactoringData() {
-		HashMap<String, TokenList> refactoringData = new LinkedHashMap<String, TokenList>();
-		for (String key: Syntax.keywordSet())
-		{
-			// START KGU#288 2016-11-06: Issue #279 - getOrDefault() may not be available
-			//String keyword = CodeParser.keywordMap.getOrDefault(key, "");
-			String keyword = Syntax.getKeywordOrDefault(key, "");
-			// END KGU#288 2016-11-06
-			if (!keyword.trim().isEmpty())
-			{
-				// Complete strings aren't likely to be found in a key, so don't bother
-				refactoringData.put(key, new TokenList(keyword,  false));
-			}
-			// An empty preForIn keyword is a synonym for the preFor keyword
-			else if (key.equals("preForIn"))
-			{
-				refactoringData.put(key, refactoringData.get("preFor"));
-			}
-		}
-		return refactoringData;
-	}
-	// END KGU#258 2016-09-26 (KGU#721 2019-08-06)
+// START KGU#1097 2023-11-09: Issue #800 made this obsolete
+//	// START KGU#258 2016-09-26: Enh. #253 (KGU#721 2019-08-06: Enh. #740 - extracted as method)
+//	/**
+//	 * Collects the current parser preferences in lexically split form for comparison
+//	 * with modified parser preferences
+//	 * @return a {@link HashMap} associating parser tags with lexically split keywords
+//	 */
+//	private HashMap<String, TokenList> fetchRefactoringData() {
+//		HashMap<String, TokenList> refactoringData = new LinkedHashMap<String, TokenList>();
+//		for (String key: Syntax.keywordSet())
+//		{
+//			// START KGU#288 2016-11-06: Issue #279 - getOrDefault() may not be available
+//			//String keyword = CodeParser.keywordMap.getOrDefault(key, "");
+//			String keyword = Syntax.getKeywordOrDefault(key, "");
+//			// END KGU#288 2016-11-06
+//			if (!keyword.trim().isEmpty())
+//			{
+//				// Complete strings aren't likely to be found in a key, so don't bother
+//				refactoringData.put(key, new TokenList(keyword,  false));
+//			}
+//			// An empty preForIn keyword is a synonym for the preFor keyword
+//			else if (key.equals("preForIn"))
+//			{
+//				refactoringData.put(key, refactoringData.get("preFor"));
+//			}
+//		}
+//		return refactoringData;
+//	}
+//	// END KGU#258 2016-09-26 (KGU#721 2019-08-06)
+// END KGU#1097 2023-11-09
 
 	// START KGU#725 2019-09-13: Enh. #746 - The importer tooltips hadn't been retranslated
 	@Override

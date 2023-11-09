@@ -254,7 +254,6 @@ import java.util.Set;
 import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.regex.Pattern;
 
 import javax.swing.ImageIcon;
 
@@ -313,7 +312,7 @@ public abstract class Element {
 	public static final long E_HELP_FILE_SIZE = 12300000;
 	public static final String E_DOWNLOAD_PAGE = "https://www.fisch.lu/Php/download.php";
 	// END KGU#791 2020-01-20
-	public static final String E_VERSION = "3.32-14";
+	public static final String E_VERSION = "3.32-15";
 	public static final String E_THANKS =
 	"Developed and maintained by\n"+
 	" - Robert Fisch <robert.fisch@education.lu>\n"+
@@ -1104,12 +1103,12 @@ public abstract class Element {
 
 	// START KGU#91 2015-12-01: We need a way to get the true value
 	/**
-	 * Returns the content of the text field no matter if mode isSwitchedTextAndComment
+	 * Returns the (decoded) content of the text field no matter if mode {@link #isSwitchTextCommentMode()}
 	 * is active.<br/>
 	 * <b>NOTE:</b> This is no longer a reference to the internal text representation
-	 *     but a reconstructed copy!<br/>
+	 * but a reconstructed copy with decoded keywords!<br/>
 	 * Use {@code getText(false)} for a mode-sensitive effect.
-	 * @return the text StringList (in normal mode) the comment StringList otherwise
+	 * @return the text StringList with decoded keywords
 	 * @see #getText(boolean)
 	 */
 	public StringList getText()
@@ -1118,7 +1117,10 @@ public abstract class Element {
 		StringList strList = new StringList();
 		synchronized (text) {
 			for (TokenList tokens: text) {
-				strList.add(tokens.getString());
+				// START KGU#1097 2023-11-09: Issue#800 Now decode the standard markers
+				//strList.add(tokens.getString());
+				strList.add(decodeLine(tokens).getString());
+				// END KGU#1097 2023-11-09
 			}
 		}
 		return strList;
@@ -1266,7 +1268,10 @@ public abstract class Element {
 		int nLines = text.size();
 		int i = 0;
 		while (i < nLines) {
-			String line = text.get(i).getString().trim();
+			// START KGU#1097 2023-11-09: Issue #800 Now decode internal standard marker tokens
+			//String line = text.get(i).getString().trim();
+			String line = decodeLine(text.get(i)).getString().trim();
+			// END KGU#1097 2023-11-09
 			while (line.endsWith("\\") && (i + 1 < nLines)) {
 				line = line.substring(0, line.length()-1) + separator + text.get(++i).getString().trim();
 			}
@@ -1497,6 +1502,7 @@ public abstract class Element {
 	 * Sets the element text from {@code aliasText} by splitting it at newlines,
 	 * after having replaced all user-specific {@link DiagramController} routine
 	 * aliases by the original routine names.
+	 * 
 	 * @param aliasText - the intended element text, possibly containing aliases
 	 * @see #getAliasText()
 	 * @see #setAliasText(StringList)
@@ -4549,6 +4555,7 @@ public abstract class Element {
 	 */
 	protected abstract String[] getRelevantParserKeys();
 
+// START KGU#1097 2023-11-09: Issue #800 Obsolete
 //	/**
 //	 * Looks up the associated token sequence in _splitOldKeywords for any of the parser preference names
 //	 * provided by getRelevantParserKeys(). If there is such a token sequence then it will be
@@ -4569,130 +4576,182 @@ public abstract class Element {
 //			this.text = result;
 //		}
 //	}
-	
-	/**
-	 * Looks up the associated token sequence in _splitOldKeys for any of the parser
-	 * preference names provided by _prefNames. If there is such a token sequence
-	 * then it will be replaced throughout {@code _line} by the associated current
-	 * parser preference for the respective name.
-	 * @param _line - line of element text
-	 * @param _splitOldKeys - a map of tokenized former non-empty parser preference keywords to be replaced
-	 * @param _prefNames - Array of parser preference names being relevant for this kind of element
-	 * @param _ignoreCase - whether case is to be ignored on comparison
-	 * @return refactored line
-	 */
-	protected final String refactorLine(String _line, HashMap<String, TokenList> _splitOldKeys, String[] _prefNames, boolean _ignoreCase)
-	{
-		TokenList tokens = new TokenList(_line);
-		boolean isModified = false;
-		// FIXME: We should order the keys by decreasing length first!
-		for (int i = 0; i < _prefNames.length; i++)
-		{
-			TokenList splitKey = _splitOldKeys.get(_prefNames[i]);
-			if (splitKey != null)
-			{
-				String subst = Syntax.getKeyword(_prefNames[i]);
-				// line shouldn't be inflated ...
-				//if (!splitKey.get(0).equals(" ")) {
-				//	while (subst.startsWith(" ")) subst = subst.substring(1); 
-				//}
-				//if (!splitKey.get(splitKey.size()-1).equals(" ")) {
-				//	while (subst.endsWith(" ")) subst = subst.substring(0, subst.length()-1);
-				//}
-				// ... but spaces must not get lost either!
-				//if (splitKey.get(0).equals(" ") && !subst.startsWith(" ")) {
-				//	subst = " " + subst;
-				//}
-				//if (splitKey.size() > 1 && splitKey.get(splitKey.size()-1).equals(" ") && !subst.endsWith(" ")) {
-				//	subst += " ";
-				//}
-				// Now seek old keyword and replace it where found
-				int pos = -1;
-				while ((pos = tokens.indexOf(splitKey, pos+1, !_ignoreCase)) >= 0)
-				{
-					// Replace the first part of the saved keyword by the entire current keyword... 
-					tokens.set(pos, subst);
-					tokens.setPadding(pos, 1, 1);
-					// ... and remove the remaining parts of the saved key
-					tokens.remove(pos+1, pos+splitKey.size());
-					isModified = true;
-				}
-			}
-		}
-		if (isModified)
-		{
-			_line = tokens.getString().trim();
-		}
-		return _line;
-	}
-	// END KGU#258 2016-09-26
+//	
+//	/**
+//	 * Looks up the associated token sequence in _splitOldKeys for any of the parser
+//	 * preference names provided by _prefNames. If there is such a token sequence
+//	 * then it will be replaced throughout {@code _line} by the associated current
+//	 * parser preference for the respective name.
+//	 * 
+//	 * @param _line - line of element text
+//	 * @param _splitOldKeys - a map of tokenized former non-empty parser preference keywords to be replaced
+//	 * @param _prefNames - Array of parser preference names being relevant for this kind of element
+//	 * @param _ignoreCase - whether case is to be ignored on comparison
+//	 * @return refactored line
+//	 */
+//	protected final String refactorLine(String _line, HashMap<String, TokenList> _splitOldKeys, String[] _prefNames, boolean _ignoreCase)
+//	{
+//		TokenList tokens = new TokenList(_line);
+//		boolean isModified = false;
+//		// FIXME: We should order the keys by decreasing length first!
+//		for (int i = 0; i < _prefNames.length; i++)
+//		{
+//			TokenList splitKey = _splitOldKeys.get(_prefNames[i]);
+//			if (splitKey != null)
+//			{
+//				String subst = Syntax.getKeyword(_prefNames[i]);
+//				// line shouldn't be inflated ...
+//				//if (!splitKey.get(0).equals(" ")) {
+//				//	while (subst.startsWith(" ")) subst = subst.substring(1); 
+//				//}
+//				//if (!splitKey.get(splitKey.size()-1).equals(" ")) {
+//				//	while (subst.endsWith(" ")) subst = subst.substring(0, subst.length()-1);
+//				//}
+//				// ... but spaces must not get lost either!
+//				//if (splitKey.get(0).equals(" ") && !subst.startsWith(" ")) {
+//				//	subst = " " + subst;
+//				//}
+//				//if (splitKey.size() > 1 && splitKey.get(splitKey.size()-1).equals(" ") && !subst.endsWith(" ")) {
+//				//	subst += " ";
+//				//}
+//				// Now seek old keyword and replace it where found
+//				int pos = -1;
+//				while ((pos = tokens.indexOf(splitKey, pos+1, !_ignoreCase)) >= 0)
+//				{
+//					// Replace the first part of the saved keyword by the entire current keyword... 
+//					tokens.set(pos, subst);
+//					tokens.setPadding(pos, 1, 1);
+//					// ... and remove the remaining parts of the saved key
+//					tokens.remove(pos+1, pos+splitKey.size());
+//					isModified = true;
+//				}
+//			}
+//		}
+//		if (isModified)
+//		{
+//			_line = tokens.getString().trim();
+//		}
+//		return _line;
+//	}
+//	// END KGU#258 2016-09-26
+// END KGU#1097 2023-11-09
 
-	// START KGU#258 2023-10-29: Enh. #253, TokenList version
+	// START KGU#258/KGU#1097 2023-11-09: Enh. #253, issue #800 TokenList version
 	/**
-	 * Looks up the associated token sequence in _splitOldKeywords for any of the parser preference names
-	 * provided by getRelevantParserKeys(). If there is such a token sequence then it will be
-	 * replaced throughout my text by the associated current parser preference for the respective name
+	 * Looks up the associated token sequence in _splitOldKeywords for any of
+	 * the parser preference names provided by getRelevantParserKeys(). If there
+	 * is such a token sequence then it will be replaced throughout my text by
+	 * the respective internal marker token
 	 * 
-	 * @param _oldKeywords - a map of tokenized former non-empty parser preference keywords to be replaced
+	 * @param _oldKeywords - a map of tokenized former non-empty parser preference
+	 *    keywords to be replaced, or {@code null} if the currently configured
+	 *    keywords are expected in the current token lists
 	 * @param _ignoreCase - whether case is to be ignored on comparison.
 	 */
-	public void refactorKeywords(HashMap<String, TokenList> _splitOldKeywords, boolean _ignoreCase)
+	public void encodeKeywords(HashMap<String, TokenList> _splitOldKeywords, boolean _ignoreCase)
 	{
+		/* Each member of relevant keys consists of an initial character specifying where
+		 * to look for the keyword tokens in an unbroken line:
+		 * '^' if only at the beginning
+		 * '$' if only at the end
+		 * '*' (or any other character) if at an arbitrary position
+		 * The remaining character sequence is the actual keyword key
+		 */
 		String[] relevantKeys = getRelevantParserKeys();
-		if (relevantKeys != null && !_splitOldKeywords.isEmpty())
+		if (relevantKeys != null)
 		{
-			var result = new ArrayList<TokenList>();
+			ArrayList<TokenList> result = new ArrayList<TokenList>();
+			boolean isContinued = false;
 			for (int i = 0; i < this.text.size(); i++)
 			{
-				result.add(refactorLine(text.get(i), _splitOldKeywords, relevantKeys, _ignoreCase));
+				// FIXME: We should order the keys by decreasing length first!
+				TokenList encoded = encodeLine(this.text.get(i), _splitOldKeywords,
+						relevantKeys, _ignoreCase, isContinued);
+				isContinued = encoded.endsWith("\\");
 			}
 			this.text = result;
 		}
 	}
-	
 	/**
-	 * Looks up the associated token sequence in _splitOldKeys for any of the parser
-	 * preference names provided by _prefNames. If there is such a token sequence
-	 * then it will be replaced throughout {@code _line} by the associated current
-	 * parser preference for the respective name.
-	 * @param tokens - line of element text as TokenList
-	 * @param _splitOldKeys - a map of tokenized former non-empty parser preference
-	 *     keywords to be replaced
-	 * @param _prefNames - Array of parser preference names being relevant for this
-	 *     kind of element
-	 * @param _ignoreCase - whether case is to be ignored on comparison
-	 * @return refactored copy of TokenList {@code tokens}
+	 * @param _tokens - the tokenized line the keywords in it are to be encoded
+	 * @param _splitOldKeywords - possibly a set of split keywords from e.g. a legacy nsd file
+	 * @param _relevantKeys - an array of key types for the element kind to handle with position
+	 *    restriction as prefix character ('^' = only at front, '$' = only at end, '*' = first
+	 *    arbitrary position)
+	 * @param _ignoreCase - if the case of the original keywords mattered
+	 * @param _isContinued - whether this is a continued part of a broken line
+	 * @return the encoded token list
 	 */
-	protected final TokenList refactorLine(TokenList tokens, HashMap<String, TokenList> _splitOldKeys, String[] _prefNames, boolean _ignoreCase)
-	{
-		boolean isModified = false;
-		// FIXME: We should order the keys by decreasing length first!
-		var newTokens = new TokenList(tokens);
-		for (int i = 0; i < _prefNames.length; i++)
+	protected TokenList encodeLine(TokenList _tokens, HashMap<String, TokenList> _splitOldKeywords,
+			String[] _relevantKeys, boolean _ignoreCase, boolean _isContinued) {
+		TokenList newTokens = new TokenList(_tokens);
+		for (int j = 0; j < _relevantKeys.length; j++)
 		{
-			TokenList splitKey = _splitOldKeys.get(_prefNames[i]);
+			// START KGU#1097 2023-11-09: Issue #800 _splitOldKes may now be null
+			//TokenList splitKey = _splitOldKeys.get(_prefNames[i]);
+			String key = _relevantKeys[j];
+			char where = key.charAt(0);	// may be '^', '$', or '*'
+			key = key.substring(1);
+			TokenList splitKey = null;
+			if (_splitOldKeywords != null) {
+				splitKey = _splitOldKeywords.get(key);
+			}
+			else {
+				splitKey = Syntax.getSplitKeyword(key);
+			}
+			// END KGU#1097 2023-11-09
 			if (splitKey != null && !splitKey.isBlank())
 			{
-				//TokenList subst = new TokenList(Syntax.getSplitKeyword(_prefNames[i]));
-				TokenList subst = Syntax.getSplitKeyword(_prefNames[i]);
-				// line shouldn't be inflated ...
-				//if (splitKey.getPadding(0)[0] == 0) {
-				//	subst.setPadding(0, 0, -1); 
-				//}
-				//if (splitKey.getPadding(splitKey.size()-1)[1] == 0) {
-				//	subst.setPadding(subst.size()-1, -1, 0);
-				//}
-				// Now seek old keyword and replace it where found
-				isModified = newTokens.replaceAll(splitKey, subst, !_ignoreCase) > 0 || isModified;
+				int sizeKey = splitKey.size();
+				int posKey = -1;
+				if (where == '$') {
+					posKey = newTokens.lastIndexOf(splitKey, !_ignoreCase);
+					// The following test will also fail if the line "ends" with '\'
+					if (posKey != newTokens.size() - sizeKey) {
+						posKey = -1;
+					}
+				}
+				else if (!(where == '^' && _isContinued)) {
+					posKey = newTokens.indexOf(splitKey, !_ignoreCase);
+					if (where == '^' && posKey != 0) {
+						posKey = -1;
+					}
+				}
+				if (posKey >= 0) {
+					// The original key word will hardly have had to little padding but be cautious
+					int[] paddings = newTokens.getPadding(posKey);
+					String subst = "§"+key.toUpperCase()+"§";
+					newTokens.set(posKey, subst);
+					if (sizeKey > 1) {
+						newTokens.remove(posKey + 1, posKey - sizeKey - 1);
+					}
+					newTokens.setPadding(posKey, paddings[0], -1);
+					newTokens.setPadding(posKey + sizeKey - 1, -1, paddings[1]);
+				}
 			}
 		}
-		if (isModified)
-		{
-			tokens = newTokens;
-		}
-		return tokens;
+		return newTokens;
 	}
-	// END KGU#258 2023-10-29
+	/**
+	 * @param _tokens - the tokenized line the keywords in it are to be encoded
+	 * @param _splitOldKeywords - possibly a set of split keywords from e.g. a legacy nsd file
+	 * @param _relevantKeys - an array of key types for the element kind to handle with position
+	 *    restriction as prefix character ('^' = only at front, '$' = only at end, '*' = first
+	 *    arbitrary position)
+	 * @param _ignoreCase - if the case of the original keywords mattered
+	 * @param _isContinued - whether this is a continued part of a broken line
+	 * @return the encoded token list
+	 */
+	protected TokenList decodeLine(TokenList _tokens) {
+		TokenList decoded = new TokenList(_tokens);
+		for (String key: Syntax.keywordSet()) {
+			TokenList keyTokens = new TokenList("§" + key.toUpperCase() + "§");
+			decoded.replaceAll(keyTokens, Syntax.getSplitKeyword(key), true);
+		}
+		return decoded;
+	}	
+	
+	// END KGU#258/KGU#1097 2023-10-29
 
 	// START KGU#301 2016-12-01: Bugfix #301
 	/**

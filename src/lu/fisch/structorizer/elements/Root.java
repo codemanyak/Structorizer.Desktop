@@ -189,11 +189,16 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2023-10-15      Bugfix #1096 More precise type and declaration handling
  *      Kay.gürtzig     2023-11-08      Issue #1112: Analyser is to avoid error3_1 and error24_8 on java.lang.
  *                                      java.util. method calls like Math.sqrt(17.2) or Character.isDigit('5')
+ *      Kay Gürtzig     2023-11-09      Issue #800: Obsolete refactoring support (#253) removed/disabled
  *      
  ******************************************************************************************************
  *
  *      Comment:		/
  *      
+ *      2023-11-09 Issues #253 / #800 (Kay Gürtzig)
+ *      - Refactoring as introduced with #253 is beeing made superfluous by internally storing fix marker
+ *        symbols like §PREFOR§ in the text tokens instead of holding user-specific keywords. This way,
+ *        only on display and editing a translation is required but nowhere else.
  *      2019-03-07 (KGU#371)
  *      - Parameter list analysis has become still more complex, so it seemed sensible to cache the
  *        parameter list while the text doesn't change.
@@ -380,9 +385,11 @@ public class Root extends Element {
 	// START KGU#316 2016-12-28: Enh. #318 Consider unzipped arrz-files
 	public String shadowFilepath = null;	// temp file path of an unzipped file
 	// END KGU#316 2016-12-28
-	// START KGU#362 2017-03-28: Issue #370 - retain original keywords if not refactored - makes Root readonly!
-	public HashMap<String, TokenList> storedParserPrefs = null;
-	// END KGU#362 2017-03-28
+	// START KGU#1097 2023-11-08: Issue #800 Became obsolete
+//	// START KGU#362 2017-03-28: Issue #370 - retain original keywords if not refactored - makes Root readonly!
+//	public HashMap<String, TokenList> storedParserPrefs = null;
+//	// END KGU#362 2017-03-28
+	// END KGU#1097 2023-11-08
 	// START KGU#363 2017-03-10: Enh. #372
 	private String author = null;
 	private String modifiedby = null;
@@ -7186,14 +7193,14 @@ public class Root extends Element {
 		}
 		else {
 			// Just do a temporary parser check (quicker) for the unbroken text lines
-			StringList lines = _ele.getUnbrokenText();
+			ArrayList<TokenList> lines = _ele.getUnbrokenTokenText();
 			LineParser parser = LineParser.getInstance();
-			int nLines = lines.count();
+			int nLines = lines.size();
 			if (_ele instanceof Case) {
 				nLines--;
 			}
 			for (int i = 0; i < nLines; i++) {
-				String line = parser.preprocessLine(lines.get(i), _ele, i, true);
+				String line = parser.preprocessLine(lines.get(i), _ele, i, true).getString();
 				String error = parser.check(line);
 				if (error != null) {
 					addError(_errors, new DetectedError(errorMsg(Menu.error32, new String[] {Integer.toString(i+1), error.replace("error.syntax:", "")}), _ele), 32);

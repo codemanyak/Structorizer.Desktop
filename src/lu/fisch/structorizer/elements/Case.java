@@ -119,53 +119,53 @@ public class Case extends Element implements IFork
     // END KGU#227 2016-07-31
 
 	// START KGU#258 2016-09-26: Enh. #253
-	private static final String[] relevantParserKeys = {"preCase", "postCase"};
+	private static final String[] relevantParserKeys = {"^preCase", "^postCase"};
 	// END KGU#258 2016-09-25
 	
-    // START KGU#91 2015-12-01: Bugfix #39 - Case may NEVER EVER interchange text and comment!
+	// START KGU#91 2015-12-01: Bugfix #39 - Case may NEVER EVER interchange text and comment!
 	/**
 	 * Returns the content of the text field. Full stop. No swapping here!
 	 * @return the text StringList
 	 */
-    @Override
+	@Override
 	public StringList getText(boolean _ignored)
 	{
 		return getText();
 	}
 
-    /* (non-Javadoc)
-     * @see lu.fisch.structorizer.elements.Element#getComment(boolean)
-     */
-    @Override
+	/* (non-Javadoc)
+	 * @see lu.fisch.structorizer.elements.Element#getComment(boolean)
+	 */
+	@Override
 	public StringList getComment(boolean _alwaysTrueComment)
 	{
-    	// START KGU#172 2016-04-01: Bugfix #145
+		// START KGU#172 2016-04-01: Bugfix #145
 		//return getComment();
-        if (!_alwaysTrueComment && isSwitchTextCommentMode())
-        {
-        	return StringList.getNew(text.get(0).getString());
-        }
-        else
-        {
-        	return comment;
-        }
+		if (!_alwaysTrueComment && isSwitchTextCommentMode())
+		{
+			return StringList.getNew(text.get(0).getString());
+		}
+		else
+		{
+			return comment;
+		}
 		// END KGU#172 2016-04-01
 	}
-    // END KGU#91 2015-12-01
-    
-    
-    @Override
-    public void setText(String _text)
-    {
+	// END KGU#91 2015-12-01
+
+
+	@Override
+	public void setText(String _text)
+	{
 // START KGU#91 2015-12-01: D.R.Y. - just employ setText(StringList)
-    	//text.setText(_text);	// Convert to a StringList
-    	StringList sl = StringList.explode(_text, "\n");
-    	// This call seems redundant but is essential since it is the overridden method 
-    	this.setText(sl);
-    	
+		//text.setText(_text);	// Convert to a StringList
+		StringList sl = StringList.explode(_text, "\n");
+		// This call seems redundant but is essential since it is the overridden method 
+		this.setText(sl);
+
 // END KGU#91 2015-12-01
 
-    }
+	}
 
     @Override
     public void setText(StringList _textList)
@@ -1114,16 +1114,16 @@ public class Case extends Element implements IFork
 	 * @see lu.fisch.structorizer.elements.Element#refactorKeywords(java.util.HashMap, boolean)
 	 */
 	@Override
-	public void refactorKeywords(HashMap<String, TokenList> _splitOldKeywords, boolean _ignoreCase)
+	public void encodeKeywords(HashMap<String, TokenList> _splitOldKeywords, boolean _ignoreCase)
 	{
 		String[] relevantKeywords = getRelevantParserKeys();
 		if (!text.isEmpty())
 		{
-			text.set(0, refactorLine(text.get(0), _splitOldKeywords, relevantKeywords, _ignoreCase));
+			text.set(0, encodeLine(text.get(0), _splitOldKeywords, relevantKeywords, _ignoreCase, false));
 			// START KGU#453 2017-11-02: Issue #447
 			boolean isContinuation = text.get(0).endsWith("\\");
 			// END KGU#453 2017-11-02
-			relevantKeywords = new String[]{"postCase"};
+			relevantKeywords = new String[]{"^postCase"};
 			for (int i = 1; i < text.size(); i++)
 			{
 				TokenList line = text.get(i);
@@ -1132,7 +1132,7 @@ public class Case extends Element implements IFork
 				if (!isContinuation && (line.size() != 1 || !line.get(0).equals("%")))
 				// END KGU#453 2017-11-02
 				{
-					text.set(i, refactorLine(line, _splitOldKeywords, relevantKeywords, _ignoreCase));
+					text.set(i, encodeLine(line, _splitOldKeywords, relevantKeywords, _ignoreCase, isContinuation));
 				}
 				// START KGU#453 2017-11-02: Issue #447
 				isContinuation = line.endsWith("\\");

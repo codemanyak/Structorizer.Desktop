@@ -55,6 +55,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig     2020-08-12      Issue #800: CodeParser references replaced by Syntax
  *      Kay Gürtzig     2021-02-22      Enh. #410: New Root field "namespace" supported
  *      Kay Gürtzig     2021-02-26      Bugfix #945: Disabled status of parallel elements had not been saved
+ *      Kay Gürtzig     2023-11-09      Issue #800: refactoring information revised (now always symbolic keys)
  *
  ******************************************************************************************************
  *
@@ -455,9 +456,14 @@ public class XmlGenerator extends Generator
 			//	pp_attributes += " " + entry.getKey() + "=\"" + BString.encodeToHtml(entry.getValue()) + "\"";
 			//}
 			String value = entry.getValue();
-			if (_root.storedParserPrefs != null && _root.storedParserPrefs.containsKey(entry.getKey())) {
-				value = _root.storedParserPrefs.get(entry.getKey()).getString();
+			// START KGU#1097 2023-11-09: Issue #800 No more refactoring but still backward compatibility
+			//if (_root.storedParserPrefs != null && _root.storedParserPrefs.containsKey(entry.getKey())) {
+			//	value = _root.storedParserPrefs.get(entry.getKey()).getString();
+			//}
+			if (!entry.getKey().equals("ignoreCase")) {
+				value = "§" + entry.getKey().toUpperCase() + "§";
 			}
+			// END KGU#1097 2023-11-09
 			if (!value.isEmpty())
 			{
 				pp_attributes += " " + entry.getKey() + "=\"" + BString.encodeToHtml(value) + "\"";

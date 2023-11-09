@@ -101,7 +101,6 @@ import lu.fisch.structorizer.elements.TypeMapEntry;
 import lu.fisch.structorizer.io.Ini;
 import lu.fisch.structorizer.locales.LangDialog;
 import lu.fisch.structorizer.locales.LangTextHolder;
-import lu.fisch.structorizer.parsers.CodeParser;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.StringList;

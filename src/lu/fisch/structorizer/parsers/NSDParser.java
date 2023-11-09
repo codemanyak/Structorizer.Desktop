@@ -119,9 +119,9 @@ public class NSDParser extends DefaultHandler {
 	// START KGU#258 2016-09-25: Enh. #253 holds the parser preferences saved with the file (3.25-01)
 	private HashMap<String, TokenList> savedParserPrefs = new HashMap<String, TokenList>();
 	private boolean ignoreCase = false;
-	// START KGU#362 2017-03-28: Issue #370 - default value flipped
-	//private boolean refactorKeywords = false;
-	private boolean refactorKeywords = true;
+	// START KGU#362 2017-03-28: Issue #370 - default value flipped, KGU#1097 2023-11-08 flipped again
+	private boolean refactorKeywords = false;
+	//private boolean refactorKeywords = true;
 	// END KGU#362 2017-03-28
 	// END KGU#258 2016-09-25
 
@@ -179,7 +179,10 @@ public class NSDParser extends DefaultHandler {
 			// START KGU#258 2016-09-25: Enh. #253 - read the saved parser preferences if any
 			// START KGU#362 2017-03-28: Issue #370 - avoid to lose original keyword information
 			//if (fileVersion.compareTo("3.25") > 0 && refactorKeywords)
-			if (fileVersion.compareTo("3.25") > 0)
+			// START KGU#1097 2023-11-08: Issue #800 newer versions don't need this any longer
+			//if (fileVersion.compareTo("3.25") > 0)
+			if (fileVersion.compareTo("3.25") > 0 && fileVersion.compareTo("3.33") < 0)
+			// END KGU#1097 2023-11-08
 			// END KGU#362 2017-03-28
 			{
 				for (String key: Syntax.keywordSet())
@@ -191,34 +194,40 @@ public class NSDParser extends DefaultHandler {
 					}
 				}
 				if (!savedParserPrefs.containsKey("preForIn") && savedParserPrefs.containsKey("preFor")) {
-					savedParserPrefs.put("preForIn", savedParserPrefs.get("preFor"));	// it should not be necessary to derive a copy
+					// it should not be necessary to derive a copy of the token list
+					savedParserPrefs.put("preForIn", savedParserPrefs.get("preFor"));
 				}
 				if (attributes.getIndex("ignoreCase") != -1)
 				{
 					ignoreCase = attributes.getValue("ignoreCase").equals("true");
 				}
-				// If no stored keywords were found then we don't need to refactor anything
-				if (savedParserPrefs.isEmpty()) {
-					refactorKeywords = false;
-				}
+				// START KGU#1097 2023-11-08: Issue #800
+//				// If no stored keywords were found then we don't need to refactor anything
+//				if (savedParserPrefs.isEmpty()) {
+//					refactorKeywords = false;
+//				}
+				refactorKeywords = !savedParserPrefs.isEmpty();
+				// END KGU#1097 2023-11-08
 			}
 			// END KGU#258 2016-09-25
-			// START KGU#362 2017-03-28: Issue #370 - avoid to lose original keyword information
-			if (!refactorKeywords && !savedParserPrefs.isEmpty()) {
-				for (String key: Syntax.keywordSet()) {
-					String current = Syntax.getKeyword(key);
-					TokenList loaded = savedParserPrefs.get(key);
-					if (loaded != null) {
-						String loadedStr = loaded.getString();
-						if (!(Syntax.ignoreCase && loadedStr.equalsIgnoreCase(current) || loadedStr.equals(current))) {
-							savedParserPrefs.put("ignoreCase", new TokenList(Boolean.toString(ignoreCase)));
-							root.storedParserPrefs = savedParserPrefs;
-							break;
-						}
-					}
-				}
-			}
-			// END KGU#362 2017-03-28
+// START KGU#1097 2023-11-08: Issue #800 does not make sense anymore we will always convert to symbolic keys
+//			// START KGU#362 2017-03-28: Issue #370 - avoid to lose original keyword information
+//			if (!refactorKeywords && !savedParserPrefs.isEmpty()) {
+//				for (String key: Syntax.keywordSet()) {
+//					String current = Syntax.getKeyword(key);
+//					TokenList loaded = savedParserPrefs.get(key);
+//					if (loaded != null) {
+//						String loadedStr = loaded.getString();
+//						if (!(Syntax.ignoreCase && loadedStr.equalsIgnoreCase(current) || loadedStr.equals(current))) {
+//							savedParserPrefs.put("ignoreCase", new TokenList(Boolean.toString(ignoreCase)));
+//							root.storedParserPrefs = savedParserPrefs;
+//							break;
+//						}
+//					}
+//				}
+//			}
+//			// END KGU#362 2017-03-28
+// END KGU#1097 2023-11-08
 			
 			// read attributes
 			root.setProgram(true);
@@ -304,11 +313,11 @@ public class NSDParser extends DefaultHandler {
 			readBaseAttributes(attributes, ele);
 			//if(attributes.getIndex("rotated")!=-1)  {if (attributes.getValue("rotated").equals("1")) {ele.rotated=true;}}
 			
-			// START KGU#258 2016-09-25: Enh. #253
-			if (this.refactorKeywords)
-			{
-				ele.refactorKeywords(savedParserPrefs, ignoreCase);
-			}
+			// START KGU#258 2016-09-25: Enh. #253 / KGU#1097 2023-11-08: obsolete
+//			if (this.refactorKeywords)
+//			{
+				ele.encodeKeywords(savedParserPrefs, ignoreCase);
+//			}
 			// END KGU#258 2016-09-25
 			
 			// place stack
@@ -327,7 +336,7 @@ public class NSDParser extends DefaultHandler {
 			// START KGU#258 2016-09-25: Enh. #253
 			if (this.refactorKeywords)
 			{
-				ele.refactorKeywords(savedParserPrefs, ignoreCase);
+				ele.encodeKeywords(savedParserPrefs, ignoreCase);
 			}
 			// END KGU#258 2016-09-25
 			
@@ -353,7 +362,7 @@ public class NSDParser extends DefaultHandler {
 			// START KGU#258/KGU#376 2017-05-17: Enh. #253, #389: Now we have to refactor at least one keyword
 			if (this.refactorKeywords)
 			{
-				ele.refactorKeywords(savedParserPrefs, ignoreCase);
+				ele.encodeKeywords(savedParserPrefs, ignoreCase);
 			}
 			// END KGU#258/KGU#376 2017-05-17
 			
@@ -373,7 +382,7 @@ public class NSDParser extends DefaultHandler {
 			// START KGU#258 2016-09-25: Enh. #253
 			if (this.refactorKeywords)
 			{
-				ele.refactorKeywords(savedParserPrefs, ignoreCase);	// FIXME does this make sense for an alternative?
+				ele.encodeKeywords(savedParserPrefs, ignoreCase);	// FIXME does this make sense for an alternative?
 			}
 			// END KGU#258 2016-09-25
 			
@@ -397,7 +406,7 @@ public class NSDParser extends DefaultHandler {
 			// START KGU#258 2016-09-25: Enh. #253
 			if (this.refactorKeywords)
 			{
-				ele.refactorKeywords(savedParserPrefs, ignoreCase);
+				ele.encodeKeywords(savedParserPrefs, ignoreCase);
 			}
 			// END KGU#258 2016-09-25
 			
@@ -457,7 +466,7 @@ public class NSDParser extends DefaultHandler {
 			
 			if (this.refactorKeywords)
 			{
-				ele.refactorKeywords(savedParserPrefs, ignoreCase);
+				ele.encodeKeywords(savedParserPrefs, ignoreCase);
 			}
 			// END KGU#258 2016-10-04
 			
@@ -560,7 +569,7 @@ public class NSDParser extends DefaultHandler {
 			// START KGU#258 2016-09-25: Enh. #253
 			if (this.refactorKeywords)
 			{
-				ele.refactorKeywords(savedParserPrefs, ignoreCase);
+				ele.encodeKeywords(savedParserPrefs, ignoreCase);
 			}
 			// END KGU#258 2016-09-25
 			
@@ -584,7 +593,7 @@ public class NSDParser extends DefaultHandler {
 			// START KGU#258 2016-09-25: Enh. #253
 			if (this.refactorKeywords)
 			{
-				ele.refactorKeywords(savedParserPrefs, ignoreCase);
+				ele.encodeKeywords(savedParserPrefs, ignoreCase);
 			}
 			// END KGU#258 2016-09-25
 			
@@ -920,7 +929,8 @@ public class NSDParser extends DefaultHandler {
 	
 	/**
 	 * Parses the NSD file specified by the given {@code File} object {@code _file} and returns the
-	 * composed {@link Root} (if possible), otherwise raises exceptions. 
+	 * composed {@link Root} (if possible), otherwise raises exceptions.
+	 * 
 	 * @param _file - a {@code File} object representing the NSD file to be parsed.  
 	 * @param _zipFile - the arrz file if {@code _file} is a temporary file unzipped from it, null otherwise
 	 * @return the built diagram
@@ -955,7 +965,9 @@ public class NSDParser extends DefaultHandler {
 		ini.load();
 		// START KGU#362 2017-03-28: Issue #370 - default value set to true
 		//this.refactorKeywords = ini.getProperty("impRefactorOnLoading","false").equals("true");
-		this.refactorKeywords = !ini.getProperty("impRefactorOnLoading","true").equals("false");
+		// START KGU#1097 2023-11-08: Issue #800 Now only dependent on file version
+		//this.refactorKeywords = !ini.getProperty("impRefactorOnLoading","true").equals("false");
+		// END KGU#1097 2023-11-06
 		// END KGU#362 2017-03-28
 		// END KGU#258 2016-09-26
 
@@ -1025,7 +1037,9 @@ public class NSDParser extends DefaultHandler {
 		ini.load();
 		// START KGU#362 2017-03-28: Issue #370 - default value set to true
 		//this.refactorKeywords = ini.getProperty("impRefactorOnLoading","false").equals("true");
-		this.refactorKeywords = !ini.getProperty("impRefactorOnLoading","true").equals("false");
+		// START KGU#1097 2023-11-08: Issue #800 Now only dependent on file version
+		//this.refactorKeywords = !ini.getProperty("impRefactorOnLoading","true").equals("false");
+		// END KGU#1097 2023-11-06
 		// END KGU#362 2017-03-28
 		// END KGU#258 2016-09-26
 				

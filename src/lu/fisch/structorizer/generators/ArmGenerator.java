@@ -1854,16 +1854,14 @@ public class ArmGenerator extends Generator {
     private String processCondition(Element _ele, String prefix, String[] keys, boolean inverse)
     {
         // Extract the text in the block
-        String condition = _ele.getUnbrokenText().getLongString().trim();
-
-        TokenList tokens = new TokenList(condition);
+        TokenList tokens = TokenList.concatenate(_ele.getUnbrokenTokenText(), null);
         // START KGU#884 2021-10-25: Issue #800
         //Element.cutOutRedundantMarkers(tokens);
         Syntax.removeDecorators(tokens);
         // END KGU#884 2021-10-25
         tokens.removePaddings();
         Syntax.unifyOperators(tokens, false);
-        condition = tokens.getString();
+        String condition = tokens.getString();
         if (!condition.startsWith("(") || !condition.endsWith(")")) {
             // To help the matching
             condition = "(" + condition + ")";

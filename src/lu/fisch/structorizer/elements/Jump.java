@@ -139,7 +139,7 @@ public class Jump extends Instruction {
 	// START KGU#258 2016-09-26: Enh. #253
 	// START KGU#686 2019-03-18: Enh. #56
 	//private static final String[] relevantParserKeys = {"preLeave", "preExit", "preReturn"};
-	private static final String[] relevantParserKeys = {"preLeave", "preExit", "preReturn", "preThrow"};
+	private static final String[] relevantParserKeys = {"^preLeave", "^preExit", "^preReturn", "^preThrow"};
 	// END KGU#686 2019-03-18
 	// END KGU#258 2016-09-25
 	

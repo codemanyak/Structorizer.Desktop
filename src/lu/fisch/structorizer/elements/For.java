@@ -126,20 +126,20 @@ public class For extends Element implements ILoop {
 	// END KGU#136 2016-03-01
 
 	// START KGU#258 2016-09-26: Enh. #253
-	private static final String[] relevantParserKeysCount = {"preFor", "postFor", "stepFor"};
-	private static final String[] relevantParserKeysTrav = {"preForIn", "postForIn"};
+	private static final String[] relevantParserKeysCount = {"^preFor", "*postFor", "*stepFor"};
+	private static final String[] relevantParserKeysTrav = {"^preForIn", "*postForIn"};
 	// END KGU#258 2016-09-25
 	
 	// START KGU#3 2015-10-24
-	private static String forSeparatorPre = "§FOR§";
-	private static String forSeparatorTo = "§TO§";
-	private static String forSeparatorBy = "§BY§";
+	private static String forSeparatorPre = "§PREFOR§";
+	private static String forSeparatorTo = "§POSTFOR§";
+	private static String forSeparatorBy = "§STEPFOR§";
 	// START KGU#61 2016-03-20: Enh. #84/#135 - support FOR-IN loops
-	private static String forInSeparatorPre = "§FOREACH§";
-	private static String forInSeparatorIn = "§IN§";
+	private static String forInSeparatorPre = "§PREFORIN§";
+	private static String forInSeparatorIn = "§POSTFORIN§";
 	// END KGU#61 2016-03-20
 	// START KGU#254 2016-09-23: Enh. #250 - Specific key for the case preFor and preForIn are equal
-	private static String commonSeparatorPre = "§FORCOMMON§";
+	private static String commonSeparatorPre = "§PREFORCOMMON§";
 	// END KGU#254 2016-09-23
 	// The following fields are dedicated for unambiguous semantics representation. If and only if the
 	// structured information of these fields is consistent field isConsistent shall be true.
@@ -818,10 +818,7 @@ public class For extends Element implements ILoop {
 					// Replace the first token of the parser keyword by the separator 
 					tokens.set(pos, forSeparators[i]);
 					// ... and remove the remaining ones (they will all pass through pos+1)
-					for (int d = 1; d < markerLen; d++)
-					{
-						tokens.remove(pos+1);
-					}
+					tokens.remove(1, markerLen);
 				}
 			}
 		}

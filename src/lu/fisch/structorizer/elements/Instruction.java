@@ -120,7 +120,7 @@ import lu.fisch.utils.*;
 public class Instruction extends Element {
 	
 	// START KGU#258 2016-09-26: Enh. #253
-	private static final String[] relevantParserKeys = {"input", "output", "preReturn"};
+	private static final String[] relevantParserKeys = {"^input", "^output", "^preReturn"};
 	// END KGU#258 2016-09-25
 	// START KGU#413 2017-06-09: Enh. #416
 	//protected static final String indentPattern = "(\\s*)(.*)";

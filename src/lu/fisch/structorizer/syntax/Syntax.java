@@ -355,7 +355,7 @@ public class Syntax {
 		{
 			keywords = new HashMap<String,String>(keywordMap);
 			// The following information may be important for a correct search
-			keywords.put("ignoreCase",  Boolean.toString(ignoreCase));
+			keywords.put("ignoreCase", Boolean.toString(ignoreCase));
 		}
 		return keywords;
 	}
@@ -446,7 +446,7 @@ public class Syntax {
 	 * 
 	 * @param _tokens - the token list to be cleansed.
 	 */
-	public static void removeDecorators(TokenList _tokens)
+	public static void removeSplitDecorators(TokenList _tokens)
 	{
 		// Collect redundant placemarkers to be deleted from the text
 		if (splitDecorators == null) {
@@ -474,6 +474,18 @@ public class Syntax {
 			{
 				_tokens.remove(pos, pos + markerLen, true);
 			}
+		}
+	}
+	/**
+	 * Removes redundant decorator keywords from the passed-in token list.
+	 * (Undispensible part of {@link Element#transformIntermediate(TokenList)}.)
+	 * 
+	 * @param _tokens - the token list to be cleansed.
+	 */
+	public static void removeDecorators(TokenList _tokens)
+	{
+		for (String key: DECORATOR_KEYS) {
+			_tokens.removeAll("§" + key.toUpperCase() + "§");
 		}
 	}
 	// END KGU#162 2016-03-31

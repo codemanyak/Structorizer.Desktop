@@ -91,7 +91,7 @@ public class Repeat extends Element implements ILoop {
 	// END KGU#136 2016-03-01
 
 	// START KGU#258 2016-09-26: Enh. #253
-	private static final String[] relevantParserKeys = {"preRepeat", "postRepeat"};
+	private static final String[] relevantParserKeys = {"^preRepeat", "$postRepeat"};
 	// END KGU#258 2016-09-25
 		
 	public Repeat()
