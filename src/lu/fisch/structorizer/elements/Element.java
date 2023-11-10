@@ -1369,10 +1369,10 @@ public abstract class Element {
 	 */
 	public Line[] getParsedText(StringList assignedVars, StringList declaredVars, StringList usedVars, TypeRegistry typeMap, StringList problems)
 	{
-		StringList unbrText = this.getUnbrokenText();
-		Line[] lines = new Line[unbrText.count()];
+		ArrayList<TokenList> unbrText = this.getUnbrokenTokenText();
+		Line[] lines = new Line[unbrText.size()];
 		for (int i = 0; i < lines.length; i++) {
-			lines[i] = LineParser.getInstance().parse(unbrText.get(i), this, i, typeMap);
+			lines[i] = LineParser.getInstance().parse(unbrText.get(i).getString(), this, i, typeMap);
 			if (lines[i].getType() != Line.LineType.LT_RAW) {
 				lines[i].gatherVariables(assignedVars, declaredVars, usedVars, problems);
 			}
