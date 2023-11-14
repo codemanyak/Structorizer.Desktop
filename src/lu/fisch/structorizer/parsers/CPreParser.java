@@ -1355,11 +1355,11 @@ public abstract class CPreParser extends CodeParser
 						// The greedy quantifier inside the parentheses ensures that we get to the rightmost closing parenthesis
 						//String argsRaw = toReplace.replaceFirst("(^|.*?\\W)" + entry.getKey() + "(\\s*)\\((.*)\\)(.*)", "$3");
 						String argsRaw = matcher.group(3);
-						// Now we split the balanced substring (up to the first unexpected closing parenthesis) syntactically
-						// (The unmatched tail of argsRaw will be re-appended later)
+						// Now we split the balanced substring (up to the first unexpected closing parenthesis)
+						// syntactically (be aware that the list also contains the unmatched tail of argsRaw)
 						StringList args = Syntax.splitExpressionList(argsRaw, ",");
-						// We test whether argument and parameter count match
-						if (args.count() != entry.getValue().length - 1) {
+						// We test whether argument and parameter count match (both contain an extra element)
+						if (args.count() != entry.getValue().length) {
 							// FIXME: function-like define doesn't match arg count
 							log("CParser.replaceDefinedEntries() cannot apply function macro\n\t"
 									// START KGU#522 2018-06-17: Bugfix #540 reconstruction of the macro
@@ -1376,7 +1376,7 @@ public abstract class CPreParser extends CodeParser
 							HashMap<String, String> argMap = new HashMap<String, String>();
 							// Lest the substitutions should interfere with one another we first split the string for all parameters
 							StringList parts = StringList.getNew(entry.getValue()[0]); 
-							for (int i = 0; i < args.count(); i++) {
+							for (int i = 0; i < args.count() - 1; i++) {
 								String param = entry.getValue()[i+1];
 								argMap.put(param, args.get(i));
 								parts = StringList.explodeWithDelimiter(parts, param);
@@ -1417,16 +1417,14 @@ public abstract class CPreParser extends CodeParser
 								}
 							}
 							// Now we correct possible matching defects
-							StringList argsPlusTail = Syntax.splitExpressionList(argsRaw, ",");
-							if (argsPlusTail.count() > args.count()) {
-								String tail = argsPlusTail.get(args.count()).trim();
-								// With high probability tail stars with a closing parenthesis, which has to be dropped if so
-								// whereas the consumed parenthesis at the end has to be restored.
-								if (tail.startsWith(")")) {
-									tail = tail.substring(1) + ")";
-								}
-								parts.add(tail);
+							String tail = args.get(args.count() - 1).trim();
+							// With high probability tail starts with a closing parenthesis, which
+							// has to be dropped if so, whereas the consumed parenthesis at the end
+							// has to be restored.
+							if (tail.startsWith(")")) {
+								tail = tail.substring(1) + ")";
 							}
+							parts.add(tail);
 							// This pattern differs in the last group from matcher (greedy <-> non-greedy)
 							toReplace = toReplace.replaceFirst("(^|.*?\\W)" + entry.getKey() + "(\\s*)\\((.*)\\)(.*)",
 									"$1" + Matcher.quoteReplacement(parts.concatenate()) + "$4");
