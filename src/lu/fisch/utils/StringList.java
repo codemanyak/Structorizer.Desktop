@@ -60,6 +60,7 @@ package lu.fisch.utils;
  *      Kay Gürtzig     2021-10-25      Results added for add(String), addOrdered(String), and addByLength()
  *      Kay Gürtzig     2021-12-05      New method removeBlanks() for convenience.
  *      Kay Gürtzig     2022-08-24      Method toLinearPos() adopted from Unimozer and corrected.
+ *      Kay Gürtzig     2023-11-13      Method containsAnyOf(StringList) added.
  *
  ******************************************************************************************************
  *
@@ -884,6 +885,23 @@ public class StringList {
 //		return found;
 		return indexOf(_string, _matchCase) != -1;
 		// END KGU 2015-11-04
+	}
+
+	/**
+	 * Checks whether any of the elements of {@code _otherStrings} is also member
+	 * of this StringList.
+	 * 
+	 * @param _otherStrings - a list of strings to be searched for.
+	 * @return {@code true} if any of the elements of {@code _otherStrings} equals an
+	 *     element of {@code this}
+	 */
+	public boolean containsAnyOf(StringList _otherStrings) {
+		for (int i = 0; i < _otherStrings.count(); i++) {
+			if (contains(_otherStrings.get(i))) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -1755,4 +1773,5 @@ public class StringList {
 		StringList sl1 = sl.copy();
 		System.out.println(sl1.getText());
 	}
+
 }

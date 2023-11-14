@@ -134,6 +134,8 @@ package lu.fisch.structorizer.gui;
  *      Kay Gürtzig     2023-10-06      Issue #311: Parts of the "Diagram" menu moved to a new "View" menu
  *      Kay Gürtzig     2023-10-13      Issue #980: New messages for declaration syntax check (error31_*)
  *      Kay Gürtzig     2023-11-09      Issue #800: Obsolete refactoring support (#253) removed/disabled
+ *      Kay Gürtzig     2023-11-09      Issue #311: Preference dump selection dialog adapted to menu changes;
+ *                                      menuEditCopyDiagramPNG and menuEditCopyDiagramEMF moved to menuDiagram
  *
  ******************************************************************************************************
  *
@@ -1236,21 +1238,23 @@ public class Menu extends LangMenuBar implements NSDController, LangEventListene
 		menuEdit.add(menuEditBreakLines);
 		menuEditBreakLines.addActionListener(new ActionListener() { public void actionPerformed(ActionEvent event) { diagram.rebreakLines(); doButtons(); } } );
 
-		menuEdit.addSeparator();
-		
-		menuEdit.add(menuEditCopyDiagramPNG);
-		menuEditCopyDiagramPNG.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_D,menuShortcutKeyMask));
-		menuEditCopyDiagramPNG.addActionListener(new ActionListener() { public void actionPerformed(ActionEvent event) { diagram.copyToClipboardPNG();; doButtons(); } } );
+		// START KGU#310 2023-11-09: Issue #311 moved to menuDiagram (still without renaming)
+		//menuEdit.addSeparator();
+		//
+		//menuEdit.add(menuEditCopyDiagramPNG);
+		//menuEditCopyDiagramPNG.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_D,menuShortcutKeyMask));
+		//menuEditCopyDiagramPNG.addActionListener(new ActionListener() { public void actionPerformed(ActionEvent event) { diagram.copyToClipboardPNG();; doButtons(); } } );
 
-		if(!System.getProperty("os.name").toLowerCase().startsWith("mac os x"))
-		{
-			menuEdit.add(menuEditCopyDiagramEMF);
-			// START KGU#324 2017-11-09: Enh. #415 Ctrl-F now needed for Find & Replace
-			//menuEditCopyDiagramEMF.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F, menuShortcutKeyMask));
-			menuEditCopyDiagramEMF.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_D, (java.awt.event.InputEvent.SHIFT_DOWN_MASK | menuShortcutKeyMask)));
-			// END KGU#324 2017-11-09
-			menuEditCopyDiagramEMF.addActionListener(new ActionListener() { public void actionPerformed(ActionEvent event) { diagram.copyToClipboardEMF(); doButtons(); } } );
-		}
+		//if(!System.getProperty("os.name").toLowerCase().startsWith("mac os x"))
+		//{
+		//	menuEdit.add(menuEditCopyDiagramEMF);
+		//	// START KGU#324 2017-11-09: Enh. #415 Ctrl-F now needed for Find & Replace
+		//	//menuEditCopyDiagramEMF.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F, menuShortcutKeyMask));
+		//	menuEditCopyDiagramEMF.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_D, (java.awt.event.InputEvent.SHIFT_DOWN_MASK | menuShortcutKeyMask)));
+		//	// END KGU#324 2017-11-09
+		//	menuEditCopyDiagramEMF.addActionListener(new ActionListener() { public void actionPerformed(ActionEvent event) { diagram.copyToClipboardEMF(); doButtons(); } } );
+		//}
+		// END KGU#310 2023-11-09
 
 		// Setting up Menu "View" with all submenus and shortcuts and actions
 		//menubar.add(menuView);
@@ -1526,6 +1530,25 @@ public class Menu extends LangMenuBar implements NSDController, LangEventListene
 //		// END KGU#868 2020-06-03
 //		menuDiagramPreview.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F4, java.awt.event.InputEvent.SHIFT_DOWN_MASK));
 //		// END KGU#305 2016-12-14
+
+		// START KGU#310 2023-11-09: Issue #311 moved to menuDiagram (still without renaming)
+		menuDiagram.addSeparator();
+		
+		menuDiagram.add(menuEditCopyDiagramPNG);
+		menuEditCopyDiagramPNG.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_D,menuShortcutKeyMask));
+		menuEditCopyDiagramPNG.addActionListener(new ActionListener() { public void actionPerformed(ActionEvent event) { diagram.copyToClipboardPNG();; doButtons(); } } );
+
+		if(!System.getProperty("os.name").toLowerCase().startsWith("mac os x"))
+		{
+			menuDiagram.add(menuEditCopyDiagramEMF);
+			// START KGU#324 2017-11-09: Enh. #415 Ctrl-F now needed for Find & Replace
+			//menuEditCopyDiagramEMF.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F, menuShortcutKeyMask));
+			menuEditCopyDiagramEMF.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_D, (java.awt.event.InputEvent.SHIFT_DOWN_MASK | menuShortcutKeyMask)));
+			// END KGU#324 2017-11-09
+			menuEditCopyDiagramEMF.addActionListener(new ActionListener() { public void actionPerformed(ActionEvent event) { diagram.copyToClipboardEMF(); doButtons(); } } );
+		}
+		// END KGU#310 2023-11-09
+
 		
 		// Setting up Menu "View" with all submenus and shortcuts and actions
 		menubar.add(menuView);
@@ -1737,7 +1760,10 @@ public class Menu extends LangMenuBar implements NSDController, LangEventListene
 			if (parserPlugins == null) {
 				parserPlugins = new Vector<GENPlugin>();
 			}
-			preferenceKeys.put("menuDiagram", Mainform.getPreferenceKeys("diagram"));
+			// START KGU#310 2023-11-09: Issue #311 Menu reorganised - so the prefernec category should follow
+			//preferenceKeys.put("menuDiagram", Mainform.getPreferenceKeys("diagram"));
+			preferenceKeys.put("menuView", Mainform.getPreferenceKeys("view"));
+			// END KGU#310 2023-11-09
 			preferenceKeys.put("menuPreferencesLanguage", new String[] {"Lang"});
 			preferenceKeys.put("menuPreferencesNotifyUpdate", Mainform.getPreferenceKeys("update"));
 			preferenceKeys.put("menuPreferencesSimplified", new String[] {"userSkillLevel"});

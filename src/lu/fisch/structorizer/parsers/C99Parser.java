@@ -1041,8 +1041,9 @@ public class C99Parser extends CPreParser
 
 	/**
 	 * Processes a function definition from the given {@code _reduction}
+	 * 
 	 * @param _reduction - the {@link Reduction} of the parser
-	 * @throws ParserCancelled 
+	 * @throws ParserCancelled when the user aborted the import
 	 */
 	private void buildFunctionDecl(Reduction _reduction) throws ParserCancelled {
 		// <Function Def> ::= <Decl Specifiers> <Declarator> <DeclListOpt> <Compound Stmt>
@@ -1200,7 +1201,7 @@ public class C99Parser extends CPreParser
 	 * syntax (Pascal style).
 	 * @param _declRed - the {@link Reduction} representing a {@code <Struct Decl>} rule.
 	 * @return {@link StringList} of the declaration strings in Structorizer syntax
-	 * @throws ParserCancelled 
+	 * @throws ParserCancelled when the user aborted the import
 	 */
 	private StringList getDeclsFromDeclList(Reduction _declRed) throws ParserCancelled
 	{
@@ -1275,7 +1276,7 @@ public class C99Parser extends CPreParser
 	 * 
 	 * @param _declSpecRed
 	 * @return
-	 * @throws ParserCancelled 
+	 * @throws ParserCancelled when the user aborted the import
 	 */
 	private String getTypeSpec(Reduction _declSpecRed) throws ParserCancelled {
 		// FIXME: Drop superfluous stuff
