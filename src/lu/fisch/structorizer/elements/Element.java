@@ -1281,6 +1281,7 @@ public abstract class Element {
 		return sl;
 	}
 	// END KGU#413 2017-06-09
+	// START KGU#1097 2023-11-09: Issue #800 New internal representation
 	/**
 	 * Returns the text of this element as a new ArrayList of TokenLists where each
 	 * broken set of lines (by means of trailing backslashes) will be glued together
@@ -1289,6 +1290,7 @@ public abstract class Element {
 	 * @return a list of TokenLists
 	 * 
 	 * @see #getBrokenTokenText()
+	 * @see #setTokenText(ArrayList)
 	 */
 	public ArrayList<TokenList> getUnbrokenTokenText()
 	{
@@ -1317,6 +1319,7 @@ public abstract class Element {
 	 * @return a list of TokenLists possibly containing "\n" tokens.
 	 * 
 	 * @see #getUnbrokenTokenText()
+	 * @see #setTokenText(ArrayList)
 	 */
 	protected ArrayList<TokenList> getBrokenTokenText()
 	{
@@ -1334,6 +1337,20 @@ public abstract class Element {
 		}
 		return tt;
 	}
+	// END KGU#1097 2023-11-09
+	// START KGU#1097 2023-11-15: Issue #800 New internal representation
+	/**
+	 * Overwrites the previous Element text with the given tokenized multi-line
+	 * text.
+	 * 
+	 * @param tokenLines
+	 */
+	public void setTokenText(ArrayList<TokenList> tokenLines)
+	{
+		// FIXME ensure triggers
+		this.text = tokenLines;
+	}
+	// END KGU#1097 2023-11-15
 	
 	// START KGU#790 2020-11-01: Issue #800 new syntax engine
 	/**
@@ -4638,10 +4655,10 @@ public abstract class Element {
 
 	// START KGU#258/KGU#1097 2023-11-09: Enh. #253, issue #800 TokenList version
 	/**
-	 * Looks up the associated token sequence in _splitOldKeywords for any of
-	 * the parser preference names provided by getRelevantParserKeys(). If there
+	 * Looks up the associated token sequence in {@code _splitOldKeywords} for any of
+	 * the parser preference keys provided by getRelevantParserKeys(). If there
 	 * is such a token sequence then it will be replaced throughout my text by
-	 * the respective internal marker token
+	 * the respective internal marker token.
 	 * 
 	 * @param _oldKeywords - a map of tokenized former non-empty parser preference
 	 *    keywords to be replaced, or {@code null} if the currently configured
@@ -4673,8 +4690,13 @@ public abstract class Element {
 		}
 	}
 	/**
-	 * @param _tokens - the tokenized line the keywords in it are to be encoded
-	 * @param _splitOldKeywords - possibly a set of split keywords from e.g. a legacy nsd file
+	 * Replaces all keywords from map {@code _splitOldKeywords} (or, if {@code null},
+	 * all currently user-configured keywords) referred by a key from {@code _relevantKeys}
+	 * by its internal code token in the given tokenized line {@code _tokens}
+	 * 
+	 * @param _tokens - the tokenized line, the keywords in which are to be encoded.
+	 * @param _splitOldKeywords - possibly a set of split keywords from e.g. a legacy nsd file,
+	 *    or {@code null} (in which case the current user-specified keywords are used)
 	 * @param _relevantKeys - an array of key types for the element kind to handle with position
 	 *    restriction as prefix character ('^' = only at front, '$' = only at end, '*' = first
 	 *    arbitrary position)
@@ -4690,7 +4712,7 @@ public abstract class Element {
 			// START KGU#1097 2023-11-09: Issue #800 _splitOldKes may now be null
 			//TokenList splitKey = _splitOldKeys.get(_prefNames[i]);
 			String key = _relevantKeys[j];
-			char where = key.charAt(0);	// may be '^', '$', or '*'
+			char where = key.charAt(0);	// may be '^', '$', or '*', symbolising the position
 			key = key.substring(1);
 			TokenList splitKey = null;
 			if (_splitOldKeywords != null) {
@@ -4720,8 +4742,7 @@ public abstract class Element {
 				if (posKey >= 0) {
 					// The original key word will hardly have had to little padding but be cautious
 					int[] paddings = newTokens.getPadding(posKey);
-					String subst = "§"+key.toUpperCase()+"§";
-					newTokens.set(posKey, subst);
+					newTokens.set(posKey, Syntax.key2token(key));
 					if (sizeKey > 1) {
 						newTokens.remove(posKey + 1, posKey - sizeKey - 1);
 					}
@@ -4732,8 +4753,9 @@ public abstract class Element {
 		}
 		return newTokens;
 	}
+	
 	/**
-	 * @param _tokens - the tokenized line the keywords in it are to be encoded
+	 * @param _tokens - the tokenized line, the keywords in which are to be encoded
 	 * @param _splitOldKeywords - possibly a set of split keywords from e.g. a legacy nsd file
 	 * @param _relevantKeys - an array of key types for the element kind to handle with position
 	 *    restriction as prefix character ('^' = only at front, '$' = only at end, '*' = first
@@ -4745,7 +4767,7 @@ public abstract class Element {
 	protected TokenList decodeLine(TokenList _tokens) {
 		TokenList decoded = new TokenList(_tokens);
 		for (String key: Syntax.keywordSet()) {
-			TokenList keyTokens = new TokenList("§" + key.toUpperCase() + "§");
+			TokenList keyTokens = new TokenList(Syntax.key2token(key));
 			decoded.replaceAll(keyTokens, Syntax.getSplitKeyword(key), true);
 		}
 		return decoded;

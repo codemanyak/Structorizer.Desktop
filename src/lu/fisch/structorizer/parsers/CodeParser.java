@@ -1597,34 +1597,34 @@ public abstract class CodeParser extends javax.swing.filechooser.FileFilter impl
 	}
 
 	// START KGU 2020-08-12: Issue #800 - Keyword stuff moved to class Syntax, wrappers placed here
-	/**
-	 * Returns the cached keyword for parser preference {@code _key} or {@code null}
-	 * 
-	 * @param _key - the name of the requested parser preference
-	 * @return the cached keyword or {@code null}
-	 */
-	public String getKeyword(String _key)
-	{
-		return Syntax.getKeyword(_key);
-	}
-
-	/**
-	 * Returns the cached keyword for parser preference {@code _key} or the given {@code _defaultVal}
-	 * if no entry or only an empty entry is found for {@code _key}.
-	 * 
-	 * @param _key - the name of the requested parser preference
-	 * @param _defaultVal - a default keyword to be returned if there is no non-empty cached value
-	 * @return the cached or default keyword
-	 */
-	public String getKeywordOrDefault(String _key, String _defaultVal)
-	{
-		return Syntax.getKeywordOrDefault(_key, _defaultVal);
-	}
+//	/**
+//	 * Returns the cached keyword for parser preference {@code _key} or {@code null}
+//	 * 
+//	 * @param _key - the name of the requested parser preference
+//	 * @return the cached keyword or {@code null}
+//	 */
+//	public String getKeyword(String _key)
+//	{
+//		return Syntax.getKeyword(_key);
+//	}
+//
+//	/**
+//	 * Returns the cached keyword for parser preference {@code _key} or the given {@code _defaultVal}
+//	 * if no entry or only an empty entry is found for {@code _key}.
+//	 * 
+//	 * @param _key - the name of the requested parser preference
+//	 * @param _defaultVal - a default keyword to be returned if there is no non-empty cached value
+//	 * @return the cached or default keyword
+//	 */
+//	public String getKeywordOrDefault(String _key, String _defaultVal)
+//	{
+//		return Syntax.getKeywordOrDefault(_key, _defaultVal);
+//	}
 	// END KGU 2020-08-12
 
 	// START KGU#822 2020-03-09: Issue #835 - convenience method for the optional insertion of keywords
 	/**
-	 * Retrieves the configured keyword specified by the internal {@code _key} if the
+	 * Retrieves the internal keyword token specified by the internal {@code _key} if the
 	 * insertion of optional structure preference keys is enabled, otherwise an empty
 	 * string. Depending on {@code _padBefore} and {@code _padAfter}, a space will be added
 	 * before and/or after the retrieved keyword if it is not empty.
@@ -1632,13 +1632,16 @@ public abstract class CodeParser extends javax.swing.filechooser.FileFilter impl
 	 * @param _key - the internal structure preferences reference
 	 * @param _padBefore - whether to insert a space before it
 	 * @param _padAfter - whether to append a space after it
-	 * @return the (padded) optional keyword if enabled and specified.
+	 * @return the (padded) optional keyword token if enabled and specified.
 	 */
 	protected String getOptKeyword(String _key, boolean _padBefore, boolean _padAfter)
 	{
 		String prefix = "";
 		if (this.optionInsertOptKeywords) {
-			prefix = Syntax.getKeyword(_key);
+			// START KGU#1097 2023-11-15: Issue #800 - modified internal representation of keywords
+			//prefix = Syntax.getKeyword(_key);
+			prefix = Syntax.key2token(_key);
+			//END KGU#1097 2023-11-15
 			if (prefix == null) {
 				prefix = "";
 			}

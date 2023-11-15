@@ -88,6 +88,7 @@ import lu.fisch.structorizer.elements.Root;
 import lu.fisch.structorizer.elements.Subqueue;
 import lu.fisch.structorizer.elements.TypeMapEntry;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.StringList;
 
 /**
@@ -221,7 +222,8 @@ public abstract class CPreParser extends CodeParser
 	 */
 	protected Root includedConsts = null;
 	
-	private final static StringList ASSIGN_OPERATORS = StringList.explode("=,+=,-=,*=,/=,%=,<<=,>>=,&=,|=,^=", ",");
+	private final static StringList ASSIGN_OPERATORS =
+			new StringList(new String[]{"=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "|=", "^="});
 	// END KGU#1105 2023-11-13
 	
 	// START KGU#547 2018-07-09: We should prevent headers from being included repeatedly.
@@ -421,8 +423,8 @@ public abstract class CPreParser extends CodeParser
 				// No further modification possible
 				return;
 			}
-			StringList tokens = Element.splitLexically(constants.get(constId)[0], true);
-			for (int i = 0; i < tokens.count(); i++) {
+			TokenList tokens = new TokenList(constants.get(constId)[0], true);
+			for (int i = 0; i < tokens.size(); i++) {
 				String token = tokens.get(i);
 				if (constants.containsKey(token)) {
 					addReferencedConstants(usedConsts, token);
@@ -1020,7 +1022,7 @@ public abstract class CPreParser extends CodeParser
 	 * @return {@code true} if constant syntax applies to the given {@code string}
 	 */
 	private boolean isLiteralOrConstExpr(String name, String string) {
-		StringList tokens = Element.splitLexically(string = string.trim(), true);
+		TokenList tokens = new TokenList(string = string.trim(), true);
 		if (tokens.isEmpty()) {
 			return false;
 		}
@@ -1055,9 +1057,9 @@ public abstract class CPreParser extends CodeParser
 //			catch (NumberFormatException ex) {}
 //		}
 //		else if (tokens.get(0).equals("(") && tokens.get(tokens.count()-1).equals(")")) {
-		if (tokens.count() == 1
-				|| tokens.get(0).equals("(") && tokens.get(tokens.count()-1).equals(")")
-				&& !tokens.containsAnyOf(ASSIGN_OPERATORS)) {
+		if (tokens.size() == 1
+				|| tokens.get(0).equals("(") && tokens.getLast().equals(")")
+				&& !tokens.containsAny(ASSIGN_OPERATORS)) {
 			try {
 				interpreter.eval(name + " = " + string);
 				return interpreter.get(name) != null;
@@ -1715,7 +1717,10 @@ public abstract class CPreParser extends CodeParser
 	 */
 	protected void buildInput(Reduction _reduction, String _name, StringList _args, Subqueue _parentNode) throws ParserCancelled {
 		//content = content.replaceAll(BString.breakup("scanf")+"[ ((](.*?),[ ]*[&]?(.*?)[))]", input+" $2");
-		String content = getKeyword("input");
+		// START KGU#1097 2023-11-15: Issue #800 New internal keyword representation
+		//String content = getKeyword("input");
+		String content = Syntax.key2token("input");
+		// END KGU#1097 2023-11-15
 		if (_args != null) {
 			// START KGU#652 2019-02-13: Issue #679: Some support for C11 (Microsoft-specific routines)
 			//if (_name.equals("scanf")) {
@@ -1778,7 +1783,10 @@ public abstract class CPreParser extends CodeParser
 	 */
 	protected void buildOutput(Reduction _reduction, String _name, StringList _args, Subqueue _parentNode) throws ParserCancelled {
 		//content = content.replaceAll(BString.breakup("printf")+"[ ((](.*?)[))]", output+" $1");
-		String content = getKeyword("output") + " ";
+		// START KGU#1097 2023-11-15: Issue #800 New internal keyword representation
+		//String content = getKeyword("output");
+		String content = Syntax.key2token("output");
+		// END KGU#1097 2023-11-15
 		if (_args != null) {
 			int nExpr = _args.count();
 			// Find the format mask
@@ -2097,14 +2105,23 @@ public abstract class CPreParser extends CodeParser
 			int lastIx = aRoot.children.getSize() - 1;
 			if (aRoot.isProgram() && lastIx >= 0) {
 				Element last = aRoot.children.getElement(lastIx);
-				if (last instanceof Jump && last.getText().getLongString().trim().equalsIgnoreCase(getKeyword("preReturn") + " 0")) {
+				// START KGU#1097 2023-11-15: Issue #800 Modified internal keyword representation 
+				//if (last instanceof Jump && last.getText().getLongString().trim().equalsIgnoreCase(getKeyword("preReturn") + " 0")) {
+				if (last instanceof Jump 
+						&& TokenList.concatenate(last.getUnbrokenTokenText(), null)
+						.equals(new TokenList(Syntax.key2token("preReturn") + " 0"))) {
+				// END KGU#1097 2023-11-15
 					aRoot.children.removeElement(lastIx);
 				}
 				// START KGU#1078 2023-09-15: Issue #809 refined
 				// Further strewn return elements with results ought to be replaced by exit elements
 				aRoot.traverse(new IElementVisitor() {
-					final String retKey = getKeyword("preReturn");
-					final String exitKey = getKeyword("preExit");
+					// START KGU#1097 2023-11-15: Issue #800 New internal keyword representation
+					//final String retKey = getKeyword("preReturn");
+					//final String exitKey = getKeyword("preExit");
+					final String retKey = Syntax.key2token("preReturn");
+					final String exitKey = Syntax.key2token("preExit");
+					// END KGU#1097 2023-11-15
 					
 					@Override
 					public boolean visitPreOrder(Element _ele) {

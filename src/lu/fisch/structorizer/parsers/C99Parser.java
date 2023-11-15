@@ -1426,14 +1426,16 @@ public class C99Parser extends CPreParser
 			String selector = getContent_R(_reduction.get(1).asReduction(), "");
 			// If the last branch was empty then just add the selector to the list
 			// and reduce the index
+			StringList caseText = _case.getText();
 			if (lastCaseWasEmpty) {
-				String selectors = _case.getText().get(iNext-1) + ", " + selector;
-				_case.getText().set(iNext - 1, selectors);
+				String selectors = caseText.get(iNext-1) + ", " + selector;
+				caseText.set(iNext - 1, selectors);
 				iNext--;
 			}
 			else {
-				_case.getText().set(iNext, selector);
+				caseText.set(iNext, selector);
 			}
+			_case.setText(caseText);
 			stmListIx = 3;	// <StmtList> index for explicit branch
 		}
 		// Add the branch content

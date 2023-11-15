@@ -1424,6 +1424,44 @@ public class TokenList implements Comparable<TokenList>{
 	}
 
 	/**
+	 * Returns {@code true} if this token list contains any of the elements of
+	 * the specified collection {@code c} as token, no matter at what position.
+	 * This will of course fail if only one element of {@code c} is not a string
+	 * or not a contiguous token.
+ 	 * 
+	 * @param c - a collection to be checked for containment in the token list
+	 * @return {@code true} if this collection contains all of the elements in
+	 *     the specified collection {@code c}
+	 */
+	public boolean containsAny(Collection<?> c) {
+		for (Object o: c) {
+			if (tokens.contains(o)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Returns {@code true} if this token list contains any of the elements of
+	 * the specified {@code StringList strings} as token, no matter at
+	 * what position.
+ 	 * 
+	 * @param strings - the {@link StringList} to be checked for containment in
+	 *    this collection.
+	 * @return {@code true} if this token list contains some of the element strings
+	 *     from the specified {@code StringList strings}
+	 */
+	public boolean containsAny(StringList strings) {
+		for (int i = 0; i < tokens.size(); i++) {
+			if (tokens.contains(strings.get(i))) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * Appends all of the tokens of the specified token list {@code other}
 	 * to this list. The new tokens will appear in this list in the same
 	 * order as in {@code other}. The tokens will not be checked or split.

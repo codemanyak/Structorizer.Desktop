@@ -58,6 +58,7 @@ package lu.fisch.structorizer.parsers;
  *      Kay Gürtzig     2021-03-06      Bugfix #962: Constructor bodies had not been imported,
  *                                      KGU#961: Array initialiser conversion in declarations improved
  *      Kay Gürtzig     2023-11-08      Bugfix #1110 method translateContent() returned the argument instead of the result
+ *      Kay Gürtzig     2023-11-15      Issue #800: Internal keyword representation modified
  *
  ******************************************************************************************************
  *
@@ -1896,7 +1897,10 @@ public class JavaParser extends CodeParser
 						if (ixLabel + 1 < target.getSize() && target.getElement(ixLabel + 1) instanceof ILoop
 								// Could be a decomposed For loop...
 								|| ixLabel + 2 < target.getSize() && target.getElement(ixLabel + 2) instanceof While) {
-							ele = new Jump(getKeyword("preLeave") + " " + Integer.toString(nLevels));
+							// START KGU#1097 2023-11-15: Issue #800 modified internal keyword representation
+							//ele = new Jump(getKeyword("preLeave") + " " + Integer.toString(nLevels));
+							ele = new Jump(Syntax.key2token("preLeave") + " " + Integer.toString(nLevels));
+							// END KGU#1097 2023-11-15
 							this.equipWithSourceComment(ele, _reduction);
 						}
 					}
@@ -1939,7 +1943,10 @@ public class JavaParser extends CodeParser
 			{
 				// <ReturnStatement> ::= return <Expression> ';'
 				// <ReturnStatement> ::= return ';'
-				String text = getKeyword("preReturn");
+				// START KGU#1097 2023-11-15: Issue #800
+				//String text = getKeyword("preReturn");
+				String text = Syntax.key2token("preReturn");
+				// END KGU#1097 2023-11-15
 				if (ruleId == RuleConstants.PROD_RETURNSTATEMENT_RETURN_SEMI) {
 					// FIXME: Face an expression decomposition!
 					text += " " + this.getContent_R(_reduction.get(1));
@@ -1953,7 +1960,10 @@ public class JavaParser extends CodeParser
 			case RuleConstants.PROD_THROWSTATEMENT_THROW_SEMI:
 			{
 				// <ThrowStatement> ::= throw <Expression> ';'
-				String text = getKeyword("preThrow");
+				// START KGU#1097 2023-11-15: Issue #800
+				//String text = getKeyword("preThrow");
+				String text = Syntax.key2token("preThrow");
+				// END KGU#1097 2023-11-15
 				// FIXME: Face an expression decomposition!
 				text += " " + this.getContent_R(_reduction.get(1));
 				Jump jmp = new Jump(text);
@@ -2040,15 +2050,24 @@ public class JavaParser extends CodeParser
 						 */
 						// START KGU#959 2021-03-05: Issue #961: give subclasses a chance for own conversions
 						if (line.startsWith("System.exit(")) {
-							ele = new Jump(getKeyword("preExit") + " "
+							// START KGU#1097 2023-11-15: Issue #800 
+							//ele = new Jump(getKeyword("preExit") + " "
+							ele = new Jump(Syntax.key2token("preExit") + " "
+							// END KGU#1097 2023-11-15
 									+ line.substring("System.exit(".length(), line.length()-1));
 						}
 						else if (line.startsWith("System.out.println(")) {
-							ele = new Instruction(getKeyword("output") + " "
+							// START KGU#1097 2023-11-15: Issue #800 
+							//ele = new Instruction(getKeyword("output") + " "
+							ele = new Instruction(Syntax.key2token("output") + " "
+							// END KGU#1097 2023-11-15
 									+ line.substring("System.out.println(".length(), line.length()-1));
 						}
 						else if (line.startsWith("System.out.print(")) {
-							ele = new Instruction(getKeyword("output") + " "
+							// STAT KGU#1097 2023-11-15: Issue #800 
+							//ele = new Instruction(getKeyword("output") + " "
+							ele = new Instruction(Syntax.key2token("output") + " "
+							// END KGU#1097 2023-11-15
 									+ line.substring("System.out.print(".length(), line.length()-1));
 						}
 						//else {
@@ -2112,15 +2131,24 @@ public class JavaParser extends CodeParser
 	{
 		Instruction ele = null;
 		if (line.startsWith("System.exit(")) {
-			ele = new Jump(getKeyword("preExit") + " "
+			// STAT KGU#1097 2023-11-15: Issue #800 
+			//ele = new Jump(getKeyword("preExit") + " "
+			ele = new Jump(Syntax.key2token("preExit") + " "
+			// END KGU#1097 2023-11-15
 					+ line.substring("System.exit(".length(), line.length()-1));
 		}
 		else if (line.startsWith("System.out.println(")) {
-			ele = new Instruction(getKeyword("output") + " "
+			// START KGU#1097 2023-11-15: Issue #800 
+			//ele = new Instruction(getKeyword("output") + " "
+			ele = new Instruction(Syntax.key2token("output") + " "
+			// END KGU#1097 2023-11-15
 					+ line.substring("System.out.println(".length(), line.length()-1));
 		}
 		else if (line.startsWith("System.out.print(")) {
-			ele = new Instruction(getKeyword("output") + " "
+			// START KGU#1097 2023-11-15: Issue #800 
+			//ele = new Instruction(getKeyword("output") + " "
+			ele = new Instruction(Syntax.key2token("output") + " "
+			// END KGU#1097 2023-11-15
 					+ line.substring("System.out.print(".length(), line.length()-1));
 		}		
 		return ele;
@@ -3558,7 +3586,10 @@ public class JavaParser extends CodeParser
 	 */
 	protected String translateContent(String _content)
 	{
-		String output = getKeyword("output");
+		// START KGU#1097 2023-11-15: Issue #800 
+		//String output = getKeyword("output");
+		String output = Syntax.key2token("output");
+		// END KGU#1097 2023-11-15
 		final TokenList outputTokens = new TokenList("System.out.println");
 		final TokenList mathTokens = new TokenList("Math.");
 		// An input conversion is not feasible.

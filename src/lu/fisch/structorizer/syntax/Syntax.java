@@ -211,6 +211,16 @@ public class Syntax {
 		keywordMap.put("output",     "OUTPUT");
 	}
 
+	// START KGU#1097 2023-11-14: Issue #800 - support for decoding
+	/** Maps internal keyword code tokens to the respective keyword key */
+	private static final HashMap<String, String> TOKENS2KEYS = new HashMap<String, String>();
+	static {
+		for (String key: keywordMap.keySet()) {
+			TOKENS2KEYS.put("§" + key.toUpperCase() + "§", key);
+		}
+	}
+	// END KGU#1097 2023-11-14
+	
 	// START KGU 2016-03-29: For keyword detection improvement
 	/** Like {@link #keywordMap} but holding the tokenized keywords (lazy initialisation) */
 	private static HashMap<String, TokenList> splitKeywords = new HashMap<String, TokenList>();
@@ -233,6 +243,49 @@ public class Syntax {
 	}
 	// END KGU#466 2019-08-02
 
+	// START KGU#1097 2023-11-14: Issue #800 - support for decoding
+	/**
+	 * Returns an internal token for the keyword referenced by the given keyword key {@code key}
+	 * 
+	 * @param key - a formal keyword key like {@code "preAlt"}
+	 * @return the corresponding key token for internal TokenList representation, e.g.
+	 *    {@code "§PREALT§"}
+	 * 
+	 * @see #token2key(String)
+	 */
+	public static String key2token(String key)
+	{
+		return "§" + key.toUpperCase() + "§";
+	}
+	
+	/**
+	 * Returns the keyword key for the given internal keyword token of kind {@code "§[A-Z]+§"}
+	 * if existing.
+	 * 
+	 * @param token - an internal keyword token, e.g. {@code "§POSTFOR§"}.
+	 * @return the corresponding keyword key, e.g. {@code "postFor"}, or {@code null}
+	 * 
+	 * @see #key2token(String)
+	 */
+	public static String token2key(String token)
+	{
+		String key = TOKENS2KEYS.get(token);
+		if (key == null) {
+			// This is a lazy workaround for bad class initialisation order
+			for (String k: keywordMap.keySet()) {
+				String tk = key2token(k);
+				if (!TOKENS2KEYS.containsKey(tk)) {
+					TOKENS2KEYS.put(tk, k);
+				}
+				if (token.equals(tk)) {
+					return k;
+				}
+			}
+		}
+		return key;
+	}
+	// END KGU#1097 2023-11-14
+	
 	/**
 	 * Loads the parser-related preferences (i.e. chiefly the configured parser keywords)
 	 * from the Ini file into the internal cache.
@@ -485,7 +538,7 @@ public class Syntax {
 	public static void removeDecorators(TokenList _tokens)
 	{
 		for (String key: DECORATOR_KEYS) {
-			_tokens.removeAll("§" + key.toUpperCase() + "§");
+			_tokens.removeAll(Syntax.key2token(key));
 		}
 	}
 	// END KGU#162 2016-03-31

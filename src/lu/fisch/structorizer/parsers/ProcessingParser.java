@@ -271,15 +271,24 @@ public class ProcessingParser extends JavaParser {
 	{
 		Instruction ele = null;
 		if (line.startsWith("exit(")) {
-			ele = new Jump(getKeyword("preExit") + " "
+			// START KGU#1097 2023-11-15: Issue #800
+			//ele = new Jump(getKeyword("preExit") + " "
+			ele = new Jump(Syntax.key2token("preExit") + " "
+			// END KGU#1097 2023-11-15
 					+ line.substring("exit(".length(), line.length()-1));
 		}
 		else if (line.startsWith("println(")) {
-			ele = new Instruction(getKeyword("output") + " "
+			// START KGU#1097 2023-11-15: Issue #800
+			//ele = new Instruction(getKeyword("output") + " "
+			ele = new Instruction(Syntax.key2token("output") + " "
+			// END KGU#1097 2023-11-15
 					+ line.substring("println(".length(), line.length()-1));
 		}
 		else if (line.startsWith("print(")) {
-			ele = new Instruction(getKeyword("output") + " "
+			// START KGU#1097 2023-11-15: Issue #800
+			//ele = new Instruction(getKeyword("output") + " "
+			ele = new Instruction(Syntax.key2token("output") + " "
+			// END KGU#1097 2023-11-15
 					+ line.substring("print(".length(), line.length()-1));
 		}		
 		return ele;
@@ -290,7 +299,10 @@ public class ProcessingParser extends JavaParser {
 	protected String translateContent(String _content)
 	{
 		final TokenList mathTokens = new TokenList("Math.");
-		String output = getKeyword("output");
+		// START KGU#1097 2023-11-15: Issue #800
+		//String output = getKeyword("output");
+		String output = Syntax.key2token("output");
+		// END KGU#1097 2023-11-15
 		String[] outputTokens = new String[] {"println", "printArray", "print"};
 		// An input conversion is not feasible.
 		//String input = getKeyword("input");

@@ -120,6 +120,7 @@ package lu.fisch.structorizer.parsers;
  *      Kay Gürtzig     2022-08-15      Bugfix #1059: Complete redesign of transformCondition();
  *                                      Issue #1064: Pseudo-Calls marking paragraphs and sections now permanently disabled
  *      Kay Gürtzig     2022-08-17      Bugfix #1059: Some finishing of negation handling in conditions.
+ *      Kay Gürtzig     2023-11-15      Issue #800: Modified internal keyword representation
  *
  ******************************************************************************************************
  *
@@ -5593,11 +5594,21 @@ public class COBOLParser extends CodeParser
 
 		@Override
 		public boolean visitPreOrder(Element _ele) {
-			String text = _ele.getText().getLongString();
+			// START KGU#1097 2023-11-15: Issue #800 New internal coding
+			//String text = _ele.getText().getLongString();
+			//if (_ele instanceof Jump && ((Jump)_ele).isReturn()) {
+			//	if (text.trim().equalsIgnoreCase(Syntax.getKeywordOrDefault("preReturn", "return"))) {
+			//		_ele.setText(text + " " + resultVar);
+			//	};
+			ArrayList<TokenList> tokenLines = _ele.getUnbrokenTokenText();
 			if (_ele instanceof Jump && ((Jump)_ele).isReturn()) {
-				if (text.trim().equalsIgnoreCase(getKeywordOrDefault("preReturn", "return"))) {
-					_ele.setText(text + " " + resultVar);
-				};
+				TokenList tokens;
+				if (tokenLines.size() == 1 && (tokens = tokenLines.get(0)).size() == 1
+						&& tokens.get(0).equals(Syntax.key2token("preReturn"))) {
+					tokens.add(resultVar);
+					_ele.setTokenText(tokenLines);
+				}
+			// END KGU#1097 2023-11-15
 				_ele.setColor(Color.WHITE);
 				_ele.setDisabled(false);
 			}
@@ -6205,7 +6216,10 @@ public class COBOLParser extends CodeParser
 		{
 			//System.out.println("PROD_GOBACK_STATEMENT_GOBACK");
 			Reduction secRed = _reduction.get(1).asReduction();
-			String content = getKeywordOrDefault("preReturn", "return");
+			// START KGU#1097 2023-11-15: Issue #800
+			//String content = getKeywordOrDefault("preReturn", "return");
+			String content = Syntax.key2token("preReturn");
+			// END KGU#1097 2023-11-15
 			if (secRed.getParent().getTableIndex() == RuleConstants.PROD_EXIT_PROGRAM_RETURNING2) {
 				content = this.getContent_R(secRed.get(1).asReduction(), content + " ");
 			}
@@ -6218,7 +6232,10 @@ public class COBOLParser extends CodeParser
 			//System.out.println("PROD_STOP_STATEMENT_STOP[_RUN]");
 			int contentIx = (ruleId == RuleConstants.PROD_STOP_STATEMENT_STOP) ? 1 : 2;
 			Reduction secRed = _reduction.get(contentIx).asReduction();
-			String content = getKeywordOrDefault("preExit", "exit");
+			// START KGU#1097 2023-11-15: Issue #800
+			//String content = getKeywordOrDefault("preExit", "exit");
+			String content = Syntax.key2token("preExit");
+			// END KGU#1097 2023-11-15
 			String exitVal = this.getContent_R(secRed, "").trim();
 			if (exitVal.isEmpty()) exitVal = "0";
 			_parentNode.addElement(this.equipWithSourceComment(new Jump(content + " " + exitVal), _reduction));
@@ -6376,7 +6393,10 @@ public class COBOLParser extends CodeParser
 	 */
 	private void importDisplay(Reduction _reduction, Subqueue _parentNode, String _comment) throws ParserCancelled {
 		int ruleId = _reduction.getParent().getTableIndex();
-		String output = getKeyword("output") + " ";
+		// START KGU#1097 20323-11-15: Issue #800
+		//String output = getKeyword("output") + " ";
+		String output = Syntax.key2token("output") + " ";
+		// END KGU#1097 2023-11-15
 		switch (ruleId) {
 		case RuleConstants.PROD_DISPLAY_BODY:
 		{
@@ -7352,7 +7372,10 @@ public class COBOLParser extends CodeParser
 		}
 		if (secRuleId == RuleConstants.PROD_ACCEPT_BODY || secRuleId == RuleConstants.PROD_ACCEPT_BODY_FROM3) {
 			// For these types we can offer a conversion
-			String content = getKeywordOrDefault("input", "input");
+			// START KGU#1097 2023-11-15. Issue 800
+			//String content = getKeywordOrDefault("input", "input");
+			String content = Syntax.key2token("input");
+			// END KGU#1097 2023-11-15
 			content += " " + varName;
 			_parentNode.addElement(new Instruction(content.trim()));
 			done = true;
@@ -7726,7 +7749,10 @@ public class COBOLParser extends CodeParser
 					fileStatusCase.qs.get(i).addElement(asgnmt);
 				}
 				fileStatusFct.children.addElement(fileStatusCase);
-				fileStatusFct.children.addElement(new Instruction(getKeywordOrDefault("preReturn", "return") + " file_status"));
+				// START KGU#1097 2023-11-15: Issue #800
+				//fileStatusFct.children.addElement(new Instruction(getKeywordOrDefault("preReturn", "return") + " file_status"));
+				fileStatusFct.children.addElement(new Instruction(Syntax.key2token("preReturn") + " file_status"));
+				// END KGU#1097 2023-11-15
 				this.addRoot(fileStatusFct);
 				this.fileStatusFctAdded = true;
 			}
@@ -8221,14 +8247,20 @@ public class COBOLParser extends CodeParser
 		case RuleConstants.PROD_EXIT_BODY_PROGRAM:	// <exit_body> ::= PROGRAM <exit_program_returning>
 		case RuleConstants.PROD_EXIT_BODY_FUNCTION:	// <exit_body> ::= FUNCTION
 			{
-				content = getKeywordOrDefault("preReturn", "return");
+				// START KGU#1097 2023-11-15: Issue #800
+				//content = getKeywordOrDefault("preReturn", "return");
+				content = Syntax.key2token("preReturn");
+				// END KGU#1097 2023-11-15
 				if (secRed.getParent().getTableIndex() == RuleConstants.PROD_EXIT_PROGRAM_RETURNING2) {
 					content = this.getContent_R(secRed.get(1).asReduction(), content + " ");
 				}
 			}
 			break;
 		case RuleConstants.PROD_EXIT_BODY_PERFORM:	// <exit_body> ::= PERFORM
-			content = getKeywordOrDefault("preLeave", "leave");
+			// START KGU#1097 2023-11-15: Issue #800
+			//content = getKeywordOrDefault("preLeave", "leave");
+			content = Syntax.key2token("preLeave");
+			// END KGU#1097 2023-11-15
 			break;
 		case RuleConstants.PROD_EXIT_BODY_PERFORM_CYCLE: // <exit_body> ::= PERFORM CYCLE
 			content = "continue";	// may even work in some code exports, can be understood
@@ -8241,7 +8273,10 @@ public class COBOLParser extends CodeParser
 			//content = this.getContent_R(_reduction, "");
 			//color = Color.RED;
 			//comment = "Unsupported kind of JUMP";
-			content = getKeywordOrDefault("preReturn", "return");
+			// START KGU#1097 2023-11-15: Issue #800
+			//content = getKeywordOrDefault("preReturn", "return");
+			content = Syntax.key2token("preReturn");
+			// END KGU#1097 2023-11-15
 			comment = "EXIT " + secRed.get(0).asString();
 			exitTarget = (secRuleId == RuleConstants.PROD_EXIT_BODY_SECTION) ? SoPTarget.SOP_SECTION : SoPTarget.SOP_PARAGRAPH;
 			break;
@@ -11028,7 +11063,10 @@ public class COBOLParser extends CodeParser
 				aRoot.traverse(new ReturnEnforcer(resultVar));
 				// Now make sure that the routine ends with a return element
 				if (nElements == 0 || !(aRoot.children.getElement(nElements-1) instanceof Jump)) {
-					aRoot.children.addElement(new Instruction(getKeywordOrDefault("preReturn", "return") + " " + this.returnMap.get(aRoot)));
+					// START KGU#1097 2023-11-15: Issue #800
+					//aRoot.children.addElement(new Instruction(getKeywordOrDefault("preReturn", "return") + " " + this.returnMap.get(aRoot)));
+					aRoot.children.addElement(new Instruction(Syntax.key2token("preReturn") + " " + this.returnMap.get(aRoot)));
+					// END KGU#1097 2023-11-15
 				}
 			}
 		}

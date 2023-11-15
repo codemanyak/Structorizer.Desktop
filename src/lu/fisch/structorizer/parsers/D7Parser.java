@@ -76,6 +76,7 @@ package lu.fisch.structorizer.parsers;
  *                                      processing no longer necessary, either, hence '\n' substitution also dropped
  *      Kay Gürtzig     2021-10-03      Mechanism to ensure case-sensitive matching of result variables with function name
  *      Kay Gürtzig     2022-12-21      Deprecation annotation added to filterNonAscii()
+ *      Kay Gürtzig     2023-11-15      Issue #800: Internal keyword presentation modified
  *
  ******************************************************************************************************
  *
@@ -1579,18 +1580,27 @@ public class D7Parser extends CodeParser
 				content += ":=";
 				content = getContent_R(_reduction.get(3).asReduction(), content);
 				content += " ";
-				content += getKeyword("postFor");
+				// START KGU#1097 2023-11-15: Issue #800
+				//content += getKeyword("postFor");
+				content += Syntax.key2token("postFor");
+				// END KGU#1097 2023-11-15
 				content += " ";
 				content = getContent_R(_reduction.get(5).asReduction(), content);
 				// START KGU#3 2016-05-02: Enh. #10 Token 4 contains the information whether it's to or downto
 				if (getContent_R(_reduction.get(4).asReduction(), "").equals("downto"))
 				{
-					content += " " + getKeyword("stepFor") + " -1";
+					// START KGU#1097 2023-11-15: Issue #800
+					//content += " " + getKeyword("stepFor") + " -1";
+					content += " " + Syntax.key2token("stepFor") + " -1";
+					// END KGU#1097 2023-11-15
 				}
 				// END KGU#3 2016-05-02
 				// START KGU 2016-05-02: This worked only if preFor ended with space
 				//For ele = new For(preFor+updateContent(content));
-				For ele = new For(getKeyword("preFor").trim() + " " + translateContent(content));
+				// START KGU#1097 2023-11-15: Issue #800
+				//For ele = new For(getKeyword("preFor").trim() + " " + translateContent(content));
+				For ele = new For(Syntax.key2token("preFor") + " " + translateContent(content));
+				// END KGU#1097 2023-11-15
 				// END KGU 2016-05-02
 				// START KGU#407 2017-06-20: Enh. #420 - comments already here
 				this.equipWithSourceComment(ele, _reduction);
@@ -1744,7 +1754,10 @@ public class D7Parser extends CodeParser
 //				case RuleConstants.PROD_RAISESTMT_RAISE:			// <RaiseStmt> ::= RAISE <OptExceptInstance>
 //				case RuleConstants.PROD_RAISESTMT_RAISE_AT:			// <RaiseStmt> ::= RAISE <OptExceptInstance> AT <Address>
 //				}
-				Jump raise = new Jump(this.getContent_R(_reduction.get(1).asReduction(), getKeywordOrDefault("preThrow", "throw")));
+				// START KGU#1097 2023-11-15: Issue #800 new internal representation of keywords
+				//Jump raise = new Jump(this.getContent_R(_reduction.get(1).asReduction(), getKeywordOrDefault("preThrow", "throw")));
+				Jump raise = new Jump(this.getContent_R(_reduction.get(1).asReduction(), Syntax.key2token("preThrow")));
+				// END KGU#1097 2023-11-15
 				_parentNode.addElement(this.equipWithSourceComment(raise, _reduction));
 			}
 			else if (
@@ -1783,7 +1796,10 @@ public class D7Parser extends CodeParser
 							buildNSD_R(elseReduc, select.qs.lastElement());
 						}
 						else {
-							select.qs.lastElement().addElement(new Jump(getKeywordOrDefault("preThrow", "throw")));
+							// START KGU#1097 2023-11-15: Issue #800 new internal representation of keywords
+							//select.qs.lastElement().addElement(new Jump(getKeywordOrDefault("preThrow", "throw")));
+							select.qs.lastElement().addElement(new Jump(Syntax.key2token("preThrow")));
+							// END KGU#1097 2023-11-15
 						}
 						ele.qCatch.addElement(select);
 						if (exVarName != null) {
@@ -1814,9 +1830,12 @@ public class D7Parser extends CodeParser
 						ele = encapsulated;
 					}
 					else {
-						ele.qCatch.addElement(new Jump(getKeywordOrDefault("preThrow", "throw")));
+						// START KGU#1097 2023-11-15: Issue #800 new internal representation of keywords
+						//ele.qCatch.addElement(new Jump(getKeywordOrDefault("preThrow", "throw")));
+						ele.qCatch.addElement(new Jump(Syntax.key2token("preThrow")));
+						// END KGU#1097 2023-11-15
 					}
-					buildNSD_R(secReduc, ele.qFinally);					
+					buildNSD_R(secReduc, ele.qFinally);
 				}
 				}
 				_parentNode.addElement(this.equipWithSourceComment(ele, _reduction));
@@ -2002,8 +2021,12 @@ public class D7Parser extends CodeParser
 		r = new Regex(BString.breakup("readln")+"(.*?)",input+" $1"); _content=r.replaceAll(_content);
 		r = new Regex(BString.breakup("read")+"(.*?)",input+" $1"); _content=r.replaceAll(_content);*/
 
-		String output = getKeyword("output");
-		String input = getKeyword("input");
+		// START KGU#1097 2023-11-15: Issue #800
+		//String output = getKeyword("output");
+		//String input = getKeyword("input");
+		String output = Syntax.key2token("output");
+		String input = Syntax.key2token("input");
+		// END KGU#1097 2023-11-15
 		_content = _content.replaceAll(BString.breakup("write", true)+"[((](.*?)[))]", output+" $1");
 		_content = _content.replaceAll(BString.breakup("writeln", true)+"[((](.*?)[))]", output+" $1");
 		_content = _content.replaceAll(BString.breakup("writeln", true)+"(.*?)", output+" $1");
