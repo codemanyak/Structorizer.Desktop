@@ -85,6 +85,7 @@ import javax.swing.ImageIcon;
 import lu.fisch.graphics.*;
 import lu.fisch.structorizer.gui.FindAndReplace;
 import lu.fisch.structorizer.gui.IconLoader;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.*;
 
@@ -1119,7 +1120,7 @@ public class Case extends Element implements IFork
 		String[] relevantKeywords = getRelevantParserKeys();
 		if (!text.isEmpty())
 		{
-			text.set(0, encodeLine(text.get(0), _splitOldKeywords, relevantKeywords, _ignoreCase, false));
+			text.set(0, Syntax.encodeLine(text.get(0), _splitOldKeywords, relevantKeywords, _ignoreCase, false));
 			// START KGU#453 2017-11-02: Issue #447
 			boolean isContinuation = text.get(0).endsWith("\\");
 			// END KGU#453 2017-11-02
@@ -1132,7 +1133,7 @@ public class Case extends Element implements IFork
 				if (!isContinuation && (line.size() != 1 || !line.get(0).equals("%")))
 				// END KGU#453 2017-11-02
 				{
-					text.set(i, encodeLine(line, _splitOldKeywords, relevantKeywords, _ignoreCase, isContinuation));
+					text.set(i, Syntax.encodeLine(line, _splitOldKeywords, relevantKeywords, _ignoreCase, isContinuation));
 				}
 				// START KGU#453 2017-11-02: Issue #447
 				isContinuation = line.endsWith("\\");

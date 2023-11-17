@@ -1247,9 +1247,11 @@ public class TokenList implements Comparable<TokenList>{
 	
 	/**
 	 * Cuts out and removes the portion of this token list between the specified
-	 * {@code fromIndex}, inclusive, and {@code toIndex}, exclusive.  (If
+	 * {@code fromIndex}, inclusive, and {@code toIndex}, exclusive. (If
 	 * {@code fromIndex} and {@code toIndex} are equal, then nothing will be
-	 * removed and the returned list will be empty.)
+	 * removed and the returned list will be empty.)<br/>
+	 * Paddings surrounding the remove subsequence will be left with the remaining
+	 * token list.
 	 *
 	 * @param fromIndex - low endpoint (inclusive) of the removed subList
 	 * @param toIndex - high endpoint (exclusive) of the remove subList

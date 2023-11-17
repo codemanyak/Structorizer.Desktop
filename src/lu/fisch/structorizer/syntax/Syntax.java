@@ -492,6 +492,108 @@ public class Syntax {
 	}
 	// END KGU#288 2016-11-06
 	
+	// START KGU#258/KGU#1097 2023-11-15: Enh. #253, issue #800 TokenList version
+	/**
+	 * Replaces all keywords from map {@code _splitOldKeywords} (or, if {@code null},
+	 * all currently user-configured keywords) referred by a key from {@code _relevantKeys}
+	 * by its internal code token in the given tokenized line {@code _tokens}
+	 * 
+	 * @param _tokens - the tokenized line, the keywords in which are to be encoded.
+	 * @param _splitOldKeywords - possibly a set of split keywords from e.g. a legacy nsd file,
+	 *    or {@code null} (in which case the current user-specified keywords are used)
+	 * @param _relevantKeys - an array of key types for the element kind to handle with position
+	 *    restriction as prefix character ('^' = only at front, '$' = only at end, '*' = first
+	 *    arbitrary position)
+	 * @param _ignoreCase - if the case of the original keywords mattered
+	 * @param _isContinued - whether this is a continued part of a broken line
+	 * @return the encoded token list
+	 */
+	public static TokenList encodeLine(TokenList _tokens, HashMap<String, TokenList> _splitOldKeywords,
+			String[] _relevantKeys, boolean _ignoreCase, boolean _isContinued) {
+		boolean wasReplaced = false;
+		for (int j = 0; j < _relevantKeys.length; j++)
+		{
+			// START KGU#1097 2023-11-09: Issue #800 _splitOldKes may now be null
+			//TokenList splitKey = _splitOldKeys.get(_prefNames[i]);
+			String key = _relevantKeys[j];
+			char where = key.charAt(0);	// may be '^', '$', or '*', symbolising the position
+			key = key.substring(1);
+			TokenList splitKey = null;
+			if (_splitOldKeywords != null) {
+				splitKey = _splitOldKeywords.get(key);
+			}
+			else {
+				splitKey = Syntax.getSplitKeyword(key);
+			}
+			// END KGU#1097 2023-11-09
+			if (splitKey != null && !splitKey.isBlank())
+			{
+				int sizeKey = splitKey.size();
+				// In general, look for the first occurrence
+				int posKey = _tokens.indexOf(splitKey, !_ignoreCase);
+				boolean wasResplit = false;
+				if ((where == '^' || where == '$') && posKey == -1
+						&& (splitKey.contains("'") || splitKey.contains("\""))) {
+					// We must resplit the line without preserving string literals
+					_tokens = new TokenList(_tokens.getString(), false);
+					posKey = _tokens.indexOf(splitKey, !_ignoreCase);
+					wasResplit = true;
+				}
+				if (posKey >= 0) {
+					if (where == '$') {
+						// The keyword must be at the end, the test will also fail if line ends with "\".
+						if ((posKey = _tokens.lastIndexOf(splitKey, !_ignoreCase)) != _tokens.size()-sizeKey) {
+							posKey = -1;
+						}
+					}
+					else if (where == '^' && (_isContinued || posKey != 0)) {
+						posKey = -1;
+					}
+				}
+				if (posKey >= 0) {
+					// The original key word will hardly have had too little padding but be cautious
+					int[] paddings = _tokens.getPadding(posKey);
+					if (!wasReplaced && !wasResplit) {
+						_tokens = new TokenList(_tokens);
+					}
+					_tokens.set(posKey, Syntax.key2token(key));
+					if (sizeKey > 1) {
+						_tokens.remove(posKey + 1, posKey - sizeKey - 1);
+					}
+					_tokens.setPadding(posKey, paddings[0], -1);
+					_tokens.setPadding(posKey + sizeKey - 1, -1, paddings[1]);
+					wasReplaced = true;
+				}
+				if (wasResplit) {
+					// Restore string literals if we had resplit the line
+					_tokens = new TokenList(_tokens.getString(), true);
+				}
+			}
+		}
+		return _tokens;
+	}
+	
+	/**
+	 * Replaces all internal key tokens (e.g. {@code "§PREFOR§"}) by the respective
+	 * user-configured keyword preference (for display or editing)
+	 * 
+	 * @param _tokens - the tokenized line, the internal key tokens in which are to
+	 *    be decoded, i.e. to be replaced by user-preferred keywords.
+	 * @return the decoded token list
+	 * 
+	 * @see #encodeLine(TokenList, HashMap, String[], boolean, boolean)
+	 */
+	public static TokenList decodeLine(TokenList _tokens) {
+		TokenList decoded = new TokenList(_tokens);
+		for (String key: Syntax.keywordSet()) {
+			TokenList keyTokens = new TokenList(Syntax.key2token(key));
+			decoded.replaceAll(keyTokens, Syntax.getSplitKeyword(key), true);
+		}
+		return decoded;
+	}
+	// END KGU#258/KGU#1097 2023-11-15
+
+	
 	// START KGU#162 2016-03-31/2021-10-25: Enh. #144 - undispensible part of transformIntermediate
 	/**
 	 * Removes redundant decorator keywords from the passed-in token list.

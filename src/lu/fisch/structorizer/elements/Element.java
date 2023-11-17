@@ -1105,11 +1105,17 @@ public abstract class Element {
 	/**
 	 * Returns the (decoded) content of the text field no matter if mode {@link #isSwitchTextCommentMode()}
 	 * is active.<br/>
+	 * Use {@code getText(false)} for a mode-sensitive effect.<br/>
 	 * <b>NOTE:</b> This is no longer a reference to the internal text representation
-	 * but a reconstructed copy with decoded keywords!<br/>
-	 * Use {@code getText(false)} for a mode-sensitive effect.
-	 * @return the text StringList with decoded keywords
+	 * but a reconstructed copy.
+	 * 
+	 * @return the text as StringList
+	 * 
 	 * @see #getText(boolean)
+	 * @see #getBrokenText()
+	 * @see #getUnbrokenText()
+	 * @see #getBrokenTokenText()
+	 * @see #getUnbrokenTokenText()U
 	 */
 	public StringList getText()
 	{
@@ -1117,10 +1123,7 @@ public abstract class Element {
 		StringList strList = new StringList();
 		synchronized (text) {
 			for (TokenList tokens: text) {
-				// START KGU#1097 2023-11-09: Issue#800 Now decode the standard markers
-				//strList.add(tokens.getString());
-				strList.add(decodeLine(tokens).getString());
-				// END KGU#1097 2023-11-09
+				strList.add(tokens.getString());
 			}
 		}
 		return strList;
@@ -1128,7 +1131,8 @@ public abstract class Element {
 	/**
 	 * Returns the content of the text field unless _alwaysTrueText is false and
 	 * mode isSwitchedTextAndComment is active, in which case the comment field
-	 * is returned instead 
+	 * is returned instead.
+	 * 
 	 * @param _alwaysTrueText - if true then mode isSwitchTextAndComment is ignored
 	 * @return either the text or the comment
 	 */
@@ -1159,7 +1163,9 @@ public abstract class Element {
 	 * off. This is for cases where the deliberate breaking of lines is of no importance
 	 * and would unnecessarily spoil the presentation.<br/>
 	 * Use {@code getCuteText(false)} for a mode-sensitive effect.
+	 * 
 	 * @return the text StringList (in normal mode) the comment StringList otherwise
+	 * 
 	 * @see #getText()
 	 * @see #getCuteText(boolean)
 	 * @see #isSwitchTextCommentMode()
@@ -1179,8 +1185,8 @@ public abstract class Element {
 			String line = cute.get(i);
 			if (line.endsWith("\\")) {
 				line = line.substring(0, line.length() - 1);
+				cute.set(i, line);
 			}
-			cute.set(i, line);
 		}
 		return cute;
 	}
@@ -1268,10 +1274,7 @@ public abstract class Element {
 		int nLines = text.size();
 		int i = 0;
 		while (i < nLines) {
-			// START KGU#1097 2023-11-09: Issue #800 Now decode internal standard marker tokens
-			//String line = text.get(i).getString().trim();
-			String line = decodeLine(text.get(i)).getString().trim();
-			// END KGU#1097 2023-11-09
+			String line = text.get(i).getString().trim();
 			while (line.endsWith("\\") && (i + 1 < nLines)) {
 				line = line.substring(0, line.length()-1) + separator + text.get(++i).getString().trim();
 			}
@@ -1341,14 +1344,34 @@ public abstract class Element {
 	// START KGU#1097 2023-11-15: Issue #800 New internal representation
 	/**
 	 * Overwrites the previous Element text with the given tokenized multi-line
-	 * text.
+	 * text. If any of the contained token lists contains a newline token then
+	 * the line will be split at this position and the part before it will be
+	 * suffixed by a "\" token.<br/>
 	 * 
-	 * @param tokenLines
+	 * @param tokenLines - a list of {@link TokenList}s representing the (possibly
+	 *    broken) lines. "Broken" means that the token lists may contain newline
+	 *    tokens at which positions the respective token lists will be split into
+	 *    several ones.
+	 *    
+	 * @see #getBrokenTokenText()
+	 * @see #getUnbrokenTokenText()
 	 */
 	public void setTokenText(ArrayList<TokenList> tokenLines)
 	{
 		// FIXME ensure triggers
-		this.text = tokenLines;
+		ArrayList<TokenList> tt = new ArrayList<TokenList>();
+		for (TokenList tokens: tokenLines) {
+			tokens = new TokenList(tokens);
+			int posNl = -1;
+			while ((posNl = tokens.indexOf("\n")) >= 0) {
+				tokens.set(posNl, "\\");
+				tt.add(tokens.subSequence(0, posNl));
+				tokens.remove(0, posNl + 1);
+			}
+			tt.add(tokens);
+		}
+		this.text = tt;
+		this.parsedLines = null;
 	}
 	// END KGU#1097 2023-11-15
 	
@@ -1362,7 +1385,7 @@ public abstract class Element {
 	 * @param typeMap - a data type map to retrieve from and add to, or {@code null}
 	 * @return the array of parse results per line
 	 * 
-	 * @see #getParsedText(StringList, StringList, TypeRegistry, StringList)
+	 * @see #getParsedText(StringList, StringList, StringList, TypeRegistry, StringList)
 	 * @see #parseLines(TypeRegistry)
 	 */
 	public Line[] getParsedText(StringList problems, TypeRegistry typeMap)
@@ -1371,15 +1394,24 @@ public abstract class Element {
 		Line[] lines = new Line[unbrText.count()];
 		for (int i = 0; i < lines.length; i++) {
 			lines[i] = LineParser.getInstance().parse(unbrText.get(i), this, i, typeMap);
+			// START KGU#790 2023-11-15: Issue #800
+			if (lines[i].getType() == Line.LineType.LT_RAW) {
+				problems.add(lines[i].getParserError() + " in line " + i);
+			}
+			// END KGU#790 2023-11-15
 		}
 		return lines;
 	}
 
 	/**
-	 * Retrieves an array of parsed lines (a {@link Line} object for each unbroken line)
+	 * Retrieves an array of parsed lines (a {@link Line} object for each unbroken line).
+	 * Also collects the names of all variables that are assigned a value, explicitly
+	 * declared, or simply used if the respective argument is not {@code null}.<br/>
+	 * Does <b>not</b> overwrite {@link #parsedLines}.
 	 * 
-	 * @param declaredVars - unused by now (is it to gather the declared variables en passant?)
-	 * @param usedVars - unused by now (is it to gather the used variables en passant?)
+	 * @param assignedVars - gathers the names of modified variables if not {@code null}
+	 * @param declaredVars - gathers the names of declared variables if not {@code null}
+	 * @param usedVars - gathers the names of referenced variables if not {@code null}
 	 * @param typeMap - a data type map to retrieve from and add to, or {@code null}
 	 * @param problems - a {@link StringList} gathering occurred syntax complaints
 	 * @return the array of parse results per line
@@ -1392,6 +1424,9 @@ public abstract class Element {
 			lines[i] = LineParser.getInstance().parse(unbrText.get(i).getString(), this, i, typeMap);
 			if (lines[i].getType() != Line.LineType.LT_RAW) {
 				lines[i].gatherVariables(assignedVars, declaredVars, usedVars, problems);
+			}
+			else {
+				problems.add(lines[i].getParserError() + " in line " + i);
 			}
 		}
 		return lines;
@@ -3533,14 +3568,15 @@ public abstract class Element {
 	 * Actually writes the of text line {@code _text} of Element {@code _this}
 	 * to the given {@code _canvas} (with its current font), where mode
 	 * {@link #E_VARHIGHLIGHT} is considered.
+	 * 
 	 * @param _canvas - the target {@link Canvas}
 	 * @param _x - the horizontal start position
 	 * @param _y - the vertical start position
 	 * @param _text - the text line to be drawn
 	 * @param _this - the responsible Element
 	 * @param _inContention - a flag indication a possible event queue contention,
-	 * in which case the drawing ought to be simplified (e.g. by suppressing syntax
-	 * highlighting)
+	 *    in which case the drawing ought to be simplified (e.g. by suppressing
+	 *    syntax highlighting)
 	 */
 	public static void writeOutVariables(Canvas _canvas, int _x, int _y, String _text, Element _this, boolean _inContention)
 	{
@@ -3597,6 +3633,7 @@ public abstract class Element {
 			}
 			else
 			{
+				_text = Syntax.decodeLine(new TokenList(_text)).getString();
 				if (_actuallyDraw)
 				{
 					_canvas.writeOut(_x + total, _y, _text);
@@ -3852,27 +3889,38 @@ public abstract class Element {
 			// END KGU#116 2015-12-23
 			String ioSign = null;
 			for (String ioKey: new String[] {"input", "output"}) {
-				TokenList splitKey = new TokenList(Syntax.getKeywordOrDefault(ioKey, ioKey), false);
-				// START KGU#1031 2022-05-31: Bugfix #1037
-				//if (parts.indexOf(splitKey, 0, Syntax.ignoreCase) == 0) {
-				if (parts.indexOf(splitKey, 0, !Syntax.ignoreCase) == 0) {
-				// END KGU#1031 2022-05-31
-					ioSign = parts.subSequence(0, splitKey.size()).getString();
-					parts.remove(1, splitKey.size());
-					parts.set(0, ioSign);
+				// START KGU#1097 2023-11-16: Issue #800 New internal keyword representation
+				//TokenList splitKey = new TokenList(Syntax.getKeywordOrDefault(ioKey, ioKey), false);
+				//// START KGU#1031 2022-05-31: Bugfix #1037
+				////if (parts.indexOf(splitKey, 0, Syntax.ignoreCase) == 0) {
+				//if (parts.indexOf(splitKey, 0, !Syntax.ignoreCase) == 0) {
+				//// END KGU#1031 2022-05-31
+				//	ioSign = parts.subSequence(0, splitKey.size()).getString();
+				//	parts.remove(1, splitKey.size());
+				//	parts.set(0, ioSign);
+				//	break;
+				//}
+				if (!parts.isEmpty() && parts.get(0).equals(Syntax.key2token(ioKey))) {
+					parts.set(0, ioSign = Syntax.getKeywordOrDefault(ioKey, ioKey));
 					break;
 				}
+				// END KGU#1097 2023-11-16
 			}
 			String jumpSign = null;
-			if (ioSign == null) {
+			if (ioSign == null && !parts.isEmpty()) {
 				for (String jumpKey: new String[] {"preLeave", "preReturn", "preExit", "preThrow"}) {
-					TokenList splitKey = new TokenList(Syntax.getKeywordOrDefault(jumpKey, jumpKey.substring(3).toLowerCase()), false);
-					if (parts.indexOf(splitKey, 0, Syntax.ignoreCase) == 0) {
-						jumpSign = parts.subSequence(0, splitKey.size()).getString();
-						parts.remove(1, splitKey.size());
-						parts.set(0, jumpSign);
-						break;
+					// START KGU#1097 2023-11-16: Issue #800 New internal keyword representation
+					//TokenList splitKey = new TokenList(Syntax.getKeywordOrDefault(jumpKey, jumpKey.substring(3).toLowerCase()), false);
+					//if (parts.indexOf(splitKey, 0, Syntax.ignoreCase) == 0) {
+					//	jumpSign = parts.subSequence(0, splitKey.size()).getString();
+					//	parts.remove(1, splitKey.size());
+					//	parts.set(0, jumpSign);
+					//	break;
+					//}
+					if (parts.get(0).equals(Syntax.key2token(jumpKey))) {
+						parts.set(0, jumpSign = Syntax.getKeywordOrDefault(jumpKey, jumpKey.substring(3).toLowerCase()));
 					}
+					// END KGU#1097 2023-11-16
 				}
 			}
 			// END KGU#1018 2021-11-17
@@ -4682,97 +4730,13 @@ public abstract class Element {
 			for (int i = 0; i < this.text.size(); i++)
 			{
 				// FIXME: We should order the keys by decreasing length first!
-				TokenList encoded = encodeLine(this.text.get(i), _splitOldKeywords,
+				TokenList encoded = Syntax.encodeLine(this.text.get(i), _splitOldKeywords,
 						relevantKeys, _ignoreCase, isContinued);
 				isContinued = encoded.endsWith("\\");
 			}
 			this.text = result;
 		}
 	}
-	/**
-	 * Replaces all keywords from map {@code _splitOldKeywords} (or, if {@code null},
-	 * all currently user-configured keywords) referred by a key from {@code _relevantKeys}
-	 * by its internal code token in the given tokenized line {@code _tokens}
-	 * 
-	 * @param _tokens - the tokenized line, the keywords in which are to be encoded.
-	 * @param _splitOldKeywords - possibly a set of split keywords from e.g. a legacy nsd file,
-	 *    or {@code null} (in which case the current user-specified keywords are used)
-	 * @param _relevantKeys - an array of key types for the element kind to handle with position
-	 *    restriction as prefix character ('^' = only at front, '$' = only at end, '*' = first
-	 *    arbitrary position)
-	 * @param _ignoreCase - if the case of the original keywords mattered
-	 * @param _isContinued - whether this is a continued part of a broken line
-	 * @return the encoded token list
-	 */
-	protected TokenList encodeLine(TokenList _tokens, HashMap<String, TokenList> _splitOldKeywords,
-			String[] _relevantKeys, boolean _ignoreCase, boolean _isContinued) {
-		TokenList newTokens = new TokenList(_tokens);
-		for (int j = 0; j < _relevantKeys.length; j++)
-		{
-			// START KGU#1097 2023-11-09: Issue #800 _splitOldKes may now be null
-			//TokenList splitKey = _splitOldKeys.get(_prefNames[i]);
-			String key = _relevantKeys[j];
-			char where = key.charAt(0);	// may be '^', '$', or '*', symbolising the position
-			key = key.substring(1);
-			TokenList splitKey = null;
-			if (_splitOldKeywords != null) {
-				splitKey = _splitOldKeywords.get(key);
-			}
-			else {
-				splitKey = Syntax.getSplitKeyword(key);
-			}
-			// END KGU#1097 2023-11-09
-			if (splitKey != null && !splitKey.isBlank())
-			{
-				int sizeKey = splitKey.size();
-				int posKey = -1;
-				if (where == '$') {
-					posKey = newTokens.lastIndexOf(splitKey, !_ignoreCase);
-					// The following test will also fail if the line "ends" with '\'
-					if (posKey != newTokens.size() - sizeKey) {
-						posKey = -1;
-					}
-				}
-				else if (!(where == '^' && _isContinued)) {
-					posKey = newTokens.indexOf(splitKey, !_ignoreCase);
-					if (where == '^' && posKey != 0) {
-						posKey = -1;
-					}
-				}
-				if (posKey >= 0) {
-					// The original key word will hardly have had to little padding but be cautious
-					int[] paddings = newTokens.getPadding(posKey);
-					newTokens.set(posKey, Syntax.key2token(key));
-					if (sizeKey > 1) {
-						newTokens.remove(posKey + 1, posKey - sizeKey - 1);
-					}
-					newTokens.setPadding(posKey, paddings[0], -1);
-					newTokens.setPadding(posKey + sizeKey - 1, -1, paddings[1]);
-				}
-			}
-		}
-		return newTokens;
-	}
-	
-	/**
-	 * @param _tokens - the tokenized line, the keywords in which are to be encoded
-	 * @param _splitOldKeywords - possibly a set of split keywords from e.g. a legacy nsd file
-	 * @param _relevantKeys - an array of key types for the element kind to handle with position
-	 *    restriction as prefix character ('^' = only at front, '$' = only at end, '*' = first
-	 *    arbitrary position)
-	 * @param _ignoreCase - if the case of the original keywords mattered
-	 * @param _isContinued - whether this is a continued part of a broken line
-	 * @return the encoded token list
-	 */
-	protected TokenList decodeLine(TokenList _tokens) {
-		TokenList decoded = new TokenList(_tokens);
-		for (String key: Syntax.keywordSet()) {
-			TokenList keyTokens = new TokenList(Syntax.key2token(key));
-			decoded.replaceAll(keyTokens, Syntax.getSplitKeyword(key), true);
-		}
-		return decoded;
-	}	
-	
 	// END KGU#258/KGU#1097 2023-10-29
 
 	// START KGU#301 2016-12-01: Bugfix #301

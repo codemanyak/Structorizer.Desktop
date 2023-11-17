@@ -284,6 +284,8 @@ public class Line {
 	/**
 	 * @return a parser error message if no line structure could be built due to
 	 *     a lexical or syntactical error, otherwise {@code null}
+	 * 
+	 * @see #getType()
 	 */
 	public String getParserError()
 	{
