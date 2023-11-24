@@ -3728,6 +3728,8 @@ public abstract class Element {
 		}
 	}
 	
+	private static final StringList ioKeys = StringList.explode("input,output", ",");
+	private static final StringList jpKeys = StringList.explode("preLeave,preReturn,preExit,preThrow", ",");
 	/**
 	 * Retrieves or creates the highlight units for the text of Element {@code _elem} from/in
 	 * the {@link #highlightCache}
@@ -3888,41 +3890,35 @@ public abstract class Element {
 			// END KGU#686 2019-03-18
 			// END KGU#116 2015-12-23
 			String ioSign = null;
-			for (String ioKey: new String[] {"input", "output"}) {
-				// START KGU#1097 2023-11-16: Issue #800 New internal keyword representation
-				//TokenList splitKey = new TokenList(Syntax.getKeywordOrDefault(ioKey, ioKey), false);
-				//// START KGU#1031 2022-05-31: Bugfix #1037
-				////if (parts.indexOf(splitKey, 0, Syntax.ignoreCase) == 0) {
-				//if (parts.indexOf(splitKey, 0, !Syntax.ignoreCase) == 0) {
-				//// END KGU#1031 2022-05-31
-				//	ioSign = parts.subSequence(0, splitKey.size()).getString();
-				//	parts.remove(1, splitKey.size());
-				//	parts.set(0, ioSign);
-				//	break;
-				//}
-				if (!parts.isEmpty() && parts.get(0).equals(Syntax.key2token(ioKey))) {
-					parts.set(0, ioSign = Syntax.getKeywordOrDefault(ioKey, ioKey));
-					break;
-				}
-				// END KGU#1097 2023-11-16
-			}
-			String jumpSign = null;
-			if (ioSign == null && !parts.isEmpty()) {
-				for (String jumpKey: new String[] {"preLeave", "preReturn", "preExit", "preThrow"}) {
-					// START KGU#1097 2023-11-16: Issue #800 New internal keyword representation
-					//TokenList splitKey = new TokenList(Syntax.getKeywordOrDefault(jumpKey, jumpKey.substring(3).toLowerCase()), false);
-					//if (parts.indexOf(splitKey, 0, Syntax.ignoreCase) == 0) {
-					//	jumpSign = parts.subSequence(0, splitKey.size()).getString();
-					//	parts.remove(1, splitKey.size());
-					//	parts.set(0, jumpSign);
-					//	break;
-					//}
-					if (parts.get(0).equals(Syntax.key2token(jumpKey))) {
-						parts.set(0, jumpSign = Syntax.getKeywordOrDefault(jumpKey, jumpKey.substring(3).toLowerCase()));
-					}
-					// END KGU#1097 2023-11-16
-				}
-			}
+			// START KGU#1097 2023-11-16: Issue #800 New internal keyword representation
+//			for (String ioKey: new String[] {"input", "output"}) {
+//				TokenList splitKey = new TokenList(Syntax.getKeywordOrDefault(ioKey, ioKey), false);
+//				// START KGU#1031 2022-05-31: Bugfix #1037
+//				//if (parts.indexOf(splitKey, 0, Syntax.ignoreCase) == 0) {
+//				if (parts.indexOf(splitKey, 0, !Syntax.ignoreCase) == 0) {
+//				// END KGU#1031 2022-05-31
+//					ioSign = parts.subSequence(0, splitKey.size()).getString();
+//					parts.remove(1, splitKey.size());
+//					parts.set(0, ioSign);
+//					break;
+//				}
+//			}
+//			String jumpSign = null;
+//			if (ioSign == null && !parts.isEmpty()) {
+//				for (String jumpKey: new String[] {"preLeave", "preReturn", "preExit", "preThrow"}) {
+//					//TokenList splitKey = new TokenList(Syntax.getKeywordOrDefault(jumpKey, jumpKey.substring(3).toLowerCase()), false);
+//					//if (parts.indexOf(splitKey, 0, Syntax.ignoreCase) == 0) {
+//					//	jumpSign = parts.subSequence(0, splitKey.size()).getString();
+//					//	parts.remove(1, splitKey.size());
+//					//	parts.set(0, jumpSign);
+//					//	break;
+//					//}
+//					if (parts.get(0).equals(Syntax.key2token(jumpKey))) {
+//						parts.set(0, jumpSign = Syntax.getKeywordOrDefault(jumpKey, jumpKey.substring(3).toLowerCase()));
+//					}
+//				}
+//			}
+			// END KGU#1097 2023-11-16
 			// END KGU#1018 2021-11-17
 
 			// START KGU#377 2017-03-30: Bugfix #333
@@ -3980,6 +3976,9 @@ public abstract class Element {
 
 					if (!display.equals(""))
 					{
+						// START KGU#1097 2023-11-20: Issue #800
+						String key = null;
+						// END KGU#1097 2023-11-20
 						// if this part has to be colored
 						if (variableSet.contains(display))
 						{
@@ -4030,50 +4029,66 @@ public abstract class Element {
 							hlUnits.add(_elem.makeHighlightUnit(display, E_HL_OPERATOR_COLOR, true, false));
 							// END KGU#701 2019-03-29
 						}
-						// if this part has to be coloured with io colour
-						// START KGU#165 2016-03-25: consider the new option
-						//else if(ioSigns.contains(display))
-						// START KGU#1018 2021-11-17: Bugfix #1021
-						//else if(ioSigns.contains(display, !Syntax.ignoreCase))
-						else if (i == 0 && display.equals(ioSign))
-						// END KGU#1018 2021-11-17
-						// END KGU#165 2016-03-25
-						{
-							// green, bold
-							// START KGU#701 2019-03-29: Issue #718
-							//_canvas.setColor(E_HL_INOUT_COLOR);
-							//_canvas.setFont(boldFont);
+						// START KGU#1097 2023-11-20: Issue #800 New internal representation
+//						// if this part has to be coloured with io colour
+//						// START KGU#165 2016-03-25: consider the new option
+//						//else if(ioSigns.contains(display))
+//						// START KGU#1018 2021-11-17: Bugfix #1021
+//						//else if(ioSigns.contains(display, !Syntax.ignoreCase))
+//						else if (i == 0 && display.equals(ioSign))
+//						// END KGU#1018 2021-11-17
+//						// END KGU#165 2016-03-25
+//						{
+//							// green, bold
+//							// START KGU#701 2019-03-29: Issue #718
+//							//_canvas.setColor(E_HL_INOUT_COLOR);
+//							//_canvas.setFont(boldFont);
+//							if (lastWasNormal) {
+//								hlUnits.add(_elem.makeHighlightUnit(normalText.toString()));
+//								normalText.delete(0, Integer.MAX_VALUE);
+//								lastWasNormal = false;
+//							}
+//							hlUnits.add(_elem.makeHighlightUnit(display, E_HL_INOUT_COLOR, true, false));
+//							// END KGU#701 2019-03-29
+//						}
+//						// START KGU 2015-11-12
+//						// START KGU#116 2015-12-23: Enh. #75
+//						// START KGU#165 2016-03-25: consider the new case option
+//						//else if(jumpSigns.contains(display))
+//						// START KGU#1018 2021-11-17: Bugfix #1021
+//						//else if(jumpSigns.contains(display, !Syntax.ignoreCase))
+//						else if (i == 0 && display.equals(jumpSign))
+//						// END KGU#1018 2021-11-17
+//						// END KGU#165 2016-03-25
+//						{
+//							// orange, bold
+//							// START KGU#701 2019-03-29: Issue #718
+//							//_canvas.setColor(E_HL_JUMP_COLOR);
+//							//_canvas.setFont(boldFont);
+//							if (lastWasNormal) {
+//								hlUnits.add(_elem.makeHighlightUnit(normalText.toString()));
+//								normalText.delete(0, Integer.MAX_VALUE);
+//								lastWasNormal = false;
+//							}
+//							hlUnits.add(_elem.makeHighlightUnit(display, E_HL_JUMP_COLOR, true, false));
+//							// END KGU#701 2019-03-29
+//						}
+//						// END KGU#116 2015-12-23
+						else if ((key = Syntax.token2key(display)) != null) {
+							display = Syntax.getKeywordOrDefault(key, "");
 							if (lastWasNormal) {
 								hlUnits.add(_elem.makeHighlightUnit(normalText.toString()));
 								normalText.delete(0, Integer.MAX_VALUE);
 								lastWasNormal = false;
 							}
-							hlUnits.add(_elem.makeHighlightUnit(display, E_HL_INOUT_COLOR, true, false));
-							// END KGU#701 2019-03-29
-						}
-						// START KGU 2015-11-12
-						// START KGU#116 2015-12-23: Enh. #75
-						// START KGU#165 2016-03-25: consider the new case option
-						//else if(jumpSigns.contains(display))
-						// START KGU#1018 2021-11-17: Bugfix #1021
-						//else if(jumpSigns.contains(display, !Syntax.ignoreCase))
-						else if (i == 0 && display.equals(jumpSign))
-						// END KGU#1018 2021-11-17
-						// END KGU#165 2016-03-25
-						{
-							// orange, bold
-							// START KGU#701 2019-03-29: Issue #718
-							//_canvas.setColor(E_HL_JUMP_COLOR);
-							//_canvas.setFont(boldFont);
-							if (lastWasNormal) {
-								hlUnits.add(_elem.makeHighlightUnit(normalText.toString()));
-								normalText.delete(0, Integer.MAX_VALUE);
-								lastWasNormal = false;
+							if (i == 0 && ioKeys.contains(key)) {
+								hlUnits.add(_elem.makeHighlightUnit(display, E_HL_INOUT_COLOR, true, false));
 							}
-							hlUnits.add(_elem.makeHighlightUnit(display, E_HL_JUMP_COLOR, true, false));
-							// END KGU#701 2019-03-29
+							else if (i == 0 && jpKeys.contains(key)) {
+								hlUnits.add(_elem.makeHighlightUnit(display, E_HL_JUMP_COLOR, true, false));
+							}
 						}
-						// END KGU#116 2015-12-23
+						// END KGU#1097 2023-11-20
 						// if it's a String or Character literal then mark it as such
 						else if (display.startsWith("\"") && display.endsWith("\"") ||
 								display.startsWith("'") && display.endsWith("'"))
