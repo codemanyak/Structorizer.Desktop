@@ -165,7 +165,6 @@ public class Case extends Element implements IFork
 		this.setText(sl);
 
 // END KGU#91 2015-12-01
-
 	}
 
     @Override

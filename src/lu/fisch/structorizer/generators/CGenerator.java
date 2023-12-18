@@ -120,12 +120,13 @@ import java.util.ArrayList;
  *                                              transformOrGenerateArrayInit() mended (mutilated empty initialisers)
  *      Kay Gürtzig             2022-09-29      Bugfix #1073: Call comments had always been duplicated
  *      Kay Gürtzig             2023-09-28      Bugfix #1092: Sensible export of alias type definitions enabled
- *      Kay Gürtzig             2023-10-04      Bugfix #1093 Undue final return 0 on function diagrams
+ *      Kay Gürtzig             2023-10-04      Bugfix #1093: Undue final return 0 on function diagrams
  *      Kay Gürtzig             2023-10-12      Issue #980: Cope with multi-variable declarations
- *      Kay Gürtzig             2023-10-15      Bugfix #1096 Handles complicated C-/Java-style declarations
+ *      Kay Gürtzig             2023-10-15      Bugfix #1096: Handles complicated C-/Java-style declarations
  *      Kay Gürtzig             2023-10-17      Bugfix #1099: Constants defined by an external routine call no longer moved
  *                                              to top (to change execution order could severely compromise the algorithm!)
  *      Kay Gürtzig             2023-11-06      Issue #800: First bugfixing after code revision towards TokenList
+ *      Kay Gürtzig             2023-12-14      Bugfix #1118: The comment of Instructions without a line wasn't exported
  *
  ******************************************************************************************************
  *
@@ -1173,10 +1174,26 @@ public class CGenerator extends Generator {
 				// 2.2 as variable
 				// 3. type definition
 				// 4. Input / output
-				commentInserted = generateInstructionLine(_inst, _indent,
-						commentInserted, lines.get(i));
+				// START KGU#1107 2023-12-15: Bugfix #1118
+				//commentInserted = generateInstructionLine(_inst, _indent,
+				//		commentInserted, lines.get(i));
+				TokenList tokList = lines.get(i);
+				if (!tokList.isBlank()) {
+					commentInserted = generateInstructionLine(_inst, _indent,
+							commentInserted, tokList);
+				}
+				else if (!commentInserted) {
+					appendComment(_inst, _indent);
+					commentInserted = true;
+					addCode("", _indent, false);
+				}
+				// END KGU#1107 2023-12-15
 			}
-
+			// START KGU#1107 2023-12-14: Bugfix #1118 - the comment of an empty element wasn't exported
+			if (!commentInserted) {
+				appendComment(_inst, _indent);
+			}
+			// END KGU#1107 2023-12-14
 		}
 		
 	}
@@ -2161,6 +2178,12 @@ public class CGenerator extends Generator {
 			for (int i = 0; i < lines.size(); i++) {
 				TokenList tokens = lines.get(i);
 				if (tokens.isBlank()) {
+					// START KGU#1107 2023-12-14: Bugfix #1118 Skip an empty line
+					if (!commentInserted) {
+						appendComment(_call, _indent);
+						commentInserted = true;
+					}
+					// END KGU#1107 2023-12-14
 					addCode("", _indent, isDisabled);
 					continue;
 				}
@@ -2229,6 +2252,11 @@ public class CGenerator extends Generator {
 				}
 				// END KGU#730 2019-09-24
 			}
+			// START KGU#1107 2023-12-14: Bugfix #1118 - the comment of an empty element wasn't exported
+			if (!commentInserted) {
+				appendComment(_call, _indent);
+			}
+			// END KGU#1107 2023-12-14
 		}
 		
 	}

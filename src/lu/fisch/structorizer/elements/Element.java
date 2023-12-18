@@ -136,6 +136,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2022-07-07      Issue #653: Consistency with Colors.defaultColors ensured
  *      Kay Gürtzig     2022-08-22      Bugfix #1068: Type inference failure for array initialisers mended
  *      Kay Gürtzig     2023-11-06      Issue #800: First bugfixing after code revision towards TokenList
+ *      Kay Gürtzig     2023-12-14      Issue #1119: To set an empty string as text now leads to an empty StringList
  *
  ******************************************************************************************************
  *
@@ -1074,9 +1075,13 @@ public abstract class Element {
 		String[] lines = _text.split("\n");
 		synchronized (text) {
 			text.clear();
-			for (String line: lines) {
-				text.add(new TokenList(line));
+			// START KGU#1108 2023-12-14: Bugfix #1119 Suppress empty text
+			if (!_text.isEmpty()) {
+				for (String line: lines) {
+					text.add(new TokenList(line));
+				}
 			}
+			// END KGU#1108 2023-12-14
 			// START KGU#790 2020-11-02: Issue #800 This is quite obvious but how to catch text alterations?
 			parsedLines = null;
 			// END KGU#790 2020-11-02
@@ -4748,6 +4753,7 @@ public abstract class Element {
 				TokenList encoded = Syntax.encodeLine(this.text.get(i), _splitOldKeywords,
 						relevantKeys, _ignoreCase, isContinued);
 				isContinued = encoded.endsWith("\\");
+				result.add(encoded);
 			}
 			this.text = result;
 		}
