@@ -4853,7 +4853,8 @@ public class Root extends Element {
 	 * 
 	 * @param _ele - the Element the supposed variable occurs in
 	 * @param _var - identifier of the entity
-	 * @param _lineNo - line number within the Element text
+	 * @param _lineNo - line number within the Element text (might be -1 if it
+	 *    doesn't matter)
 	 * @return {@code true} if {@code _var} is initial part of a method access path and there
 	 *     is a potentially matching static Java method
 	 * 
@@ -4861,7 +4862,11 @@ public class Root extends Element {
 	 * @see #analyse_24_tokens(Element, Vector, HashMap, StringList)
 	 */
 	private boolean mayBeJavaMethod(Element _ele, String _var, int _lineNo) {
-		TokenList tokens = _ele.getUnbrokenTokenText().get(_lineNo);
+		ArrayList<TokenList> tokenLines = _ele.getUnbrokenTokenText();
+		if (_lineNo >= 0) {
+			return mayBeJavaMethod(_var, tokenLines.get(_lineNo));
+		}
+		TokenList tokens = TokenList.concatenate(tokenLines, null);
 		return mayBeJavaMethod(_var, tokens);
 	}
 	/**
