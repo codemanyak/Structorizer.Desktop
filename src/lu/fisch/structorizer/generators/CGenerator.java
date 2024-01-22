@@ -126,6 +126,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig             2023-11-06      Issue #800: First bugfixing after code revision towards TokenList
  *      Kay Gürtzig             2023-12-14      Bugfix #1118: The comment of Instructions without a line wasn't exported
  *      Kay Gürtzig             2023-12-26      Issue #1123: Translation of built-in function random() added.
+ *      Kay Gürtzig             2024-01-22      Issue #800: Parts of the transformation adapted to internal keys
  *
  ******************************************************************************************************
  *
@@ -1667,7 +1668,10 @@ public class CGenerator extends Generator {
 		//if (_inputItems.count() > 2) {
 		if (_inputItems.count() > 2 || this.getClass().getSimpleName().equals("CGenerator") && _inputItems.count() == 2) {
 		// END KGU#794 2020-02-13
-			String inputKey = Syntax.getKeyword("input") + " ";
+			// START KGU#1097 2024-01-22: Issue #800 we need the internal key now
+			//String inputKey = Syntax.getKeyword("input") + " ";
+			String inputKey = "§INPUT§ ";
+			// END KGU#1097 2024-01-22
 			String prompt = _inputItems.get(0);
 			if (!prompt.isEmpty()) {
 				prompt += " ";

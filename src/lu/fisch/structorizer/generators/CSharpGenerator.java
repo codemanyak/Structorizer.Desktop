@@ -79,6 +79,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig             2023-10-04      Bugfix #1093 Undue final return 0 on function diagrams
  *      Kay Gürtzig             2023-10-15      Bugfix #1096 Initialisation for multidimensional arrays fixed
  *      Kay Gürtzig             2023-12-27      Issue #1123: Translation of built-in function random() added.
+ *      Kay Gürtzig             2024-01-22      Issue #800: transfrOutput() adapted to internal keys
  *
  ******************************************************************************************************
  *
@@ -338,8 +339,12 @@ public class CSharpGenerator extends CGenerator
 		String subst = getOutputReplacer();
 		String subst0 = subst.replaceAll("Line", "");
 		// Between the input keyword and the variable name there MUST be some blank...
-		String keyword = Syntax.getKeyword("output").trim();
-		if (!keyword.isEmpty() && _interm.startsWith(keyword))
+		// START KGU#1097 2024-01-22: Issue #800 expect an internal keyword marker now
+		//String keyword = Syntax.getKeyword("output").trim();
+		//if (!keyword.isEmpty() && _interm.startsWith(keyword))
+		String keyword = "§OUTPUT§";
+		if (_interm.startsWith(keyword))
+		// END KGU#1097 2024-01-22
 		{
 			String matcher = Matcher.quoteReplacement(keyword);
 			if (Character.isJavaIdentifierPart(keyword.charAt(keyword.length()-1)))

@@ -1181,6 +1181,7 @@ public class BASHGenerator extends Generator {
 			appendComment(_inst, _indent);
 			boolean disabled = _inst.isDisabled(false);
 			// END KGU 2014-11-16
+			// FIXME: KGU#1097 / Issue #800 We should preferably work over TokenLists
 			StringList text = _inst.getUnbrokenText(); 
 			// START KGU#803 2020-02-16: Issue #816
 			String preReturn = Syntax.getKeywordOrDefault("preReturn","return").trim();

@@ -2947,13 +2947,19 @@ public class Root extends Element {
 		// END KGU#332/KGU#375 2017-01-17
 
 		// cutoff output keyword
-		else if (token0.equals(Syntax.getKeyword("output")))	// Must be at the line's very beginning
+		// START KGU#1097 2024-01-22: Issue #800 We don't need to care for user-chosen keywords anymore
+		//else if (token0.equals(Syntax.getKeyword("output")))	// Must be at the line's very beginning
+		else if (token0.equals("§OUTPUT§"))	// Must be at the line's very beginning
+		// END KGU#1097 2024-01-22
 		{
 			tokens.remove(0);
 		}
 
 		// parse out array index
-		else if (token0.equals(Syntax.getKeyword("input")))
+		// START KGU#1097 2024-01-22: Issue #800 We don't need to care for user-chosen keywords anymore
+		//else if (token0.equals(Syntax.getKeyword("input")))
+		else if (token0.equals("§INPUT§"))
+		// END KGU#1097 2024-01-22
 		{
 			// START KGU#653 2019-02-16: Enh. #680 - with multiple variables we must decompose the list
 			StringList items = Instruction.getInputItems(tokens);
@@ -3106,7 +3112,7 @@ public class Root extends Element {
      * language-specific characters etc.
      * <ul>
      * <li>HYP 1: [const] [&lt;type&gt;] VARNAME &lt;- (?)</li>
-     * <li>HYP 2: [input] VARNAME, VARNAME, VARNAME</li>
+     * <li>HYP 2: input VARNAME, VARNAME, VARNAME</li>
      * <li>HYP 3: for VARNAME &lt;- (?) ...</li>
      * <li>HYP 4: foreach VARNAME in (?)</li>
      * </ul>
@@ -3122,14 +3128,16 @@ public class Root extends Element {
     {
         StringList varNames = new StringList();
 
-        // START KGU#163 2016-03-25: Pre-processed match patterns for identifier search
-        splitKeywords.clear();
-        String[] keywords = Syntax.getAllProperties();
-        for (int k = 0; k < keywords.length; k++)
-        {
-            splitKeywords.add(new TokenList(keywords[k], false));
-        }
-        // END KGU#163 2016-03-25
+// START KGU#1097 2024-01-22: Issue #800 We don't need to care for user-chosen keywords anymore
+//        // START KGU#163 2016-03-25: Pre-processed match patterns for identifier search
+//        splitKeywords.clear();
+//        String[] keywords = Syntax.getAllProperties();
+//        for (int k = 0; k < keywords.length; k++)
+//        {
+//            splitKeywords.add(new TokenList(keywords[k], false));
+//        }
+//        // END KGU#163 2016-03-25
+// END KGU#1097 2024-01-22
 
         for(int i = 0; i < lines.size(); i++)
         {
@@ -3146,28 +3154,31 @@ public class Root extends Element {
 
             Syntax.unifyOperators(tokens, false);
 
-            // Replace all split keywords by the respective configured strings
-            // This replacement will be aware of the case sensitivity preference
-            for (int kw = 0; kw < keywords.length; kw++)
-            {
-                if (keywords[kw].trim().length() > 0)
-                {
-                    TokenList keyTokens = splitKeywords.elementAt(kw);
-                    int keyLength = keyTokens.size();
-                    int pos = -1;
-                    while ((pos = tokens.indexOf(keyTokens, pos + 1, !Syntax.ignoreCase)) >= 0)
-                    {
-                        tokens.set(pos, keywords[kw]);
-                        tokens.remove(pos + 1, pos + keyLength);
-                    }
-                }
-            }
-
-            // Unify FOR-IN loops and FOR loops for the purpose of variable analysis
-            if (!Syntax.getKeyword("postForIn").trim().isEmpty())
-            {
-                tokens.replaceAll(Syntax.getKeyword("postForIn"), "<-", true);
-            }
+// START KGU#1097 2024-01-22: Issue #800 We don't need to care for user-chosen keywords anymore
+//            // Replace all split keywords by the respective configured strings
+//            // This replacement will be aware of the case sensitivity preference
+//            for (int kw = 0; kw < keywords.length; kw++)
+//            {
+//                if (keywords[kw].trim().length() > 0)
+//                {
+//                    TokenList keyTokens = splitKeywords.elementAt(kw);
+//                    int keyLength = keyTokens.size();
+//                    int pos = -1;
+//                    while ((pos = tokens.indexOf(keyTokens, pos + 1, !Syntax.ignoreCase)) >= 0)
+//                    {
+//                        tokens.set(pos, keywords[kw]);
+//                        tokens.remove(pos + 1, pos + keyLength);
+//                    }
+//                }
+//            }
+//
+//            // Unify FOR-IN loops and FOR loops for the purpose of variable analysis
+//            if (!Syntax.getKeyword("postForIn").trim().isEmpty())
+//            {
+//                tokens.replaceAll(Syntax.getKeyword("postForIn"), "<-", true);
+//            }
+            tokens.replaceAll("§POSTFORIN§", "<-");
+// END KGU#1097 2024-01-22
 
             // Here all the unification, alignment, reduction is done, now the actual analysis begins
 
@@ -3196,14 +3207,17 @@ public class Root extends Element {
                 boolean wasNew = varNames.addOrderedIfNew(varName);
                 // START KGU#375 2017-03-31: Enh. #388 collect constant definitions
                 // Register it as constant if marked as such and not having been declared before
-                if (tokens.get(0).equals("const") && wasNew && !constantDefs.containsKey(varName)) {
+                if (tokens.get(0).equalsIgnoreCase("const") && wasNew && !constantDefs.containsKey(varName)) {
                     constantDefs.put(varName, tokens.subSequenceToEnd(asgnPos+1).getString().trim());
                 }
             }
 
 
             // get names from read statements
-            int inpPos = tokens.indexOf(Syntax.getKeyword("input"));
+            // START KGU#1097 2024-01-22: Issue #800 We don't need to care for user-chosen keywords anymore
+            //int inpPos = tokens.indexOf(Syntax.getKeyword("input"));
+            int inpPos = tokens.indexOf("§INPUT§");
+            // END KGU#1097 2024-01-22
             if (inpPos >= 0)
             {
                 // START KGU#281 2016-10-12: Issue #271 - there may be a prompt string literal to be skipped
@@ -3335,7 +3349,7 @@ public class Root extends Element {
             	collectParameters(varNames, argTypes, null);
             	for (int i = 0; i < varNames.count(); i++) {
             		String type = argTypes.get(i); 
-            		if (type != null && (type.trim() + " ").startsWith("const ")) {
+            		if (type != null && (type.trim() + " ").toLowerCase().startsWith("const ")) {
             			this.constants.put(varNames.get(i), null);
             		}
             	}
@@ -3387,7 +3401,7 @@ public class Root extends Element {
 
             varNames = varNames.reverse();	// FIXME (KGU): What is intended by reversing?
             if (_entireProg) {
-                    this.variables = varNames;
+                this.variables = varNames;
             }
             //System.out.println(varNames.getCommaText());
             return varNames;

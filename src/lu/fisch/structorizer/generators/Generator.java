@@ -1846,30 +1846,32 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		}
 		// END KGU#162 2016-03-31
 		
-		// START KGU 2016-03-29: Unify all parser keywords
-		/* This is somewhat redundant because most of the keywords have already been cut out
-		 * but it's still needed for the meaningful ones.
-		 */
-		for (Map.Entry<String, String> keyEntry: Syntax.getPropertyMap(false).entrySet())
-		{
-			String keyword = keyEntry.getValue();
-			String key = keyEntry.getKey();
-			if (keyword.trim().length() > 0)
-			{
-				TokenList keyTokens = Syntax.getSplitKeyword(key);
-				int keySize = keyTokens.size();
-				int posKey = tokens.size() - keySize;
-				while (posKey >= 0 && (posKey = tokens.lastIndexOf(keyTokens, posKey, !Syntax.ignoreCase)) >= 0)
-				{
-					// Replace the first token of the keyword by the entire keyword
-					tokens.set(posKey, keyword);
-					// Remove the remaining tokens of the split keyword
-					tokens.remove(posKey+1, posKey + keySize);
-					posKey -= keySize;
-				}
-			}
-		}
-		// END KGU 2016-03-29
+// START KGU#1097 2024-01-22: Issue #800 Expect internal keys, nothing to replace
+//		// START KGU 2016-03-29: Unify all parser keywords
+//		/* This is somewhat redundant because most of the keywords have already been cut out
+//		 * but it's still needed for the meaningful ones.
+//		 */
+//		for (Map.Entry<String, String> keyEntry: Syntax.getPropertyMap(false).entrySet())
+//		{
+//			String keyword = keyEntry.getValue();
+//			String key = keyEntry.getKey();
+//			if (keyword.trim().length() > 0)
+//			{
+//				TokenList keyTokens = Syntax.getSplitKeyword(key);
+//				int keySize = keyTokens.size();
+//				int posKey = tokens.size() - keySize;
+//				while (posKey >= 0 && (posKey = tokens.lastIndexOf(keyTokens, posKey, !Syntax.ignoreCase)) >= 0)
+//				{
+//					// Replace the first token of the keyword by the entire keyword
+//					tokens.set(posKey, keyword);
+//					// Remove the remaining tokens of the split keyword
+//					tokens.remove(posKey+1, posKey + keySize);
+//					posKey -= keySize;
+//				}
+//			}
+//		}
+//		// END KGU 2016-03-29
+// END KGU#1097 2024-01-22
 		// START KGU#162 2016-03-31: Enh. #144
 		//String transformed = transformTokens(tokens);
 		String transformed = "";
@@ -1890,11 +1892,11 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 			//transformed = transformInput(transformed);
 			//// output instruction transformation
 			//transformed = transformOutput(transformed);
-			if (transformed.indexOf(Syntax.getKeyword("input").trim()) >= 0)
+			if (transformed.indexOf("§INPUT§") >= 0)
 			{
 				transformed = transformInput(transformed);
 			}
-			else if (transformed.indexOf(Syntax.getKeyword("output").trim()) >= 0)
+			else if (transformed.indexOf("§OUTPUT§") >= 0)
 			{
 				transformed = transformOutput(transformed);
 			}
@@ -2087,13 +2089,16 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		//String subst = getInputReplacer();
 		// END KGU#281 2016-10-15
 		// Between the input keyword and the variable name there MUST be some blank...
-		String keyword = Syntax.getKeyword("input").trim();
-		// START KGU#399 2017-05-16: bugfix #403
-		//if (!keyword.isEmpty() && _interm.startsWith(keyword))
-		String gap = (!keyword.isEmpty() && Character.isJavaIdentifierPart(keyword.charAt(keyword.length()-1)) ? "[\\W]" : "");
-		String pattern = "^" + getKeywordPattern(keyword) + "(" + gap + ".*|$)";
-		if (!keyword.isEmpty() && _interm.matches(pattern))
-		// END KGU#399 2017-05-16
+// START KGU#1097 2024-01-22: Issue #800 now expect internal markers
+//		String keyword = Syntax.getKeyword("input").trim();
+//		// START KGU#399 2017-05-16: bugfix #403
+//		//if (!keyword.isEmpty() && _interm.startsWith(keyword))
+//		String gap = (!keyword.isEmpty() && Character.isJavaIdentifierPart(keyword.charAt(keyword.length()-1)) ? "[\\W]" : "");
+//		String pattern = "^" + getKeywordPattern(keyword) + "(" + gap + ".*|$)";
+//		if (!keyword.isEmpty() && _interm.matches(pattern))
+//		// END KGU#399 2017-05-16
+		String pattern = "^§INPUT§(.*|$)";
+// END KGU#1097 2024-01-22
 		{
 			// START KGU#281 2016-10-15: for enh. #271 (input with prompt)
 			String quotes = "";
@@ -2167,19 +2172,23 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	protected String transformOutput(String _interm)
 	{
 		String subst = getOutputReplacer();
-		String keyword = Syntax.getKeyword("output").trim();
-		// START KGU#399 2017-05-16: bugfix #403
-		//if (!keyword.isEmpty() && _interm.startsWith(keyword))
-		// Between the input keyword and a variable name there must be some blank unless the keyword itself ends
-		// with a blank or some non-identifier character. On the other hand, the expression might start with an
-		// operator symbol or a parenthesis... We try to approach this uncertainty with the gap variable.
-		// As a result, however, a superfluous blank may remain in front of the first expression.
-		String gap = (!keyword.isEmpty() && Character.isJavaIdentifierPart(keyword.charAt(keyword.length()-1)) ? "[\\W]" : "");
-		// START KGU#505 2018-03-13: The substitution mechanism introduced with #403 left a leading blank in the expression
-		//String pattern = "^" + getKeywordPattern(keyword) + "\\s*(" + gap + ".*|$)";
-		//if (!keyword.isEmpty() && _interm.matches(pattern))
-		Matcher matcher = Pattern.compile("^" + getKeywordPattern(keyword) + "\\s*(" + gap + ".*|$)").matcher(_interm);
-		if (!keyword.isEmpty() && matcher.matches())
+// START KGU#1097 2024-01-22: Issue #800 Expect internal keys now
+//		String keyword = Syntax.getKeyword("output").trim();
+//		// START KGU#399 2017-05-16: bugfix #403
+//		//if (!keyword.isEmpty() && _interm.startsWith(keyword))
+//		// Between the input keyword and a variable name there must be some blank unless the keyword itself ends
+//		// with a blank or some non-identifier character. On the other hand, the expression might start with an
+//		// operator symbol or a parenthesis... We try to approach this uncertainty with the gap variable.
+//		// As a result, however, a superfluous blank may remain in front of the first expression.
+//		String gap = (!keyword.isEmpty() && Character.isJavaIdentifierPart(keyword.charAt(keyword.length()-1)) ? "[\\W]" : "");
+//		// START KGU#505 2018-03-13: The substitution mechanism introduced with #403 left a leading blank in the expression
+//		//String pattern = "^" + getKeywordPattern(keyword) + "\\s*(" + gap + ".*|$)";
+//		//if (!keyword.isEmpty() && _interm.matches(pattern))
+//		Matcher matcher = Pattern.compile("^" + getKeywordPattern(keyword) + "\\s*(" + gap + ".*|$)").matcher(_interm);
+//		if (!keyword.isEmpty() && matcher.matches())
+		Matcher matcher = Pattern.compile("^§OUTPUT§\\s*(.*|$)").matcher(_interm);
+		if (matcher.matches())
+			// END KGU#1097 2024-01-22
 		// END KGU#505 2018-03-13
 		// END KGU#399 2017-05-16
 		{

@@ -78,6 +78,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2021-09-28      Issue #1091: Type definition detection mended (aliases and array types)
  *      Kay Gürtzig     2023-10-10/13   Issue #980: Declaration-related stuff revised
  *      Kay Gürtzig     2023-10-15      Bugfix #1096: More precise type and C-style declaration handling
+ *      Kay Gürtzig     2024-01-22      Issue #800: Many methods converted to work with TokenLists and internal keys
  *
  ******************************************************************************************************
  *
@@ -947,7 +948,12 @@ public class Instruction extends Element {
 	 */
 	public static StringList getInputItems(String line)
 	{
-		return getInputItems(new TokenList(line, true));
+		// START KGU#1097 2024-01-22: Issue #800 Use internal keys
+		//return getInputItems(new TokenList(line, true));
+		TokenList tokens = new TokenList(line, true);
+		tokens = Syntax.encodeLine(tokens, null, relevantParserKeys, Syntax.ignoreCase, false);
+		return getInputItems(tokens);
+		// END KGU#1097 2024-01-22
 	}
 	/**
 	 * Checks whether the given tokenized instruction line {@code tokens} represents an
@@ -966,8 +972,11 @@ public class Instruction extends Element {
 	public static StringList getInputItems(TokenList tokens)
 	{
 		StringList inputItems = null;
-		TokenList keyTokens = Syntax.getSplitKeyword("input");
-		if (tokens.indexOf(keyTokens, 0, !Syntax.ignoreCase) == 0) {
+		// START KGU#1097 2024-01-22: Issue #800 expect internal keys now
+		//TokenList keyTokens = Syntax.getSplitKeyword("input");
+		//if (tokens.indexOf(keyTokens, 0, !Syntax.ignoreCase) == 0) {
+		if (tokens.indexOf("§INPUT§") == 0) {
+		// END KGU#1097 2024-01-22
 			// It is an input instruction
 			inputItems = new StringList();
 			tokens = tokens.subSequenceToEnd(1);	// Skip the keyword
@@ -1019,7 +1028,7 @@ public class Instruction extends Element {
 		return getInputItems(tokens) != null;
 	}
 	/** @return {@code true} if at least one instruction line of {@code this} complies
-	 *    to {@link #isInput(String)}
+	 *    to {@link #isInput(TokenList)}
 	 * 
 	 * @see #isEmptyInput()
 	 * @see #isAssignment()
@@ -1049,6 +1058,8 @@ public class Instruction extends Element {
 	 *    instruction without target variables
 	 * 
 	 * @see #isEmptyInput(TokenList)
+	 * 
+	 * @deprecated prefer {@link #isEmptyInput(TokenList)}
 	 */
 	public static boolean isEmptyInput(String line)
 	{
@@ -1064,17 +1075,25 @@ public class Instruction extends Element {
 		StringList items = getInputItems(tokens);
 		return items != null && items.count() <= 1;
 	}
-	/** @return true if at least on of the instruction lines of {@code this} complies to {@link #isEmptyInput(String)} */
+	/** @return true if at least on of the instruction lines of {@code this} complies to {@link #isEmptyInput(TokenList)} */
 	public boolean isEmptyInput()
 	{
-		StringList lines = this.getUnbrokenText();
-		for (int i = 0; i < lines.count(); i++)
-		{
-			if (isEmptyInput(lines.get(i)))
-			{
+		// START KGU#1097 2024-01-22: Issue #800
+		//StringList lines = this.getUnbrokenText();
+		//for (int i = 0; i < lines.count(); i++)
+		//{
+		//	if (isEmptyInput(lines.get(i)))
+		//	{
+		//		return true;
+		//	}
+		//}
+		ArrayList<TokenList> tokenLines = this.getUnbrokenTokenText();
+		for (int i = 0; i < tokenLines.size(); i++) {
+			if (isEmptyInput(tokenLines.get(i))) {
 				return true;
 			}
 		}
+		// END KGU#1097 2024-01-22
 		return false;
 	}	
 	// END KGU#236 2016-08-10

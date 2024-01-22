@@ -36,6 +36,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig     2020-04-02      PapParallel fundamentally rewritten, provisional Jump mechanism implemented
  *      Kay Gürtzig     2020-04-25      Bugfix #863/2: Assignment symbols hadn't been transformed in CALLs
  *      Kay Gürtzig     2020-04-28      Issue #864: Parameter lists of calls and routine declarations had to be transformed
+ *      Kay Gürtzig     2024-01-22      Issue #800: Adaptation to tokenList representation of texts
  *
  ******************************************************************************************************
  *
@@ -588,11 +589,18 @@ public class PapGenerator extends Generator {
 				// END KGU#496 2020-04-02
 			}
 			else if (element instanceof Instruction) {
-				StringList lines = element.getUnbrokenText();
+				// START KGU#1097 2024-01-22: Issue #800 Prefer tokenized content
+				//StringList lines = element.getUnbrokenText();
+				ArrayList<TokenList> lines = element.getUnbrokenTokenText();
+				// END KGU#1097 2024-01-22
 				text.clear();	// No collected lines so far
 				PapFigure lastFigure = null;
-				for (int i = 0; i < lines.count(); i++) {
-					String line = lines.get(i);
+				// START KGU#1097 2024-01-22: Issue #800 Prefer tokenized content
+				//for (int i = 0; i < lines.count(); i++) {
+				//	String line = lines.get(i);
+				for (int i = 0; i < lines.size(); i++) {
+					TokenList line = lines.get(i);
+				// END KGU#1097 2024-01-22
 					boolean isInput = Instruction.isInput(line);
 					if (isInput || Instruction.isOutput(line)) {
 						if (!text.isEmpty()) {
@@ -609,7 +617,12 @@ public class PapGenerator extends Generator {
 						if (!din66001_1982) {
 							papType = isInput ? PapFigure.Type.PapInput : PapFigure.Type.PapOutput;
 						}
-						figures.add(lastFigure = new PapFigure(row++, column0, papType, line, null));
+						
+						// START KGU#1097 2024-01-22: Issue #800 Prefer tokenized content
+						//figures.add(lastFigure = new PapFigure(row++, column0, papType, line, null));
+						line = Syntax.decodeLine(line);
+						figures.add(lastFigure = new PapFigure(row++, column0, papType, line.getString(), null));
+						// END KGU#1097 2024-01-22
 						if (prevId >= 0) {
 							connections.add(new PapConnection(prevId, lastFigure.getId()));
 						}
@@ -622,7 +635,11 @@ public class PapGenerator extends Generator {
 					else {
 						// Collect the line such that we may produce a multi-line element
 						papType = PapFigure.Type.PapActivity;
-						text.add(transform(line, false));
+						// START KGU#1097 2024-01-22: Issue #800 Prefer tokenized content
+						//text.add(transform(line, false));
+						line = Syntax.decodeLine(line);
+						text.add(transform(line.getString()));
+						// END KGU#1097 2024-01-22
 					}
 				}
 			}
