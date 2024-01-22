@@ -20,8 +20,6 @@
 
 package lu.fisch.structorizer.generators;
 
-import java.util.ArrayList;
-
 /******************************************************************************************************
  *
  *      Author:         Bob Fisch
@@ -197,6 +195,7 @@ import java.util.ArrayList;
  *
  ******************************************************************************************************///
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.TreeMap;
@@ -596,6 +595,7 @@ public class CGenerator extends Generator {
 				tokens.addAll(exprs.get(0));
 				tokens.add(")");
 				tokens.addAll(exprs.get(1));
+				pos += 5;
 			}
 		}
 		// END KGU#1112 2023-12-17

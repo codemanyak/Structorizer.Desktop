@@ -256,7 +256,7 @@ public class JsGenerator extends CGenerator {
 			ArrayList<TokenList> exprs = Syntax.splitExpressionList(tokens.subSequence(pos+2, tokens.size()), ",");
 			if (exprs.size() == 2 && !exprs.get(1).isBlank() && exprs.get(1).get(0).equals(")")) {
 				tokens.remove(pos, tokens.size());
-				// The code "§RANDOM§" is to protect it from super. It will be replaced after super call.
+				tokens.add(Element.splitLexically("Math.floor(Math.random() * " + exprs.get(0) + exprs.get(1), true));
 				tokens.addAll(new TokenList("Math.floor(Math.random() * "));
 				tokens.addAll(exprs.get(0));
 				tokens.addAll(exprs.get(1));
