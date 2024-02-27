@@ -557,13 +557,26 @@ public class Expression {
 	 */
 	public TokenList asTokenList()
 	{
+		return asTokenList(null);
+	}
+	
+	/**
+	 * Returns this expression as {@link TokenList} in a syntax induced by the
+	 * operator specifications given as {@code _alternOprs}.
+	 * 
+	 * @param _alternOprs - alternative operator specifications (differing symbol
+	 *    or precedence).
+	 * @return this expression as (linear) {@link TokenList}
+	 */
+	public TokenList asTokenList(HashMap<String, Operator> _alternOprs)
+	{
 		TokenList tokens = new TokenList();
-		appendToTokenList(tokens, (byte)-1, null);
+		appendToTokenList(tokens, (byte)-1, _alternOprs);
 		return tokens;
 	}
 	
 	/**
-	 * Returns this expression as linearized string in Structorizer-compatible
+	 * Returns this expression as linearized TokenList in Structorizer-compatible
 	 * syntax, assuming that this expression is embedded as operand of an operator
 	 * with precedence level {@code parentPrec}.
 	 * 
@@ -587,7 +600,8 @@ public class Expression {
 	
 	/**
 	 * Given an operator symbol mapping to alternative operator symbols and preferences,
-	 * returns a translated linear expression string.
+	 * returns a translated linear expression string. Shorthand for
+	 * {@code asTokenList(_operatorSpecs).getString()}
 	 * 
 	 * @param _operatorSpecs - maps operator symbols from the key set of {@link #OPERATOR_PRECEDENCE}
 	 *    to pairs of target operator symbol, and preference.
@@ -738,7 +752,8 @@ public class Expression {
 					else if (text.equals("[]")) {
 						// The first operand was the array, now the indices will follow
 						if (isFirst) {
-							sepa = symbol.substring(0, 1);
+							//sepa = symbol.substring(0, 1);
+							tokens.add(symbol.substring(0, 1));
 						}
 						else {
 							sepa = comma;
@@ -2092,5 +2107,42 @@ public class Expression {
 //			children.get(i).traverseInOrder(sb);
 //		}
 //	}
+	
+	public static void main(String[] args) {
+		TypeRegistry tpReg = new TypeRegistry();
+		LinkedHashMap<String, Type> comps = new LinkedHashMap<String, Type>();
+		comps.put("year", tpReg.getType("int"));
+		comps.put("month", tpReg.getType("short"));
+		comps.put("day", tpReg.getType("short"));
+		try {
+			tpReg.putType("Date", new RecordType("Date", comps), null, 0, true);
+		} catch (SyntaxException exc) {
+			// TODO Auto-generated catch block
+			exc.printStackTrace();
+		}
+		
+		String[] testLines = new String[] {
+			"unsigned int[] intArray <- {47, 11}",
+			"unsigned short shortArray[3] <- {0, 8, 15}",
+			"var dates: array of Date <- {Date{2024,2,1}, Date{1959,6,3}}"
+		};
+		
+		for (String ln: testLines) {
+			
+			try {
+				LinkedList<Expression> exprs = Expression.parse(new TokenList(ln), null, (short)0);
+				System.out.println(ln);
+				int i = 0;
+				for (Expression expr: exprs) {
+					System.out.println(++i + ": " + expr.toString());
+				}
+			} catch (SyntaxException exc) {
+				// TODO Auto-generated catch block
+				exc.printStackTrace();
+			}
+			
+		}
+		
+	}
 	
 }

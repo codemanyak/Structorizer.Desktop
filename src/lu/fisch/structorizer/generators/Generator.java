@@ -1713,19 +1713,19 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	 * 
 	 * @param _line - a {@link Line} object representing the syntax structure of the
 	 *    raw text line {@code _rawLine} if possible.
-	 * @param _rawLine - the original text line
+	 * @param _rawLineTokens - the original text line as TokenList
 	 * @return a list of code lines for the translation result
 	 */
-	protected StringList transform(Line _line, String _rawLine)
+	protected ArrayList<TokenList> transform(Line _line, TokenList _rawLineTokens)
 	{
 		// Dummy implementation
-		StringList result = new StringList();
+		ArrayList<TokenList> result = new ArrayList<TokenList>();
 		if (_line.getType() == Line.LineType.LT_RAW) {
-			result.add(transform(_rawLine));
+			result.add(transform(_rawLineTokens));
 		}
 		else {
 			for (int i = 0; i < _line.getExprCount(); i++) {
-				StringList exprs = transform(_line.getExpression(i));
+				TokenList exprs = transform(_line.getExpression(i));
 				result.add(exprs);
 			}
 		}
@@ -1733,16 +1733,15 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	}
 	
 	/**
-	 * Transforms the given expression {@code _expr} into equivalent expression
-	 * string for this language.
+	 * Transforms the given expression {@code _expr} into an equivalent expression
+	 * TokenList for this language.
+	 * 
 	 * @param _expr - a syntax tree representing an expression in Structorizer syntax
-	 * @return the respectively transformed expression represented by a {@link StringList}.
+	 * @return the respectively transformed expression represented by a {@link TokenList}.
 	 */
-	protected StringList transform(Expression _expr)
+	protected TokenList transform(Expression _expr)
 	{
-		HashMap<String, Operator> transOprs = getOperatorMap();
-		String transExpr = _expr.translate(transOprs);
-		return StringList.getNew(transExpr);
+		return _expr.asTokenList(getOperatorMap());
 	}
 
 	/**
@@ -1905,6 +1904,13 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 
 		return transformed.trim();
 	}
+	
+	// START KGU#790 2024-01-29: Issue #800 Consequent use of TokenLists and Expressions
+	protected TokenList transform(TokenList tokens)
+	{
+		return tokens;
+	}
+	// END KGU#790 2024-01-29
 	
 	// START KGU#93 2015-12-21: Bugfix #41/#68/#69
 	/**
