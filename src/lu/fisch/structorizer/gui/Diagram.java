@@ -245,6 +245,7 @@ package lu.fisch.structorizer.gui;
  *      Kay Gürtzig     2023-11-09      Issue #800: Obsolete refactoring support (#253) removed/disabled
  *      Kay Gürtzig     2023-11-09      Enh. #1114: Place the InputBox caret at the first question mark in
  *                                      the default text for new Elements
+ *      Kay Gürtzig     2024-03-07      Issue #1129: Restrict the number of lines to show in a warning popup
  *
  ******************************************************************************************************
  *
@@ -1123,7 +1124,10 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 							String text = "";
 							for (Entry<Element, Vector<DetectedError>> entry: errorMap.entrySet()) {
 								Element errEle = entry.getKey();
-								if (errorMap.size() > 1 || errEle != selEle) {
+								// START KGU#1116 2024-03-07: Issue #1129: Restrict the popup lines
+								//if (errorMap.size() > 1 || errEle != selEle) {
+								if ((errorMap.size() > 1 || errEle != selEle) && lines < Element.E_ANALYSER_MAX_POPUP_LINES) {
+								// END KGU#1116 2024-03-07
 									// This is a collapsed element, i.e., potentially represents several elements
 									text = ElementNames.getElementName(errEle, false, null);
 									StringList elText = errEle.getText();
@@ -1141,19 +1145,31 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 									lines++;
 								}
 								for (DetectedError err: entry.getValue()) {
-									text = err.getMessage();
-									if (err.isWarning()) {
-										sb.append("<span style=\"color: #FF0000;\">");
+									// START KGU#1116 2024-03-07: Issue #1129: Restrict the popup lines
+									if (lines < Element.E_ANALYSER_MAX_POPUP_LINES) {
+									// END KGU#1116 2024-03-07
+										text = err.getMessage();
+										if (err.isWarning()) {
+											sb.append("<span style=\"color: #FF0000;\">");
+										}
+										else {
+											sb.append("<span style=\"color: #0000FF;\">");
+										}
+										sb.append(BString.encodeToHtml(text));
+										sb.append("</span><br/>");
+										width = Math.max(width, fm.stringWidth(text));
+									// START KGU#1116 2024-03-07: Issue #1129: Restrict the popup lines
 									}
-									else {
-										sb.append("<span style=\"color: #0000FF;\">");
-									}
-									sb.append(BString.encodeToHtml(text));
-									sb.append("</span><br/>");
-									width = Math.max(width, fm.stringWidth(text));
+									// END KGU#1116 2024-03-07
 									lines++;
 								}
 							}
+							// START KGU#1116 2024-03-07: Issue #1129: Restrict the popup lines
+							if (lines > Element.E_ANALYSER_MAX_POPUP_LINES) {
+								sb.append("... (+ " + (lines - Element.E_ANALYSER_MAX_POPUP_LINES) + ")<br/>");
+								lines = Element.E_ANALYSER_MAX_POPUP_LINES + 1;
+							}
+							// END KGU#1116 2024-03-07
 							sb.append("</html>");
 							lblPop.setText(sb.toString());
 							lblPop.setPreferredSize(

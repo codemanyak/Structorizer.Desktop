@@ -4915,7 +4915,9 @@ public class Root extends Element {
 								}
 							}
 						} catch (ClassNotFoundException exc) {
-							System.err.println(exc);
+							// START KGU#1115 2024-03-07: Issue #1128 Nobody wants to see this except on debugging
+							//System.err.println(exc);
+							// END KGU#1115 2024-03-07
 						}
 					}
 				}
@@ -4943,7 +4945,7 @@ public class Root extends Element {
 			_myVars.addIfNew(((Try)ele).getExceptionVarName());			
 		}
 		// END KGU#812 2020-02-21
-		for (int j=0; j<_myVars.count(); j++)
+		for (int j = 0; j < _myVars.count(); j++)
 		{
 			String myVar = _myVars.get(j);
 			// START KGU#343 2017-02-07: Ignore pseudo-variables (markers)
@@ -4953,9 +4955,9 @@ public class Root extends Element {
 			// END KGU#343 2017-02-07
 
 			// CHECK: non-uppercase var (#5)
-			if(!myVar.toUpperCase().equals(myVar) && !rootVars.contains(myVar))
+			if (!myVar.toUpperCase().equals(myVar) && !rootVars.contains(myVar))
 			{
-				if(!((myVar.toLowerCase().equals("result") && this.isSubroutine())))
+				if (!((myVar.toLowerCase().equals("result") && this.isSubroutine())))
 				{
 					//error  = new DetectedError("The variable «"+myVars.get(j)+"» must be written in uppercase!",(Element) _node.getElement(i));
 					addError(_errors, new DetectedError(errorMsg(Menu.error05, myVar), ele), 5);

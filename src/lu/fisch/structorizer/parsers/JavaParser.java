@@ -59,6 +59,7 @@ package lu.fisch.structorizer.parsers;
  *                                      KGU#961: Array initialiser conversion in declarations improved
  *      Kay Gürtzig     2023-11-08      Bugfix #1110 method translateContent() returned the argument instead of the result
  *      Kay Gürtzig     2023-11-15      Issue #800: Internal keyword representation modified
+ *      Kay Gürtzig     2024-03-08      KGU#1117: Missing backward replacement of c_l_a_s_s in one case mended.
  *
  ******************************************************************************************************
  *
@@ -951,7 +952,7 @@ public class JavaParser extends CodeParser
 
 	/** Rule ids representing statements, used as stoppers for comment retrieval (enh. #420) */
 	private static final int[] statementIds = new int[]{
-			/* TODO: Fill in the RuleConstants members of those productions that are
+			/* RuleConstants members of those productions that are
 			 * to be associated with comments found in their syntax subtrees or their
 			 * immediate environment. */
 			RuleConstants.PROD_NORMALCLASSDECLARATION,
@@ -2767,7 +2768,10 @@ public class JavaParser extends CodeParser
 			break;
 				
 			default:
-				exprs.add(this.getContent_R(exprToken));
+				// START KGU#1117 2024-03-08: Some expressions slipped through without replacement
+				//exprs.add(this.getContent_R(exprToken));
+				exprs.add(this.getContent_R(exprToken).replace(".c_l_a_s_s", ".class"));
+				// END KGU#1117 2024-03-08
 			}
 			
 		}
