@@ -224,6 +224,7 @@ package lu.fisch.structorizer.executor;
  *      Kay Gürtzig     2023-10-16      Bugfix #980/#1096: Simple but effective workaround for complicated C-style
  *                                      initialisation (declaration + assignment) case where setVar used to fail.
  *      Kay Gürtzig     2023-11-07      Issue #800: Fundamental revision of stepForIn()
+ *      Kay Gürtzig     2024-03-14      Bugfix #1139: Catch now always saves message in a variable (possibly a generic one)
  *
  ******************************************************************************************************
  *
@@ -2972,6 +2973,7 @@ public class Executor implements Runnable
      * Searches all known pools for either routine diagrams with a signature
      * compatible to {@code name(arg1, arg2, ..., arg_nArgs)} or for includable
      * diagrams with name {@code name}
+     * 
      * @param name - diagram name
      * @param nArgs - number of parameters of the requested function (negative
      *        for Includable)
@@ -3014,7 +3016,10 @@ public class Executor implements Runnable
     				int similarity = diagr.compareTo(cand); 
     				if (similarity > 2 && similarity != 4) {
     					// 3: Equal file path but unsaved changes in one or both diagrams;
-    					// 5: Equal signature (i. e. type, name and argument number) but different content or structure.
+    					// 5: Equal qualified signature (i. e. type, qualified name and argument
+    					//    number) but different content or structure;
+    					// 6: Equal signature (i. e. type, qualified name and argument number)
+    					//    but differing namespace, content or structure
     					throw new Exception(control.msgAmbiguousCall.getText().replace("%1", name)
     							.replace("%2", (nArgs < 0 ? "--" : Integer.toString(nArgs))));
     				}
@@ -6157,6 +6162,8 @@ public class Executor implements Runnable
 			try {
 				TokenList tokens = sl.get(0).subSequenceToEnd(Syntax.getSplitKeyword("preThrow").size());
 				if (tokens.isBlank()) {
+					// This message can be recognized by an enclosing TRY on stack unwinding.
+					// Hence if it is a rethrow then it will be replaced by the original error message. 
 					trouble = RETHROW_MESSAGE;
 				}
 				else {
@@ -8371,12 +8378,15 @@ public class Executor implements Runnable
 			String origTrouble = trouble;	// For the case of a rethrow
 			try {
 				this.updateVariableDisplay(true);
-				String varName = element.getExceptionVarName();
+				// START KGU#1125 2024-03-14: Bugfix #1139 Make the error visible
+				//String varName = element.getExceptionVarName();
+				String varName = element.getExceptionVarName(true);
+				// END KGU#1125 2024-03-14
 				Object priorValue = null;
 				boolean hadVariable = false;
 				if (varName != null) {
 					if ((hadVariable = context.variables.contains(varName))) {
-					priorValue = context.interpreter.get(varName);
+						priorValue = context.interpreter.get(varName);
 					}
 					setVar(varName, trouble, true);
 				}

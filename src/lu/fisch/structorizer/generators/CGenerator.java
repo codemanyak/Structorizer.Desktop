@@ -127,6 +127,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig             2023-12-14      Bugfix #1118: The comment of Instructions without a line wasn't exported
  *      Kay Gürtzig             2023-12-26      Issue #1123: Translation of built-in function random() added.
  *      Kay Gürtzig             2024-01-22      Issue #800: Parts of the transformation adapted to internal keys
+ *      Kay Gürtzig             2024-03-19      Issue #1148: Special indentation for "if else if" chains
  *
  ******************************************************************************************************
  *
@@ -199,6 +200,7 @@ package lu.fisch.structorizer.generators;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.Stack;
 import java.util.TreeMap;
 import java.util.Vector;
 import java.util.Map.Entry;
@@ -1778,6 +1780,7 @@ public class CGenerator extends Generator {
 		
 		// START KGU#453 2017-11-02: Issue #447
 		//String condition = transform(_alt.getText().getLongString(), false).trim();
+		// FIXME -> #800
 		String condition = transform(_alt.getUnbrokenText().getLongString(), false).trim();
 		// END KGU#453 2017-11-02
 		// START KGU#301 2016-12-01: Bugfix #301
@@ -1790,11 +1793,37 @@ public class CGenerator extends Generator {
 		generateCode(_alt.qTrue, _indent + this.getIndent());
 		appendBlockTail(_alt, null, _indent);
 
+		// START KGU#1137 2024-03-19: Issue #1148 We ought to make use of the ELSE IF if possible
+		Element ele = null;
+		// We must cater for the code mapping of the chained sub-alternatives
+		Stack<Element> processedAlts = new Stack<Element>();
+		Stack<Integer> storedLineNos = new Stack<Integer>();
+		while (_alt.qFalse.getSize() == 1 
+				&& (ele = _alt.qFalse.getElement(0)) instanceof Alternative) {
+			_alt = (Alternative)ele;
+			// FIXME -> #800
+			condition = transform(_alt.getUnbrokenText().getLongString(), false).trim();
+			if (!isParenthesized(condition)) {
+				condition = "(" + condition + ")";
+			}
+			// We must care for the code mapping explicitly here since we circumvent generateCode()
+			markElementStart(_alt, _indent, processedAlts, storedLineNos);
+			appendComment(_alt, _indent);
+			appendBlockHeading(_alt, "else if " + condition, _indent);
+			generateCode(_alt.qTrue, _indent + this.getIndent());
+			appendBlockTail(_alt, null, _indent);
+		}
+		// END KGU#1137 2024-03-19
+		
 		if (_alt.qFalse.getSize() != 0) {
 			appendBlockHeading(_alt, "else", _indent);
 			generateCode(_alt.qFalse, _indent + this.getIndent());
 			appendBlockTail(_alt, null, _indent);
 		}
+		
+		// START KGU#1137 2024-03-19: Issue #1148 Accomplish the code map for the processed child alternatives
+		markElementEnds(processedAlts, storedLineNos);
+		// END KGU#1137 2024-03-19
 	}
 
 	@Override

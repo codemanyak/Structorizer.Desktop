@@ -126,6 +126,9 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig     2022-08-23      Issue #1068: Auxiliary method transformIndexLists(StringList) added
  *      Kay Gürtzig     2023-09-28      Bugfix #1092: Sensible export of alias type definitions enabled
  *      Kay Gürtzig     2023-11-06      Issue #800: First bugfixing after code revision towards TokenList
+ *      Kay Gürtzig     2024-03-14      Bugfix #1139: NullPointerException risk in generateCode(Try, String)
+ *      Kay Gürtzig     2024-03-19      Issue #1148 Auxiliary methods markElementStart() and markElementEnds()
+ *                                      moved up to Generator in order to facilitate IF ELSE IF chains
  *
  ******************************************************************************************************
  *
@@ -188,6 +191,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.SortedMap;
+import java.util.Stack;
 import java.util.TreeMap;
 import java.util.Vector;
 import java.util.logging.Level;
@@ -3400,7 +3404,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	{
 		appendComment("try (FIXME!)", _indent);
 		generateCode(_try.qTry, _indent + this.getIndent());
-		appendComment(("catch " + _try.getExceptionVarName()).trim() + " (FIXME!)", _indent);
+		appendComment(("catch " + _try.getExceptionVarName(true)).trim() + " (FIXME!)", _indent);
 		generateCode(_try.qCatch, _indent + this.getIndent());
 		appendComment("finally (FIXME!)", _indent);
 		generateCode(_try.qFinally, _indent + this.getIndent());
@@ -3536,6 +3540,52 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 			generateCode(_subqueue.getElement(i),_indent);
 		}
 	}
+
+	// START KGU#1135 2024-03-19: Issue #1146 Refactored to regain clarity
+	/**
+	 * Marks the start of the instruction code for nested alternative {@code _alt}
+	 * within the IF ELSIF chain for the code preview.
+	 * 
+	 * @param _alt - nested alternative in the IF ELSIF sequence
+	 * @param _indent - current indentation
+	 * @param _processedAlts - stack of the marked nested Alternatives (to be modified)
+	 * @param _storedLineNos - stack of the associated start line numbers (to be modified)
+	 */
+	protected void markElementStart(Alternative _alt, String _indent, Stack<Element> _processedAlts,
+			Stack<Integer> _storedLineNos) {
+		if (codeMap != null) {
+			int line0 = code.count();
+			codeMap.put(_alt, new int[]{line0, line0, _indent.length()});
+			_processedAlts.push(_alt);
+			_storedLineNos.push(line0);
+		}
+	}
+	/**
+	 * Marks the common end of the instruction codes of all the alternatives
+	 * gathered in stack {@code -processedAlts}, considering the differences
+	 * between the start line numbers held in the {@link codeMap} and in the
+	 * stack {@code _storedLineNos}.
+	 * 
+	 * @param _processedAlts - stack of the marked nested Alternatives (to be emptied)
+	 * @param _storedLineNos - stack of the associated start line numbers (to be emptied)
+	 */
+	protected void markElementEnds(Stack<Element> _processedAlts, Stack<Integer> _storedLineNos) {
+		Element ele;
+		assert _processedAlts.size() == _storedLineNos.size();
+		if (codeMap!= null) {
+			while (!_processedAlts.isEmpty()) {
+				ele = _processedAlts.pop();
+				int line0 = _storedLineNos.pop();
+				int[] codeMapEntry = codeMap.get(ele);
+				if (codeMapEntry[0] > line0) {
+					// The element code was moved due to some insertions, update line0
+					line0 = codeMap.get(ele)[0];
+				}
+				codeMapEntry[1] += (code.count() - line0);
+			}
+		}
+	}
+	// END KGU#1135 2024-03-18
 
 	/******** Public Methods *************/
 	

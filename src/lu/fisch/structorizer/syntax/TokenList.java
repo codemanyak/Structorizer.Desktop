@@ -2009,10 +2009,10 @@ public class TokenList implements Comparable<TokenList>{
 					|| token1.equals(token0)) {
 				boolean found = true;
 				for (int j = 1; j < subList.size(); j++) {
-					token0 = subList.get(j);
+					String token2 = subList.get(j);
 					token1 = tokens.get(i+j);
-					if ((matchCase || !token1.equalsIgnoreCase(token0))
-							&& !token1.equalsIgnoreCase(token0)) {
+					if ((matchCase || !token1.equalsIgnoreCase(token2))
+							&& !token1.equalsIgnoreCase(token2)) {
 						found = false;
 						break;
 					}
@@ -2084,10 +2084,10 @@ public class TokenList implements Comparable<TokenList>{
 					|| token1.equals(token0)) {
 				boolean found = true;
 				for (int j = 1; j < subList.size(); j++) {
-					token0 = subList.get(j);
+					String token2 = subList.get(j);
 					token1 = tokens.get(i+j);
-					if ((caseSensitive || !token1.equalsIgnoreCase(token0))
-							&& !token1.equals(token0)) {
+					if ((caseSensitive || !token1.equalsIgnoreCase(token2))
+							&& !token1.equals(token2)) {
 						found = false;
 						break;
 					}

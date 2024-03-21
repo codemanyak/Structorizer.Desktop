@@ -24,8 +24,6 @@
 
 package lu.fisch.structorizer.generators;
 
-import java.util.ArrayList;
-
 /******************************************************************************************************
  *
  *      Author:         Klaus-Peter Reimers
@@ -97,6 +95,10 @@ import java.util.ArrayList;
  *      Kay Gürtzig         2021-12-05      Bugfix #1024: Precautions against defective record initializers
  *      Kay Gürtzig         2023-09-28      Bugfix #1092: Sensible export of alias type definitions enabled
  *      Kay Gürtzig         2023-10-04      Bugfix #1093 Undue final return 0 on function diagrams
+ *      Kay Gürtzig             2024-03-18/19   Bugfix #1146 Wrong END between THEN and ELSE on Alternative export,
+ *                                              missed opportunity to use ELSIF in IF chains now implemented
+ *      Kay Gürtzig             2024-03-19      Issue #1148 Auxiliary methods markElementStart() and markElementEnds()
+ *                                              moved up to Generator, reaction to disabled state improved
  *
  ******************************************************************************************************
  *
@@ -121,12 +123,14 @@ import java.util.ArrayList;
  *
  ******************************************************************************************************///
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
+import java.util.Stack;
 import java.util.regex.Matcher;
 
 import lu.fisch.utils.*;
@@ -1010,17 +1014,42 @@ public class OberonGenerator extends Generator {
 		// END KGU 2014-11-16
 		// START KGU#453 2017-11-02: Issue #447
 		//addCode("IF "+ transform(_alt.getText().getLongString()) + " THEN",
+		// FIXME -> #800
 		addCode("IF "+ transform(_alt.getUnbrokenText().getLongString()) + " THEN",
 		// END KGU#453 2017-1102
 				_indent, isDisabled);
 		generateCode(_alt.qTrue, _indent+this.getIndent());
-		if (_alt.qFalse.getSize()!=0)
+		
+		// START KGU#1135 2024-03-18: Issue #1146 We ought to make use of the ELSIF if possible
+		Element ele = null;
+		// We must cater for the code mapping of the chained sub-alternatives
+		Stack<Element> processedAlts = new Stack<Element>();
+		Stack<Integer> storedLineNos = new Stack<Integer>();
+		while (_alt.qFalse.getSize() == 1 
+				&& (ele = _alt.qFalse.getElement(0)) instanceof Alternative) {
+			_alt = (Alternative)ele;
+			// We must care for the code mapping explicitly here since we circumvent generateCode()
+			markElementStart(_alt, _indent, processedAlts, storedLineNos);
+			appendComment(_alt, _indent);
+			// FIXME -> #800
+			addCode("ELSIF "+ transform(_alt.getUnbrokenText().getLongString()) + " THEN",
+					_indent, ele.isDisabled(false));
+			generateCode(_alt.qTrue, _indent+this.getIndent());
+		}
+		// END KGU#1135 2024-03-18
+		
+		if (_alt.qFalse.getSize() != 0)
 		{
-			addCode("END", _indent, isDisabled);
-			addCode("ELSE", _indent, isDisabled);
+			// START KGU#1135 2024-03-18: Bugfix #1146 END is wrong here
+			//addCode("END", _indent, isDisabled);
+			// END KGU#1135 2024-03-18
+			addCode("ELSE", _indent, _alt.isDisabled(false));
 			generateCode(_alt.qFalse, _indent+this.getIndent());
 		}
 		addCode("END;", _indent, isDisabled);
+		// START KGU#1135 2024-03-18: Issue #1146 Accomplish the code map for the processed child alternatives
+		markElementEnds(processedAlts, storedLineNos);
+		// END KGU#1135 2024-03-18
 	}
 
 	protected void generateCode(Case _case, String _indent)

@@ -37,6 +37,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *      Kay Gürtzig     2021-01-22      Enh. #714: Special visibility control for the FINALLY block
  *      Kay Gürtzig     2023-11-08      Bugfix #1109: Auxiliary method findEnclosingTry added.
+ *      Kay Gürtzig     2024-03-14      Bugfix #1139: Precautions against missing exception variable
  *
  ******************************************************************************************************
  *
@@ -548,6 +549,7 @@ public class Try extends Element {
 		if (excName != null) {
 			addToTypeMap(typeMap, excName, "Exception", 0, true, true);
 		}
+		// END KGU#413 2017-06-09
 	}
 	
 	@Override
@@ -560,16 +562,49 @@ public class Try extends Element {
 			varNames = this.parent.getVariableSetFor(this);
 		}
 		if (_child == this || _child == this.qCatch) {
-			varNames.add(this.getExceptionVarName());
+			// START KGU#1125 2024-03-14: Bugfix #1139 We must not insert null
+			//varNames.add(this.getExceptionVarName());
+			String exName = this.getExceptionVarName();
+			if (exName != null && !exName.isBlank()) {
+				varNames.add(exName);
+			}
+			// END KGU#1125 2024-03-14
 		}
 		return varNames;
 	}
 	
 	/**
 	 * @return the most likely variable name extracted from the text (assuming it
-	 * to be either a pure name or a declaration).
+	 * to be either a pure name or a declaration). Might be {@code null} or empty.
+	 * 
+	 * @see #getExceptionVarName(boolean)
 	 */
 	public String getExceptionVarName()
+	{
+		// START KGU#1125 2024-03-14: Bugfix #1139 We shouldn't return null here
+		//ArrayList<TokenList> unbr = this.getUnbrokenTokenText();
+		//if (unbr.isEmpty()) {
+		//	return null;
+		//}
+		//for (int i = 1; i < unbr.size(); i++) {
+		//	unbr.get(0).addAll(unbr.get(i));
+		//}
+		//return Instruction.getAssignedVarname(unbr.get(0), false);
+		//		Element.splitLexically(this.getUnbrokenText().getLongString(), true),
+		return getExceptionVarName(false);
+		// END KGU#1125 2024-03-14
+	}
+
+	/**
+	 * Provides the most likely variable name extracted from the text (assuming it
+	 * to be either a pure name or a declaration), possibly a generic name.
+	 * 
+	 * @param force - if {@code true} then forces a generic but unique exception
+	 *    name in case non is specified.
+	 * @return the exception variable name. May be {@code null} in case
+	 *    {@code force == false}
+	 */
+	public String getExceptionVarName(boolean force)
 	{
 		ArrayList<TokenList> unbr = this.getUnbrokenTokenText();
 		if (unbr.isEmpty()) {
@@ -578,8 +613,13 @@ public class Try extends Element {
 		for (int i = 1; i < unbr.size(); i++) {
 			unbr.get(0).addAll(unbr.get(i));
 		}
-		return Instruction.getAssignedVarname(unbr.get(0), false);
+		String excName = Instruction.getAssignedVarname(unbr.get(0), false);
+		if (force && (excName == null || excName.isBlank())) {
+			excName = "exception_" + Integer.toHexString(this.hashCode());
+		}
+		return excName;
 	}
+	// END KGU#1125 2024-03-14
 	
 	// START KGU#695 2021-01-22: Enh. #714
 	/**

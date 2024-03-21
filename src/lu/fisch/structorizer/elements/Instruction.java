@@ -79,6 +79,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2023-10-10/13   Issue #980: Declaration-related stuff revised
  *      Kay Gürtzig     2023-10-15      Bugfix #1096: More precise type and C-style declaration handling
  *      Kay Gürtzig     2024-01-22      Issue #800: Many methods converted to work with TokenLists and internal keys
+ *      Kay Gürtzig     2024-03-15      Bugfix #1140: Function syntax check ignored the 'qualified' argument 
  *
  ******************************************************************************************************
  *
