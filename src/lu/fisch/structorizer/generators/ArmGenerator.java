@@ -1859,7 +1859,7 @@ public class ArmGenerator extends Generator {
         //Element.cutOutRedundantMarkers(tokens);
         Syntax.removeDecorators(tokens);
         // END KGU#884 2021-10-25
-        tokens.removePaddings();
+        tokens.shrink();
         Syntax.unifyOperators(tokens, false);
         String condition = tokens.getString();
         if (!condition.startsWith("(") || !condition.endsWith(")")) {

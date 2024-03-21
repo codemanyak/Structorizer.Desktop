@@ -1001,7 +1001,7 @@ public class Instruction extends Element {
 				}
 			}
 			// Now extract the target variables
-			tokens.removePaddings();
+			tokens.shrink();
 			StringList exprs = Syntax.splitExpressionList(tokens.getString(), ",");
 			exprs.removeAll("");
 			inputItems.add(exprs);

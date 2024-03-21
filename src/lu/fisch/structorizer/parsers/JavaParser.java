@@ -1141,6 +1141,7 @@ public class JavaParser extends CodeParser
 							strLine = strLine.substring(1);
 						}
 					}
+
 					/* We have to replace "class" as a component identifier
 					 * as in "Logger.getLogger(XYZClass.class.getName())"
 					 */
@@ -1193,8 +1194,16 @@ public class JavaParser extends CodeParser
 						while ((posAngBr = tokens.indexOf(">>", posAngBr+1)) >= 0) {
 							tokens.set(posAngBr, ">");
 							tokens.add(++posAngBr, ">");
-							// This is no modification w.r.t. the string representation
+							// Ensure there is no modification w.r.t. the string representation
 							tokens.setPadding(posAngBr, 0, -1);
+						}
+						posAngBr = -1;
+						while ((posAngBr = tokens.indexOf(">>>", posAngBr+1)) >= 0) {
+							tokens.set(posAngBr, ">");
+							tokens.add(++posAngBr, ">");
+							tokens.add(++posAngBr, ">");
+							// Ensure there is no modification w.r.t. the string representation
+							tokens.setPadding(posAngBr-1, 0, 0);
 						}
 						// START KGU#1122 2024-03-18: Bugfix #1136 can only be an empty type param list
 						// ... get rid of "<>" tokens ...
@@ -1205,13 +1214,12 @@ public class JavaParser extends CodeParser
 						// ... and remove all token sequences "<", ">".
 						posAngBr = -1;
 						while ((posAngBr = tokens.indexOf(">", posAngBr+1)) >= 0) {
-							int pos = posAngBr - 1;
 							// START KGU#1122 2024-03-18: Bugfix #1136
-							if (pos > 0 && tokens.get(pos).equals("<")) {
+							if (posAngBr > 1 && tokens.get(posAngBr-1).equals("<")) {
 								// Found token sequence "<", ">", which can only be an empty type param list
-								tokens.remove(pos, posAngBr+1);
+								tokens.remove(posAngBr-1, posAngBr+1);
 								replaced = true;
-								posAngBr = pos;
+								posAngBr--;
 							}
 							// END KGU#1122 2024-03-18
 						}
@@ -1310,7 +1318,8 @@ public class JavaParser extends CodeParser
 							break;
 						}
 					}
-					else if (!Syntax.isIdentifier(token, false, "$")
+					else if (token.equals("instanceof")	// must be an expression
+							|| !Syntax.isIdentifier(token, false, "$")
 							&& !(token.length() == 1 && "[],.?".contains(token))) {
 						break;
 					}
@@ -1320,13 +1329,16 @@ public class JavaParser extends CodeParser
 						&& isTypeSpecificationList(tokens.subSequence(posId, posAngBr+1))) {
 					String origSequence = tokens.subSequence(posId, posAngBr+1).getString();
 					// We should have a dense token sequence now and produce a pseudo-identifier
-					tokens.replaceAllBetween("<", ANG_BRACK_SUBST[0], true, posPar0+1, posPar1);
-					tokens.replaceAllBetween(">", ANG_BRACK_SUBST[2], true, posPar0+1, posPar1);
-					tokens.replaceAllBetween(",", ANG_BRACK_SUBST[1], true, posPar0+1, posPar1);
-					tokens.replaceAllBetween("[", ANG_BRACK_SUBST[3], true, posPar0+1, posPar1);
-					tokens.replaceAllBetween("]", ANG_BRACK_SUBST[4], true, posPar0+1, posPar1);
-					tokens.replaceAllBetween("?", ANG_BRACK_SUBST[5], true, posPar0+1, posPar1);
-					// Remove pure "<?(,?)*>" sequences as questionmarks may cause trouble later
+					tokens.replaceAllBetween("<", ANG_BRACK_SUBST[0], true, posId, posAngBr+1);
+					tokens.replaceAllBetween(">", ANG_BRACK_SUBST[2], true, posId, posAngBr+1);
+					tokens.replaceAllBetween(",", ANG_BRACK_SUBST[1], true, posId, posAngBr+1);
+					tokens.replaceAllBetween("[", ANG_BRACK_SUBST[3], true, posId, posAngBr+1);
+					tokens.replaceAllBetween("]", ANG_BRACK_SUBST[4], true, posId, posAngBr+1);
+					tokens.replaceAllBetween("?", ANG_BRACK_SUBST[5], true, posId, posAngBr+1);
+					// The insertions will have re-introduced white space between the word parts,
+					// so get rid of it again.
+					tokens.removePaddings(posId, posAngBr);
+					// Remove pure "<?(,?)*>" sequences as question marks may cause trouble later
 					origSequence = origSequence.replaceAll("<\\?(,\\?)*>", "");
 					// Ensure the operator symbols will be restored after the parsing
 					this.replacedIds.putIfAbsent(tokens.subSequence(posId, posAngBr+1).getString(), origSequence);

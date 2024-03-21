@@ -2625,7 +2625,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		//StringList nameParts = StringList.explode(name.getString(), " ");
 		// START KGU#790 2023-11-06: Don't tear apart a component access path
 		//if (type.isEmpty() || name.size() > 1) {
-		name.removePaddings();
+		name.shrink();
 		if ((type.isEmpty() || name.size() > 1) && !Syntax.isIdentifier(name.getString(), false, ".")) {
 		// END KGU#790 2023-11-06
 			type += " " + name.remove(0, name.size()-1).getString().trim() + " ";

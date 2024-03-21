@@ -776,7 +776,7 @@ public class COBOLGenerator extends Generator {
 		//{
 		//	tokens.remove(pos);	// Get rid of one of the blanks
 		//}
-		tokens.removePaddings();
+		tokens.shrink();
 		// On inserting operator keywords we better make sure them being padded
 		// (lest neighbouring identifiers be glued to them on concatenating)
 		// The correct way would of course be to add blank tokens where needed

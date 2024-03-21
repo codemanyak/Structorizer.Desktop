@@ -729,7 +729,7 @@ public class TexAlgGenerator extends Generator {
 				tokens.set(i, token.replace("^", "\\textasciicircum{}"));
 			}
 		}
-		tokens.removePaddings();
+		tokens.shrink();
 		return tokens.getString();
 	}
 

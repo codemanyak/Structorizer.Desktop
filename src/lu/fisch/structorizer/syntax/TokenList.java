@@ -41,6 +41,10 @@ import lu.fisch.utils.StringList;
  *      ------          ----            -----------
  *      Kay Gürtzig     2023-10-19      First Issue
  *      Kay Gürtzig     2023-11-07      Several corrections, set of methods extended
+ *      Kay Gürtzig     2024-03-21      indexOf(TokenList, ...), lastIndexOf(TokenList,...) fixed;
+ *                                      '_' allowed as initial character of names (to be consistent with
+ *                                      System.isIdentifier(...) and code import.
+ *                                      New methods removePaddings(), removePaddings(int, int)
  *
  ******************************************************************************************************
  *
@@ -73,6 +77,11 @@ import lu.fisch.utils.StringList;
  */
 public class TokenList implements Comparable<TokenList>{
 
+	/**
+	 * States of the scanner state machine. {@code LX_0} is the initial state,
+	 * others like LX_WHITESPACE, LX_NAME, etc. represent different lexicographic
+	 * entities.
+	 */
 	private static enum LexState {
 		LX_0,
 		LX_WHITESPACE,
@@ -82,6 +91,12 @@ public class TokenList implements Comparable<TokenList>{
 		LX_INT, LX_INT0, LX_INTB, LX_INTO, LX_INTX,
 		LX_FLOAT, LX_FLOATSE, LX_FLOATE,
 		LX_SYMBOL};
+	/**
+	 * Non-alphanumeric character sequences to be detected as lexicographic tokens,
+	 * chiefly operator symbols relevant for Structorizer, as string array.
+	 * 
+	 * @see #LEX_SYMBOL_LIST
+	 */
 	private static final String[] LEX_SYMBOLS = {
 			":=", "<-",
 			"<=", ">=", "<>", "==", "!=",
@@ -91,30 +106,51 @@ public class TokenList implements Comparable<TokenList>{
 			"++", "--",
 			"+=", "-=", "*=", "/=", "%=", "&=", "|=", "<<=", ">>=",
 			"\\\\"};
+	/**
+	 * Same as {@link LEX_SYMBOLS} but as {@link StringList}, which facilitates
+	 * several operations.
+	 * 
+	 * @see LEX_SYMBOLS
+	 */
 	private static final StringList LEX_SYMBOL_LIST = new StringList(LEX_SYMBOLS);
+	/**
+	 * A string used as a set of all characters that may occur as second or third
+	 * character of a symbol from {@link LEX_SYMBOLS}. Used to facilitate symbol
+	 * detection and composition from the input stream.
+	 */
 	private static final String SYMBOL_CONTINUATIONS = ".+-<>=:&|\\";
+	/**
+	 * A string containing non-ASCII characters that may serve as operator symbols.
+	 * (Comprises at least &le;, &ne;, and &ge;.)
+	 */
 	private static final String SPEC_OPR_SYMBOLS = "\u2260\u2264\u2265";
 
 	/**
-	 * List of lexicographic tokens
+	 * List of non-empty lexicographic tokens representing a specific syntactical
+	 * unit, without white space (which is held separately in the field
+	 * {@link paddings}).
+	 * 
+	 * @see #paddings
 	 */
 	private ArrayList<String> tokens;
 	
 	/**
-	 * List of paddings (blank sequences) between the {@link tokens}. The length always equals
-	 * {@code tokens.size() + 1}, i.e. {@code paddings.get(0)} is the number of blanks before
-	 * the first token, {@code paddings.get(i)} with i > 0 is the length of the gap between
-	 * {@code tokens.get(i-1)} and {@code tokens.get(i)}.
+	 * List of paddings (blank sequences) between the {@link tokens}. The length
+	 * always equals {@code tokens.size() + 1}, i.e. {@code paddings.get(0)} is
+	 * the number of blanks before the first token, {@code paddings.get(i)} with
+	 * i > 0 is the length of the gap between {@code tokens.get(i-1)} and
+	 * {@code tokens.get(i)}.
 	 */
 	private ArrayList<Integer> paddings;
 	
 	/**
-	 * The total text length of the string represented by this token list
+	 * The total text length of the string represented by this token list, will
+	 * be updated on every modifying operation over {@code this}.
 	 */
 	private int len = 0;
 
 	/**
-	 * Creates an empty token list
+	 * Creates an empty token list, i.e. a token list representing an empty string.
 	 * 
 	 * @see #TokenList(String)
 	 */
@@ -180,7 +216,10 @@ public class TokenList implements Comparable<TokenList>{
 					nBlanks++;
 					state = LexState.LX_WHITESPACE;
 				}
-				else if (Character.isLetter(cp)) {
+				// START KGU 2024-03-21: We ought to allow names beginning with '_'
+				//else if (Character.isLetter(cp)) {
+				else if (Character.isLetter(cp) || cp == '_') {
+				// END KGU 2024-03-21
 					sbToken.appendCodePoint(cp);
 					state = LexState.LX_NAME;
 				}
@@ -862,17 +901,74 @@ public class TokenList implements Comparable<TokenList>{
 	 * list at the beginning and the end.
 	 * 
 	 * @return change of the number of whitespace characters (likely to be a
-	 *     negative result).
+	 *     negative result, but could evn be positive, if more necessary gaps
+	 *     are restored than superfluous whitespace removed).
 	 * 
 	 * @see #trim()
 	 * @see #trimEnd()
 	 * @see #trimStart()
 	 */
-	public int removePaddings()
+	public int shrink()
 	{
 		int nWS = 0;
 		for (int i = 0; i < tokens.size(); i += 2) {
 			nWS += setPadding(i, 0, 0);
+		}
+		return nWS;
+	}
+	
+	/**
+	 * Eliminates absolutely all whitespace around th tokens without ensuring
+	 * minimum gaps between tokens that would amalgamate with {@link #getString()}.<br/>
+	 * <b>Hint:</b> Necessary gaps can be automatically restored with
+	 * {@link #shrink()} or, individually, by {@link #setPadding(int, int, int)}.
+	 * 
+	 * @param fromIndex - index of the token before the wiping
+	 * @param toIndex - index of the token behind the wiping
+	 * @return change of the number of whitespace characters. Can only be 0
+	 *    or negative.
+	 * 
+	 * @see #removePaddings(int, int)
+	 * @see #shrink()
+	 * @see #setPadding(int, int, int)
+	 */
+	public int removePaddings()
+	{
+		int nWS = 0;
+		for (int i = 0; i < paddings.size(); i++) {
+			nWS -= paddings.set(i, 0);
+		}
+		return nWS;
+	}
+	
+	/**
+	 * Eliminates all whitespace between token {@code fromIndex} and token
+	 * {@code toIndex} without ensuring minimum gaps between tokens that
+	 * would amalgamate with {@link #getString()}. To have any effect,
+	 * {@code toIndex > @code fromIndex} must hold. The outer paddings will
+	 * remain even if {@code fromIndex == 0} and {@code toIndex == size()-1}.
+	 * 
+	 * To remove them alone use {@link #trim()}, to remove all paddings use
+	 * {@link #removePaddings()}.<br/>
+	 * <b>Hint:</b> Necessary gaps can be automatically restored with
+	 * {@link #shrink()} or, individually, by {@link #setPadding(int, int, int)}.
+	 * 
+	 * @param fromIndex - index of the token before the wiping
+	 * @param toIndex - index of the token behind the wiping
+	 * @return change of the number of whitespace characters. Can only be 0
+	 *    or negative.
+	 * @throws #IndexOutOfBoundsException - if {@code fromIndex} or {@code toIndex}
+	 *    is out of range ({@code fromIndex < 0 || toIndex >= size()})
+	 * 
+	 * @see #removePaddings()
+	 * @see #shrink()
+	 * @see #trim()
+	 */
+	public int removePaddings(int fromIndex, int toIndex)
+	{
+		int nWS = 0;
+		for (int i = fromIndex+1; i <= toIndex; i++) {
+			nWS -= paddings.set(i, 0);
 		}
 		return nWS;
 	}
@@ -1735,7 +1831,7 @@ public class TokenList implements Comparable<TokenList>{
 	 * Removes all the tokens and paddings from this list. The list will
 	 * be empty after this call returns.
 	 * 
-	 * @see #removePaddings()
+	 * @see #shrink()
 	 * @see #trim()
 	 * @see #remove(int, int, boolean)
 	 */

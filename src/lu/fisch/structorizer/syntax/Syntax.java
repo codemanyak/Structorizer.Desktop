@@ -1842,6 +1842,10 @@ public class Syntax {
 						path.remove(0);
 					}
 				}
+				// FIXME We were likely to fall into an eternal loop here!
+				if (!varType.isArray() && !varType.isRecord()) {
+					varType = null;
+				}
 			}
 			if (varType != null && varType.isRecord()) {
 				// path must now be exhausted, the component names are our proposals
