@@ -150,7 +150,7 @@ public class Parallel extends Element
     // START KGU#227 2016-07-31: Enh. #128 new helper method
     private String getGenericText()
     {
-        return getClass().getSimpleName() + "(" + this.text.get(0).getString() + ")";
+        return getClass().getSimpleName() + "(" + this.text.get(0).trim() + ")";
     }
     // END KGU#227 2016-07-31
 
@@ -203,7 +203,7 @@ public class Parallel extends Element
     	if (!text.isEmpty())
     	{
     		int count = 10;
-    		String content = text.get(0).getString().trim(); 
+    		String content = text.get(0).trim(); 
     		try
     		{
     			// retrieve the number of parallel tasks
@@ -218,7 +218,7 @@ public class Parallel extends Element
     					"Error", JOptionPane.ERROR_MESSAGE);
     			//text = StringList.getNew(Integer.toString(count));
     			text.clear();
-    			text.add(new TokenList(Integer.toString(count)));
+    			text.add(Integer.toString(count));
     		}
 
     		// add subqueues

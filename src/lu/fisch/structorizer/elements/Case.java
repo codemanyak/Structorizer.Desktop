@@ -144,7 +144,7 @@ public class Case extends Element implements IFork
 		//return getComment();
 		if (!_alwaysTrueComment && isSwitchTextCommentMode())
 		{
-			return StringList.getNew(text.get(0).getString());
+			return StringList.getNew(text.get(0));
 		}
 		else
 		{
@@ -189,11 +189,11 @@ public class Case extends Element implements IFork
             while (this.getUnbrokenText().count() < 3)
             // END KGU#453 2017-11-02
             {
-                text.add(new TokenList("?"));
+                text.add("?");
             }
             if (text.get(0).isEmpty())
             {
-                text.set(0, new TokenList("???"));
+                text.set(0, "???");
             }
             // END KGU#91 2015-12-01
             // START KGU#453 2017-11-02: Issue #447
@@ -237,8 +237,8 @@ public class Case extends Element implements IFork
     // START KGU#227 2016-07-31: Apparently helpful method
     protected boolean hasDefaultBranch()
     {
-        int nLines = text.size();
-        return nLines > 1 && !text.get(nLines-1).getString().trim().equals("%");
+        int nLines = text.count();
+        return nLines > 1 && !text.get(nLines-1).trim().equals("%");
     }
     // END KGU#227 2016-07-31
     
@@ -1119,20 +1119,20 @@ public class Case extends Element implements IFork
 		String[] relevantKeywords = getRelevantParserKeys();
 		if (!text.isEmpty())
 		{
-			text.set(0, Syntax.encodeLine(text.get(0), _splitOldKeywords, relevantKeywords, _ignoreCase, false));
+			text.set(0, Syntax.encodeLine(new TokenList(text.get(0)), _splitOldKeywords, relevantKeywords, _ignoreCase, false).getString());
 			// START KGU#453 2017-11-02: Issue #447
 			boolean isContinuation = text.get(0).endsWith("\\");
 			// END KGU#453 2017-11-02
 			relevantKeywords = new String[]{"^postCase"};
-			for (int i = 1; i < text.size(); i++)
+			for (int i = 1; i < text.count(); i++)
 			{
-				TokenList line = text.get(i);
+				TokenList line = new TokenList(text.get(i));
 				// START KGU#453 2017-11-02: Issue #447
 				//if (!line.equals("%"))
 				if (!isContinuation && (line.size() != 1 || !line.get(0).equals("%")))
 				// END KGU#453 2017-11-02
 				{
-					text.set(i, Syntax.encodeLine(line, _splitOldKeywords, relevantKeywords, _ignoreCase, isContinuation));
+					text.set(i, Syntax.encodeLine(line, _splitOldKeywords, relevantKeywords, _ignoreCase, isContinuation).getString());
 				}
 				// START KGU#453 2017-11-02: Issue #447
 				isContinuation = line.endsWith("\\");

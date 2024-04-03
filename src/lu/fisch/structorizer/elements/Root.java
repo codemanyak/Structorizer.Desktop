@@ -2156,10 +2156,7 @@ public class Root extends Element {
 		Subqueue oldChildren = (Subqueue)children.copy(); 
 		// START KGU#120 2016-01-02: Bugfix #85 - park my StringList attributes on the stack top
 		//oldChildren.setText(new StringList(this.text));
-		oldChildren.text = new ArrayList<TokenList>(this.text.size());
-		for (TokenList tokens: this.text) {
-			oldChildren.text.add(new TokenList(tokens));
-		}
+		oldChildren.setText(new StringList(this.text));
 		oldChildren.setComment(new StringList(this.comment));
 		// END KGU#120 2016-01-02
 		// START KGU#363 2017-05-21: Enh. #372: Care for the new attributes
@@ -2305,12 +2302,7 @@ public class Root extends Element {
                 Subqueue redoSq = (Subqueue)children.copy();
                 redoList.add(redoSq);
                 // START KGU#120 2016-01-02: Bugfix #85 - park my StringList attributes in the stack top
-                //redoList.peek().setText(new StringList(this.text));
-                //redoList.peek().setText(this.getText());
-                redoSq.text = new ArrayList<TokenList>(this.text.size());
-                for (TokenList tokens: this.text) {
-                    redoSq.text.add(new TokenList(tokens));
-                }
+                redoSq.setText(new StringList(this.text));
                 redoSq.setComment(new StringList(this.comment));
                 // END KGU#120 2016-01-02
                 // START KGU#507 2018-03-15: Bugfix #523
@@ -2818,10 +2810,10 @@ public class Root extends Element {
     				}
     			}
     			// START KGU#163 2016-03-25: The Case default line must be deleted
-    			else if (_ele instanceof Case && _ele.text.size() > 1)
+    			else if (_ele instanceof Case && _ele.text.count() > 1)
     			{
     				// Remove the last line of the CASE element
-    				lines.remove(_ele.text.size() - 1);
+    				lines.remove(_ele.text.count() - 1);
     			}
     			// END KGU#163 2016-03-25
     		}

@@ -2454,12 +2454,12 @@ public class TokenList implements Comparable<TokenList>{
 	
 	/**
 	 * Returns a list of TokenLists representing the parts of the line
-	 * represented by this token list after having broken (wrapped) such that
+	 * emerging from this token list after having broken (wrapped) such that
 	 * the lengths of the partial lines do not excess a text length of
 	 * {@code maxChars} if possible. (If a single token happens to be longer
 	 * than {@code maxChars} then it will not of course be split.)<br/>
 	 * The first n-1 TokenLists of the result will end with a "\" token.<br/>
-	 * This token list will not be affected. If {@code maxChars > length()} 
+	 * This token list itself will not be affected. If {@code maxChars > length()} 
 	 * then the result will contain a single TokenList which is an exact copy
 	 * of this.
 	 * 

@@ -679,7 +679,7 @@ public abstract class Element {
 	// END KGU#365 2017-04-14
 	
 //	element attributes
-	protected ArrayList<TokenList> text = new ArrayList<TokenList>();
+	protected StringList text = new StringList();
 	public StringList comment = new StringList();
 
 	// START KGU#701 2019-03-29: Issue #718 Attempt to accelerate syntax highlighting by caching
@@ -805,7 +805,9 @@ public abstract class Element {
 	public Element(ArrayList<TokenList> _tokenizedLines)
 	{
 		makeNewId();
-		text = new ArrayList<TokenList>(_tokenizedLines);
+		for (TokenList tokens: _tokenizedLines) {
+			text.add(tokens.getString());
+		}
 	}
 
 	/**
@@ -1095,20 +1097,13 @@ public abstract class Element {
 	 */
 	public void setText(String _text)
 	{
-		//text.setText(_text);
-		String[] lines = _text.split("\n");
 		synchronized (text) {
-			text.clear();
-			// START KGU#1108 2023-12-14: Bugfix #1119 Suppress empty text
-			if (!_text.isEmpty()) {
-				for (String line: lines) {
-					text.add(new TokenList(line));
-				}
+			if (_text.isEmpty()) {
+				text.clear();
 			}
-			// END KGU#1108 2023-12-14
-			// START KGU#790 2020-11-02: Issue #800 This is quite obvious but how to catch text alterations?
-			parsedLines = null;
-			// END KGU#790 2020-11-02
+			else {
+				text.setText(_text);	// Convert to a StringList
+			}
 		}
 	}
 
@@ -1118,15 +1113,8 @@ public abstract class Element {
 	 */
 	public void setText(StringList _text)
 	{
-		//text = _text
 		synchronized (text) {
-			text.clear();
-			for (int i = 0; i < _text.count(); i++) {
-				text.add(new TokenList(_text.get(i)));
-			}
-			// START KGU#790 2020-11-02: Issue #800 This is quite obvious but how to catch text alterations?
-			parsedLines = null;
-			// END KGU#790 2020-11-02
+			text = _text;
 		}
 	}
 
@@ -1148,14 +1136,7 @@ public abstract class Element {
 	 */
 	public StringList getText()
 	{
-		//return text;
-		StringList strList = new StringList();
-		synchronized (text) {
-			for (TokenList tokens: text) {
-				strList.add(tokens.getString());
-			}
-		}
-		return strList;
+		return text;
 	}
 	/**
 	 * Returns the content of the text field unless _alwaysTrueText is false and
@@ -1179,8 +1160,7 @@ public abstract class Element {
 		}
 		else
 		{
-			//return text;
-			return getText();
+			return text;
 		}
 	}
 
@@ -1201,20 +1181,14 @@ public abstract class Element {
 	 */
 	public StringList getCuteText()
 	{
-//		StringList cute = new StringList();
-//		for (int i = 0; i < text.count(); i++) {
-//			String line = text.get(i);
-//			if (line.endsWith("\\")) {
-//				line = line.substring(0, line.length() - 1);
-//			}
-//			cute.add(line);
-//		}
-		StringList cute = this.getText();
-		for (int i = 0; i < cute.count(); i++) {
-			String line = cute.get(i);
-			if (line.endsWith("\\")) {
-				line = line.substring(0, line.length() - 1);
-				cute.set(i, line);
+		StringList cute = new StringList();
+		synchronized (text) {
+			for (int i = 0; i < text.count(); i++) {
+				String line = text.get(i);
+				if (line.endsWith("\\")) {
+					line = line.substring(0, line.length() - 1);
+				}
+				cute.add(line);
 			}
 		}
 		return cute;
@@ -1291,21 +1265,23 @@ public abstract class Element {
 		return getBrokenText("\\\n");
 	}
 	/**
-	 * Returns the text of this element as a new StringList where each broken line (by means
-	 * of backslashes) will be glued together such that instead of the delimiting backslashes
-	 * the given {@code separator} will be inserted.
-	 * @param separator - an arbitrary string working as separator instead of the original backslash
+	 * Returns the text of this element as a new StringList where each broken line
+	 * (by means of backslashes) will be glued together such that instead of the
+	 * delimiting backslashes the given {@code separator} will be inserted.
+	 * 
+	 * @param separator - an arbitrary string working as separator instead of the
+	 *    original backslash
 	 * @return a StringList consisting of possibly broken text lines
 	 */
 	protected StringList getBrokenText(String separator)
 	{
 		StringList sl = new StringList();
-		int nLines = text.size();
+		int nLines = text.count();
 		int i = 0;
 		while (i < nLines) {
-			String line = text.get(i).getString().trim();
+			String line = text.get(i).trim();
 			while (line.endsWith("\\") && (i + 1 < nLines)) {
-				line = line.substring(0, line.length()-1) + separator + text.get(++i).getString().trim();
+				line = line.substring(0, line.length()-1) + separator + text.get(++i).trim();
 			}
 			sl.add(line);
 			i++;
@@ -1326,18 +1302,10 @@ public abstract class Element {
 	 */
 	public ArrayList<TokenList> getUnbrokenTokenText()
 	{
+		StringList unbroken = this.getUnbrokenText();
 		ArrayList<TokenList> tt = new ArrayList<TokenList>();
-		int nLines = text.size();
-		int i = 0;
-		while (i < nLines) {
-			TokenList tokens = new TokenList(text.get(i));
-			while (!tokens.isBlank() && tokens.getLast().equals("\\")
-					&& (i + 1 < nLines)) {
-				tokens.remove(tokens.size()-1);
-				tokens.addAll(text.get(++i));
-			}
-			tt.add(tokens);
-			i++;
+		for (int i = 0; i < unbroken.count(); i++) {
+			tt.add(new TokenList(unbroken.get(i), true));
 		}
 		return tt;
 	}
@@ -1355,17 +1323,10 @@ public abstract class Element {
 	 */
 	protected ArrayList<TokenList> getBrokenTokenText()
 	{
+		StringList broken = this.getBrokenText();
 		ArrayList<TokenList> tt = new ArrayList<TokenList>();
-		int nLines = text.size();
-		int i = 0;
-		while (i < nLines) {
-			TokenList line = new TokenList(text.get(i));
-			while (!line.isBlank() && line.get(line.size()-1).equals("\\") && (i + 1 < nLines)) {
-				line.set(line.size()-1, "\n");
-				line.addAll(text.get(++i));
-			}
-			tt.add(line);
-			i++;
+		for (int i = 0; i < broken.count(); i++) {
+			tt.add(new TokenList(broken.get(i), true));
 		}
 		return tt;
 	}
@@ -1373,9 +1334,9 @@ public abstract class Element {
 	// START KGU#1097 2023-11-15: Issue #800 New internal representation
 	/**
 	 * Overwrites the previous Element text with the given tokenized multi-line
-	 * text. If any of the contained token lists contains a newline token then
-	 * the line will be split at this position and the part before it will be
-	 * suffixed by a "\" token.<br/>
+	 * text. If any of the contained token lists happens to contain an escaped
+	 * newline token (i.e., a string "\n") then the line will be split at this position and the part
+	 * before it will be suffixed by a "\" token.<br/>
 	 * 
 	 * @param tokenLines - a list of {@link TokenList}s representing the (possibly
 	 *    broken) lines. "Broken" means that the token lists may contain newline
@@ -1388,19 +1349,17 @@ public abstract class Element {
 	public void setTokenText(ArrayList<TokenList> tokenLines)
 	{
 		// FIXME ensure triggers
-		ArrayList<TokenList> tt = new ArrayList<TokenList>();
+		StringList sl = new StringList();
 		for (TokenList tokens: tokenLines) {
-			tokens = new TokenList(tokens);
+			int pos0 = 0;
 			int posNl = -1;
-			while ((posNl = tokens.indexOf("\n")) >= 0) {
-				tokens.set(posNl, "\\");
-				tt.add(tokens.subSequence(0, posNl));
-				tokens.remove(0, posNl + 1);
+			while ((posNl = tokens.indexOf("\n", pos0)) >= 0) {
+				sl.add(tokens.subSequence(pos0, posNl).getString() + "\\");
+				pos0 = posNl + 1;
 			}
-			tt.add(tokens);
+			sl.add(tokens.subSequenceToEnd(pos0).getString());
 		}
-		this.text = tt;
-		this.parsedLines = null;
+		this.setText(sl);
 	}
 	// END KGU#1097 2023-11-15
 	
@@ -1485,27 +1444,33 @@ public abstract class Element {
 	public boolean breakTextLines(int maxLineLength, boolean rebreak)
 	{
 		boolean modified = false;
+		ArrayList<TokenList> tokenLines = null;
+		// FIXME the critical section is incomplete but we cannot include this.setTokenText()
 		synchronized (text) {
 			if (rebreak) {
-				ArrayList<TokenList> unbroken = this.getUnbrokenTokenText();
-				modified = unbroken.size() < this.text.size();
-				this.text = unbroken;
+				tokenLines = this.getUnbrokenTokenText();
+				modified = tokenLines.size() < this.text.count();
 			}
-			for (int i = this.text.size()-1; i >= 0; i--) {
-				TokenList line = this.text.get(i);
-				int length = line.length();
-				if (line.isEmpty()) {
-					continue;
-				}
-				ArrayList<TokenList> broken = line.breakAtLength(maxLineLength);
-				if (broken.size() > 1 || broken.get(0).length() != length) {
-					this.text.remove(i);
-					this.text.addAll(i, broken);
-					modified = true;
-				}
+			else {
+				tokenLines = this.getBrokenTokenText();
+			}
+		}
+		// We work backwards through the (possibly bre-broken) lines
+		for (int i = tokenLines.size()-1; i >= 0; i--) {
+			TokenList tokens = tokenLines.get(i);
+			int length = tokens.length();
+			if (tokens.isEmpty()) {
+				continue;
+			}
+			ArrayList<TokenList> broken = tokens.breakAtLength(maxLineLength);
+			if (broken.size() > 1 || !broken.isEmpty() && broken.get(0).length() != length) {
+				tokenLines.remove(i);
+				tokenLines.addAll(i, broken);
+				modified = true;
 			}
 		}
 		if (modified) {
+			this.setTokenText(tokenLines);
 			this.resetDrawingInfoUp();
 		}
 		return modified;
@@ -1524,7 +1489,7 @@ public abstract class Element {
 	public int getMaxLineLength(boolean _includeSubstructure)
 	{
 		int maxLen = 0;
-		for (int i = 0; i < this.text.size(); i++) {
+		for (int i = 0; i < this.text.count(); i++) {
 			maxLen = Math.max(maxLen, this.text.get(i).length());
 		}
 		return maxLen;
@@ -4776,15 +4741,15 @@ public abstract class Element {
 		{
 			ArrayList<TokenList> result = new ArrayList<TokenList>();
 			boolean isContinued = false;
-			for (int i = 0; i < this.text.size(); i++)
+			for (int i = 0; i < this.text.count(); i++)
 			{
 				// FIXME: We should order the keys by decreasing length first!
-				TokenList encoded = Syntax.encodeLine(this.text.get(i), _splitOldKeywords,
+				TokenList encoded = Syntax.encodeLine(new TokenList(this.text.get(i)), _splitOldKeywords,
 						relevantKeys, _ignoreCase, isContinued);
 				isContinued = encoded.endsWith("\\");
 				result.add(encoded);
 			}
-			this.text = result;
+			this.setTokenText(result);
 		}
 	}
 	// END KGU#258/KGU#1097 2023-10-29
