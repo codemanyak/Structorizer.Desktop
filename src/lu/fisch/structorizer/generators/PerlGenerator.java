@@ -90,14 +90,26 @@ import java.util.ArrayList;
  *      Kay Gürtzig         2021-12-05  Bugfix #1024: Precautions against defective record initializers
  *      Kay Gürtzig         2023-10-04  Bugfix #1093 Undue final return 0 on function diagrams
  *      Kay Gürtzig         2024-03-19  Issue #1148: Special indentation for "if else if" chains
+ *      Kay Gürtzig         2024-04-02  Bugfix #1156: Proper handling of constant definitions (new export option)
  *
  ******************************************************************************************************
  *
  *      Comment:		LGPL license (http://www.gnu.org/licenses/lgpl.html).
  *      
+ *      2024-04-02 Issue #1156 (KGU#1143)
+ *      - A somewhat more sophisticated approach for the handling of constants via pragma use constant (see
+ *        comment below) was used and bound to a new Perl-specific export option. We distinguish between
+ *        constants define in a CALL (which will never be involved in the use constant approach - as they
+ *        cannot be evaluated at compile time) and those defined in an instruction where we dare to apply
+ *        the use constant pragma only if the user had set the respective option. For the expression trans-
+ *        formation we use the wasDefHandled mechanism of Generator, which hasn't been used for other stuff
+ *        in PerlGenerator by now. The latter is essential. If it should be used for other declaraton purposes
+ *        as well then our test for defined constants in transformTokens won't work any longer in that simple
+ *        manner.
  *      2019-11-28 Issue #388 (KGU#375)
- *      - A temporary solution for constants (via use constant) had to be withdrawn because these constants cannot be scoped
- *        and don't behave like readonly variables, they can hardly be used with function calls or the like.
+ *      - A temporary solution for constants (via use constant) had to be withdrawn because these constants
+ *        cannot be scoped and don't behave like readonly variables, they can hardly be used with function
+ *        calls or the like.
  *
  ******************************************************************************************************///
 
@@ -246,6 +258,36 @@ public class PerlGenerator extends Generator {
 	/** Currently exported {@link Root} object. */
 	private Root root;
 	// END KGU#542 2019-11-20
+	
+	// START KGU#1143 2024-04-02: Bugfix #1156/2 New option for pragma use const
+	/** Line number for the insertion of use constant lines */
+	private int constantInsertionLine = 0;
+	/** Indent at the {@link constantInsertionLine} */
+	private String constantIndent = "";
+	/** Internally caches the export option value for pragma "use constant" */
+	private Boolean pragmaUseConstant = null;
+	/**
+	 * @returns value of the (potential) export option to apply the "use constant"
+	 * pragma for constants
+	 */
+	private boolean optionPragmaUseConstant()
+	{
+		if (pragmaUseConstant == null) {
+			pragmaUseConstant = (boolean)getPluginOption("pragmaUseConstant", false);
+		}
+		return pragmaUseConstant;
+	}
+	/* (non-Javadoc)
+	 * @see lu.fisch.structorizer.generators.Generator#updateLineMarkers(int, int)
+	 */
+	@Override
+	protected void updateLineMarkers(int atLine, int nLines) {
+		super.updateLineMarkers(atLine, nLines);
+		if (this.constantInsertionLine >= atLine) {
+			this.constantInsertionLine += nLines;
+		}
+	}
+		// END KGU#1143 2024-04-02
 
 	// START KGU#18/KGU#23 2015-11-01 Transformation decomposed
 	/**
@@ -329,7 +371,14 @@ public class PerlGenerator extends Generator {
 			String varName = varNames.get(i);
 			// Is it an enumeration constant? Then don't prefix it
 			String constVal = root.constants.get(varName);
-			if (constVal != null && constVal.startsWith(":") && constVal.contains("€")) {
+			// START KGU#1143 2024-04-02: Issue #1156/2 if constant pragma is used, don't prefix
+			//if (constVal != null && constVal.startsWith(":") && constVal.contains("€")) {
+			if (constVal != null && (
+					constVal.startsWith(":") && constVal.contains("€")
+					// NOTE: This works only while DefHandled isn't used for anything else here!
+					|| optionPragmaUseConstant() && wasDefHandled(this.root, varName, false, false)
+					)) {
+			// END KGU#1143 2024-04-02
 				//tokens.replaceAll(varName, constVal.substring(1, constVal.indexOf('€')) + '_' + varName);
 				continue;
 			}
@@ -566,7 +615,10 @@ public class PerlGenerator extends Generator {
 			{
 				TokenList tokens = lines.get(i);
 				boolean isAsgn = Instruction.isAssignment(tokens);
-				boolean isDecl = Instruction.isDeclaration(tokens);
+				// START KGU#1143 2024-04-02 Bugfx #1156: typed constants caused error
+				//boolean isDecl = Instruction.isDeclaration(tokens);
+				boolean isDecl = Instruction.isDeclaration(tokens, true);
+				// END KGU#1143 2024-04-02
 				// START KGU#653 2019-02-15: Enh. #680 - input with several items...
 				StringList inputItems = Instruction.getInputItems(tokens);
 				if (inputItems != null && inputItems.count() > 2) {
@@ -606,6 +658,13 @@ public class PerlGenerator extends Generator {
 					int posAsgn = tokens.indexOf("<-");
 					String var = Instruction.getAssignedVarname(tokens.subSequence(0, posAsgn), true);
 					TokenList expr = tokens.subSequenceToEnd(posAsgn+1);
+					// START KGU#1143 2024-04-02 Bugfix #1156/2 special constant handling
+					if (optionPragmaUseConstant() && tokens.get(0).equalsIgnoreCase("const")) {
+						insertCode(constantIndent + "use constant " + var + " => " + this.transform(expr.getString()) + ";", constantInsertionLine);
+						this.wasDefHandled(root, var, true);
+						continue;
+					}
+					// END KGU#1143 2024-04-02
 					if (Syntax.isIdentifier(var, false, null) && expr.get(0).equals("{") && expr.getLast().equals("}")) {
 						text = "@" + var + " = " + transform(expr.getString());
 					}
@@ -1014,11 +1073,28 @@ public class PerlGenerator extends Generator {
 			// START KGU#352 2017-02-26: Handle arrays as arguments appropriately
 			this.isWithinCall = true;
 			// END KGU#352 2017-02-26
-			StringList lines = _call.getUnbrokenText();
-			for (int i=0; i<lines.count(); i++)
+			ArrayList<TokenList> tokenLines = _call.getUnbrokenTokenText();
+			for (int i = 0; i < tokenLines.size(); i++)
 			{
+				// START KGU#1143 2024-04-03: Bugfix #1156/2 Optional constant handling
+				TokenList tokens = tokenLines.get(i);
+				if (optionPragmaUseConstant() && Instruction.isAssignment(tokens)) {
+					if (tokens.get(0).equalsIgnoreCase("const")) {
+						String constName = Instruction.getAssignedVarname(tokens, false);
+						TypeMapEntry typeEntry = this.typeMap.get(constName);
+						String prefix = (typeEntry != null && typeEntry.isArray()) ? "@" : "$";
+						String text = "my " + prefix + constName + ";";
+						if (isDisabled) {
+							insertComment(text, constantIndent, constantInsertionLine);
+						}
+						else {
+							insertCode(constantIndent + text, constantInsertionLine);
+						}
+					}
+				}
+				// END KGU#1143 2024-04-03
 				// FIXME: Arrays must be passed as reference, i.e. "\@arr" or "\@$para"
-				addCode(transform(lines.get(i)) + ";", _indent, isDisabled);
+				addCode(transform(tokens.getString()) + ";", _indent, isDisabled);
 			}
 			// START KGU#352 2017-02-26: Handle arrays as arguments appropriately
 			this.isWithinCall = false;
@@ -1341,6 +1417,10 @@ public class PerlGenerator extends Generator {
 		//	}
 		//}
 		// END KGU#375 2019-11-19
+		// START KGU#1143 2024-04-02: Bugfix #1156/2 Special constant handling
+		constantInsertionLine = code.count();
+		constantIndent = _indent;
+		// END KGU#1143 2024-04-02
 		for (int v = 0; v < _varNames.count(); v++) {
 			String varName = _varNames.get(v);
 			TypeMapEntry typeEntry = this.typeMap.get(varName);
@@ -1348,9 +1428,12 @@ public class PerlGenerator extends Generator {
 			//String prefix = (typeEntry != null && typeEntry.isArray()) ? "@" : "$";
 			//code.add(_indent + "my " + prefix + varName + ";");
 			String constVal = _root.constants.get(varName);
-			if (constVal == null || !constVal.startsWith(":")) {
+			// START KGU#1143 2024-04-02: Bugfix #1156/2 Special constant handling
+			//if (constVal == null || !constVal.startsWith(":")) {
+			if (constVal == null || !constVal.startsWith(":") && !optionPragmaUseConstant()) {
+			// END KGU#1143 2024-04-02
 				String prefix = (typeEntry != null && typeEntry.isArray()) ? "@" : "$";
-				code.add(_indent + "my " + prefix + varName + ";");
+				addCode("my " + prefix + varName + ";", _indent, false);
 			}
 			// END KGU#375/KGU#542 2019-11-19
 		}

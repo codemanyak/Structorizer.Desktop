@@ -140,6 +140,8 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2024-01-22      Bugfix #1125: Equality check must consider disabled state
  *      Kay Gürtzig	    2024-03-07      Bugfix #1128 Risk of endless loop in method retrieveComponentNmes() fixed;
  *                                      Issue #1129: Limitation of error lines in the Analyser warning popup
+ *      Kay Gürtzig     2024-03-21      Bugfix #1128 revised (method retrieveComponentNmes()).
+ *      Kay Gürtzig     2024-03-22      Issue #1154: New method drawHatched(Rect, Canvas) to allow subclassing
  *
  ******************************************************************************************************
  *
@@ -316,7 +318,7 @@ public abstract class Element {
 	public static final long E_HELP_FILE_SIZE = 12300000;
 	public static final String E_DOWNLOAD_PAGE = "https://www.fisch.lu/Php/download.php";
 	// END KGU#791 2020-01-20
-	public static final String E_VERSION = "3.32-19";
+	public static final String E_VERSION = "3.32-20";
 	public static final String E_THANKS =
 	"Developed and maintained by\n"+
 	" - Robert Fisch <robert.fisch@education.lu>\n"+
@@ -907,6 +909,19 @@ public abstract class Element {
 	 * @return false iff the traversal is to be exited after this call
 	 */
 	public abstract boolean traverse(IElementVisitor _visitor);
+	
+	// START KGU#1142 2024-03-22: Issue #1154 Intended to be subclassed for special purposes
+	/**
+	 * Draws a dark grey hatch pattern into the given rectangle {@code rect} on the
+	 * {@link Canvas} {@code canvas}.
+	 * 
+	 * @param myrect - the rectangle to be (partially) hatched
+	 * @param canvas - the target canvas
+	 */
+	protected void drawHatched(Rect rect, Canvas canvas) {
+		canvas.hatchRect(rect, 5, 10);
+	}
+	// END KGU#1142 2024-03-22
 	
 	// START KGU#156 2016-03-11: Enh. #124
 	/**
@@ -3547,6 +3562,11 @@ public abstract class Element {
 //						path.remove(0);
 //					}
 //				}
+//				// START KGU#1115 2024-03-21: Bugfix #1128: We must not get trapped in the loop
+//				if (varType != null && !varType.isArray() && !varType.isRecord()) {
+//					varType = null;
+//				}
+//				// END KGU#1115 2024-03-21
 //			}
 //			if (varType != null && varType.isRecord()) {
 //				// path must now be exhausted, the component names are our proposals
@@ -5216,7 +5236,6 @@ public abstract class Element {
 		}
 		
 	}
-	
 	// END KGU#906/KGU#926 2021-02-04
 	
 	// START KGU#790 2020-11-02: Issue #800
