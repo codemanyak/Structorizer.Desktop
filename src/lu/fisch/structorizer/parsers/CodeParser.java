@@ -57,6 +57,8 @@ package lu.fisch.structorizer.parsers;
  *      Kay Gürtzig     2022-07-29      Issue #1051: New methods getSubRoot() and removeRoot() to support COBOL tidying
  *      Kay Gürtzig     2023-10-09      Javadoc comments revised.
  *      Kay Gürtzig     2024-03-18      Standard colour names refactored (e.g. colorConst -> COLOR_CONST)
+ *      Kay Gürtzig     2024-04-07      Issue #1157 Explanation text for "error.group_runaway" inserted.
+ *      Kay Gürtzig     2024-04-16      KGU#1147: New auxiliary method isRegisteredStatementRule()
  *
  ******************************************************************************************************
  *
@@ -797,6 +799,11 @@ public abstract class CodeParser extends javax.swing.filechooser.FileFilter impl
 				} else {
 					isSyntaxError = true;
 					error = parser.getErrorMessage() + " in file \"" + _textToParse + "\"";
+					// START KGU#1144 2024-04-07: Issue #1157 Better explanation for group runaway
+					if (error.startsWith("error.group_runaway ")) {
+						error += "\n(An unterminated lexical group - most likely a comment - consumes the tail of the file. Consider to remove it.)";
+					}
+					// END KGU#1144 2024-04-07
 				}
 			}
 			catch (ParserException e) {
@@ -1170,6 +1177,19 @@ public abstract class CodeParser extends javax.swing.filechooser.FileFilter impl
 	{
 		this.statementRuleIds.add(_ruleId);
 	}
+	// START KGU#1147 2024-04-16: Allow a quick check for registered rule IDs
+	/**
+	 * Checks whether the rule id of the passed-in {@link Reduction} {@code _red}
+	 * is registered as statement rule id for comment retrieval.
+	 * 
+	 * @param _red - the Reduction to be checked
+	 * @return {@code true} if the rule id of {@code _red} is registered
+	 */
+	protected boolean isRegisteredStatementRule(Reduction _red)
+	{
+		return this.statementRuleIds.contains(_red.getParent().getTableIndex());
+	}
+	// END KGU#1147 2024-04-16
 	/**
 	 * Retrieves comments associated to {@link Token}s in the subtree rooted by the
 	 * given {@link Reduction} {@code _reduction} if {@link #optionImportComments} is

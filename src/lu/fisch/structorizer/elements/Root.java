@@ -191,7 +191,8 @@ package lu.fisch.structorizer.elements;
  *                                      java.util. method calls like Math.sqrt(17.2) or Character.isDigit('5')
  *      Kay Gürtzig     2023-11-09      Issue #800: Obsolete refactoring support (#253) removed/disabled
  *      Kay Gürtzig     2024-03-14      Bugfix #1139: NullPointerException in analyse_5_7_13() with empty Try
- *      
+ *      Kay Gürtzig     2024-04-17      Issues #161, #1161 Improved reachability check (via mayPassControl())
+ *
  ******************************************************************************************************
  *
  *      Comment:		/
@@ -3884,6 +3885,14 @@ public class Root extends Element {
 
 			// get all set variables from actual instruction (just this level, no substructre)
 			StringList myVars = getVarNames(ele);
+			
+			// START KGU#1151 2024-04-17: Issues #161, #1161 Check reachability
+			if (check(16)) {
+				if (i > 0 && !_node.getElement(i-1).mayPassControl()) {
+					addError(_errors, new DetectedError(errorMsg(Menu.error16_7, ""), ele), 16);
+				}
+			}
+			// END KGU#1151 2024-04-17
 
 			// START KGU#790 2021-12-04: Issue #800 Grammar-based check
 			if (check(32) && !eleClassName.equals("Parallel")) {
@@ -5261,8 +5270,9 @@ public class Root extends Element {
 	}
 
 	/**
-	 * CHECK #16: Correct usage of Jump, including return<br/>
+	 * CHECK #16: Correct usage of Jump, including return, reachability<br/>
 	 * CHECK #13: Competitive return mechanisms
+	 * 
 	 * @param ele - JUMP element to be analysed
 	 * @param _errors - global error list
 	 * @param _myVars - all variables defined or modified by this element (should be empty so far, might be extended) 
@@ -5310,33 +5320,34 @@ public class Root extends Element {
 				lineComp.matches("exit([\\W].*|$)") ||	// Also check hard-coded keywords
 				lineComp.matches("break([\\W].*|$)");	// Also check hard-coded keywords
 		Element parent = ele.parent;
-		// START KGU#179 2022-01-04: Issue #161 similar check in multi-line case
-		if (unbroken.size() > 1) {
-			String nonEmptyLine = null;
-			for (int i = 1; i < unbroken.size(); i++) {
-				if (!unbroken.get(i).isBlank()) {
-					nonEmptyLine = unbroken.get(i).getString();
-				}
-			}
-			if (nonEmptyLine != null
-					&& (isReturn = Jump.isReturn(line0tokens))
-						|| (isLeave = Jump.isLeave(line0tokens))
-						|| (isExit = Jump.isExit(line0tokens))
-						|| (isThrow = Jump.isThrow(line0tokens))) {
-				//error = new DetectedError("Instruction isn't reachable after a JUMP!",((Subqueue)parent).getElement(pos+1)));
-				addError(_errors, new DetectedError(errorMsg(Menu.error16_7, nonEmptyLine), ele), 16);	
-			}
-		}
-		// END KGU#179 2022-01-04
-		// START KGU#179 2016-04-12: Enh. #161 New check for unreachable instructions
-		int pos = -1;
-		if (parent instanceof Subqueue 
-				&& (pos = ((Subqueue)parent).getIndexOf(ele)) < ((Subqueue)parent).getSize()-1)
-		{
-			//error = new DetectedError("Instruction isn't reachable after a JUMP!",((Subqueue)parent).getElement(pos+1)));
-			addError(_errors, new DetectedError(errorMsg(Menu.error16_7, ""), ((Subqueue)parent).getElement(pos+1)), 16);	
-		}
-		// END KGU#179 2016-04-12
+		// START KGU#1151 2024-04-17: Issues #161, #1161 Now done outside
+		//// START KGU#179 2022-01-04: Issue #161 similar check in multi-line case
+		//if (unbroken.size() > 1) {
+		//	String nonEmptyLine = null;
+		//	for (int i = 1; i < unbroken.size(); i++) {
+		//		if (!unbroken.get(i).isBlank()) {
+		//			nonEmptyLine = unbroken.get(i).getString();
+		//		}
+		//	}
+		//	if (nonEmptyLine != null
+		//			&& (isReturn = Jump.isReturn(line0tokens))
+		//				|| (isLeave = Jump.isLeave(line0tokens))
+		//				|| (isExit = Jump.isExit(line0tokens))
+		//				|| (isThrow = Jump.isThrow(line0tokens))) {
+		//		//error = new DetectedError("Instruction isn't reachable after a JUMP!",((Subqueue)parent).getElement(pos+1)));
+		//		addError(_errors, new DetectedError(errorMsg(Menu.error16_7, nonEmptyLine), ele), 16);	
+		//	}
+		//}
+		//// END KGU#179 2022-01-04
+		//// START KGU#179 2016-04-12: Enh. #161 New check for unreachable instructions
+		//int pos = -1;
+		//if (parent instanceof Subqueue && (pos = ((Subqueue)parent).getIndexOf(ele)) < ((Subqueue)parent).getSize()-1)
+		//{
+		//	//error = new DetectedError("Instruction isn't reachable after a JUMP!",((Subqueue)parent).getElement(pos+1)));
+		//	addError(_errors, new DetectedError(errorMsg(Menu.error16_7, ""), ((Subqueue)parent).getElement(pos+1)), 16);	
+		//}
+		//// END KGU#179 2016-04-12
+		// END KGU#1151 2024-04-17
 
 		// START KGU#78/KGU#365 2017-04-14: Enh. #23, #380 - completely rewritten
 		
@@ -5383,7 +5394,7 @@ public class Root extends Element {
 			if (levelsUp < 0 || loopsToLeave == null)
 			{
 				//error = new DetectedError("Wrong argument for this kind of JUMP (should be an integer constant)!",(Element) _node.getElement(i));
-				addError(_errors, new DetectedError(errorMsg(Menu.error16_6, preLeave), ele), 16);    					    							
+				addError(_errors, new DetectedError(errorMsg(Menu.error16_6, preLeave), ele), 16);
 			}
 			else {
 				int levelsDown = loopsToLeave.size();
@@ -5395,7 +5406,7 @@ public class Root extends Element {
 				if (levelsUp < 1 || levelsUp > levelsDown)
 				{
 					//error = new DetectedError("Cannot leave or break more loop levels than being nested in!",(Element) _node.getElement(i));
-					addError(_errors, new DetectedError(errorMsg(Menu.error16_4, String.valueOf(levelsDown)), ele), 16);    								
+					addError(_errors, new DetectedError(errorMsg(Menu.error16_4, String.valueOf(levelsDown)), ele), 16);
 				}
 			}
 		}

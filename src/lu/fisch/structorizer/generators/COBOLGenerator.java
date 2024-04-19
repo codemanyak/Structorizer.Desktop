@@ -26,7 +26,7 @@ import java.util.ArrayList;
  *
  *      Author:         Simon Sobisch
  *
- *      Description:    This class generates COBOL code.
+ *      Description:    This class generates COBOL code from Nassi-Shneiderman diagrams.
  *
  ******************************************************************************************************
  *
@@ -42,6 +42,8 @@ import java.util.ArrayList;
  *      Kay Gürtzig         2020-04-22      Bugfix #854: Deterministic topological order of type definitions ensured
  *      Kay Gürtzig         2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *      Kay Gürtzig         2021-06-07      Issue #67: lineNumering option made plugin-specific
+ *      Kay Gürtzig         2024-04-12      Issue #1148: Special handling of ELSE-IF chains by EVALUATE
+ *      Kay Gürtzig         2024-04-13/14   Some efforts for assignments and output instructions
  *      
  ******************************************************************************************************
  *
@@ -73,6 +75,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Stack;
 import java.util.Map.Entry;
 
 import lu.fisch.structorizer.elements.Alternative;
@@ -770,7 +773,7 @@ public class COBOLGenerator extends Generator {
 	protected String transformTokens(TokenList tokens)
 	{
 		// First get rid of superfluous spaces
-		int pos = -1;
+		//int pos = -1;
 		//StringList doubleBlank = StringList.explode(" \n ", "\n");
 		//while ((pos = tokens.indexOf(doubleBlank, 0, true)) >= 0)
 		//{
@@ -835,99 +838,227 @@ public class COBOLGenerator extends Generator {
 				if (tokens.isBlank() || Instruction.isMereDeclaration(tokens)) {
 					continue;
 				}
+				boolean lineDone = false;
 				Syntax.unifyOperators(tokens, false);
 				// FIXME Don't descend to string level
-				String transfLine = transform(tokens.getString());
-				// Input and output should work via standard transformation...
+				//String transfLine = transform(tokens.getString());
+				// Input should work via standard transformation...
 				if (Instruction.isAssignment(tokens)) {
-					int posAsgn = tokens.indexOf("<-");
-					// FIXME Somehow we must find out what data type is transferred... -> #800
-					String varName = transform(Instruction.getAssignedVarname(tokens, false));
-					TokenList exprTokens = tokens.subSequenceToEnd(posAsgn+1);
-					boolean isVar = isVariable(exprTokens, true, typeMap);
-					if (varNames.contains(varName)) {
-						String target = Instruction.getAssignedVarname(tokens, true);
-						TypeMapEntry varType = typeMap.get(varName);
-						// FIXME This is all awful without syntax trees (#800)
-						if (varType != null && (varType.isArray() || varType.isRecord())) {
-							if (isVar) {
-								// FIXME Don't descend to string level
-								transfLine = "MOVE " + transform(exprTokens.getString()) + " CORRESPONDING TO " + transform(target);
+// START KGU#395 2024-04-13: Enh. #357 Extracted to a separate method
+//					int posAsgn = tokens.indexOf("<-");
+//					// FIXME Somehow we must find out what data type is transferred... -> #800
+//					String varName = transform(Instruction.getAssignedVarname(tokens, false));
+//					StringList exprTokens = tokens.subSequence(posAsgn+1, tokens.count());
+//					boolean isVar = isVariable(exprTokens, true, typeMap);
+//					if (varNames.contains(varName)) {
+//						String target = Instruction.getAssignedVarname(tokens, true);
+//						TypeMapEntry varType = typeMap.get(varName);
+//						// FIXME This is all awful without syntax trees (#800)
+//						if (varType != null && (varType.isArray() || varType.isRecord())) {
+//							if (isVar) {
+//								transfLine = "MOVE " + transform(exprTokens.concatenate(null)) + " CORRESPONDING TO " + transform(target);
+//							}
+//							else if (exprTokens.contains("{") && exprTokens.contains("}")) {
+//								// Should be an initializer - so we will have to decompose it
+//								// The code below was basically copied from CGenerator
+//								int posBrace = exprTokens.indexOf("{");
+//								// FIXME This code is incomllete and not ready
+//								if (posBrace >= 0 && posBrace <= 1 && exprTokens.get(exprTokens.count()-1).equals("}")) {
+//									String transfExpr = null;
+//									if (posBrace == 1 && exprTokens.count() >= 3 && Function.testIdentifier(exprTokens.get(0), true, null)) {
+//										String typeName = exprTokens.get(0);							
+//										TypeMapEntry recType = this.typeMap.get(":"+typeName);
+//										if (recType != null && recType.isRecord()) {
+//											// transforms the Structorizer record initializer into a C-conform one
+//											transfExpr = this.transformRecordInit(exprTokens, recType);
+//										}
+//									}
+//									else if (posBrace == 0) {
+//										// Seems to be an array initializer so decompose it to singulary assignments
+//										/* (The alternative would have been to fake an initialized array declaration
+//										 * in the data section and to  
+//										 */
+//										StringList items = Element.splitExpressionList(exprTokens.subSequence(1, exprTokens.count()), ",", true);
+//										String elemType = null;
+//										if (varType.isArray()) {
+//											elemType = varType.getCanonicalType(true, false);
+//											if (elemType != null && elemType.startsWith("@")) {
+//												elemType = elemType.substring(1);
+//											}
+//											// START KGU #784 2019-12-02: varName is only part of the left side, there may be indices, so reduce the type if so
+//											int posIdx = tokens.indexOf(varName)+1;
+//											StringList indices = tokens.subSequence(posIdx, posAsgn);
+//											while (elemType.startsWith("@") && indices.indexOf("[") == 0) {
+//												elemType = elemType.substring(1);
+//												StringList indexList = Element.splitExpressionList(indices.subSequence(1, indices.count()), ",", true);
+//												indexList.remove(0); // Drop first index expression (has already been handled)
+//												// Are there perhaps more indices within the same bracket pair (comma-separated list)?
+//												while (indexList.count() > 1 && elemType.startsWith("@")) {
+//													indexList.remove(0);
+//													elemType = elemType.substring(1);
+//												}
+//												if (indexList.isEmpty()) {
+//													indices.clear();
+//												}
+//												else if (indexList.get(0).trim().startsWith("]")) {
+//													// This should be the tail
+//													indices = Element.splitLexically(indexList.get(0).substring(1), true);
+//												}
+//											}
+//											// END KGU #784 2019-12-02
+//										}
+//										transfExpr = this.transformOrGenerateArrayInit(line, items.subSequence(0, items.count()-1), _indent, isDisabled, elemType);
+//										if (transfExpr == null) {
+//											break;	// FIXME FIXME FIXME
+//										}
+//									}
+//								}
+//								
+//							}
+//						}
+//					}
+					lineDone = generateAssignment(tokens, _indent, isDisabled);
+// END KGU#395 2024-04-13
+				}
+				// START KGU#395 2024-04-13: Enh. #357
+				else if (Instruction.isOutput(tokens)) {
+					tokens.remove(0);
+					ArrayList<TokenList> exprs = Syntax.splitExpressionList(tokens, ",");
+					if (exprs.size() == 1 && exprs.get(0).isBlank()) {
+						addCode("DISPLAY \"\"", _indent, isDisabled);
+					}
+					else {
+						String varName = "out-" + Integer.toHexString(_inst.hashCode()) + "-";
+						for (int j = 0; j < exprs.size()-1; j++) {
+							tokens = exprs.get(j);
+							if (tokens.size() == 1) {
+								addCode("DISPLAY " + tokens.get(0), _indent, isDisabled);
 							}
-							else if (exprTokens.contains("{") && exprTokens.contains("}")) {
-								// Should be an initializer - so we will have to decompose it
-								// The code below was basically copied from CGenerator
-								int posBrace = exprTokens.indexOf("{");
-								// FIXME This code is incomplete and not ready
-								if (posBrace >= 0 && posBrace <= 1 && exprTokens.get(exprTokens.size()-1).equals("}")) {
-									String transfExpr = null;
-									if (posBrace == 1 && exprTokens.size() >= 3 && Syntax.isIdentifier(exprTokens.get(0), false, null)) {
-										String typeName = exprTokens.get(0);
-										TypeMapEntry recType = this.typeMap.get(":"+typeName);
-										if (recType != null && recType.isRecord()) {
-											// transforms the Structorizer record initializer into a C-conform one
-											transfExpr = this.transformRecordInit(exprTokens, recType);
-										}
-									}
-									else if (posBrace == 0) {
-										// Seems to be an array initializer so decompose it to singulary assignments
-										/* (The alternative would have been to fake an initialized array declaration
-										 * in the data section and to  
-										 */
-										ArrayList<TokenList> items = Syntax.splitExpressionList(exprTokens.subSequenceToEnd(1), ",");
-										String elemType = null;
-										if (varType.isArray()) {
-											elemType = varType.getCanonicalType(true, false);
-											if (elemType != null && elemType.startsWith("@")) {
-												elemType = elemType.substring(1);
-											}
-											// START KGU #784 2019-12-02: varName is only part of the left side, there may be indices, so reduce the type if so
-											int posIdx = tokens.indexOf(varName)+1;
-											TokenList indices = tokens.subSequence(posIdx, posAsgn);
-											while (elemType.startsWith("@") && indices.indexOf("[") == 0) {
-												elemType = elemType.substring(1);
-												StringList indexList = Syntax.splitExpressionList(indices.subSequenceToEnd(1).getString(), ",");
-												indexList.remove(0); // Drop first index expression (has already been handled)
-												// Are there perhaps more indices within the same bracket pair (comma-separated list)?
-												while (indexList.count() > 1 && elemType.startsWith("@")) {
-													indexList.remove(0);
-													elemType = elemType.substring(1);
-												}
-												if (indexList.isEmpty()) {
-													indices.clear();
-												}
-												else if (indexList.get(0).trim().startsWith("]")) {
-													// This should be the tail
-													indices = new TokenList(indexList.get(0).substring(1), true);
-												}
-											}
-											// END KGU #784 2019-12-02
-										}
-										items.remove(items.size()-1);	// Get rid of tail
-										// FIXME Still not implemented!
-										transfExpr = this.transformOrGenerateArrayInit(varName, items, _indent, isDisabled, elemType);
-										if (transfExpr == null) {
-											break;	// FIXME FIXME FIXME
-										}
-									}
-								}
-								
+							else {
+								// TODO insert a declaration if not done
+								TokenList asgnmt = new TokenList(tokens);
+								asgnmt.add(0, varName);
+								asgnmt.add(1, "<-");
+								generateAssignment(asgnmt, _indent, isDisabled);
+								addCode("DISPLAY " + varName, _indent, isDisabled);
 							}
 						}
 					}
+					lineDone = true;
 				}
+				// END KGU#395 2024-04-13
 				// TODO
-				addCode("INSTRUCTION STILL NOT IMPLEMENTED!", _indent, true);
+				if (!lineDone) {
+					addCode("INSTRUCTION STILL NOT IMPLEMENTED!", _indent, isDisabled);
+				}
 			}
 		}
 	}
+	
+	// START KGU#395 2024-04-14: Enh. #357 Extracted from generateCode(Instruction, String)
+	/**
+	 * Appends the COBOL code lines representing the variable assignment given
+	 * by the unified token list {@code tokens} and the original instruction
+	 * line {@code line}.
+	 * 
+	 * @param tokens - the unified token list of the given {@code line}
+	 * @param _indent - the current indentation as string
+	 * @param isDisabled - whether the underlying element is disabled
+	 */
+	private boolean generateAssignment(TokenList tokens, String _indent, boolean isDisabled)
+	{
+		int posAsgn = tokens.indexOf("<-");
+		String transfLine = transform(tokens.getString());
+		// FIXME Somehow we must find out what data type is transferred... -> #800
+		String varName = transform(Instruction.getAssignedVarname(tokens, false));
+		TokenList exprTokens = tokens.subSequenceToEnd(posAsgn+1);
+		boolean isVar = isVariable(exprTokens, true, typeMap);
+		if (varNames.contains(varName)) {
+			String target = Instruction.getAssignedVarname(tokens, true);
+			TypeMapEntry varType = typeMap.get(varName);
+			// FIXME This is all awful without syntax trees (#800)
+			if (varType != null && (varType.isArray() || varType.isRecord())) {
+				if (isVar) {
+					// FIXME Don't descend to string level
+					transfLine = "MOVE " + transform(exprTokens.getString()) + " CORRESPONDING TO " + transform(target);
+				}
+				else if (exprTokens.contains("{") && exprTokens.contains("}")) {
+					// Should be an initializer - so we will have to decompose it
+					// The code below was basically copied from CGenerator
+					int posBrace = exprTokens.indexOf("{");
+					// FIXME This code is incomplete and not ready
+					if (posBrace >= 0 && posBrace <= 1 && exprTokens.get(exprTokens.size()-1).equals("}")) {
+						String transfExpr = null;
+						if (posBrace == 1 && exprTokens.size() >= 3 && Syntax.isIdentifier(exprTokens.get(0), false, null)) {
+							String typeName = exprTokens.get(0);
+							TypeMapEntry recType = this.typeMap.get(":"+typeName);
+							if (recType != null && recType.isRecord()) {
+								// transforms the Structorizer record initializer into a C-conform one
+								transfExpr = this.transformRecordInit(exprTokens, recType);
+							}
+						}
+						else if (posBrace == 0) {
+							// Seems to be an array initializer so decompose it to singulary assignments
+							/* (The alternative would have been to fake an initialized array declaration
+							 * in the data section and to  
+							 */
+							ArrayList<TokenList> items = Syntax.splitExpressionList(exprTokens.subSequenceToEnd(1), ",");
+							String elemType = null;
+							if (varType.isArray()) {
+								elemType = varType.getCanonicalType(true, false);
+								if (elemType != null && elemType.startsWith("@")) {
+									elemType = elemType.substring(1);
+								}
+								// START KGU #784 2019-12-02: varName is only part of the left side, there may be indices, so reduce the type if so
+								int posIdx = tokens.indexOf(varName)+1;
+								TokenList indices = tokens.subSequence(posIdx, posAsgn);
+								while (elemType.startsWith("@") && indices.indexOf("[") == 0) {
+									elemType = elemType.substring(1);
+									StringList indexList = Syntax.splitExpressionList(indices.subSequenceToEnd(1).getString(), ",");
+									indexList.remove(0); // Drop first index expression (has already been handled)
+									// Are there perhaps more indices within the same bracket pair (comma-separated list)?
+									while (indexList.count() > 1 && elemType.startsWith("@")) {
+										indexList.remove(0);
+										elemType = elemType.substring(1);
+									}
+									if (indexList.isEmpty()) {
+										indices.clear();
+									}
+									else if (indexList.get(0).trim().startsWith("]")) {
+										// This should be the tail
+										indices = new TokenList(indexList.get(0).substring(1), true);
+									}
+								}
+								// END KGU #784 2019-12-02
+							}
+							items.remove(items.size()-1);	// Get rid of tail
+							// FIXME Still not implemented!
+							transfExpr = this.transformOrGenerateArrayInit(varName, items, _indent, isDisabled, elemType);
+							if (transfExpr == null) {
+								return false;	// FIXME FIXME FIXME
+							}
+						}
+					}
+					// TODO Compose transfLine
+				}
+			}
+			// FIXME The test should better/also analyse the expression structuer
+			else if (varType != null && varType.isNumeric()) {
+				String transfExpr = transform(exprTokens.getString()); 
+				transfLine = "COMPUTE " + transform(varName) + " = " + transfExpr;
+			}
+		}
+		addCode(transfLine, _indent, isDisabled);
+		return true;
+	}
+	// END KGU#395 2024-04-13
 	
 	/**
 	 * Either composes and returns a syntax-conform array initializer expression
 	 * (if possible and allowed) or directly generates code that decomposes an array
 	 * initializer into a series of element assignments if there is no compact
 	 * translation. In the latter case {@code null} will be returned.
-	 * 	 * 
+	 * 
 	 * @param _lValue - the target variable for the array initialisation
 	 * @param _arrayItems - list of the tokenized item expressions
 	 * @param _indent - the current indentation
@@ -945,7 +1076,8 @@ public class COBOLGenerator extends Generator {
 	}
 	/**
 	 * Returns a target-language expression replacing the Structorizer record
-	 * initializer - as far as it can be handled within one line
+	 * initializer - as far as it can be handled within one line, otherwise
+	 * directly appends it to the code.
 	 * 
 	 * @param exprTokens - the tokenized Structorizer record initializer
 	 * @param recType - the TypeMapEntry describing the record type
@@ -969,17 +1101,56 @@ public class COBOLGenerator extends Generator {
 		String condition = transform(_alt.getUnbrokenText().getLongString()).trim();
 		
 		// TODO: check for File API needs
-
-		addCode("IF " + condition, _indent, isDisabled);
-		addCode("THEN", _indent, isDisabled);
-		
-		generateCode(_alt.qTrue, _indent+this.getIndent());
-
-		if (_alt.qFalse.getSize() > 0) {
-			addCode("ELSE", _indent, isDisabled);
-			generateCode(_alt.qFalse, _indent+this.getIndent());
+		// START KGU#1145 2024-04-12: Issue #1148 treatment for ELSE-IF chains
+		final int EVAL_THRESHOLD = 2; // Min. number of else-if to prefer EVALUATE
+		int elseifCount = 0;
+		Alternative alt1 = _alt;
+		while (elseifCount < EVAL_THRESHOLD
+				&& alt1.qFalse.getSize() == 1
+				&& alt1.qFalse.getElement(0) instanceof Alternative) {
+			elseifCount++;
+			alt1 = (Alternative)alt1.qFalse.getElement(0);
 		}
-		addCode("END-IF", _indent, isDisabled);
+		if (elseifCount >= EVAL_THRESHOLD) {
+			addCode("EVAUATE TRUE", _indent, isDisabled);
+			addCode("WHEN " + condition, _indent, isDisabled);
+			generateCode(_alt.qTrue, _indent+this.getIndent());
+			Element ele = null;
+			// We must cater for the code mapping of the chained sub-alternatives
+			Stack<Element> processedAlts = new Stack<Element>();
+			Stack<Integer> storedLineNos = new Stack<Integer>();
+			while (_alt.qFalse.getSize() == 1
+					&& (ele = _alt.qFalse.getElement(0)) instanceof Alternative) {
+				_alt = (Alternative)ele;
+				// We must care for the code mapping explicitly here since we circumvent generateCode()
+				markElementStart(_alt, _indent, processedAlts, storedLineNos);
+				appendComment(_alt, _indent);
+				condition = transform(_alt.getUnbrokenText().getLongString()).trim();
+				addCode("WHEN " + condition, _indent, isDisabled);
+				generateCode(_alt.qTrue, _indent+this.getIndent());
+			}
+			if (_alt.qFalse.getSize() > 0) {
+				addCode("WHEN OTHER", _indent, isDisabled);
+				generateCode(_alt.qFalse, _indent+this.getIndent());
+			}
+			addCode("END-EVALUATE", _indent, isDisabled);
+			markElementEnds(processedAlts, storedLineNos);
+		}
+		else {
+		// END KGU#1145 2024-04-12
+			addCode("IF " + condition, _indent, isDisabled);
+			addCode("THEN", _indent, isDisabled);
+
+			generateCode(_alt.qTrue, _indent+this.getIndent());
+
+			if (_alt.qFalse.getSize() > 0) {
+				addCode("ELSE", _indent, isDisabled);
+				generateCode(_alt.qFalse, _indent+this.getIndent());
+			}
+			addCode("END-IF", _indent, isDisabled);
+		// START KGU#1145 2024-04-12: Issue #1148 treatment for ELSE-IF chains
+		}
+		// END KGU#1145 2024-04-12
 		// code.add(_indent+"");
 	}
 

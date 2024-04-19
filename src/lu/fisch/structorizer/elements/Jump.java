@@ -49,6 +49,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2019-03-18      Issue #56: New throw flavour implemented
  *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *      Kay Gürtzig     2021-11-17      Bugfix #1021: Keyword detection didn't work if they were not single tokens
+ *      Kay Gürtzig     2024-04-16      Bugfix #1160: Separate X and Y text offset for drawing rotated elements
  *
  ******************************************************************************************************
  *
@@ -168,15 +169,25 @@ public class Jump extends Instruction {
 	// END KGU#199 2016-07-07	
 	
 	// START KGU#227 2016-07-30: Enh. #128
-	/**
-	 * Provides a subclassable left offset for drawing the text
-	 */
-	protected int getTextDrawingOffset()
+	// START KGU#1150 2024-04-16: Bugfix #1160 consider rotation
+	//protected int getTextDrawingOffset()
+	//{
+	//	return (Element.E_PADDING/2);
+	//}
+	@Override
+	protected int getTextDrawingOffsetX()
 	{
-		return (Element.E_PADDING/2);
+		return rotated ? 0 : (Element.E_PADDING/2);
 	}
+	@Override
+	protected int getTextDrawingOffsetY()
+	{
+		return rotated ? (Element.E_PADDING/2) : 0;
+	}
+	// END KGU#1150 2024-04-16
 	// END KGU#227 2016-07-30
 
+	@Override
 	public Rect prepareDraw(Canvas _canvas)
 	{
 		// START KGU#136 2016-03-01: Bugfix #97 (prepared)
@@ -185,11 +196,20 @@ public class Jump extends Instruction {
 
 		// START KGU#227 2016-07-30: Enh. #128 - on this occasion, we just enlarge the instruction rect width
 		super.prepareDraw(_canvas);
-		rect0.right += (E_PADDING/2);		
+		// START KGU#1150 2024-04-16: Bugfix #1160 Consider rotation
+		//rect0.right += (E_PADDING/2);
+		if (rotated) {
+			rect0.bottom += (E_PADDING/2);
+		}
+		else {
+			rect0.right += (E_PADDING/2);
+		}
+		// END KGU#1150 2024-04-16
 		// END KGU#227 2016-07-30
 		return rect0;
 	}
 	
+	@Override
 	public void draw(Canvas _canvas, Rect _top_left, Rectangle _viewport, boolean _inContention)
 	{
 		// START KGU#502/KGU#524/KGU#553 2019-03-13: New approach to reduce drawing contention
@@ -235,6 +255,7 @@ public class Jump extends Instruction {
 	}
 	// END KGU#535 2018-06-28
 
+	@Override
 	public Element copy()
 	{
 		Element ele = new Jump(new StringList(this.getText()));
@@ -555,6 +576,7 @@ public class Jump extends Instruction {
 	/* (non-Javadoc)
 	 * @see lu.fisch.structorizer.elements.Element#mayPassControl()
 	 */
+	@Override
 	public boolean mayPassControl()
 	{
 		// This may only pass control if being disabled
@@ -567,6 +589,7 @@ public class Jump extends Instruction {
 	 * @return {@code false} since a Jump can never be declaratory.
 	 * @see #isMereDeclaration(String) 
 	 */
+	@Override
 	public boolean isMereDeclaratory()
 	{
 		return false;
