@@ -314,8 +314,11 @@ public class Jump extends Instruction {
 	 */
 	public static boolean isReturn(TokenList tokens)
 	{
-		TokenList keyTokens = Syntax.getSplitKeyword("preReturn");
-		return (tokens.indexOf(keyTokens, 0, !Syntax.ignoreCase) == 0);
+		// START KGU#1097 2024-04-19: Issue #800 modified internal keyword representation
+		//TokenList keyTokens = Syntax.getSplitKeyword("preReturn");
+		//return (tokens.indexOf(keyTokens, 0, !Syntax.ignoreCase) == 0);
+		return tokens.indexOf(Syntax.key2token("preReturn")) == 0;
+		// END KGU#1097 2024-04-19
 	}
 	/**
 	 * Checks whether this element contains a return statement
@@ -352,8 +355,11 @@ public class Jump extends Instruction {
 	 */
 	public static boolean isLeave(TokenList tokens)
 	{
-		TokenList keyTokens = Syntax.getSplitKeyword("preLeave");
-		return (tokens.indexOf(keyTokens, 0, !Syntax.ignoreCase) == 0);
+		// START KGU#1097 2024-04-19: Issue #800 modified internal keyword representation
+		//TokenList keyTokens = Syntax.getSplitKeyword("preLeave");
+		//return (tokens.indexOf(keyTokens, 0, !Syntax.ignoreCase) == 0);
+		return tokens.indexOf(Syntax.key2token("preLeave")) == 0;
+		// END KGU#1097 2024-04-19
 	}
 	/**
 	 * Checks whether this element contains a leave statement.
@@ -392,8 +398,11 @@ public class Jump extends Instruction {
 	 */
 	public static boolean isExit(TokenList tokens)
 	{
-		TokenList keyTokens = Syntax.getSplitKeyword("preExit");
-		return (tokens.indexOf(keyTokens, 0, !Syntax.ignoreCase) == 0);
+		// START KGU#1097 2024-04-19: Issue #800 modified internal keyword representation
+		//TokenList keyTokens = Syntax.getSplitKeyword("preExit");
+		//return (tokens.indexOf(keyTokens, 0, !Syntax.ignoreCase) == 0);
+		return tokens.indexOf(Syntax.key2token("preExit")) == 0;
+		// END KGU#1097 2024-04-19
 	}
 	/**
 	 * Checks whether this element contains an exit statement
@@ -435,8 +444,11 @@ public class Jump extends Instruction {
 	 */
 	public static boolean isThrow(TokenList tokens)
 	{
-		TokenList keyTokens = Syntax.getSplitKeyword("preThrow");
-		return (tokens.indexOf(keyTokens, 0, !Syntax.ignoreCase) == 0);
+		// START KGU#1097 2024-04-19: Issue #800 modified internal keyword representation
+		//TokenList keyTokens = Syntax.getSplitKeyword("preThrow");
+		//return (tokens.indexOf(keyTokens, 0, !Syntax.ignoreCase) == 0);
+		return tokens.indexOf(Syntax.key2token("preThrow")) == 0;
+		// END KGU#1097 2024-04-19
 	}
 	/**
 	 * Checks whether this element contains a throw statement

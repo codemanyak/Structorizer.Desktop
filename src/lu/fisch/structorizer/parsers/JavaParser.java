@@ -77,6 +77,7 @@ package lu.fisch.structorizer.parsers;
  *                                      bugfix #1159/2: Correct handling of labelled break instructions.
  *                                      bugfix #1159/3: Heuristic approach to manage embedded breaks in CASE branches
  *      Kay Gürtzig     2024-04-18      Bugfix #1159.3: Approach to resolve certain cases of conditional switch breaks
+ *      Kay Gürtzig     2024-04-19      Issue #800: Methods isLeave(), isReturn(), isExit(), isThrow() adapted
  *
  ******************************************************************************************************
  *

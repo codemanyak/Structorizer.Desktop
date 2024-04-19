@@ -837,7 +837,7 @@ public class C99Parser extends CPreParser
 					ruleId == RuleConstants.PROD_JUMPSTMT_BREAK_SEMI
 					)
 			{
-				String content = Syntax.getKeyword("preLeave");
+				String content = Syntax.key2token("preLeave");
 				// START KGU#1153 2024-04-17: Bugfix #1163 check context
 				//_parentNode.addElement(this.equipWithSourceComment(new Jump(content.trim()), _reduction));
 				Jump leave = new Jump(content.trim());
@@ -866,7 +866,7 @@ public class C99Parser extends CPreParser
 					ruleId == RuleConstants.PROD_JUMPSTMT_RETURN_SEMI
 					)
 			{
-				String content = Syntax.getKeyword("preReturn");
+				String content = Syntax.key2token("preReturn");
 				Reduction exprRed = _reduction.get(1).asReduction();
 				if (exprRed.getParent().getTableIndex() != RuleConstants.PROD_EXPROPT2) { 
 					content += " " + translateContent(getContent_R(exprRed, ""));
