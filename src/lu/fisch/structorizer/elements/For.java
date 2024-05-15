@@ -39,7 +39,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2015-10-12      Comment drawing centralized and breakpoint mechanism prepared.
  *      Kay Gürtzig     2015-11-04      New mechanism to split and compose the FOR clause into/from dedicated fields
  *      Kay Gürtzig     2015-11-14      Bugfixes (#28 = KGU#80 and #31 = KGU#82) in Method copy
- *      Kay Gürtzig     2015-11-30      Inheritance changed: implements ILoop
+ *      Kay Gürtzig     2015-11-30      Inheritance changed: implements Loop
  *      Kay Gürtzig     2015-12-01      Bugfix #39 (=KGU#91) -> getText(false), prepareDraw() optimised
  *      Kay Gürtzig     2016-01-02      Bugfix #78 (KGU#119): New method equals(Element)
  *      Kay Gürtzig     2016-01-03      Bugfix #87 (KGU#121): Correction in getElementByCoord(), getIcon()
@@ -73,6 +73,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2021-10-09      Bugfix #997: Inconsistent blank handling between forms and text
  *      Kay Gürtzig     2022-08-15      Bugfix #997: Collateral damage of previous bugfix version mended.
  *      Kay Gürtzig     2023-11-07      Issue #800 Method getValueListItems() fundamentally revised
+ *      Kay Gürtzig     2024-04-22      Inheritance modified (instead of implementing ILoop now extends Loop)
  *
  ******************************************************************************************************
  *
@@ -106,7 +107,7 @@ import lu.fisch.utils.*;
  * 
  * @author Bob Fisch
  */
-public class For extends Element implements ILoop {
+public class For extends Loop {
 
 	// START KGU#61 2016-03-20: Enh. #84/#135
 	public enum ForLoopStyle {
@@ -115,15 +116,6 @@ public class For extends Element implements ILoop {
 		TRAVERSAL
 	}
 	// END KGU#61 2016-03-26
-
-	public Subqueue q = new Subqueue();
-	
-	// START KGU#136 2016-02-27: Bugfix #97 - replaced by local variable in prepareDraw()
-	//private Rect r = new Rect();
-	// END KGU#136 2016-02-27
-	// START KGU#136 2016-03-01: Bugfix #97
-	private Point pt0Body = new Point(0,0);
-	// END KGU#136 2016-03-01
 
 	// START KGU#258 2016-09-26: Enh. #253
 	private static final String[] relevantParserKeysCount = {"^preFor", "*postFor", "*stepFor"};
@@ -159,35 +151,44 @@ public class For extends Element implements ILoop {
 	public For()
 	{
 		super();
-		q.parent=this;
 	}
 
 	/**
-	 * This constructor version is intended to be used by the code import. It automatically
-	 * fills in the dedicated parameter fields by analysing the passed-in header string _string. 
+	 * This constructor version is intended to be used by the code import. It
+	 * automatically fills in the dedicated parameter fields by analysing the
+	 * passed-in header string {@code _string}.
+	 * 
 	 * @param _string - the header string
+	 * 
+	 * @see #For(StringList)
+	 * @see #For(String, String)
+	 * @see #For(String, String, String, int)
 	 */
 	public For(String _string)
 	{
 		super(_string);
-		q.parent=this;
-		setText(_string);
+		//setText(_string);
 		// START KGU#192 2016-05-02: Bugfix #184 - Support for code import (Pascal)
 		this.updateFromForClause();
 		// END KGU#192 2016-05-02
 	}
 	
 	/**
-	 * This is a more low-level constructor e.g. to be used on copying. It simply adopts
-	 * the given StringList _strings as text content and does NOT attempt to fill in the
-	 * FOR-loop-specific parameter fields (this is supposed to be done explicitly afterwards)
-	 * @param _strings
+	 * This is a more low-level constructor e.g. to be used on copying. It simply
+	 * adopts the given StringList {@code _strings} as text content and does <b>NOT</b>
+	 * attempt to fill in the FOR-loop-specific parameter fields (this is supposed
+	 * to be done explicitly afterwards).
+	 * 
+	 * @param _strings - the header as {@link StringList}
+	 * 
+	 * @see #For(String)
+	 * @see #For(String, String)
+	 * @see #For(String, String, String, int)
 	 */
 	public For(StringList _strings)
 	{
 		super(_strings);
-		q.parent=this;
-		setText(_strings);
+		//setText(_strings);
 	}
 	
 	// START KGU#354 2017-04-30: Enh. #354 Further facilitation of import
@@ -451,7 +452,7 @@ public class For extends Element implements ILoop {
 	public boolean combineRuntimeData(Element _cloneOfMine)
 	{
 		return super.combineRuntimeData(_cloneOfMine) &&
-				this.getBody().combineRuntimeData(((ILoop)_cloneOfMine).getBody());
+				this.getBody().combineRuntimeData(((Loop)_cloneOfMine).getBody());
 	}
 	// END KGU#117 2016-03-07
 
@@ -844,13 +845,17 @@ public class For extends Element implements ILoop {
 	{
 		// START KGU#453 2017-11-02: Issue #447 - eliminate line continuation backslashes 
 		//return splitForClause(this.getText().getText());
-		return splitForClause(this.getUnbrokenText().getLongString());
+		// START KGU#790 2024-04-22: Issue #800
+		//return splitForClause(this.getUnbrokenText().getLongString());
+		return splitForClause(TokenList.concatenate(this.getUnbrokenTokenText(), " "));
+		// END KGU#790 2024-04-22
 		// END KGU#453 2017-11-02
 	}
 	
 	/**
-	 * Splits a potential FOR clause (after operator unification, see unifyOperators for details)
-	 * into an array consisting of six strings meant to have following meaning:<br/>
+	 * Splits a potential FOR clause (after operator unification, see unifyOperators
+	 * for details) into an array consisting of six strings meant to have following
+	 * meaning:<br/>
 	 * 0. counter variable name<br/>
 	 * 1. expression representing the initial value<br/>
 	 * 2. expression representing the final value<br/>
@@ -875,15 +880,36 @@ public class For extends Element implements ILoop {
 		TokenList tokens = disambiguateForClause(_text);		
 		//System.out.println("Disambiguated For clause: \"" + _intermediate + "\"");
 		
-		tokens.replaceAll("\n", " "); // Concatenate the lines
-		int posFor = tokens.indexOf(forSeparatorPre);
+	// START KGU#790 2024-04-22: Issue #800
+		return splitForClause(tokens);
+	}
+	
+	/**
+	 * Splits a potential FOR clause (after operator unification, see unifyOperators
+	 * for details) and keyowrd encoding into an array consisting of six strings meant
+	 * to have following meaning:<br/>
+	 * 0. counter variable name<br/>
+	 * 1. expression representing the initial value<br/>
+	 * 2. expression representing the final value<br/>
+	 * 3. Integer literal representing the increment value ("1" if the substring can't be parsed)<br/>
+	 * 4. Substring for increment section as found on splitting (no integer coercion done)<br/>
+	 * 5. Substring representing the set of values to be traversed (FOR-IN loop) or null<br/>
+	 * 
+	 * @param _tokens - the tokenized FOR clause to be split with keyword tokens;
+	 * @return String array consisting of the four parts explained above. Some parts might be
+	 *     {@code null}, though!
+	 */
+	private static String[] splitForClause(TokenList _tokens) {
+	// END KGU#790 2024-04-22
+		_tokens.replaceAll("\n", " "); // Concatenate the lines
+		int posFor = _tokens.indexOf(forSeparatorPre);
 		//int lenFor = forSeparatorPre.length();
-		int posTo = tokens.indexOf(forSeparatorTo);
+		int posTo = _tokens.indexOf(forSeparatorTo);
 		//int lenTo = forSeparatorTo.length();
-		int posBy = tokens.indexOf(forSeparatorBy);
+		int posBy = _tokens.indexOf(forSeparatorBy);
 		//int lenBy = forSeparatorBy.length();
-		int posForIn = tokens.indexOf(forInSeparatorPre);
-		int posIn = tokens.indexOf(forInSeparatorIn);
+		int posForIn = _tokens.indexOf(forInSeparatorPre);
+		int posIn = _tokens.indexOf(forInSeparatorIn);
 		// START KGU#61 2016-03-20: Enh. #84/#135 - must go different ways now
 		// If both forInSeparatorIn and forSeparatorTo occur then a traditional loop is assumed
 		// START KGU#61 2016-09-23: Enh. #250  More criteria combinations (if for and forin keywords are equal then
@@ -894,15 +920,15 @@ public class For extends Element implements ILoop {
 		//}
 		if (posFor < 0 && posForIn < 0)
 		{
-			posFor = posForIn = tokens.indexOf(commonSeparatorPre);
+			posFor = posForIn = _tokens.indexOf(commonSeparatorPre);
 		}
 		if (posIn > 0 && posTo < 0 || posIn > 0 && posForIn >= 0 || posForIn >= 0 && posTo < 0)
 		{
-			return splitForTraversal(tokens, posForIn, posIn);
+			return splitForTraversal(_tokens, posForIn, posIn);
 		}
 		// END KGU#61 2016-09-23
 		else {
-			return splitForCounter(tokens, posFor, posTo, posBy);
+			return splitForCounter(_tokens, posFor, posTo, posBy);
 		}
 		// END KGU#61 2016-03-20
 	}
@@ -1203,16 +1229,16 @@ public class For extends Element implements ILoop {
 	}
 	// END KGU#61 2016-03-20
 
-	// START KGU 2015-11-30
-	@Override
-	public Subqueue getBody() {
-		return this.q;
-	}
-	// END KGU 2015-11-30
-	@Override
-	public Element getLoop() {
-		return this;
-	}
+//	// START KGU 2015-11-30
+//	@Override
+//	public Subqueue getBody() {
+//		return this.q;
+//	}
+//	// END KGU 2015-11-30
+//	@Override
+//	public Element getLoop() {
+//		return this;
+//	}
 
 	
 //    public static void main(String[] args)

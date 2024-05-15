@@ -100,10 +100,6 @@ public class Case extends Element implements IFork
 	
     public Vector<Subqueue> qs = new Vector<Subqueue>();
     
-    // START KGU#453 2017-11-01: Issue #447 - cope with line continuation
-    private static final String SOFT_LINE_BREAK = "\u00B6";
-    // END KGU#453 2017-11-01
-
     //private Rect r = new Rect();
     private int fullWidth = 0;
     // START KGU#136 2016-03-01: Bugfix #97 - cache the upper left corners of all branches
@@ -301,7 +297,7 @@ public class Case extends Element implements IFork
             StringList discrLines = new StringList();
             if (nBranches > 0)
             {
-                if (getText().get(nBranches).equals("%")) nBranches--;
+                if (text.get(nBranches).equals("%")) nBranches--;
                 // START KGU#453 2017-11-01: Issue #447 - cope with line continuation (end-standing backslashes)
                 //discrLines.add(getText().get(0));
                 discrLines = StringList.explode(brokenText.get(0), SOFT_LINE_BREAK);

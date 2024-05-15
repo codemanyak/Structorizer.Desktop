@@ -252,11 +252,11 @@ public class NSDParser extends DefaultHandler {
 			StringList text = new StringList();
 			if (attributes.getIndex("text")!=-1) {
 				text.setCommaText(attributes.getValue("text"), true);
-				root.setText(text);
+				root.setText(text.copy());
 			}
 			if (attributes.getIndex("comment")!=-1) {
 				text.setCommaText(attributes.getValue("comment"), true);
-				root.setComment(text);
+				root.setComment(text.copy());
 			}
 			// START KGU#376 2017-06-30: Enh. #389: Includable now directly managed by Root
 			if (attributes.getIndex("includeList") != -1) {
@@ -411,7 +411,7 @@ public class NSDParser extends DefaultHandler {
 			// END KGU#258 2016-09-25
 			
 			// set children
-			ele.q.setColor(ele.getColor());
+			ele.getBody().setColor(ele.getColor());
 			
 			// place stack
 			lastE = ele;
@@ -533,7 +533,7 @@ public class NSDParser extends DefaultHandler {
 			// END KGU#3 2015-11-08
 			
 			// set children
-			ele.q.setColor(ele.getColor());
+			ele.getBody().setColor(ele.getColor());
 			
 			// place stack
 			lastE = ele;
@@ -551,7 +551,7 @@ public class NSDParser extends DefaultHandler {
 			// Enh. #253: In a Forever loop, there isn't anything to refactor
 
 			// set children
-			ele.q.setColor(ele.getColor());
+			ele.getBody().setColor(ele.getColor());
 			
 			// place stack
 			lastE = ele;
@@ -574,7 +574,7 @@ public class NSDParser extends DefaultHandler {
 			// END KGU#258 2016-09-25
 			
 			// set children
-			ele.q.setColor(ele.getColor());
+			ele.getBody().setColor(ele.getColor());
 			
 			// place stack
 			lastE = ele;
@@ -711,7 +711,7 @@ public class NSDParser extends DefaultHandler {
 		else if (qualifiedName.equals("qFor"))
 		{
 			// handle stacks
-			lastQ = ((For) lastE).q;
+			lastQ = ((For) lastE).getBody();
 			// START KGU 2106-12-21: Bugfix #317
 			if (attributes.getIndex("color") != -1 && !attributes.getValue("color").equals("")) {
 				lastQ.setColor(Color.decode("0x" + attributes.getValue("color")));
@@ -722,7 +722,7 @@ public class NSDParser extends DefaultHandler {
 		else if (qualifiedName.equals("qForever"))
 		{
 			// handle stacks
-			lastQ = ((Forever) lastE).q;
+			lastQ = ((Forever) lastE).getBody();
 			// START KGU 2106-12-21: Bugfix #317
 			if (attributes.getIndex("color") != -1 && !attributes.getValue("color").equals("")) {
 				lastQ.setColor(Color.decode("0x" + attributes.getValue("color")));
@@ -733,7 +733,7 @@ public class NSDParser extends DefaultHandler {
 		else if (qualifiedName.equals("qWhile"))
 		{
 			// handle stacks
-			lastQ = ((While) lastE).q;
+			lastQ = ((While) lastE).getBody();
 			// START KGU 2106-12-21: Bugfix #317
 			if (attributes.getIndex("color") != -1 && !attributes.getValue("color").equals("")) {
 				lastQ.setColor(Color.decode("0x" + attributes.getValue("color")));
@@ -744,7 +744,7 @@ public class NSDParser extends DefaultHandler {
 		else if (qualifiedName.equals("qRepeat"))
 		{
 			// handle stacks
-			lastQ = ((Repeat) lastE).q;
+			lastQ = ((Repeat) lastE).getBody();
 			// START KGU 2106-12-21: Bugfix #317
 			if (attributes.getIndex("color") != -1 && !attributes.getValue("color").equals("")) {
 				lastQ.setColor(Color.decode("0x" + attributes.getValue("color")));
@@ -805,11 +805,11 @@ public class NSDParser extends DefaultHandler {
 		StringList text = new StringList();
 		if (attributes.getIndex("text") != -1) {
 			text.setCommaText(attributes.getValue("text"), true);
-			ele.setText(text);
+			ele.setText(text.copy());
 		}
 		if (attributes.getIndex("comment") != -1) {
 			text.setCommaText(attributes.getValue("comment"), true);
-			ele.setComment(text);
+			ele.setComment(text.copy());
 		}
 		if (attributes.getIndex("color") != -1 && !attributes.getValue("color").equals("")) {
 			ele.setColor(Color.decode("0x" + attributes.getValue("color")));

@@ -990,10 +990,11 @@ public class StringList {
 	}
 
 	/**
-	 * Replaces the current content by the sequence of text lines {@code _text}
-	 * is consisting of. If {@code _text} does not contain newline characters then
-	 * a this will contain {@code _text} as single element. Note that trailing empty
-	 * lines will be cut off.
+	 * Overwrites the content by the list of all strings resulting from splitting
+	 * {@code _text} into separate lines (at all contained newline characters).
+	 * If {@code _text} does not contain newline characters then this will contain
+	 * {@code _text} as single element. Note that trailing empty lines will be
+	 * cut off.
 	 *
 	 * @param _text - the text to be adopted as line sequence
 	 *

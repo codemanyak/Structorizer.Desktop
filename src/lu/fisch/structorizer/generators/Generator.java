@@ -213,7 +213,7 @@ import lu.fisch.structorizer.elements.Element;
 import lu.fisch.structorizer.elements.For;
 import lu.fisch.structorizer.elements.Forever;
 import lu.fisch.structorizer.elements.IElementVisitor;
-import lu.fisch.structorizer.elements.ILoop;
+import lu.fisch.structorizer.elements.Loop;
 import lu.fisch.structorizer.elements.Instruction;
 import lu.fisch.structorizer.elements.Jump;
 import lu.fisch.structorizer.elements.Parallel;
@@ -2342,7 +2342,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 //				Element parent = elem.parent;
 //				while (parent != null && !(parent instanceof Parallel) && levelsUp > 0)
 //				{
-//					if (parent instanceof ILoop)
+//					if (parent instanceof Loop)
 //					{
 //						if (--levelsUp == 0 && !simpleBreak)	// Target reached?
 //						{
@@ -2426,9 +2426,9 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 				}
 				if (willReturn) surelyReturns = true;
 			}
-			else if (elem instanceof ILoop)	// While, Repeat, For, Forever
+			else if (elem instanceof Loop)	// While, Repeat, For, Forever
 			{
-				if (mapJumps(((ILoop)elem).getBody())) surelyReturns = true;
+				if (mapJumps(((Loop)elem).getBody())) surelyReturns = true;
 			}
 			else if (elem instanceof Parallel)
 			{
@@ -3184,7 +3184,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	protected void generateCode(For _for, String _indent)
 	{
 		// code.add(_indent+"");
-		generateCode(_for.q, _indent + this.getIndent());
+		generateCode(_for.getBody(), _indent + this.getIndent());
 		// code.add(_indent+"");
 	}
 
@@ -3216,7 +3216,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	protected void generateCode(While _while, String _indent)
 	{
 		// code.add(_indent+"");
-		generateCode(_while.q, _indent + this.getIndent());
+		generateCode(_while.getBody(), _indent + this.getIndent());
 		// code.add(_indent+"");
 	}
 
@@ -3248,7 +3248,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	protected void generateCode(Repeat _repeat, String _indent)
 	{
 		// code.add(_indent+"");
-		generateCode(_repeat.q, _indent + this.getIndent());
+		generateCode(_repeat.getBody(), _indent + this.getIndent());
 		// code.add(_indent+"");
 	}
 
@@ -3280,7 +3280,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	protected void generateCode(Forever _forever, String _indent)
 	{
 		// code.add(_indent+"");
-		generateCode(_forever.q, _indent + this.getIndent());
+		generateCode(_forever.getBody(), _indent + this.getIndent());
 		// code.add(_indent+"");
 	}
 	

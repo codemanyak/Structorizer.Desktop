@@ -264,6 +264,8 @@ import java.util.logging.Logger;
 
 import javax.swing.ImageIcon;
 
+import org.freehep.graphicsio.emf.gdi.Text;
+
 /**
  * Abstract parent class for all kinds of elements of Nassi-Shneiderman diagrams,
  * i.e., the basic algorithmic structure blocks.
@@ -642,6 +644,10 @@ public abstract class Element {
 	public static boolean useInputBoxCase = true;
 	// END KGU#916 2021-01-25
 	
+	// START KGU#453 2017-11-01: Issue #447 - cope with line continuation
+	protected static final String SOFT_LINE_BREAK = "\u00B6";
+	// END KGU#453 2017-11-01
+
 	// START KGU#906 2021-01-02: Enh. #905 Draw markers on elements with related Analyser reports
 	/** Defines the bit number of the canvas flag for drawing Analyser markers or not */
 	protected static final int CANVAS_FLAGNO_ERROR_CHECK = 0;
@@ -1109,8 +1115,11 @@ public abstract class Element {
 	// END KGU#227 2016-07-30
 
 	/**
-	 * Splits the given string {@code _text} into lines and assigns them as new text.
-	 * @param _text - the (possibly multi-line) new text as single string
+	 * Overwrites the text by the list of all strings resulting from splitting
+	 * {@code _text} into separate lines (at all contained newline characters).
+	 * Subclasses may override this with more complex behaviour.
+	 * 
+	 * @param _text - the source string (will be split by '\n')
 	 */
 	public void setText(String _text)
 	{
@@ -1125,8 +1134,11 @@ public abstract class Element {
 	}
 
 	/**
-	 * Adopts the given StringList {@code _text} as is for the text.
-	 * @param _text - the new text (<b>this will just be assigned, not copied!</b>)
+	 * Just overwrites the text StringList by the given {@link StringList}
+	 * {@code _text}
+	 * 
+	 * @param _text - the new content as {@link StringList}, will be assigned
+	 *    as is, unless subclasses override it with more complex behaviour.
 	 */
 	public void setText(StringList _text)
 	{
@@ -1137,8 +1149,8 @@ public abstract class Element {
 
 	// START KGU#91 2015-12-01: We need a way to get the true value
 	/**
-	 * Returns the (decoded) content of the text field no matter if mode {@link #isSwitchTextCommentMode()}
-	 * is active.<br/>
+	 * Returns the (decoded) content of the text field no matter if mode
+	 * {@link #isSwitchTextCommentMode()} is active or not.<br/>
 	 * Use {@code getText(false)} for a mode-sensitive effect.<br/>
 	 * <b>NOTE:</b> This is no longer a reference to the internal text representation
 	 * but a reconstructed copy.
@@ -1181,7 +1193,7 @@ public abstract class Element {
 		}
 	}
 
-	// START KGU#453 2017-11-01: Bugfix #447 - we need a cute representation of broken lines in some cases
+	//START KGU#453 2017-11-01: Bugfix #447 - we need a cute representation of broken lines in some cases
 	/**
 	 * Returns the content of the text field no matter if mode {@code isSwitchedTextAndComment}
 	 * is active.<br/>
@@ -1716,7 +1728,7 @@ public abstract class Element {
 			return comment;
 		}
 	}
-	
+
 	/* START KGU#172 2016-04-01: Issue #145: Make it easier to obtain this information,
 	 * 2019-03-16 made static, 2020-12-15 made public */
 	/**

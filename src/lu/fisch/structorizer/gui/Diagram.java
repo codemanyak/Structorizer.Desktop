@@ -4136,8 +4136,8 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 				if (data.result == true) {
 					// START KGU#480 2018-01-21: Enh. #490 we have to replace DiagramController aliases by the original names
 					//Element ele = new Instruction(data.text.getText());
-					String text = Element.replaceControllerAliases(data.text.getText(), false, false);
-					Element ele = new Instruction(text);
+					// START KGU#470 2024-04-23: Issue #800
+					Element ele = new Instruction(Element.replaceControllerAliases(data.text.getText(), false, false));
 					// END KGU#480 2018-01-21
 					// START #1097 2023-11-09: Issue #800 Now replace the user-defined keys
 					ele.encodeKeywords(null, Syntax.ignoreCase);
@@ -5611,9 +5611,8 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 			whileLoop.toggleBreakpoint();
 		}
 		whileLoop.setBreakTriggerCount(forLoop.getBreakTriggerCount());
-		whileLoop.q = forLoop.getBody();
-		whileLoop.q.parent = whileLoop;
-		whileLoop.q.addElement(elements[2]);
+		whileLoop.setBody(forLoop.getBody());
+		whileLoop.getBody().addElement(elements[2]);
 		whileLoop.setCollapsed(forLoop.isCollapsed(true));
 		for (int i = 0; i < elements.length; i++) {
 			Element elem = elements[i];
@@ -5687,10 +5686,11 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		}
 
 		int nAlts = 0;	// number of alternatives created so far
-		for (int lineNo = 1; lineNo < caseElem.getText().count(); lineNo++) {
-			String line = caseElem.getText().get(lineNo);
+		StringList unbroken = caseElem.getUnbrokenText();
+		for (int lineNo = 1; lineNo < unbroken.count(); lineNo++) {
+			String line = unbroken.get(lineNo);
 			// Specific handling of the last branch
-			if (lineNo == caseElem.getText().count() - 1) {
+			if (lineNo == unbroken.count() - 1) {
 				// In case it's a "%", nothing is to be added, otherwise the last
 				// branch is to be the else path of the innermost alternative
 				if (!line.equals("%")) {
@@ -10736,11 +10736,11 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 				break;
 			case CMD_DOWN:
 				// START KGU#495 2018-02-15: Bugfix #511 - we must never dive into collapsed loops!
-				//if (selected instanceof ILoop && !(selected instanceof Repeat))
-				if (selected instanceof ILoop && !selected.isCollapsed(false) && !(selected instanceof Repeat))
+				//if (selected instanceof Loop && !(selected instanceof Repeat))
+				if (selected instanceof Loop && !selected.isCollapsed(false) && !(selected instanceof Repeat))
 				// END KGU#495 2018-02-15
 				{
-					Subqueue body = ((ILoop) selected).getBody();
+					Subqueue body = ((Loop) selected).getBody();
 					y = body.getRectOffDrawPoint().top + 2;
 				}
 				// START KGU#346 2017-02-08: Issue #198 - Unification of forking elements
@@ -10797,11 +10797,11 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 				break;
 			case CMD_RIGHT:
 				// START KGU#495 2018-02-15: Bugfix #511 - we must never dive into collapsed loops!
-				//if (selected instanceof ILoop)
-				if (selected instanceof ILoop && !selected.isCollapsed(false))
+				//if (selected instanceof Loop)
+				if (selected instanceof Loop && !selected.isCollapsed(false))
 				// END KGU#495 2018-02-15
 				{
-					Rect bodyRect = ((ILoop) selected).getBody().getRectOffDrawPoint();
+					Rect bodyRect = ((Loop) selected).getBody().getRectOffDrawPoint();
 					x = bodyRect.left + 2;
 					// The central element of the subqueue isn't the worst choice because from
 					// here the distances are minimal. The top element, on the other hand,
@@ -10848,7 +10848,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 				else if (_direction == Editor.CursorMoveDirection.CMD_UP
 						&& (newSel instanceof Forever || !Element.E_DIN && newSel instanceof For)
 						&& newSel.getRectOffDrawPoint().bottom < selRect.bottom) {
-					Subqueue body = ((ILoop) newSel).getBody();
+					Subqueue body = ((Loop) newSel).getBody();
 					Element sel = root.getElementByCoord(x, body.getRectOffDrawPoint().bottom - 2, true);
 					if (sel != null) {
 						newSel = sel;

@@ -937,7 +937,7 @@ public class Instruction extends Element {
 	 */
 	public static boolean isOutput(TokenList tokens)
 	{
-		return (tokens.indexOf(Syntax.getKeyword("output"), !Syntax.ignoreCase) == 0);
+		return (tokens.indexOf(Syntax.key2token("output"), !Syntax.ignoreCase) == 0);
 	}
 	/**
 	 * @return true if at least one of the instruction lines of {@code this} complies
@@ -1011,7 +1011,7 @@ public class Instruction extends Element {
 		// START KGU#1097 2024-01-22: Issue #800 expect internal keys now
 		//TokenList keyTokens = Syntax.getSplitKeyword("input");
 		//if (tokens.indexOf(keyTokens, 0, !Syntax.ignoreCase) == 0) {
-		if (tokens.indexOf("§INPUT§") == 0) {
+		if (tokens.indexOf(Syntax.key2token("input")) == 0) {
 		// END KGU#1097 2024-01-22
 			// It is an input instruction
 			inputItems = new StringList();

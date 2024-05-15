@@ -325,7 +325,7 @@ public class XmlGenerator extends Generator
 		//code.add(_indent+this.getIndent()+"<qFor>");
 		//generateCode(_for.q,_indent+this.getIndent()+this.getIndent());
 		//code.add(_indent+this.getIndent()+"</qFor>");
-		generateCode(_for.q, _indent+this.getIndent(), "qFor");
+		generateCode(_for.getBody(), _indent+this.getIndent(), "qFor");
 		// END KGU 2016-12-21
 		code.add(_indent + "</for>");
 	}
@@ -342,7 +342,7 @@ public class XmlGenerator extends Generator
 		//code.add(_indent+this.getIndent()+"<qWhile>");
 		//generateCode(_while.q,_indent+this.getIndent()+this.getIndent());
 		//code.add(_indent+this.getIndent()+"</qWhile>");
-		generateCode(_while.q, _indent+this.getIndent(), "qWhile");
+		generateCode(_while.getBody(), _indent+this.getIndent(), "qWhile");
 		// END KGU 2016-12-21
 		code.add(_indent + "</while>");
 	}
@@ -359,7 +359,7 @@ public class XmlGenerator extends Generator
 		//code.add(_indent+this.getIndent()+"<qRepeat>");
 		//generateCode(_repeat.q,_indent+this.getIndent()+this.getIndent());
 		//code.add(_indent+this.getIndent()+"</qRepeat>");
-		generateCode(_repeat.q, _indent+this.getIndent(), "qRepeat");
+		generateCode(_repeat.getBody(), _indent+this.getIndent(), "qRepeat");
 		// END KGU 2016-12-21
 		code.add(_indent + "</repeat>");
 	}
@@ -376,7 +376,7 @@ public class XmlGenerator extends Generator
 		//code.add(_indent+this.getIndent()+"<qForever>");
 		//generateCode(_forever.q,_indent+this.getIndent()+this.getIndent());
 		//code.add(_indent+this.getIndent()+"</qForever>");
-		generateCode(_forever.q, _indent+this.getIndent(), "qForever");
+		generateCode(_forever.getBody(), _indent+this.getIndent(), "qForever");
 		// END KGU 2016-12-21
 		code.add(_indent + "</forever>");
 	}

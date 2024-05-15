@@ -6836,8 +6836,7 @@ public class Executor implements Runnable
 	{
 		String trouble = "";
 		// KGU 2015-12-11: Instruction is supposed to start with the output keyword!
-		cmd = cmd.subSequenceToEnd(/*cmd.indexOf(CodeParser.output) +*/
-						Syntax.getSplitKeyword("output").size());
+		cmd = cmd.subSequenceToEnd(1);
 		// START KGU#490 2018-02-07: Bugfix #503 
 		cmd = this.evaluateDiagramControllerFunctions(convertExpression(cmd));
 		// END KGU#490 2018-02-07
@@ -7557,7 +7556,7 @@ public class Executor implements Runnable
 					// START KGU#117 2016-03-07: Enh. #77 - consistent subqueue handling
 					if (trouble.isEmpty())
 					{
-						trouble = stepSubqueue(((ILoop)element).getBody(), true);						
+						trouble = stepSubqueue(((Loop)element).getBody(), true);						
 					}
 					// END KGU#117 2016-03-07
 
@@ -8232,7 +8231,7 @@ public class Executor implements Runnable
 
 					if (trouble.isEmpty())
 					{
-						trouble = stepSubqueue(((ILoop)element).getBody(), true);
+						trouble = stepSubqueue(((Loop)element).getBody(), true);
 					}
 
 					element.executed = true;

@@ -4101,9 +4101,9 @@ public class Root extends Element {
 
 
 			// continue analysis for subelements
-			if (ele instanceof ILoop)
+			if (ele instanceof Loop)
 			{
-				analyse(((ILoop) ele).getBody(), _errors, _vars, _uncertainVars, _constants, _resultFlags, _types);
+				analyse(((Loop) ele).getBody(), _errors, _vars, _uncertainVars, _constants, _resultFlags, _types);
 
 				if (ele instanceof Repeat)
 				{
@@ -4558,9 +4558,9 @@ public class Root extends Element {
 
 
 			// continue analysis for subelements
-			if (ele instanceof ILoop)
+			if (ele instanceof Loop)
 			{
-				analyse(((ILoop) ele).getBody(), _errors, _vars, _uncertainVars, _constants, _resultFlags, _dataTypes);
+				analyse(((Loop) ele).getBody(), _errors, _vars, _uncertainVars, _constants, _resultFlags, _dataTypes);
 
 				if (ele instanceof Repeat)
 				{
@@ -9174,9 +9174,9 @@ public class Root extends Element {
 			_vars.addIfNew(myVars);
 
 			// continue analysis for subelements
-			if (ele instanceof ILoop)
+			if (ele instanceof Loop)
 			{
-				getUninitializedVars(((ILoop) ele).getBody(), _vars, _args);
+				getUninitializedVars(((Loop) ele).getBody(), _vars, _args);
 			}
 			else if (eleClassName.equals("Parallel"))
 			{

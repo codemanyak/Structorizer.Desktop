@@ -1116,7 +1116,7 @@ public class OberonGenerator extends Generator {
 				" TO " + transform(_for.getEndValue(), false) + incr +" DO",
 				_indent, isDisabled);
 		// END KGU#3 2015-11-02
-		generateCode(_for.q,_indent+this.getIndent());
+		generateCode(_for.getBody(),_indent+this.getIndent());
 		addCode("END;", _indent, isDisabled);
 	}
 
@@ -1251,7 +1251,7 @@ public class OberonGenerator extends Generator {
 
 			// Creation of the loop body
 			addCode(var + " := " + arrayName + "[" + indexName + "];", _indent+this.getIndent(), isDisabled);
-			generateCode(_for.q, _indent+this.getIndent());
+			generateCode(_for.getBody(), _indent+this.getIndent());
 			addCode("END;", _indent, isDisabled);
 
 			done = true;
@@ -1275,7 +1275,7 @@ public class OberonGenerator extends Generator {
 			addCode(var + " := " + valueList + "[" + indexName + "];",
 					_indent+this.getIndent(), isDisabled);
 			// Add the loop body as is
-			generateCode(_for.q, _indent + this.getIndent());
+			generateCode(_for.getBody(), _indent + this.getIndent());
 			addCode("END;", _indent, isDisabled);
 
 			done = true;
@@ -1294,7 +1294,7 @@ public class OberonGenerator extends Generator {
 //				_indent, isDisabled);
 		addCode("WHILE " + transform(_while.getUnbrokenText().getLongString()) + " DO",
 				_indent, isDisabled);
-		generateCode(_while.q, _indent + this.getIndent());
+		generateCode(_while.getBody(), _indent + this.getIndent());
 		addCode("END;", _indent, isDisabled);
 	}
 	
@@ -1305,7 +1305,7 @@ public class OberonGenerator extends Generator {
 		appendComment(_repeat, _indent);
 		// END KGU 2014-11-16
 		addCode("REPEAT", _indent, isDisabled);
-		generateCode(_repeat.q,_indent+this.getIndent());
+		generateCode(_repeat.getBody(),_indent+this.getIndent());
 //		addCode("UNTIL "+BString.replace(transform(_repeat.getUnbrokenText().getText()),"\n","")+";",
 //				_indent, isDisabled);
 		addCode("UNTIL " + transform(_repeat.getUnbrokenText().getLongString()) + ";",
@@ -1319,7 +1319,7 @@ public class OberonGenerator extends Generator {
 		appendComment(_forever, _indent);
 		// END KGU 2014-11-16
 		addCode("LOOP", _indent, isDisabled);
-		generateCode(_forever.q,_indent+this.getIndent());
+		generateCode(_forever.getBody(),_indent+this.getIndent());
 		addCode("END;", _indent, isDisabled);
 	}
 	

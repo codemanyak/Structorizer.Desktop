@@ -891,7 +891,7 @@ public class PythonGenerator extends Generator
 			addCode("for "+counterStr+" in " + valueList + ":", _indent, isDisabled);
 		}
 		// END KGU#934 2021-02-13
-		generateCode((Subqueue) _for.q,_indent + this.getIndent());
+		generateCode((Subqueue) _for.getBody(),_indent + this.getIndent());
 		// START KGU#54 2015-10-19: Avoid accumulation of empty lines!
 		//code.add("");
 		if (code.count() > 0 && !code.get(code.count()-1).isEmpty())
@@ -917,7 +917,7 @@ public class PythonGenerator extends Generator
 		// END KGU#301 2016-12-01
 
 		addCode("while "+condition+":", _indent, isDisabled);
-		generateCode((Subqueue) _while.q, _indent + this.getIndent());
+		generateCode((Subqueue) _while.getBody(), _indent + this.getIndent());
 		// START KGU#54 2015-10-19: Avoid accumulation of empty lines!
 		//code.add("");
 		if (code.count() > 0 && !code.get(code.count()-1).isEmpty())
@@ -936,7 +936,7 @@ public class PythonGenerator extends Generator
 		appendComment(_repeat, _indent);
 		// END KGU 2014-11-16
 		addCode("while True:", _indent, isDisabled);
-		generateCode((Subqueue) _repeat. q,_indent + this.getIndent());
+		generateCode((Subqueue) _repeat. getBody(),_indent + this.getIndent());
 		// START KGU#54 2015-10-19: Why should the last two rows be empty? They aren't! This strange behaviour ate code lines! 
 		//code.delete(code.count()-1); // delete empty row
 		//code.delete(code.count()-1); // delete empty row
@@ -961,7 +961,7 @@ public class PythonGenerator extends Generator
 		appendComment(_forever, _indent);
 		// END KGU 2014-11-16
 		addCode("while True:", _indent, isDisabled);
-		generateCode((Subqueue) _forever.q, _indent + this.getIndent());
+		generateCode((Subqueue) _forever.getBody(), _indent + this.getIndent());
 		// START KGU#54 2015-10-19: Avoid accumulation of empty lines!
 		//code.add("");
 		if (code.count() > 0 && !code.get(code.count()-1).isEmpty())
