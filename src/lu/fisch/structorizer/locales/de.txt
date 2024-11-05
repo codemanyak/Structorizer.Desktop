@@ -205,7 +205,7 @@ Menu.menuFileExportCode.text=Quellcode
 Menu.menuFileExportPicturePNG.text=
 Menu.menuFileExportPicturePNGmulti.text=PNG (gekachelt) ...
 Menu.menuFileExportPictureEMF.text=
-Menu.menuFileExportPictureSWF.text=
+Menu.menuFileExportPictureSWF.text=SWF (veraltet!) ...
 Menu.menuFileExportPicturePDF.text=
 Menu.menuFileExportPictureSVG.text=
 Menu.lbFileExportCodeFavorite.text=Exportieren nach %
@@ -741,7 +741,7 @@ Editor.popupMoveDown.text=Nach unten bewegen
 Editor.popupTransmute.text=Umwandeln
 Editor.popupOutsource.text=Auslagern
 Editor.popupOutsource.tooltip=Ausgewählte Elementfolge in neues @o auslagern.
-Editor.popupEditSub.text=Unterprogramm bearbeiten ...
+Editor.popupEditSub.text=@o bearbeiten ...
 Editor.popupEditSub.tooltip=Aufgerufenes @o oder einbezogenes Diagram zur Bearbeitung heranziehen.
 // Collapsing
 Editor.popupCollapse.text=Reduzieren
