@@ -163,6 +163,7 @@ import lu.fisch.structorizer.io.StructogramFilter;
 import lu.fisch.structorizer.parsers.CodeParser;
 import lu.fisch.structorizer.parsers.GENParser;
 import lu.fisch.structorizer.parsers.NSDParser;
+import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.utils.StringList;
 
 public class Structorizer
@@ -1690,7 +1691,7 @@ public class Structorizer
 		}
 		Element.loadFromINI();
 		Element.fetchViewSettings(Ini.getInstance());
-		CodeParser.loadFromINI();
+		Syntax.loadFromINI();
 
 		// First operate the roots from nsd files
 		for (Root root: roots) {

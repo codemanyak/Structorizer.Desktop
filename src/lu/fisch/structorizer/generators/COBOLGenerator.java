@@ -921,8 +921,10 @@ public class COBOLGenerator extends Generator {
 // END KGU#395 2024-04-13
 				}
 				// START KGU#395 2024-05-23: Enh. #357
-				else if (Instruction.isInput(line)) {
-					addCode(transfLine, _indent, isDisabled);
+				else if (Instruction.isInput(tokens)) {
+					// FIXME
+					String transfline = transformTokens(tokens);
+					addCode(transformInput(transfline), _indent, isDisabled);
 					lineDone = true;
 				}
 				// END KGU#395 204-05-23

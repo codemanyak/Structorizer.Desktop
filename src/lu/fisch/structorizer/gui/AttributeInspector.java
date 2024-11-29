@@ -90,8 +90,9 @@ import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.StringList;
 
 /**
+ * Dialog class to present and edit the Root attributes
+ * 
  * @author Kay Gürtzig
- *
  */
 @SuppressWarnings("serial")
 public class AttributeInspector extends LangDialog implements WindowListener {

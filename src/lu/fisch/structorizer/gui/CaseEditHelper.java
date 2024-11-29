@@ -61,9 +61,9 @@ import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.StringList;
 
 /**
- * Helper class for InputBoxCase
+ * Helper class for InputBoxCase, use to retrieve and check Case options
+ * 
  * @author Kay Gürtzig
- *
  */
 public class CaseEditHelper {
 	
