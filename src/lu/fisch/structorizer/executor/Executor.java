@@ -7405,18 +7405,22 @@ public class Executor implements Runnable
 				TokenList[] constants = Syntax.splitExpressionList(text.get(q), ",").toArray(new TokenList[]{});
 				// END KGU#755 2019-11-08
 				// END KGU#15 2015-10-21
+				if (constants.length > 0 && !constants[constants.length-1].isBlank()) {
+					trouble = control.msgBadValueList.getText().replace("%", text.get(q).getString());
+					break;
+				}
 				boolean go = false;
 				if ((q == last) && hasDefaultBranch)
 				{
 					// default branch
 					go = true;
 				}
-				if (go == false)
+				if (!go)
 				{
 					// START KGU#15 2015-10-21: Test against a list of constants now
 					//Object n = interpreter.eval(test);
 					//go = n.toString().equals("true");
-					for (int c = 0; !go && c < constants.length; c++)
+					for (int c = 0; !go && c < constants.length - 1; c++)
 					{
 						// START KGU#259 2016-09-25: Bugfix #254
 						//String test = convert(expression + constants[c]);
