@@ -237,6 +237,12 @@ public class Syntax {
 	// END KGU 2021-10-25
 
 	// START KGU#466 2019-08-02: Issue #733 - Support selective preference export
+	/**
+	 * @return an array of Syntax-related property keys or key patterns with wildcards
+	 * (for selective preference export)
+	 * 
+	 * @see #saveToINI()
+	 */
 	public static String[] getPreferenceKeys()
 	{
 		return new String[] {"Parser*"};
@@ -359,6 +365,8 @@ public class Syntax {
 	/**
 	 * Saves the parser-related preferences, i.e. chiefly the configured keywords to the
 	 * Ini file.
+	 * 
+	 * @see #getPreferenceKeys()
 	 * @see #getPropertyMap(boolean)
 	 * @see #loadFromINI()
 	 */

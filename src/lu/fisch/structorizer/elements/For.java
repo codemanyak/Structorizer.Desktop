@@ -1066,7 +1066,9 @@ public class For extends Loop {
 	}
 	
 	/**
-	 * Returns the FOR loop header resulting from the given arguments
+	 * Returns the FOR loop header resulting from the given arguments (with user-
+	 * configured keywords)
+	 * 
 	 * @param _counter - name of the loop variable
 	 * @param _start - start value expression
 	 * @param _end - end value expression or {@code null}
@@ -1108,6 +1110,10 @@ public class For extends Loop {
 		return forClause;
 	}
 	
+	/**
+	 * @return {@code true} if the stored header text is equal to the text
+	 *    composed from the form fields, {@code false} otherwise
+	 */
 	public boolean checkConsistency()
 	{
 		//String string1 = this.getText().getLongString();
@@ -1171,7 +1177,10 @@ public class For extends Loop {
 		//String thisText = this.getText().getLongString().trim();
 		// START KGU#453 2017-11-02: Issue #447 - get rid of end-standing backslashes
 		//String thisText = this.getText().getLongString().trim().replace(":=", "<-");
-		String thisText = this.getUnbrokenText().getLongString().trim().replace(":=", "<-");
+		ArrayList<TokenList> tokenLines = this.getUnbrokenTokenText();
+		TokenList tokenText = TokenList.concatenate(tokenLines, "");
+		tokenText.replaceAll(":=", "<-");
+		String thisText = Syntax.decodeLine(tokenText).getString();
 		// END KGU#453 2017-11-02
 		// END KGU#256 2016-09-25
 		//System.out.println(thisText + " <-> " + this.composeForClause() + " <-> " + this.composeForInClause());

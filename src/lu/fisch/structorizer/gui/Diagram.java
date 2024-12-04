@@ -4147,8 +4147,10 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 				if (data.result == true) {
 					// START KGU#480 2018-01-21: Enh. #490 we have to replace DiagramController aliases by the original names
 					//Element ele = new Instruction(data.text.getText());
-					// START KGU#470 2024-04-23: Issue #800
+					// START KGU#470 2024-12-02: Issue #800
+					//Element ele = new Instruction(Element.replaceControllerAliases(data.text.getText(), false, false));
 					Element ele = new Instruction(Element.replaceControllerAliases(data.text.getText(), false, false));
+					// END KGU#470 2024-12-02
 					// END KGU#480 2018-01-21
 					// START #1097 2023-11-09: Issue #800 Now replace the user-defined keys
 					ele.encodeKeywords(null, Syntax.ignoreCase);

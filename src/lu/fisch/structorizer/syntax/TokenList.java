@@ -45,6 +45,7 @@ import lu.fisch.utils.StringList;
  *                                      '_' allowed as initial character of names (to be consistent with
  *                                      System.isIdentifier(...) and code import.
  *                                      New methods removePaddings(), removePaddings(int, int)
+ *      Kay Gürtzig     2024-12-03      Attribute newlines added and functional integration begun
  *
  ******************************************************************************************************
  *
@@ -136,12 +137,19 @@ public class TokenList implements Comparable<TokenList>{
 	
 	/**
 	 * List of paddings (blank sequences) between the {@link tokens}. The length
-	 * always equals {@code tokens.size() + 1}, i.e. {@code paddings.get(0)} is
-	 * the number of blanks before the first token, {@code paddings.get(i)} with
-	 * i > 0 is the length of the gap between {@code tokens.get(i-1)} and
-	 * {@code tokens.get(i)}.
+	 * of this list always equals {@code tokens.size() + 1}, i.e.,
+	 * {@code paddings.get(0)} is the number of blanks before the first token,
+	 * {@code paddings.get(i)} with i > 0 is the length of the gap between
+	 * {@code tokens.get(i-1)} and {@code tokens.get(i)}.
 	 */
 	private ArrayList<Integer> paddings;
+	
+	/**
+	 * Ordered list of possible newline positions (paddings indices). If some i
+	 * is included, then this means that the first character of padding i is to
+	 * be interpreted as newline character.
+	 */
+	private ArrayList<Integer> newlines;
 	
 	/**
 	 * The total text length of the string represented by this token list, will
@@ -177,6 +185,7 @@ public class TokenList implements Comparable<TokenList>{
 	 * @param _text - the text line to be split into tokens
 	 * 
 	 * @see #TokenList(String, boolean)
+	 * @see #TokenList(String, StringList, boolean)
 	 */
 	public TokenList(String _text) {
 		this(_text, true);
@@ -188,21 +197,95 @@ public class TokenList implements Comparable<TokenList>{
 	 * will possibly overdo somewhat (e. g. signs of number literals will form
 	 * separated tokens, but floating-point literals like {@code 123.45} or
 	 * {@code .09e-8} will properly be preserved as contiguous tokens).<br/>
-	 * Preserves string and character literals.<br/>
-	 * By default, {@code preserveStrings 0 true} should be set {@code true},
-	 * which ensures that string and character literals will be preserved (for
-	 * keyword preferences, however, which possibly contain quotes like
-	 * {@code "jusqu'à"} it may be necessary to set it {@code false}<br/>
-	 * The inter-lexeme whitespace will preserved internally such that a
+	 * By default, {@code preserveStrings} should be set {@code true},
+	 * which ensures that string and character literals will be preserved.
+	 * For keyword preferences, however, which possibly contain quotes like
+	 * {@code "jusqu'à"} it may be necessary to set it {@code false}.<br/>
+	 * Inter-lexeme whitespace will be preserved internally such that a
 	 * nearly complete reconstruction of the original string is possible
 	 * by {@link #getString()}. It can also be retrieved or manipulated
 	 * by e.g. {@link #getPadding(int)}, {@link #setPadding(int, int, int)} 
 	 * 
 	 * @param _text - the text line to be split into tokens
+	 * @param preserveStrings - whether strings pairwise delimited by {@code "}
+	 *    or {@code '} are to be preserved rather than split.
+	 * 
+	 * @see #TokenList(String, StringList, boolean)
 	 */
 	public TokenList(String _text, boolean preserveStrings) {
+		this(_text, preserveStrings, null, false);
+	}
+	
+	/**
+	 * Creates a token list from the input string {@code _text}.<br/>
+	 * Splits the given {@code _text} into lexical morphemes (lexemes). This
+	 * will possibly overdo somewhat (e. g. signs of number literals will form
+	 * separated tokens, but floating-point literals like {@code 123.45} or
+	 * {@code .09e-8} will properly be preserved as contiguous tokens).<br/>
+	 * Preserves string and character literals unless some special keywords
+	 * containing one or more quote characters like {@code "jusqu'à"} and
+	 * contained in the list {@code specialKeywords} match a token subsequence,
+	 * in which case these are prioritized to form a token. {@code _ignoreCase}
+	 * is taken into account.<br/>
+	 * Inter-lexeme whitespace will be preserved internally such that a
+	 * nearly complete reconstruction of the original string is possible
+	 * by {@link #getString()}. It can also be retrieved or manipulated
+	 * by e.g. {@link #getPadding(int)}, {@link #setPadding(int, int, int)} 
+	 * 
+	 * @param _text - the text line to be split into tokens
+	 * @param _specialKeywords - optionally a list of keyword preferences,
+	 *    which contain single (or double) quotes like {@code "jusqu'à"} and
+	 *    are to produce token. <b>Note</b>: The list should be ordered by
+	 *    decreasing length!
+	 * @param _ignoreCase - whether the matching for special keys is not to be
+	 *    done in a case-sensitive way.
+	 *    
+	 * @see #TokenList(String, boolean)
+	 */
+	public TokenList(String _text, StringList _specialKeywords, boolean _ignoreCase) {
+		this(_text, true, _specialKeywords, _ignoreCase);
+	}
+	
+	/**
+	 * Creates a token list from the input string {@code _text}.<br/>
+	 * Splits the given {@code _text} into lexical morphemes (lexemes). This
+	 * will possibly overdo somewhat (e. g. signs of number literals will form
+	 * separated tokens, but floating-point literals like {@code 123.45} or
+	 * {@code .09e-8} will properly be preserved as contiguous tokens).<br/>
+	 * If {@code preserveStrings} is {@code false} then string and character
+	 * literals are ignored and split into smaller tokens (the quotes forming
+	 * isolated tokens) and argument {@code specialKeywords will be ignored}.
+	 * Otherwise preserves string and character literals unless some of the
+	 * {@code specialKeywords} (if given) that are containing one or more quote
+	 * characters like {@code "jusqu'à"} match a token subsequence, in which
+	 * case these are prioritized to form a token. {@link Syntax#ignoreCase}
+	 * is taken into account.<br/>
+	 * Inter-lexeme whitespace will be preserved internally such that a
+	 * nearly complete reconstruction of the original string is possible
+	 * by {@link #getString()}. It can also be retrieved or manipulated
+	 * by e.g. {@link #getPadding(int)}, {@link #setPadding(int, int, int)} 
+	 * 
+	 * @param _text - the text line to be split into tokens
+	 * @param preserveStrings - whether strings pairwise delimited by {@code "}
+	 *    or {@code '} are to be preserved rather than split.
+	 * @param specialKeywords - optionally a list of keyword preferences,
+	 *    which contain single (or double) quotes like {@code "jusqu'à"} and
+	 *    are to produce token. <b>Note</b>: The list should be ordered by
+	 *    decreasing length!
+	 * @param _ignoreCase - whether the matching for special keys is not to be
+	 *    done in a case-sensitive way.
+	 */
+	private TokenList(String _text, boolean preserveStrings, StringList specialKeywords, boolean _ignoreCase) {
 		tokens = new ArrayList<String>();
 		paddings = new ArrayList<Integer>();
+		
+		TokenList[] tokenizedKeys = null;
+		if (preserveStrings && specialKeywords != null && !specialKeywords.isEmpty()) {
+			tokenizedKeys = new TokenList[specialKeywords.count()];
+			for (int k = 0; k < tokenizedKeys.length; k++) {
+				tokenizedKeys[k] = new TokenList(specialKeywords.get(k));
+			}
+		}
 		
 		int nBlanks = 0;
 		LexState state = LexState.LX_0;
@@ -212,10 +295,35 @@ public class TokenList implements Comparable<TokenList>{
 			int cp = _text.codePointAt(ix);
 			switch (state) {
 			case LX_0:	// Initial and interregnum state
+				// We try to preserve '\n' characters in an appropriate way
 				if (Character.isWhitespace(cp)) {
+					if (Character.codePointAt("\n", 0) == cp) {
+						newlines.add(paddings.size());
+					}
 					nBlanks++;
 					state = LexState.LX_WHITESPACE;
 				}
+				// START KGU#470 2024-12-02: Issue #800 Check special keys with priority
+				else if (preserveStrings && specialKeywords != null && sbToken.length() == 0) {
+					for (int k = 0; k < specialKeywords.count(); k++) {
+						String skey = specialKeywords.get(k);
+						if (skey.length() <= _text.length() - ix
+								// First simply check on substring base ...
+								&& (_ignoreCase && _text.substring(ix, ix + skey.length()).equalsIgnoreCase(skey)
+										|| !_ignoreCase && _text.substring(ix, ix + skey.length()).equals(skey))
+								// ... then make sure the tokenized forms actually match
+								&& (new TokenList(_text.substring(ix), false)).startsWith(tokenizedKeys[k], !_ignoreCase)) {
+							paddings.add(nBlanks);
+							tokens.add(skey);
+							len += nBlanks + skey.length();
+							nBlanks = 0;
+							state = LexState.LX_0;
+							ix += skey.length()-1;
+							break;
+						}
+					}
+				}
+				// END KGU#470 2024-12-02
 				// START KGU 2024-03-21: We ought to allow names beginning with '_'
 				//else if (Character.isLetter(cp)) {
 				else if (Character.isLetter(cp) || cp == '_') {
@@ -1585,6 +1693,7 @@ public class TokenList implements Comparable<TokenList>{
 	 */
 	public boolean addAll(int index, TokenList other) {
 		synchronized (this) {
+			int nPaddings = paddings.size();
 			int pad0 = other.paddings.get(0);
 			int padI = paddings.get(index);
 			// We split the padding at the insertion position into halves
@@ -1617,6 +1726,9 @@ public class TokenList implements Comparable<TokenList>{
 			}
 			ensureGap(index-1);
 			ensureGap(index-1 + other.size());
+			for (int nlPos: other.newlines) {
+				newlines.add(nPaddings + nlPos);
+			}
 		}
 		return !other.isEmpty();
 	}

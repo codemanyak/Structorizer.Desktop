@@ -8234,73 +8234,74 @@ public class Executor implements Runnable
 //				// END KGU#1024 2022-01-05
 //			}
 //		}
-//		
-//		// Might be a function or variable otherwise evaluable
-//		if (value == null)
-//		{
-//			try
-//			{
-//				value = this.evaluateExpression(valueListTokens, false, false);
-//				// START KGU#429 2017-10-08
-//				// In case it was a variable or function, it MUST contain or return an array to be acceptable
-//				if (value != null
-//						&& /*!(value instanceof Object[]) &&*/ !(value instanceof ArrayList<?>)
-//						&& !(value instanceof String)) {
-//					valueNoArray = true;
-//					problem += valueListTokens.getString() + " = " + prepareValueForDisplay(value, context.dynTypeMap);
-//				}
-//				// END KGU#429 2017-10-08
-//			}
-//			catch (EvalError ex)
-//			{
-//				// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
-//				//problem += "\n" + ex.getMessage();
-//				// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
-//				//String exMessage = ex.getRawMessage();
-//				//int pilcrowPos = -1;
-//				//if (exMessage != null && (pilcrowPos = exMessage.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-//				//	exMessage = exMessage.substring(0, pilcrowPos);
-//				//}
-//				String exMessage = getEvalErrorMessage(ex);
-//				// END KGU#1058 2022-09-29
-//				problem += "\n" + exMessage;
-//				// END KGU#1024 2022-01-05
-//			}
-//		}
-//		if (value == null && valueListTokens.size() > 1 && valueListTokens.getPadding() > 0)
-//		{
-//			// Rather desperate attempt to compose an array from loose strings (like in shell scripts)
-//			ArrayList<TokenList> exprTokens = Syntax.splitExpressionList(valueListTokens, " ");
-//			try
-//			{
-//				// START KGU#439 2017-10-13: Issue #436
-//				//this.evaluateExpression("Object[] tmp20160321kgu = {" + tokens.concatenate(",") + "}", false, false);
-//				//value = context.interpreter.get("tmp20160321kgu");
-//				//context.interpreter.unset("tmp20160321kgu");
-//				//value = this.evaluateExpression("{" + tokens.concatenate(",") + "}", true, false);
-//				TokenList tempTokens = TokenList.concatenate(exprTokens.subList(0, exprTokens.size()-1), ",");
-//				tempTokens.add(0, "{");
-//				tempTokens.add("}");
-//				value = this.evaluateExpression(tempTokens, true, false);
-//				// END KGU#439 2017-10-13
-//			}
-//			catch (EvalError ex)
-//			{
-//				// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
-//				//problem += "\n" + ex.getMessage();
-//				// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
-//				//String exMessage = ex.getRawMessage();
-//				//int pilcrowPos = -1;
-//				//if (exMessage != null && (pilcrowPos = exMessage.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-//				//	exMessage = exMessage.substring(0, pilcrowPos);
-//				//}
-//				String exMessage = getEvalErrorMessage(ex);
-//				// END KGU#1058 2022-09-29
-//				problem += "\n" + exMessage;
-//				// END KGU#1024 2022-01-05
-//			}
-//		}
 // END KGU#790 2023-11-07
+		
+		// Might be a function or variable otherwise evaluable
+		if (value == null)
+		{
+			try
+			{
+				value = this.evaluateExpression(valueListTokens, false, false);
+				// START KGU#429 2017-10-08
+				// In case it was a variable or function, it MUST contain or return an array to be acceptable
+				if (value != null
+						&& /*!(value instanceof Object[]) &&*/ !(value instanceof ArrayList<?>)
+						&& !(value instanceof String)) {
+					valueNoArray = true;
+					problem += valueListTokens.getString() + " = " + prepareValueForDisplay(value, context.dynTypeMap);
+				}
+				// END KGU#429 2017-10-08
+			}
+			catch (EvalError ex)
+			{
+				// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
+				//problem += "\n" + ex.getMessage();
+				// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+				//String exMessage = ex.getRawMessage();
+				//int pilcrowPos = -1;
+				//if (exMessage != null && (pilcrowPos = exMessage.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+				//	exMessage = exMessage.substring(0, pilcrowPos);
+				//}
+				String exMessage = getEvalErrorMessage(ex);
+				// END KGU#1058 2022-09-29
+				problem += "\n" + exMessage;
+				// END KGU#1024 2022-01-05
+			}
+		}
+		if (value == null && valueListTokens.size() > 1 && valueListTokens.getPadding() > 0)
+		{
+			// Rather desperate attempt to compose an array from loose strings (like in shell scripts)
+			ArrayList<TokenList> exprTokens = Syntax.splitExpressionList(valueListTokens, " ");
+			try
+			{
+				// START KGU#439 2017-10-13: Issue #436
+				//this.evaluateExpression("Object[] tmp20160321kgu = {" + tokens.concatenate(",") + "}", false, false);
+				//value = context.interpreter.get("tmp20160321kgu");
+				//context.interpreter.unset("tmp20160321kgu");
+				//value = this.evaluateExpression("{" + tokens.concatenate(",") + "}", true, false);
+				TokenList tempTokens = TokenList.concatenate(exprTokens.subList(0, exprTokens.size()-1), ",");
+				tempTokens.add(0, "{");
+				tempTokens.add("}");
+				value = this.evaluateExpression(tempTokens, true, false);
+				// END KGU#439 2017-10-13
+			}
+			catch (EvalError ex)
+			{
+				// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
+				//problem += "\n" + ex.getMessage();
+				// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+				//String exMessage = ex.getRawMessage();
+				//int pilcrowPos = -1;
+				//if (exMessage != null && (pilcrowPos = exMessage.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+				//	exMessage = exMessage.substring(0, pilcrowPos);
+				//}
+				String exMessage = getEvalErrorMessage(ex);
+				// END KGU#1058 2022-09-29
+				problem += "\n" + exMessage;
+				// END KGU#1024 2022-01-05
+			}
+		}
+
 		if (value != null)
 		{
 			// Shouldn't occur anymore

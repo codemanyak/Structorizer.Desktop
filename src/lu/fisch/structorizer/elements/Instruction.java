@@ -112,7 +112,6 @@ import lu.fisch.structorizer.gui.SelectedSequence;
 import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.structorizer.syntax.TokenList;
-import lu.fisch.structorizer.syntax.TypeRegistry;
 //import lu.fisch.structorizer.gui.IconLoader;
 import lu.fisch.utils.*;
 
@@ -282,9 +281,10 @@ public class Instruction extends Element {
 	 * with the given {@code _text} on the {@code _canvas}.<br/>
 	 * Sets {@link Element#rect} and {@link Element#topLeft} on {@code _element}, obeys the flags
 	 * {@link Element#rotated} and {@code Element#disabled}.
+	 * 
 	 * @param _canvas - The drawing {@link Canvas}
 	 * @param _top_left - the given shape and position
-	 * @param _text - the text to be written into the element area
+	 * @param _text - the text to be written into the element area (as internally coded)
 	 * @param _element - the originating {@link Element}.
 	 * @param _inContention - whether this drawing is done under heavy contention
 	 */
@@ -2528,9 +2528,9 @@ public class Instruction extends Element {
 	public boolean mayPassControl()
 	{
 		if (!disabled) {
-			StringList unbroken = getUnbrokenText();
-			for (int i = 0; i < unbroken.count(); i++) {
-				String line = unbroken.get(i);
+			ArrayList<TokenList> unbroken = getUnbrokenTokenText();
+			for (int i = 0; i < unbroken.size(); i++) {
+				TokenList line = unbroken.get(i);
 				if (!line.isBlank() 
 						&& (Jump.isLeave(line)
 								|| Jump.isReturn(line)

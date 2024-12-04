@@ -2899,6 +2899,7 @@ public class Root extends Element {
 	 */
 	private StringList getUsedVarNames(TokenList tokens, String[] _keywords)
 	{
+		// FIXME: KGU#790 This still needed? Rather not, I'd say
 		if (_keywords == null) {
 			_keywords = Syntax.getAllProperties();
 		}
@@ -2928,30 +2929,35 @@ public class Root extends Element {
 
 		Syntax.unifyOperators(tokens, false);
 
-		// Replace all split keywords by the respective configured strings
-		// This replacement will be aware of the case sensitivity preference
-		for (int kw = 0; kw < _keywords.length; kw++)
-		{
-			if (_keywords[kw] != null && !_keywords[kw].isBlank())
-			{
-				TokenList keyTokens = splitKeywords.elementAt(kw);
-				int keySize = keyTokens.size();
-				int posKey = tokens.size() - keySize;
-				while (posKey >= 0 && (posKey = tokens.lastIndexOf(keyTokens, posKey, !Syntax.ignoreCase)) >= 0)
-				{
-					// FIXME might compromise gaps
-					tokens.set(posKey, _keywords[kw]);
-					tokens.remove(posKey + 1, posKey + keySize);
-					posKey -= keySize;
-				}
-			}
-		}
+		// START KGU#790 2024-12-03: Issue #800 No longer necessary/sensible - expect internal key tokens
+//		// Replace all split keywords by the respective configured strings
+//		// This replacement will be aware of the case sensitivity preference
+//		for (int kw = 0; kw < _keywords.length; kw++)
+//		{
+//			if (_keywords[kw] != null && !_keywords[kw].isBlank())
+//			{
+//				TokenList keyTokens = splitKeywords.elementAt(kw);
+//				int keySize = keyTokens.size();
+//				int posKey = tokens.size() - keySize;
+//				while (posKey >= 0 && (posKey = tokens.lastIndexOf(keyTokens, posKey, !Syntax.ignoreCase)) >= 0)
+//				{
+//					// FIXME might compromise gaps
+//					tokens.set(posKey, _keywords[kw]);
+//					tokens.remove(posKey + 1, posKey + keySize);
+//					posKey -= keySize;
+//				}
+//			}
+//		}
+		// END KGU#790 2024-12-03
 
 		String token0 = "";
 		if (!tokens.isBlank()) token0 = tokens.get(0);
 		// Unify FOR-IN loops and FOR loops for the purpose of variable analysis
-		String postForIn = Syntax.getKeyword("postForIn");
-		if (!postForIn.isBlank() && token0.equals(Syntax.getKeyword("preForIn")))
+		// START KGU#790 2024-12-03: Issue #800 Modified text representation
+		//String postForIn = Syntax.getKeyword("postForIn");
+		//if (!postForIn.isBlank() && token0.equals(Syntax.getKeyword("preForIn")))
+		String postForIn = Syntax.key2token("postForIn");
+		if (token0.equals(Syntax.key2token("preForIn")))
 		{
 			//tokens.replaceAll(Syntax.getKeyword("postForIn"), "<-");
 			tokens.replaceAll(postForIn, "<-", true);
@@ -2995,7 +3001,7 @@ public class Root extends Element {
 		// cutoff output keyword
 		// START KGU#1097 2024-01-22: Issue #800 We don't need to care for user-chosen keywords anymore
 		//else if (token0.equals(Syntax.getKeyword("output")))	// Must be at the line's very beginning
-		else if (token0.equals("§OUTPUT§"))	// Must be at the line's very beginning
+		else if (token0.equals(Syntax.key2token("output")))	// Must be at the line's very beginning
 		// END KGU#1097 2024-01-22
 		{
 			tokens.remove(0);
@@ -3004,7 +3010,7 @@ public class Root extends Element {
 		// parse out array index
 		// START KGU#1097 2024-01-22: Issue #800 We don't need to care for user-chosen keywords anymore
 		//else if (token0.equals(Syntax.getKeyword("input")))
-		else if (token0.equals("§INPUT§"))
+		else if (token0.equals(Syntax.key2token("input")))
 		// END KGU#1097 2024-01-22
 		{
 			// START KGU#653 2019-02-16: Enh. #680 - with multiple variables we must decompose the list

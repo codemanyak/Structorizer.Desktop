@@ -1145,7 +1145,7 @@ public abstract class Element {
 			text = _text;
 		}
 	}
-
+	
 	// START KGU#91 2015-12-01: We need a way to get the true value
 	/**
 	 * Returns the (decoded) content of the text field no matter if mode
@@ -1191,7 +1191,7 @@ public abstract class Element {
 			return text;
 		}
 	}
-
+	
 	//START KGU#453 2017-11-01: Bugfix #447 - we need a cute representation of broken lines in some cases
 	/**
 	 * Returns the content of the text field no matter if mode {@code isSwitchedTextAndComment}
@@ -1534,13 +1534,18 @@ public abstract class Element {
 	 */
 	public StringList getAliasText()
 	{
-		if (!Element.E_APPLY_ALIASES) {
-			return this.getText();
-		}
-		var sl = new StringList();
+		// START KGU#790 2024-12-02: Issue #800 We must also replace symbolic key tokens
+		//if (!Element.E_APPLY_ALIASES) {
+		//	return this.getText();
+		//}
+		// END KGU#790 2024-12-02
+		StringList sl = new StringList();
 		for (TokenList tokens: getBrokenTokenText()) 
 		{
 			TokenList aliasTokens = replaceControllerAliases(tokens, true, false);
+			// START KGU#790 2024-12-02: Issue #800 Now we replace symbolic key tokens
+			aliasTokens = Syntax.decodeLine(aliasTokens);
+			// END KGU#790 2024-12-02
 			sl.add(StringList.explode(aliasTokens.getString(), "\n"));
 		}
 		return sl;
@@ -1558,18 +1563,37 @@ public abstract class Element {
 	 */
 	public void setAliasText(StringList aliasText)
 	{
-		if (Element.E_APPLY_ALIASES) {
-			// START KGU#488 2018-02-02: Bugfix #501 - We must not undermine the effect of overriding of setText()!
-			//text.setText(Element.replaceControllerAliases(aliasText.getText(), false, false));
-			this.setText(Element.replaceControllerAliases(aliasText.getText(), false, false));
-			// END KGU#488 2018-01-02
+		// START KGU#790 2024-12-02: Issue #800 We must also replace configured keywords by placeholders
+		//if (Element.E_APPLY_ALIASES) {
+		//	// START KGU#488 2018-02-02: Bugfix #501 - We must not undermine the effect of overriding of setText()!
+		//	//text.setText(Element.replaceControllerAliases(aliasText.getText(), false, false));
+		//	this.setText(Element.replaceControllerAliases(aliasText.getText(), false, false));
+		//	// END KGU#488 2018-01-02
+		//}
+		//else {
+		//	// START KGU#488 2018-02-02: Bugfix #501 - We must not undermine the effect of overriding of setText()!
+		//	//text = aliasText;
+		//	this.setText(aliasText);
+		//	// END KGU#488 2018-01-02
+		//}
+		boolean isContinued = false;
+		String[] keys = this.getRelevantParserKeys();
+		StringList lines = new StringList();
+		for (int i = 0; i < aliasText.count(); i++) {
+//			StringList keywords = new StringList();
+//			for (String key: keys) {
+//				String keyword = Syntax.getKeyword(key);
+//				if (keyword != null) {
+//					keywords.addByLength(keyword);
+//				}
+//			}
+			String line = aliasText.get(i);
+			lines.add(Syntax.encodeLine(new TokenList(line), null,
+					keys, Syntax.ignoreCase, isContinued).getString());
+			isContinued = line.endsWith("\\");
 		}
-		else {
-			// START KGU#488 2018-02-02: Bugfix #501 - We must not undermine the effect of overriding of setText()!
-			//text = aliasText;
-			this.setText(aliasText);
-			// END KGU#488 2018-01-02
-		}
+		this.setText(Element.replaceControllerAliases(lines.getText(), false, false));
+		// END KGU#790 2024-12-02
 	}
 	
 	/**
@@ -1599,11 +1623,12 @@ public abstract class Element {
 	 * If {@link #E_APPLY_ALIASES} is true then replaces the names of all routines
 	 * of {@link DiagramController} classes with registered alias names or vice versa,
 	 * depending on {@code names2aliases} and returns the modified text. The text may
-	 * contain newlines and line continuators (end-standing backslashes).  
+	 * contain newlines and line continuators (end-standing backslashes).
+	 * 
 	 * @param text - the (Element) text as concatenated string
 	 * @param names2aliases - whether names are to be replaced by aliases (or vice versa)
 	 * @param withArity - whether the replacing alias (or original name) is to be combined
-	 * with the number of the routine arguments (like this: "{@code <name>#<arity>}"). 
+	 *     with the number of the routine arguments (like this: "{@code <name>#<arity>}"). 
 	 * @return the resulting text.
 	 */
 	public static String replaceControllerAliases(String text, boolean names2aliases, boolean withArity)
@@ -1611,19 +1636,76 @@ public abstract class Element {
 		if (!Element.E_APPLY_ALIASES) {
 			return text;
 		}
+		// FIXME
+		// To preserve '\n' we have to split the text, but then a broken parameter list may not be recognised!
+		//TokenList tokens = new TokenList(text);
+		//replaceControllerAliases(names2aliases, withArity, tokens);
+		//return tokens.getString();
+		StringList lines = StringList.explode(text, "\n");
+		for (int i = 0; i < lines.count(); i++) {
+			TokenList tokens = new TokenList(lines.get(i));
+			// Compose soft-broken lines
+			while (!tokens.isBlank() && "\\".equals(tokens.getLast()) && i+1 < lines.count()) {
+				tokens.addAll(new TokenList(lines.get(++i)));
+			}
+			replaceControllerAliases(names2aliases, withArity, tokens);
+			// Restore soft line breaks
+			int j = 0;
+			int posBs = -1;
+			while ((posBs = tokens.lastIndexOf("\\")) >= 0) {
+				TokenList tail = tokens.remove(posBs+1, tokens.size());
+				lines.set(i - j,  tail.getString());
+				j++;
+			}
+			lines.set(i - j,  tokens.getString());
+		}
+		return lines.getText();
+	}
+
+	/**
+	 * If {@link #E_APPLY_ALIASES} is true then replaces the names of all routines
+	 * of {@link DiagramController} classes with registered alias names or vice versa,
+	 * depending on {@code names2aliases} and returns the modified text. The text may
+	 * contain newline characters as tokens.
+	 * 
+	 * @param tokens - an (Element) text line as TokenList (may contain "\n" as tokens)
+	 * @param names2aliases - whether names are to be replaced by aliases (or vice versa)
+	 * @param withArity - whether the replacing alias (or original name) is to be combined
+	 *     with the number of the routine arguments (like this: "{@code <name>#<arity>}"). 
+	 * @return the resulting text.
+	 */
+	public static TokenList replaceControllerAliases(TokenList tokens, boolean names2aliases, boolean withArity)
+	{
+		if (!Element.E_APPLY_ALIASES) {
+			return tokens;
+		}
+		TokenList tokens1 = new TokenList(tokens);	// Make copy to avoid argument being changed
+		replaceControllerAliases(names2aliases, withArity, tokens1);
+		return tokens1;
+	}
+
+	/**
+	 * Internal helper for {@link #replaceControllerAliases(String, boolean, boolean)} and
+	 * {@link #replaceControllerAliases(TokenList, boolean, boolean)}
+	 * 
+	 * @param names2aliases - whether names are to be replaced by aliases (or vice versa)
+	 * @param withArity - whether the replacing alias (or original name) is to be combined
+	 *     with the number of the routine arguments (like this: "{@code <name>#<arity>}").
+	 * @param tokens - an (Element) text line as TokenList (may contain "\n" as tokens)
+	 */
+	private static void replaceControllerAliases(boolean names2aliases, boolean withArity, TokenList tokens) {
 		HashMap<String, String> substitutions = 
 				names2aliases ? controllerName2Alias : controllerAlias2Name;
-		TokenList tokens = new TokenList(text);
 		for (int i = 0; i < tokens.size(); i++) {
-			String token = tokens.get(i).trim();
-			if (!token.isEmpty() && Syntax.isIdentifier(token, false, null)) {
-				// Skip all whitespace
-				int j = i;
+			String token = tokens.get(i);
+			if (Syntax.isIdentifier(token, false, null)) {
+				// Skip line continuation symbols... (won't help if lines where broken, though)
+				int j = i+1;
 				String nextToken = null;
-				while (++j < tokens.size() && ((nextToken = tokens.get(j).trim()).isEmpty() || nextToken.equals("\\")));
+				while (j < tokens.size() && (nextToken = tokens.get(j++)).equals("\\"));
 				// Now check for a beginning parameter list
-				if ("(".equals(nextToken)) {
-					int nArgs = Syntax.splitExpressionList(tokens.subSequenceToEnd(j+1), ",").size() - 1;
+				if (i+1 < tokens.size() && "(".equals(nextToken)) {
+					int nArgs = Syntax.splitExpressionList(tokens.subSequenceToEnd(i+2), ",").size() - 1;
 					String key = token.toLowerCase() + "#" + nArgs;
 					String subst = substitutions.get(key);
 					if (subst != null) {
@@ -1636,53 +1718,6 @@ public abstract class Element {
 				}
 			}
 		}
-		// FIXME Why not return as TokenList?
-		return tokens.getString();
-	}
-
-	/**
-	 * If {@link #E_APPLY_ALIASES} is true then replaces the names of all routines
-	 * of {@link DiagramController} classes with registered alias names or vice versa,
-	 * depending on {@code names2aliases} and returns the modified text. The text may
-	 * contain newline characters as tokens.
-	 * 
-	 * @param tokens - an (Element) text line TokenList (may contain "\n" as tokens)
-	 * @param names2aliases - whether names are to be replaced by aliases (or vice versa)
-	 * @param withArity - whether the replacing alias (or original name) is to be combined
-	 *     with the number of the routine arguments (like this: "{@code <name>#<arity>}"). 
-	 * @return the resulting text.
-	 */
-	public static TokenList replaceControllerAliases(TokenList tokens, boolean names2aliases, boolean withArity)
-	{
-		if (!Element.E_APPLY_ALIASES) {
-			return tokens;
-		}
-		var tokens1 = new TokenList(tokens);
-		HashMap<String, String> substitutions = 
-				names2aliases ? controllerName2Alias : controllerAlias2Name;
-		for (int i = 0; i < tokens.size(); i++) {
-			String token = tokens.get(i);
-			if (!token.isBlank() && Syntax.isIdentifier(token, false, null)) {
-				// Skip all whitespace
-				int j = i;
-				String nextToken = null;
-				while (++j < tokens.size() && (nextToken = tokens.get(j)).isBlank());
-				// Now check for a beginning parameter list
-				if ("(".equals(nextToken)) {
-					int nArgs = Syntax.splitExpressionList(tokens.subSequenceToEnd(j+1), ",").size() - 1;
-					String key = token.toLowerCase() + "#" + nArgs;
-					String subst = substitutions.get(key);
-					if (subst != null) {
-						token = subst;
-						if (withArity) {
-							token += "#" + nArgs;
-						}
-						tokens1.set(i, token);
-					}
-				}
-			}
-		}
-		return tokens1;
 	}
 	// END KGU#480 2018-01-21
 
@@ -2982,7 +3017,7 @@ public abstract class Element {
 	 * 
 	 * @see Element#getPreferenceKeys(String)
 	 * @see Root#getPreferenceKeys()
-	 * @see CodeParser#getPreferenceKeys()
+	 * @see Syntax#getPreferenceKeys()
 	 */
 	public static String[] getPreferenceKeys(String category)
 	{
@@ -4014,8 +4049,8 @@ public abstract class Element {
 			//jumpSigns.add(Syntax.getKeywordOrDefault("preThrow", "throw").trim());
 			// END KGU#686 2019-03-18
 			// END KGU#116 2015-12-23
-			String ioSign = null;
 			// START KGU#1097 2023-11-16: Issue #800 New internal keyword representation
+//			String ioSign = null;
 //			for (String ioKey: new String[] {"input", "output"}) {
 //				TokenList splitKey = new TokenList(Syntax.getKeywordOrDefault(ioKey, ioKey), false);
 //				// START KGU#1031 2022-05-31: Bugfix #1037
@@ -4211,6 +4246,11 @@ public abstract class Element {
 							}
 							else if (i == 0 && jpKeys.contains(key)) {
 								hlUnits.add(_elem.makeHighlightUnit(display, E_HL_JUMP_COLOR, true, false));
+							}
+							else {
+								// Remaining keywords are not specifically highlighted
+								normalText.append(display);
+								lastWasNormal = true;
 							}
 						}
 						// END KGU#1097 2023-11-20
@@ -4755,8 +4795,11 @@ public abstract class Element {
 	// START KGU#258 2016-09-26: Enh. #253
 	/**
 	 * Returns a fixed array of names of parser preferences being relevant for
-	 * the current type of Element (e.g. in case of refactoring)
-	 * @return Arrays of key strings for Syntax.keywordMap
+	 * the current type of Element (e.g. in case of refactoring) with one of
+	 * the placement prefixes "^" for start of line, "$" for end of line and
+	 * "*" anywhere in line.
+	 * 
+	 * @return Arrays of prefixed key strings for Syntax.keywordMap
 	 */
 	protected abstract String[] getRelevantParserKeys();
 
