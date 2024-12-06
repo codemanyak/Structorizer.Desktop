@@ -20,12 +20,6 @@
 
 package lu.fisch.structorizer.syntax;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-
-import lu.fisch.utils.StringList;
-
 /******************************************************************************************************
  *
  *      Author:         Kay Gürtzig
@@ -45,7 +39,7 @@ import lu.fisch.utils.StringList;
  *                                      '_' allowed as initial character of names (to be consistent with
  *                                      System.isIdentifier(...) and code import.
  *                                      New methods removePaddings(), removePaddings(int, int)
- *      Kay Gürtzig     2024-12-03      Attribute newlines added and functional integration begun
+ *      Kay Gürtzig     2024-12-03/05   Attribute newlines added and functional integration begun
  *
  ******************************************************************************************************
  *
@@ -53,6 +47,12 @@ import lu.fisch.utils.StringList;
  *      
  *
  ******************************************************************************************************///
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+
+import lu.fisch.utils.StringList;
 
 /**
  * Class represents a lexicographically split line of text, maintaining
@@ -166,6 +166,7 @@ public class TokenList implements Comparable<TokenList>{
 		tokens = new ArrayList<String>();
 		paddings = new ArrayList<Integer>();
 		paddings.add(0);
+		newlines = new ArrayList<Integer>();
 	}
 
 	/**
@@ -270,7 +271,7 @@ public class TokenList implements Comparable<TokenList>{
 	 *    or {@code '} are to be preserved rather than split.
 	 * @param specialKeywords - optionally a list of keyword preferences,
 	 *    which contain single (or double) quotes like {@code "jusqu'à"} and
-	 *    are to produce token. <b>Note</b>: The list should be ordered by
+	 *    are to produce a token. <b>Note</b>: The list should be ordered by
 	 *    decreasing length!
 	 * @param _ignoreCase - whether the matching for special keys is not to be
 	 *    done in a case-sensitive way.
@@ -278,6 +279,9 @@ public class TokenList implements Comparable<TokenList>{
 	private TokenList(String _text, boolean preserveStrings, StringList specialKeywords, boolean _ignoreCase) {
 		tokens = new ArrayList<String>();
 		paddings = new ArrayList<Integer>();
+		newlines = new ArrayList<Integer>();
+		
+		int cpnl = Character.codePointAt("\n", 0);
 		
 		TokenList[] tokenizedKeys = null;
 		if (preserveStrings && specialKeywords != null && !specialKeywords.isEmpty()) {
@@ -297,7 +301,7 @@ public class TokenList implements Comparable<TokenList>{
 			case LX_0:	// Initial and interregnum state
 				// We try to preserve '\n' characters in an appropriate way
 				if (Character.isWhitespace(cp)) {
-					if (Character.codePointAt("\n", 0) == cp) {
+					if (cp == cpnl && !newlines.contains(paddings.size())) {
 						newlines.add(paddings.size());
 					}
 					nBlanks++;
@@ -308,11 +312,9 @@ public class TokenList implements Comparable<TokenList>{
 					for (int k = 0; k < specialKeywords.count(); k++) {
 						String skey = specialKeywords.get(k);
 						if (skey.length() <= _text.length() - ix
-								// First simply check on substring base ...
+								// Simply check on substring base ...
 								&& (_ignoreCase && _text.substring(ix, ix + skey.length()).equalsIgnoreCase(skey)
-										|| !_ignoreCase && _text.substring(ix, ix + skey.length()).equals(skey))
-								// ... then make sure the tokenized forms actually match
-								&& (new TokenList(_text.substring(ix), false)).startsWith(tokenizedKeys[k], !_ignoreCase)) {
+										|| !_ignoreCase && _text.substring(ix, ix + skey.length()).equals(skey))) {
 							paddings.add(nBlanks);
 							tokens.add(skey);
 							len += nBlanks + skey.length();
@@ -356,6 +358,7 @@ public class TokenList implements Comparable<TokenList>{
 					sbToken.appendCodePoint(cp);
 					state = preserveStrings ? LexState.LX_STRING2 : LexState.LX_SYMBOL;
 				}
+				// FIXME: Should these really be unified (decomposed) here?
 				else if (SPEC_OPR_SYMBOLS.indexOf(cp) >= 0) {
 					if (cp == '\u2260') {
 						paddings.add(0);
@@ -747,12 +750,13 @@ public class TokenList implements Comparable<TokenList>{
 	{
 		tokens = new ArrayList<String>(other.tokens);
 		paddings = new ArrayList<Integer>(other.paddings);
+		newlines = new ArrayList<Integer>(other.newlines);
 		len = other.len;
 	}
 	
 	/**
 	 * Concatenates the token lists held in collection {@code tokenLists} into a single token
-	 * list according to the order of the token lists in {@code tokenLists} , possibly inserting
+	 * list according to the order of the token lists in {@code tokenLists}, possibly inserting
 	 * the tokens and whitespace emerging from {@code separator} between them unless
 	 * {@code separator} is {@code null}.
 	 * 
@@ -772,6 +776,11 @@ public class TokenList implements Comparable<TokenList>{
 		for (TokenList tokens: tokenLists) {
 			if (i > 0 && separator != null) {
 				if (separator.isBlank()) {
+					if (separator.contains("\n")
+							&& !total.newlines.contains(total.size())
+							&& !tokens.newlines.contains(0)) {
+						total.newlines.add(total.size());
+					}
 					if (!separator.isEmpty() && !total.isBlank()) {
 						total.setPadding(total.size()-1, -1, separator.length());
 					}
@@ -795,11 +804,24 @@ public class TokenList implements Comparable<TokenList>{
 	public String getString()
 	{
 		StringBuilder sb = new StringBuilder();
-		for (int i = 0; i < tokens.size(); i++) {
-			sb.append(" ".repeat(paddings.get(i)));
+		int nTokens = tokens.size();
+		for (int i = 0; i < nTokens; i++) {
+			if (newlines.contains(i)) {
+				sb.append("\n");
+				sb.append(" ".repeat(paddings.get(i)-1)); // padding should not be 0
+			}
+			else {
+				sb.append(" ".repeat(paddings.get(i)));
+			}
 			sb.append(tokens.get(i));
 		}
-		sb.append(" ".repeat(paddings.get(tokens.size())));
+		if (newlines.contains(nTokens)) {
+			sb.append("\n");
+			sb.append(" ".repeat(paddings.get(nTokens)-1)); // padding should not be 0
+		}
+		else {
+			sb.append(" ".repeat(paddings.get(nTokens)));
+		}
 		return sb.toString();
 	}
 	
@@ -1009,7 +1031,7 @@ public class TokenList implements Comparable<TokenList>{
 	 * list at the beginning and the end.
 	 * 
 	 * @return change of the number of whitespace characters (likely to be a
-	 *     negative result, but could evn be positive, if more necessary gaps
+	 *     negative result, but could even be positive, if more necessary gaps
 	 *     are restored than superfluous whitespace removed).
 	 * 
 	 * @see #trim()
@@ -1021,12 +1043,23 @@ public class TokenList implements Comparable<TokenList>{
 		int nWS = 0;
 		for (int i = 0; i < tokens.size(); i += 2) {
 			nWS += setPadding(i, 0, 0);
+			if (paddings.get(i) == 0) {
+				newlines.remove(Integer.valueOf(i));
+			}
+			if (paddings.get(i+1) == 0) {
+				newlines.remove(Integer.valueOf(i+1));
+			}
+		}
+		if (tokens.size() % 2 == 1) {
+			Integer pd = paddings.set(tokens.size(), 0);
+			nWS += pd;
+			newlines.remove(pd);
 		}
 		return nWS;
 	}
 	
 	/**
-	 * Eliminates absolutely all whitespace around th tokens without ensuring
+	 * Eliminates absolutely all whitespace around the tokens without ensuring
 	 * minimum gaps between tokens that would amalgamate with {@link #getString()}.<br/>
 	 * <b>Hint:</b> Necessary gaps can be automatically restored with
 	 * {@link #shrink()} or, individually, by {@link #setPadding(int, int, int)}.
@@ -1046,6 +1079,7 @@ public class TokenList implements Comparable<TokenList>{
 		for (int i = 0; i < paddings.size(); i++) {
 			nWS -= paddings.set(i, 0);
 		}
+		newlines.clear();
 		return nWS;
 	}
 	
@@ -1077,6 +1111,7 @@ public class TokenList implements Comparable<TokenList>{
 		int nWS = 0;
 		for (int i = fromIndex+1; i <= toIndex; i++) {
 			nWS -= paddings.set(i, 0);
+			newlines.remove(Integer.valueOf(i));
 		}
 		return nWS;
 	}
@@ -1092,6 +1127,8 @@ public class TokenList implements Comparable<TokenList>{
 	public int trim()
 	{
 		int shortened = paddings.set(0, 0) + paddings.set(tokens.size(), 0);
+		newlines.remove(Integer.valueOf(0));
+		newlines.remove(Integer.valueOf(tokens.size()));
 		len -= shortened;
 		return shortened;
 	}
@@ -1107,6 +1144,7 @@ public class TokenList implements Comparable<TokenList>{
 	public int trimEnd()
 	{
 		int shortened = paddings.set(tokens.size(), 0);
+		newlines.remove(Integer.valueOf(tokens.size()));
 		len -= shortened;
 		return shortened;
 	}
@@ -1122,6 +1160,7 @@ public class TokenList implements Comparable<TokenList>{
 	public int trimStart()
 	{
 		int shortened = paddings.set(0, 0);
+		newlines.remove(Integer.valueOf(0));
 		len -= shortened;
 		return shortened;
 	}
@@ -1154,6 +1193,12 @@ public class TokenList implements Comparable<TokenList>{
 		}
 		for (int i = 0; i < part.tokens.size(); i++) {
 			part.len += part.tokens.get(i).length() + part.paddings.get(i);
+		}
+		for (int i = 0; i < newlines.size(); i++) {
+			int nlPos = newlines.get(i);
+			if (nlPos > fromIndex && nlPos < toIndex - 1) {
+				part.newlines.add(nlPos - fromIndex);
+			}
 		}
 		return part;
 	}
@@ -1254,8 +1299,8 @@ public class TokenList implements Comparable<TokenList>{
 	}
 	
 	/**
-	 * Check whether this token list contains token list {@code subList } as an equivalent
-	 * sublista case-ignorant way.<br/>
+	 * Check whether this token list contains token list {@code subList } as an
+	 * equivalent sublist in a possibly case-ignorant way.<br/>
 	 * Hint: In order to check whether certain string might be a substring
 	 * of the string represented by this token list, consider one of:
 	 * <ul>
@@ -1442,6 +1487,21 @@ public class TokenList implements Comparable<TokenList>{
 			}
 			len -= tokens.get(index).length();
 			String removed = tokens.remove(index);
+			int iNlDup = -1;
+			for (int i = 0; i < newlines.size(); i++) {
+				int nlPos = newlines.get(i);
+				if (nlPos > index) {
+					if (newlines.contains(nlPos - 1)) {
+						// Remember the index of the duplicate position to remove it later
+						iNlDup = i;
+					}
+					newlines.set(i, nlPos - 1);
+				}
+			}
+			// If two newline positions clashed then remove one of them
+			if (iNlDup >= 0) {
+				newlines.remove(iNlDup);
+			}
 			if (index > 0) {
 				ensureGap(index-1);
 			}
@@ -1693,7 +1753,7 @@ public class TokenList implements Comparable<TokenList>{
 	 */
 	public boolean addAll(int index, TokenList other) {
 		synchronized (this) {
-			int nPaddings = paddings.size();
+			int otherSize = other.size();
 			int pad0 = other.paddings.get(0);
 			int padI = paddings.get(index);
 			// We split the padding at the insertion position into halves
@@ -1706,13 +1766,24 @@ public class TokenList implements Comparable<TokenList>{
 			else {
 				pad1 = padI;
 			}
+			// Increase all newline positions >= index by other.size()
+			int iNl1 = newlines.size();
+			for (; iNl1 > 0; iNl1--) {
+				int nlPos = 0;
+				if ((nlPos = newlines.get(iNl1-1)) > index) {
+					newlines.set(iNl1-1, nlPos + otherSize);
+				}
+				else {
+					break;	// Larger positions shouldn't follow
+				}
+			}
 			/*
 			 * As an invariant for this loop: The padding before the next token
-			 * to be inserted (i) will already have been handled andwill have
+			 * to be inserted (i) will already have been handled and will have
 			 * length pad1, the post-token padding is to be prepared within the
 			 * loop (for the next cycle) and will have to be cached in pad1 again.
 			 */
-			for (int i = 0; i < other.size(); i++) {
+			for (int i = 0; i < otherSize; i++) {
 				String otherToken = other.tokens.get(i);
 				tokens.add(index + i, otherToken);
 				// post-token padding
@@ -1722,12 +1793,12 @@ public class TokenList implements Comparable<TokenList>{
 			}
 			// The other half of the split padding at index; don't eliminate a former padding
 			if (pad2 > 0) {
-				len += pad1 + pad2 - paddings.set(index + other.size(), pad1 + pad2);
+				len += pad1 + pad2 - paddings.set(index + otherSize, pad1 + pad2);
 			}
 			ensureGap(index-1);
 			ensureGap(index-1 + other.size());
 			for (int nlPos: other.newlines) {
-				newlines.add(nPaddings + nlPos);
+				newlines.add(iNl1, index + nlPos);
 			}
 		}
 		return !other.isEmpty();
@@ -1858,7 +1929,8 @@ public class TokenList implements Comparable<TokenList>{
 	 * Replaces all occurrences of sub-Tokenlist {@code toFind} by {@link
 	 * TokenList} {@code subst} and returns the number of replacements.
 	 * If token list {@code toFind} is blank (i.e. contains no tokens) then
-	 * no replacement will be done.
+	 * no replacement will be done.<br/>
+	 * Note that newlines will be ignored on matching but replaced accordingly.
 	 * 
 	 * @param toFind - the sub-TokenList to be replaced by {@code subst}
 	 * @param subst - a TokenList to substitute each occurrence of {@code
@@ -1950,6 +2022,7 @@ public class TokenList implements Comparable<TokenList>{
 	public void clear() {
 		tokens.clear();
 		paddings.clear();
+		newlines.clear();
 		paddings.add(0);
 	}
 
@@ -2490,7 +2563,7 @@ public class TokenList implements Comparable<TokenList>{
 	}
 
 	/**
-	 * Compares (possibly case-ignorantly)  the specified token list with this
+	 * Compares (possibly case-ignorantly) the specified token list with this
 	 * TokenList to determine whether or not the former is a (case-insensitive)
 	 * prefix of the latter. The widths of padding or separating whitespace is
 	 * completely ignored.
@@ -2592,9 +2665,14 @@ public class TokenList implements Comparable<TokenList>{
 		else {
 			var tList = new TokenList();
 			for (int i = 0; i < tokens.size(); i++) {
-				int plus = paddings.get(i) + tokens.get(i).length();
+				int pd = paddings.get(i);
+				int plus = pd + tokens.get(i).length();
+				boolean nl = pd > 0 && newlines.contains(i);
 				if (i == 0 || tList.len + plus <= maxChars) {
-					tList.paddings.set(tList.tokens.size(), paddings.get(i));
+					tList.paddings.set(tList.tokens.size(), pd);
+					if (nl) {
+						tList.newlines.add(tList.size());
+					}
 					tList.tokens.add(tokens.get(i));
 					tList.paddings.add(0);
 					tList.len += plus;
@@ -2605,7 +2683,10 @@ public class TokenList implements Comparable<TokenList>{
 					tList.len++;
 					broken.add(tList);
 					tList = new TokenList();
-					tList.paddings.set(0, paddings.get(i));
+					tList.paddings.set(0, pd);
+					if (nl) {
+						tList.newlines.add(0);
+					}
 					tList.tokens.add(tokens.get(i));
 					tList.paddings.add(0);
 					tList.len += plus;
@@ -2642,12 +2723,16 @@ public class TokenList implements Comparable<TokenList>{
 		StringBuilder sb = new StringBuilder();
 		sb.append(this.getClass().getSimpleName());
 		sb.append('[');
+		int pd = 0;
 		for (int i = 0; i < tokens.size(); i++) {
 			if (i >= paddings.size()) {
 				sb.append('#');
 			}
-			else if (paddings.get(i) > 0) {
-				sb.append(paddings.get(i));
+			else if ((pd = paddings.get(i)) > 0) {
+				if (newlines.contains(Integer.valueOf(i))) {
+					sb.append("‖");
+				}
+				sb.append(pd);
 			}
 			sb.append('┤');
 			sb.append(tokens.get(i));
@@ -2656,8 +2741,11 @@ public class TokenList implements Comparable<TokenList>{
 		if (tokens.size() >= paddings.size()) {
 			sb.append('#');
 		}
-		else if (paddings.get(tokens.size()) > 0) {
-			sb.append(paddings.get(tokens.size()));
+		else if ((pd = paddings.get(tokens.size())) > 0) {
+			if (newlines.contains(Integer.valueOf(tokens.size()))) {
+				sb.append("‖");
+			}
+			sb.append(pd);
 		}
 		sb.append(']');
 		return sb.toString();

@@ -1276,6 +1276,7 @@ public abstract class Element {
 	/**
 	 * Returns the text of this element but with re-concatenated and trimmed lines if some
 	 * lines were deliberately broken (i.e. ended with backslash).
+	 * 
 	 * @return a StringList consisting of unbroken text lines
 	 */
 	public StringList getUnbrokenText()
@@ -1283,9 +1284,14 @@ public abstract class Element {
 		return getBrokenText(" ");
 	}
 	/**
-	 * Returns the text of this element as a new StringList where each broken line (by means
-	 * of backslashes) will form together an element with newlines.
+	 * Returns the text of this element as a new StringList where the parts of each broken
+	 * line (by means of backslashes at line ends) will form together an element with
+	 * newlines after the backslashes.
+	 * 
 	 * @return a StringList consisting of possibly broken text lines
+	 * 
+	 * @see #getUnbrokenText()
+	 * @see #getBrokenTokenText()
 	 */
 	public StringList getBrokenText()
 	{
@@ -1341,10 +1347,10 @@ public abstract class Element {
 	/**
 	 * Returns the text of this element as a new ArrayList of TokenLists where each
 	 * broken set of lines (by means of trailing backslashes) will be glued together
-	 * to a single TokenList with a "\n" token where a trailing backslash had broken
-	 * the line.
+	 * to a single TokenList with a newline marker where a trailing backslash had
+	 * broken the line (still preserving the backslash tokens).
 	 * 
-	 * @return a list of TokenLists possibly containing "\n" tokens.
+	 * @return a list of TokenLists, possibly with cached "\n" positions.
 	 * 
 	 * @see #getUnbrokenTokenText()
 	 * @see #setTokenText(ArrayList)
