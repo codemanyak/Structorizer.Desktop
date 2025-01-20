@@ -158,7 +158,9 @@ public class LineParser /*extends CodeParser*/
 
 	//---------------------- Grammar table constants DON'T MODIFY! ---------------------------
 
-	// Symbolic constants naming the table indices of the symbols of the grammar 
+	/**
+	 * Symbolic constants naming the table indices of the symbols of the grammar 
+	 */
 	@SuppressWarnings("unused")
 	private interface SymbolConstants 
 	{
@@ -325,7 +327,11 @@ public class LineParser /*extends CodeParser*/
 		final int SYM_VARINITOPT                           = 160;  // <VarInitOpt>
 	};
 
-	// Symbolic constants naming the table indices of the grammar rules
+	/**
+	 * Symbolic constants naming the table indices of the grammar rules
+	 * 
+	 * @author Kay Gürtzig
+	 */
 	@SuppressWarnings("unused")
 	private interface RuleConstants
 	{
@@ -527,8 +533,10 @@ public class LineParser /*extends CodeParser*/
 		final int PROD_CASESELECTORS_SELECTORKEY                                  = 195;  // <CaseSelectors> ::= SelectorKey <ExpressionList>
 	};
 	
-	/** Collection of expression list rule identifiers used in
-	 *  {@link #buildExpressionList(Token, int, List, TypeRegistry)} */
+	/**
+	 * Collection of expression list rule identifiers used in
+	 * {@link #buildExpressionList(Token, int, List, TypeRegistry)}
+	 */
 	private static final HashSet<Integer> EXPR_LIST_RULE_IDS = new HashSet<Integer>();
 	static {
 		EXPR_LIST_RULE_IDS.add(RuleConstants.PROD_EXPRESSIONLIST_COMMA);
@@ -658,6 +666,7 @@ public class LineParser /*extends CodeParser*/
 	 * Preprocesses the given element line for the parser, i.e. replaces configured
 	 * keywords by grammar-defined ones, inserts classifying prefixes where needed
 	 * and unifies operator symbols.
+	 * 
 	 * @param _line - the element line to be parsed or checked
 	 * @param _element - the owning NSD element
 	 * @param _lineNo - the line index
@@ -1234,6 +1243,7 @@ public class LineParser /*extends CodeParser*/
 	/**
 	 * Composes an error description with position marked in the source text
 	 * (in case a preceding parser run caused a syntax error).
+	 * 
 	 * @param _textToParse - the parsed line
 	 * @param _problems - StringBuilder the error description is to be appended to
 	 */
