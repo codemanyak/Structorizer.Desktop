@@ -84,6 +84,8 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2024-04-02      Bugfix #1156: getAssignedVarName used to return null on typed constant definitions
  *      Kay Gürtzig     2024-04-16      Bugfix #1160: Drawing of rotated elements fixed,
  *                                      issues #161, #1161: Method mayPassControl() overridden
+ *      Kay Gürtzig     2025-01-17      Bugfix #1183: updateTypeMap was caught in an eternal loop by assignment
+ *                                      lines like "m[i][j] <- something"
  *
  ******************************************************************************************************
  *
@@ -1965,7 +1967,11 @@ public class Instruction extends Element {
 						// Don't mistake an index as a size, so better don't specify size
 						while ((pos = declZone.indexOf("[")) == 1) {
 							// There might be more than one index in the bracket
-							ArrayList<TokenList> indices = Syntax.splitExpressionList(declZone.subSequenceToEnd(2), ",");
+							// START KGU#1168 2025-10-17: Bugfix #1183 endless loop in case of "[i][j]"
+							//ArrayList<TokenList> indices = Syntax.splitExpressionList(declZone.subSequenceToEnd(2), ",");
+							declZone = declZone.subSequenceToEnd(2);
+							ArrayList<TokenList> indices = Syntax.splitExpressionList(declZone, ",");
+							// END KGU#1168 2025-01-17
 							if (indices.get(indices.size()-1).startsWith("]")) {
 								declZone.remove(0, declZone.indexOf("]"));
 							}
