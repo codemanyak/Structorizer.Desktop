@@ -231,6 +231,7 @@ package lu.fisch.structorizer.executor;
  *      Kay Gürtzig     2024-11-27      Bugfix #1181: Execution highlighting in the code preview was compromised
  *                                      after Calls and within multi-line Calls
  *      Kay Gürtzig     2025-01-21      Enh. #1184: Lazy multi-dimensional array creation on first element assignment
+ *      Kay Gürtzig     2025-02-03/04   Issues #30, #343, #800: New mechanism for comparison transformation.
  *
  ******************************************************************************************************
  *
@@ -243,7 +244,7 @@ package lu.fisch.structorizer.executor;
  *        (e.g. preWhile only at the very start of a While condition, postWhile only at its end)? Postponed.
  *      - PLAN: In a later step, Line and Expression objects should play a more important role. The Element
  *        texts (i.e. TokenLists should no longer contain user-defined keywords but internal tokens, e.g.
- *        "§preWhile§" - only for display ad editing theuser-specified key words should appear. This way, no
+ *        "§preWhile§" - only for display ad editing the user-specified key words should appear. This way, no
  *        refactoring would ever be necessary again.
  *      2021-01-10 Issue #910 (Kay Gürtzig)
  *      - It seemed to be sensible to hold special Includables for additionally enabled DiagramController
@@ -413,9 +414,12 @@ import lu.fisch.structorizer.elements.*;
 import lu.fisch.structorizer.gui.Diagram;
 import lu.fisch.structorizer.gui.IconLoader;
 import lu.fisch.structorizer.gui.Menu;
+import lu.fisch.structorizer.syntax.Expression;
 import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.SyntaxException;
 import lu.fisch.structorizer.syntax.TokenList;
+import lu.fisch.structorizer.syntax.Expression.Operator;
 //import lu.fisch.structorizer.syntax.ExprParser;
 import lu.fisch.utils.BString;
 import lu.fisch.utils.StringList;
@@ -704,6 +708,124 @@ public class Executor implements Runnable
 					+ "}",
 			// END KGU 2016-12-18
 	};
+	
+	// START KGU#342/KGU#790 2025-02-03: Issues #343 + #800 Comparison conversion delegated to Interpreter
+	/**
+	 * Maps operator symbols from the key set of {@link Expression#OPERATOR_PRECEDENCE} to
+	 * function names used for internal type-aware comparison interpretation.
+	 */
+	@SuppressWarnings("serial")
+	public static final HashMap<String, Operator> COMPARISON_MAP = new HashMap<String, Operator>() {{
+		//put("<-", new Operator("<-", 0));	// Does not change anything
+		//put("or", new Operator("or", 1));	// Does not change anything
+		//put("||", new Operator("||", 1));	// Does not change anything
+		//put("and", new Operator("and", 2));	// Does not change anything
+		//put("&&", new Operator("&&", 2));	// Does not change anything
+		//put("|", new Operator("|", 3));	// Does not change anything
+		//put("^", new Operator("^", 4));	// Does not change anything
+		//put("xor", new Operator("xor", 4));	// Does not change anything
+		//put("&", new Operator("&", 5));	// Does not change anything
+		put("=", new Operator("structorizerEq"));	// Does not change anything
+		put("==", new Operator("structorizerEq"));
+		put("<>", new Operator("structorizerNe"));	// Does not change anything
+		put("!=", new Operator("structorizerNe"));
+		put("<", new Operator("structorizerLt"));
+		put(">", new Operator("structorizerGt"));
+		put("<=", new Operator("structorizerLe"));
+		put(">=", new Operator("structorizerGe"));
+		//put("shl", new Operator("shl", 8));	// Does not change anything
+		//put("<<", new Operator("<<", 8));	// Does not change anything
+		//put("shr", new Operator("shr", 8));	// Does not change anything
+		//put(">>", new Operator(">>", 8));	// Does not change anything
+		//put(">>>", new Operator(">>>", 8));	// Does not change anything
+		//put("+", new Operator("+", 9));	// Does not change anything
+		//put("-", new Operator("-", 9));	// Does not change anything
+		//put("*", new Operator("*", 10));	// Does not change anything
+		//put("/", new Operator("/", 10));	// Does not change anything
+		//put("div", new Operator("div", 10));	// Does not change anything
+		//put("mod", new Operator("mod", 10));	// Does not change anything
+		//put("%", new Operator("%", 10));
+		//put("not", new Operator("not", 11));	// Does not change anything
+		//put("!", new Operator("!", 11));	// Does not change anything
+		//put("~", new Operator("~", 11));	// Does not change anything
+		//put("+1", new Operator("+1", 11));	// Does not change anything
+		//put("-1", new Operator("-1", 11));	// Does not change anything
+		//put("*1", new Operator("1^", 11));	// Does not change anything
+		//put("&1", new Operator("@1", 11));	// Does not change anything
+		//put("[]", new Operator("[]", 12));	// Does not change anything
+		//put(".", new Operator(".", 12));	// Does not change anything
+		//put("?,!", new Operator("ifthenelse"));	// Does not change anything
+	}};
+	/**
+	 * Maps internal comparison functions names to respective unified comparison
+	 * operators for reverse expression conversion.
+	 */
+	@SuppressWarnings("serial")
+	private static final HashMap<String, String> REVERSE_CMP_MAP = new HashMap<String, String>() {{
+		put("structorizerEq", "==");
+		put("structorizerNe", "!=");
+		put("structorizerLt", "<");
+		put("structorizerGt", ">");
+		put("structorizerLe", "<=");
+		put("structorizerGe", ">=");
+	}};
+	/**
+	 * Provides interpreter implementations for type-aware comparisons.
+	 */
+	private static final String[] comparisonRoutines = new String[] {
+			"public int structorizerCmp(char c1, char c2) {"
+					+ "return Character.compare(c1, c2);"
+					+ "}",
+			"public int structorizerCmp(int i1, int i2) {"
+					+ "return Integer.compare(i1, i2);"
+					+ "}",
+			"public int structorizerCmp(float f1, float f2) {"
+					+ "return Float.compare(f1, f2);"
+					+ "}",
+			"public int structorizerCmp(double d1, double d2) {"
+					+ "return Double.compare(d1, d2);"
+					+ "}",
+			"public int structorizerCmp(String s1, char c2) {"
+					+ "return s1.compareTo(Character.toString(c2));"
+					+ "}",
+			"public int structorizerCmp(char c1, String s2) {"
+					+ "return -s2.compareTo(Character.toString(c1));"
+					+ "}",
+			"public int structorizerCmp(String s1, String s2) {"
+					+ "return s1.compareTo(s2);"
+					+ "}",
+			"public boolean structorizerEq(Object o1, Object o2) {"
+					+ "return o1.equals(o2);"
+					+ "}",
+			"public boolean structorizerNe(Object o1, Object o2) {"
+					+ "return !o1.equals(o2);"
+					+ "}",
+			"public boolean structorizerGt(Boolean b1, Boolean b2) {"
+					+ "return b1 > b2;"	// Just induces the correct error message
+					+ "}",
+			"public boolean structorizerGt(Object o1, Object o2) {"
+					+ "return structorizerCmp(o1, o2) > 0;"
+					+ "}",
+			"public boolean structorizerLt(Boolean b1, Boolean b2) {"
+					+ "return b1 < b2;"	// Just induces the correct error message
+					+ "}",
+			"public boolean structorizerLt(Object o1, Object o2) {"
+					+ "return structorizerCmp(o1, o2) < 0;"
+					+ "}",
+			"public boolean structorizerGe(Boolean b1, Boolean b2) {"
+					+ "return b1 >= b2;"	// Just induces the correct error message
+					+ "}",
+			"public boolean structorizerGe(Object o1, Object o2) {"
+					+ "return structorizerCmp(o1, o2) >= 0;"
+					+ "}",
+			"public boolean structorizerLe(Boolean b1, Boolean b2) {"
+					+ "return b1 <= b2;"	// Just induces the correct error message
+					+ "}",
+			"public boolean structorizerLe(Object o1, Object o2) {"
+					+ "return structorizerCmp(o1, o2) <= 0;"
+					+ "}"
+	};
+	// END KGU#342/KGU#790 2025-02-03
 	
 	/**
 	 * Returns the singleton instance IF THERE IS ONE. Does NOT create an instance!
@@ -1480,218 +1602,232 @@ public class Executor implements Runnable
 		if (containsComparison)
 		// END KGU#76 2016-04-25
 		{
-			// START KGU#612 2018-12-12: Bugfix #642 - operator symbols weren't reliably detected
-			//// We are looking for || operators and split the expression by them (if present)
-			//// START KGU#490 2018-02-07: Bugfix #503 - the regex precaution was wrong here
-			////StringList exprs = StringList.explodeWithDelimiter(str, " \\|\\| ");
-			//StringList exprs = StringList.explodeWithDelimiter(str, " || ");
-			//// END KGU#490 2018-02-07
-			//// Now we do the same with && operators
-			//exprs = StringList.explodeWithDelimiter(exprs, " && ");
-			ArrayList<TokenList> exprs = new ArrayList<TokenList>();
-			int lastI = 0;
-			for (int i = 0; i < allTokens.size(); i++) {
-				String token = allTokens.get(i);
-				if (token.equals("||") || token.equals("&&")) {
-					exprs.add(allTokens.subSequence(lastI, i));
-					exprs.add(new TokenList(token));
-					lastI = i+1;
+// START KGU#1170 2025-02-03: Issues #343, #509, #800 Completely new approach
+//			// START KGU#612 2018-12-12: Bugfix #642 - operator symbols weren't reliably detected
+//			//// We are looking for || operators and split the expression by them (if present)
+//			//// START KGU#490 2018-02-07: Bugfix #503 - the regex precaution was wrong here
+//			////StringList exprs = StringList.explodeWithDelimiter(str, " \\|\\| ");
+//			//StringList exprs = StringList.explodeWithDelimiter(str, " || ");
+//			//// END KGU#490 2018-02-07
+//			//// Now we do the same with && operators
+//			//exprs = StringList.explodeWithDelimiter(exprs, " && ");
+//			ArrayList<TokenList> exprs = new ArrayList<TokenList>();
+//			int lastI = 0;
+//			for (int i = 0; i < allTokens.size(); i++) {
+//				String token = allTokens.get(i);
+//				if (token.equals("||") || token.equals("&&")) {
+//					exprs.add(allTokens.subSequence(lastI, i));
+//					exprs.add(new TokenList(token));
+//					lastI = i+1;
+//				}
+//			}
+//			exprs.add(allTokens.subSequenceToEnd(lastI));
+//			// END KGU#612 2018-12-12
+//			// Now we should have some "atomic" assertions, among them comparisons
+//			boolean replaced = false;
+//			for (int i = 0; i < exprs.size(); i++)
+//			{
+//				// START KGU#76 2016-04-25: Issue #30 - convert all string comparisons
+//				//String[] eqOps = {"==", "!="};
+//				//for (int op = 0; op < eqOps.length; op++)
+//				TokenList tokens = exprs.get(i);
+//				// Context info for the case of a syntax error
+//				String leftOpr = "";
+//				String rightOpr = "";
+//				if (i > 0) {
+//					leftOpr = "..." + exprs.get(i-1).getString() + " ";
+//				}
+//				if (i+1 < exprs.size()) {
+//					rightOpr = " " + exprs.get(i+1).getString() + "...";
+//				}
+//				for (int op = 0; op < compOps.length; op++)
+//				// END KGU#76 2016-04-25
+//				{
+//					// START KGU#76 2016-04-25: Issue #30
+//					//Regex r = null;
+//					// We can no longer expect operators to be padded, better use tokens
+//					//if (!s.equals(" " + eqOps[op] + " ") && s.indexOf(eqOps[op]) >= 0)
+//					int opPos = -1;		// Operator position
+//					if ((opPos = tokens.indexOf(compOps[op])) >= 0)
+//					{
+//						String leftParenth = "";
+//						String rightParenth = "";
+//						// Get the left operand expression
+//						// START KGU#76 2016-04-25: Issue #30
+//						//r = new Regex("(.*)"+eqOps[op]+"(.*)", "$1");
+//						//String left = r.replaceAll(s).trim();	// All? Really? What's the result supposed to be then?
+//						TokenList left = tokens.subSequence(0, opPos);
+//						// END KGU#76 2016-04-25
+//						// Re-balance parentheses
+//						int nPars0 = left.count("(");
+//						int nPars1 = left.count(")");
+//						while (nPars0 > nPars1 &&
+//								left.get(0).equals("("))
+//						{
+//							leftParenth = leftParenth + "(";
+//							left.remove(0);
+//							nPars0--;
+//						}
+//						left.trim();
+//						// Get the right operand expression
+//						// START KGU#76 2016-04-25: Issue #30
+//						//r = new Regex("(.*)"+eqOps[op]+"(.*)", "$2");
+//						//String right = r.replaceAll(s).trim();
+//						TokenList right = tokens.subSequenceToEnd(opPos+1);
+//						// END KGU#76 2016-04-25
+//						// Re-balance parentheses
+//						nPars0 = right.count("(");
+//						nPars1 = right.count(")");
+//						while (nPars1 > nPars0 &&
+//								right.getLast().equals(")"))
+//						{
+//							rightParenth = rightParenth + ")";
+//							right.remove(right.size() - 1);
+//							nPars1--;
+//						}
+//						right.trim();
+//						// ---- thanks to autoboxing, we can always use the "equals" method
+//						// ---- to compare things ...
+//						// addendum: sorry, doesn't always work.
+//						try
+//						{
+//							int pos = -1;	// some character position
+//							// FIXME: Beware of side effects!
+//							Object leftO = this.evaluateExpression(left, false, false);
+//							Object rightO = this.evaluateExpression(right, false, false);
+//							String neg = (op > 0) ? "!" : "";
+//							// First the obvious case: two String expressions
+//							if ((leftO instanceof String) && (rightO instanceof String))
+//							{
+//								// START KGU#76 2016-04-25: Issue #30 support all string comparison
+//								//exprs.set(i, leftParenth + neg + left + ".equals(" + right + ")" + rightParenth);
+//								TokenList subst = new TokenList(leftParenth);
+//								subst.addAll(left);
+//								subst.add(".compareTo(");
+//								subst.addAll(right);
+//								subst.add(") " + compOps[op] + " 0" + rightParenth);
+//								exprs.set(i, subst);
+//								// END KGU#76 2016-04-25
+//								replaced = true;
+//							}
+//							// We must make single-char strings comparable with characters, since it
+//							// doesn't work automatically and several conversions have been performed 
+//							else if ((leftO instanceof String) && (rightO instanceof Character))
+//							{
+//								// START KGU#76 2016-04-25: Issue #30 support all string comparison
+//								//exprs.set(i, leftParenth + neg + left + ".equals(\"" + (Character)rightO + "\")" + rightParenth);
+//								// START KGU#342 2017-02-09: Bugfix #343 - be aware of characters to be escaped
+//								//exprs.set(i, leftParenth + left + ".compareTo(\"" + (Character)rightO + "\") " + compOps[op] + " 0" + rightParenth);
+//								//exprs.set(i, leftParenth + left
+//								//		+ ".compareTo(\"" + this.literalFromChar((Character)rightO) + "\") "
+//								//		+ compOps[op] + " 0" + rightParenth);
+//								TokenList subst = new TokenList(leftParenth);
+//								subst.addAll(left);
+//								subst.add(".compareTo(\"" + this.literalFromChar((Character)rightO) + "\") ");
+//								subst.add(compOps[op] + " 0" + rightParenth);
+//								exprs.set(i, subst);
+//								// END KGU#342 2017-02-09
+//								// END KGU#76 2016-04-25
+//								replaced = true;
+//							}
+//							else if ((leftO instanceof Character) && (rightO instanceof String))
+//							{
+//								// START KGU#76 2016-04-25: Issue #30 support all string comparison
+//								//exprs.set(i, leftParenth + neg + right + ".equals(\"" + (Character)leftO + "\")" + rightParenth);
+//								// START KGU#342 2017-02-09: Bugfix #343 - be aware of characters to be escaped
+//								//exprs.set(i, leftParenth + "\"" + (Character)leftO + "\".compareTo(" + right + ") " + compOps[op] + " 0" + rightParenth);
+//								//exprs.set(i, leftParenth + "\"" + this.literalFromChar((Character)leftO)
+//								//		+ "\".compareTo(" + right + ") " + compOps[op] + " 0" + rightParenth);
+//								TokenList subst = new TokenList(leftParenth);
+//								subst.add("\"" + this.literalFromChar((Character)leftO) + "\".compareTo(");
+//								subst.addAll(right);
+//								subst.add(") " + compOps[op] + " 0" + rightParenth);
+//								exprs.set(i, subst);
+//								// END KGU#342 2017-02-09
+//								// END KGU#76 2016-04-25
+//								replaced = true;
+//							}
+//							// START KGU#99 2015-12-10: Bugfix #49 (also replace if both operands are array elements (objects!)
+//							// START KGU#76 2016-04-25: Issue #30 - this makes only sense for "==" and "!="
+//							//else if ((pos = left.indexOf('[')) > -1 && left.indexOf(']', pos) > -1 && 
+//							else if (op < 2 &&
+//									(pos = left.indexOf("[")) >= 0 && left.indexOf("]", pos) >= 0 && 
+//							// END KGU#76 2016-04-25
+//									(pos = right.indexOf("[")) >= 0 && right.indexOf("]", pos) >= 0)
+//							{
+//								//exprs.set(i, leftParenth + neg + left + ".equals(" + right + ")" + rightParenth);
+//								TokenList subst = new TokenList(leftParenth + neg);
+//								subst.addAll(left);
+//								subst.add(".equals(");
+//								subst.addAll(right);
+//								subst.add(")"+rightParenth);
+//								exprs.set(i, subst);
+//								replaced = true;
+//							}
+//							// END KGU#99 2015-12-10
+//						}
+//						catch (EvalError ex)
+//						{
+//							// START KGU#1024 2022-01-05: Upgrade bsh-2.0b6.jar to bsh-2.1.0.jar
+//							//logger.log(Level.WARNING, "convertStringComparison(\"{0}\"): {1}", new Object[]{str, ex.getMessage()});
+//							// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
+//							//String msg = ex.getRawMessage();
+//							//int pilcrowPos = -1;
+//							//if ((pilcrowPos = msg.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
+//							//	msg = msg.substring(0, pilcrowPos);
+//							//}
+//							String msg = getEvalErrorMessage(ex);
+//							// END KGU#1058 2022-09-29
+//							logger.log(Level.WARNING, "convertStringComparison(\"{0}\"): {1}", new Object[]{leftOpr + tokens.getString() + rightOpr, msg});
+//							// END KGU#1024 2022-01-05
+//						}
+//						catch (Exception ex)
+//						{
+//							String msg = ex.getMessage();
+//							logger.log(Level.WARNING, "convertStringComparison(\"{0}\"): {1}", new Object[]{leftOpr + tokens.getString() + rightOpr, msg});
+//						}
+//					} // if (!s.equals(" " + eqOps[op] + " ") && (s.indexOf(eqOps[op]) >= 0))
+//				} // for (int op = 0; op < eqOps.length; op++)
+//				//if (replaced)
+//				//{
+//				//	// START KGU#490 2018-02-07: Bugfix #503 - the regex escaping was wrong (see above)
+//				//	//// Compose the partial expressions and undo the regex escaping for the initial split
+//				//	//str = exprs.getLongString().replace(" \\|\\| ", " || ");
+//				//	str = exprs.getLongString();
+//				//	// END KGU#490 2018-02-07
+//				//	str.replace("  ", " ");	// Get rid of multiple spaces
+//				//}
+//			} // for (int i = 0; i < exprs.size(); i++)
+//			if (replaced) {
+//				allTokens = TokenList.concatenate(exprs, null);
+//			}
+			try {
+				TokenList copiedTokens = new TokenList(allTokens);
+				LinkedList<Expression> exprs = Expression.parse(copiedTokens, null, (short)0);
+				if (exprs.size() == 1) {
+					allTokens = exprs.get(0).asTokenList(COMPARISON_MAP);
 				}
+			} catch (SyntaxException exc) {
+				// TODO Auto-generated catch block
+				logger.log(Level.WARNING, "Expression parsing failed for «" + allTokens.getString() + "»", exc);
 			}
-			exprs.add(allTokens.subSequenceToEnd(lastI));
-			// END KGU#612 2018-12-12
-			// Now we should have some "atomic" assertions, among them comparisons
-			boolean replaced = false;
-			for (int i = 0; i < exprs.size(); i++)
-			{
-				// START KGU#76 2016-04-25: Issue #30 - convert all string comparisons
-				//String[] eqOps = {"==", "!="};
-				//for (int op = 0; op < eqOps.length; op++)
-				TokenList tokens = exprs.get(i);
-				// Context info for the case of a syntax error
-				String leftOpr = "";
-				String rightOpr = "";
-				if (i > 0) {
-					leftOpr = "..." + exprs.get(i-1).getString() + " ";
-				}
-				if (i+1 < exprs.size()) {
-					rightOpr = " " + exprs.get(i+1).getString() + "...";
-				}
-				for (int op = 0; op < compOps.length; op++)
-				// END KGU#76 2016-04-25
-				{
-					// START KGU#76 2016-04-25: Issue #30
-					//Regex r = null;
-					// We can no longer expect operators to be padded, better use tokens
-					//if (!s.equals(" " + eqOps[op] + " ") && s.indexOf(eqOps[op]) >= 0)
-					int opPos = -1;		// Operator position
-					if ((opPos = tokens.indexOf(compOps[op])) >= 0)
-					{
-						String leftParenth = "";
-						String rightParenth = "";
-						// Get the left operand expression
-						// START KGU#76 2016-04-25: Issue #30
-						//r = new Regex("(.*)"+eqOps[op]+"(.*)", "$1");
-						//String left = r.replaceAll(s).trim();	// All? Really? What's the result supposed to be then?
-						TokenList left = tokens.subSequence(0, opPos);
-						// END KGU#76 2016-04-25
-						// Re-balance parentheses
-						int nPars0 = left.count("(");
-						int nPars1 = left.count(")");
-						while (nPars0 > nPars1 &&
-								left.get(0).equals("("))
-						{
-							leftParenth = leftParenth + "(";
-							left.remove(0);
-							nPars0--;
-						}
-						left.trim();
-						// Get the right operand expression
-						// START KGU#76 2016-04-25: Issue #30
-						//r = new Regex("(.*)"+eqOps[op]+"(.*)", "$2");
-						//String right = r.replaceAll(s).trim();
-						TokenList right = tokens.subSequenceToEnd(opPos+1);
-						// END KGU#76 2016-04-25
-						// Re-balance parentheses
-						nPars0 = right.count("(");
-						nPars1 = right.count(")");
-						while (nPars1 > nPars0 &&
-								right.getLast().equals(")"))
-						{
-							rightParenth = rightParenth + ")";
-							right.remove(right.size() - 1);
-							nPars1--;
-						}
-						right.trim();
-						// ---- thanks to autoboxing, we can always use the "equals" method
-						// ---- to compare things ...
-						// addendum: sorry, doesn't always work.
-						try
-						{
-							int pos = -1;	// some character position
-							// FIXME: Beware of side effects!
-							Object leftO = this.evaluateExpression(left, false, false);
-							Object rightO = this.evaluateExpression(right, false, false);
-							String neg = (op > 0) ? "!" : "";
-							// First the obvious case: two String expressions
-							if ((leftO instanceof String) && (rightO instanceof String))
-							{
-								// START KGU#76 2016-04-25: Issue #30 support all string comparison
-								//exprs.set(i, leftParenth + neg + left + ".equals(" + right + ")" + rightParenth);
-								TokenList subst = new TokenList(leftParenth);
-								subst.addAll(left);
-								subst.add(".compareTo(");
-								subst.addAll(right);
-								subst.add(") " + compOps[op] + " 0" + rightParenth);
-								exprs.set(i, subst);
-								// END KGU#76 2016-04-25
-								replaced = true;
-							}
-							// We must make single-char strings comparable with characters, since it
-							// doesn't work automatically and several conversions have been performed 
-							else if ((leftO instanceof String) && (rightO instanceof Character))
-							{
-								// START KGU#76 2016-04-25: Issue #30 support all string comparison
-								//exprs.set(i, leftParenth + neg + left + ".equals(\"" + (Character)rightO + "\")" + rightParenth);
-								// START KGU#342 2017-02-09: Bugfix #343 - be aware of characters to be escaped
-								//exprs.set(i, leftParenth + left + ".compareTo(\"" + (Character)rightO + "\") " + compOps[op] + " 0" + rightParenth);
-								//exprs.set(i, leftParenth + left
-								//		+ ".compareTo(\"" + this.literalFromChar((Character)rightO) + "\") "
-								//		+ compOps[op] + " 0" + rightParenth);
-								TokenList subst = new TokenList(leftParenth);
-								subst.addAll(left);
-								subst.add(".compareTo(\"" + this.literalFromChar((Character)rightO) + "\") ");
-								subst.add(compOps[op] + " 0" + rightParenth);
-								exprs.set(i, subst);
-								// END KGU#342 2017-02-09
-								// END KGU#76 2016-04-25
-								replaced = true;
-							}
-							else if ((leftO instanceof Character) && (rightO instanceof String))
-							{
-								// START KGU#76 2016-04-25: Issue #30 support all string comparison
-								//exprs.set(i, leftParenth + neg + right + ".equals(\"" + (Character)leftO + "\")" + rightParenth);
-								// START KGU#342 2017-02-09: Bugfix #343 - be aware of characters to be escaped
-								//exprs.set(i, leftParenth + "\"" + (Character)leftO + "\".compareTo(" + right + ") " + compOps[op] + " 0" + rightParenth);
-								//exprs.set(i, leftParenth + "\"" + this.literalFromChar((Character)leftO)
-								//		+ "\".compareTo(" + right + ") " + compOps[op] + " 0" + rightParenth);
-								TokenList subst = new TokenList(leftParenth);
-								subst.add("\"" + this.literalFromChar((Character)leftO) + "\".compareTo(");
-								subst.addAll(right);
-								subst.add(") " + compOps[op] + " 0" + rightParenth);
-								exprs.set(i, subst);
-								// END KGU#342 2017-02-09
-								// END KGU#76 2016-04-25
-								replaced = true;
-							}
-							// START KGU#99 2015-12-10: Bugfix #49 (also replace if both operands are array elements (objects!)
-							// START KGU#76 2016-04-25: Issue #30 - this makes only sense for "==" and "!="
-							//else if ((pos = left.indexOf('[')) > -1 && left.indexOf(']', pos) > -1 && 
-							else if (op < 2 &&
-									(pos = left.indexOf("[")) >= 0 && left.indexOf("]", pos) >= 0 && 
-							// END KGU#76 2016-04-25
-									(pos = right.indexOf("[")) >= 0 && right.indexOf("]", pos) >= 0)
-							{
-								//exprs.set(i, leftParenth + neg + left + ".equals(" + right + ")" + rightParenth);
-								TokenList subst = new TokenList(leftParenth + neg);
-								subst.addAll(left);
-								subst.add(".equals(");
-								subst.addAll(right);
-								subst.add(")"+rightParenth);
-								exprs.set(i, subst);
-								replaced = true;
-							}
-							// END KGU#99 2015-12-10
-						}
-						catch (EvalError ex)
-						{
-							// START KGU#1024 2022-01-05: Upgrade bsh-2.0b6.jar to bsh-2.1.0.jar
-							//logger.log(Level.WARNING, "convertStringComparison(\"{0}\"): {1}", new Object[]{str, ex.getMessage()});
-							// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
-							//String msg = ex.getRawMessage();
-							//int pilcrowPos = -1;
-							//if ((pilcrowPos = msg.indexOf(EVAL_ERR_PREFIX_SEPA)) > 0) {
-							//	msg = msg.substring(0, pilcrowPos);
-							//}
-							String msg = getEvalErrorMessage(ex);
-							// END KGU#1058 2022-09-29
-							logger.log(Level.WARNING, "convertStringComparison(\"{0}\"): {1}", new Object[]{leftOpr + tokens.getString() + rightOpr, msg});
-							// END KGU#1024 2022-01-05
-						}
-						catch (Exception ex)
-						{
-							String msg = ex.getMessage();
-							logger.log(Level.WARNING, "convertStringComparison(\"{0}\"): {1}", new Object[]{leftOpr + tokens.getString() + rightOpr, msg});
-						}
-					} // if (!s.equals(" " + eqOps[op] + " ") && (s.indexOf(eqOps[op]) >= 0))
-				} // for (int op = 0; op < eqOps.length; op++)
-				//if (replaced)
-				//{
-				//	// START KGU#490 2018-02-07: Bugfix #503 - the regex escaping was wrong (see above)
-				//	//// Compose the partial expressions and undo the regex escaping for the initial split
-				//	//str = exprs.getLongString().replace(" \\|\\| ", " || ");
-				//	str = exprs.getLongString();
-				//	// END KGU#490 2018-02-07
-				//	str.replace("  ", " ");	// Get rid of multiple spaces
-				//}
-			} // for (int i = 0; i < exprs.size(); i++)
-			if (replaced) {
-				allTokens = TokenList.concatenate(exprs, null);
-			}
+// END KGU#1170 2025-02-03
 		}
 		return allTokens;
 	}
 	// END KGU#57 2015-11-07
-	
-	// START KGU#342 2017-02-09: Bugfix #343
-	private String literalFromChar(char ch) {
-		String literal = Character.toString(ch);
-		if ("\"\'\\\b\f\n\r\t".indexOf(ch) >= 0) {
-			literal = "\\" + literal;
-		}
-		return literal;
-	}
-	// END KGU#342 2017-02-09
+
+// START KGU#1170 2025-02-03: Issues #343, #509, #800 Completely new mechanism now
+//	// START KGU#342 2017-02-09: Bugfix #343
+//	private String literalFromChar(char ch) {
+//		String literal = Character.toString(ch);
+//		if ("\"\'\\\b\f\n\r\t".indexOf(ch) >= 0) {
+//			literal = "\\" + literal;
+//		}
+//		return literal;
+//	}
+//	// END KGU#342 2017-02-09
+// END KGU#1170 2025-02-03
 
 	private void delay()
 	{
@@ -3301,6 +3437,11 @@ public class Executor implements Runnable
 				interpreter.eval(fileApiRoutines[i]);
 			}
 			// END KGU#790 2021-12-22
+			// START KGU#342/KGU#790 2025-02-03: Issues #343, #800 Delegation of comparison stuff
+			for (int i = 0; i < comparisonRoutines.length; i++) {
+				interpreter.eval(comparisonRoutines[i]);
+			}
+			// END KGU#790 2025-02-03
 			
 		} catch (EvalError ex)
 		{
@@ -8735,7 +8876,7 @@ public class Executor implements Runnable
 	 * impact. If there happens to be some place in code where it seems helpful to activate this
 	 * mechanism just go ahead and try.
 	 * 
-	 * @param tokens - the tokenized converted expression to be evaluated
+	 * @param _tokens - the tokenized converted expression to be evaluated
 	 * @param _withInitializers - whether an array or record initializer is to be managed here
 	 * @param _preserveBrackets - if true then brackets won't be substituted
 	 * @return the evaluated result if successful
@@ -8743,7 +8884,7 @@ public class Executor implements Runnable
 	 * @throws EvalError an exception if something went wrong (may be raised by the interpreter
 	 *     or this method itself)
 	 */
-	protected Object evaluateExpression(TokenList tokens, boolean _withInitializers, boolean _preserveBrackets) throws EvalError
+	protected Object evaluateExpression(TokenList _tokens, boolean _withInitializers, boolean _preserveBrackets) throws EvalError
 	{
 		Object value = null;
 		// START KGU#773 2019-11-28: Bugfix #786 Blanks are not tolerated by the susequent mechanisms like index evaluation
@@ -8751,38 +8892,38 @@ public class Executor implements Runnable
 		// END KGU#773 2019-11-28
 		// START KGU#439 2017-10-13: Enh. #436 Arrays now represented by ArrayLists
 		if (!_preserveBrackets) {
-			if (tokens.indexOf(OBJECT_ARRAY, 0, true) == 0) {
-				tokens.set(0, "Object[]");
-				tokens.remove(1,3);
+			if (_tokens.indexOf(OBJECT_ARRAY, 0, true) == 0) {
+				_tokens.set(0, "Object[]");
+				_tokens.remove(1,3);
 			}
 			// START KGU#1060 2022-08-21: Issue #1068 Inconsistency in the support of index expressions
 			// We accept index lists on the left-hand side, so we should do here too
 			//tokens.replaceAll("[", ".get(");
 			//tokens.replaceAll("]", ")");
-			int pos = tokens.size() - 1;
-			while ((pos = tokens.lastIndexOf("]", pos)) >= 0) {
+			int pos = _tokens.size() - 1;
+			while ((pos = _tokens.lastIndexOf("]", pos)) >= 0) {
 				Stack<Boolean> context = new Stack<Boolean>();
 				context.push(true);
-				tokens.set(pos--, ")");
+				_tokens.set(pos--, ")");
 				while (!context.isEmpty() && pos >= 0) {
-					String tok = tokens.get(pos);
+					String tok = _tokens.get(pos);
 					if (tok.equals("]")) {
 						context.push(true);
-						tokens.set(pos, ")");
+						_tokens.set(pos, ")");
 					}
 					else if (tok.equals(")") || tok.equals("}")) {
 						context.push(false);
 					}
 					else if (tok.equals("[")) {
 						context.pop();
-						tokens.set(pos, ".get(");
+						_tokens.set(pos, ".get(");
 					}
 					else if (tok.equals("(") || tok.equals("{")) {
 						context.pop();
 					}
 					else if (tok.equals(",") && context.peek()) {
 						// We are at bracket level, so this comma separates indices...
-						tokens.set(pos, ").get(");
+						_tokens.set(pos, ").get(");
 					}
 					pos--;
 				}
@@ -8792,45 +8933,45 @@ public class Executor implements Runnable
 		// END KGU#439 2017-10-13
 		// Special treatment for inc() and dec() functions? - no need if convert was applied before
 		int i = 0;
-		while ((i = tokens.indexOf(".", i+1)) > 0) {
+		while ((i = _tokens.indexOf(".", i+1)) > 0) {
 			// FIXME: We should check for either declared type or actual object type of what's on the left of the dot.
 			// The trouble is that we would have to analyse the expression on the left of the dot in order to find out
 			// whether it is a record. But where does it begin? It could be a function call (e.g. copyRecord()) or an
 			// indexed access to an array element... An how can we make sure its evaluation hasn't got irreversible side
 			// effects?
 			// At least the check against following parenthesis will help to avoid the spoiling of Java method calls.
-			if (i+1 < tokens.size() && Syntax.isIdentifier(tokens.get(i+1), false, null) && (i+2 == tokens.size() || !tokens.get(i+2).equals("("))) {
-				tokens.set(i, ".get(\"" + tokens.get(i+1) + "\")");
-				tokens.remove(i+1);
+			if (i+1 < _tokens.size() && Syntax.isIdentifier(_tokens.get(i+1), false, null) && (i+2 == _tokens.size() || !_tokens.get(i+2).equals("("))) {
+				_tokens.set(i, ".get(\"" + _tokens.get(i+1) + "\")");
+				_tokens.remove(i+1);
 			}
 		}
 		// START KGU#100/KGU#388 2017-09-29: Enh. #84, #423 TODO Make this available at more places
-		if (tokens.getLast().equals("}") && _withInitializers) {
+		if (_tokens.getLast().equals("}") && _withInitializers) {
 			TypeMapEntry recordType = null;
 			// START KGU#100 2016-01-14: Enh. #84 - accept array assignments with syntax array <- {val1, val2, ..., valN}
-			if (tokens.get(0).equals("{")) {
-				value = evaluateArrayInitializer(tokens);
+			if (_tokens.get(0).equals("{")) {
+				value = evaluateArrayInitializer(_tokens);
 			}
 			// END KGU#100 2016-01-14
 			// START KGU#388 2017-09-13: Enh. #423 - accept record assignments with syntax recordVar <- typename{comp1: val1, comp2: val2, ..., compN: valN}
-			else if (tokens.get(1).equals("{") && (recordType = identifyRecordType(tokens.get(0), true)) != null) {
-				value = evaluateRecordInitializer(tokens, recordType);
+			else if (_tokens.get(1).equals("{") && (recordType = identifyRecordType(_tokens.get(0), true)) != null) {
+				value = evaluateRecordInitializer(_tokens, recordType);
 			}
 			// END KGU#388 2017-09-13
 		}
 		// END KGU#100/KGU#388 2017-09-29
 		// START KGU#920 2021-02-01: Bugfix #920: "Infinity" should be interpreted
-		else if (tokens.size() == 1 && tokens.get(0).equals("Infinity")) {
+		else if (_tokens.size() == 1 && _tokens.get(0).equals("Infinity")) {
 			value = Double.POSITIVE_INFINITY;
 		}
-		else if (tokens.size() == 2 && tokens.get(0).equals("-") && tokens.get(1).equals("Infinity")) {
+		else if (_tokens.size() == 2 && _tokens.get(0).equals("-") && _tokens.get(1).equals("Infinity")) {
 			value = Double.NEGATIVE_INFINITY;
 		}
 		// END KGU#920 2021-02-01
 		else
 		{
 			// START KGU#920 2021-02-04: Bugfix #920: "Infinity" should be interpreted
-			tokens.replaceAll("Infinity", "Double.POSITIVE_INFINITY");
+			_tokens.replaceAll("Infinity", "Double.POSITIVE_INFINITY");
 			// END KGU#920 2021-02-04
 			
 			// Possibly our resolution of qualified names went too far. For this case give it some more tries
@@ -8839,7 +8980,7 @@ public class Executor implements Runnable
 			boolean error423 = false;
 			// START KGU#773 2019-11-28: Bugfix #786 Since blanks have been eliminated now, we must be cautious on concatenation
 			//String expr = tokens.concatenate();
-			String expr = tokens.getString();
+			String expr = _tokens.getString();
 			// END KGU#773 2019-11-28
 			// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
 			//boolean messageAugmented = false;
@@ -8851,6 +8992,9 @@ public class Executor implements Runnable
 					value = context.interpreter.eval(expr);
 				}
 				catch (EvalError err) {
+					// START KGU#1170 2025-02-04: Issues #30, #343. #509, #800
+					expr = undoComparisonConversion(expr);
+					// END KGU#1170 2025-02-04
 					// START KGU#1024 2022-01-05: Upgrade from bsh-2.0b6.jar to bsh-2.1.0.jar
 					//String error423message = err.getMessage();
 					String error423message = err.getRawMessage();
@@ -8963,6 +9107,43 @@ public class Executor implements Runnable
 		return value;
 	}
 	// END KGU#388 2017-09-16
+
+	// START KGU#1170 2025-02-04: Issues #30, #343, #509, #800
+	/**
+	 * Replaces function calls {@code structorizerLt(op1, op2)} etc. by {@code (op1 < op2)}
+	 * etc. and thus undoes comparison conversion.
+	 * 
+	 * @param exprStr - the evaluated expression as string
+	 * @return the backconverted expression as string
+	 */
+	private String undoComparisonConversion(String exprStr) {
+		try {
+			LinkedList<Expression> exprs = Expression.parse(new TokenList(exprStr), null, (short)0);
+			if (exprs.size() == 1 && undoComparisonConversion(exprs.get(0))) {
+				exprStr = exprs.get(0).asTokenList().getString();
+			}
+		} catch (SyntaxException exc) {
+			logger.log(Level.FINE, exprStr, exc);
+		}
+		return exprStr;
+	}
+	private boolean undoComparisonConversion(Expression expr)
+	{
+		boolean replaced = false;
+		String opr = null;
+		if (expr.type == Expression.NodeType.FUNCTION
+				&& (opr = REVERSE_CMP_MAP.get(expr.text)) != null
+				&& expr.children.size() == 2) {
+			expr.type = Expression.NodeType.OPERATOR;
+			expr.text = opr;
+			replaced = true;
+		}
+		for (Expression sub: expr.children) {
+			replaced = undoComparisonConversion(sub) || replaced;
+		}
+		return replaced;
+	}
+	// END KGU#2025-02-04
 
 	// START KGU#1058 2022-09-29: Bugfix #1067 some errors passed unnoticed
 	/**

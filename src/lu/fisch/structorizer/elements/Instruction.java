@@ -546,7 +546,7 @@ public class Instruction extends Element {
 	@Override
 	public Element copy()
 	{
-		Element ele = new Instruction(text);
+		Element ele = new Instruction(new StringList(this.getText()));
 		// START KGU#199 2016-07-06: Enh. #188 specific conversions enabled
 		return copyDetails(ele, false, false);
 	}
