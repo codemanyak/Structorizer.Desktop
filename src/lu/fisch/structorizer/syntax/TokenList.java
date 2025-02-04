@@ -2050,7 +2050,7 @@ public class TokenList implements Comparable<TokenList>{
 	 * in this list from index {@code from} on, or -1 if this list does not contain
 	 * the token in the specified subsequence.<br/>
 	 * More formally, returns the lowest index {@code i >= from} such that
-	 * {@code token.equals(get(i))} or {@code token.equalsIgnoreCase(get(i)),
+	 * {@code token.equals(get(i))} or {@code token.equalsIgnoreCase(get(i))},
 	 * or -1 if there is no such index.
 	 * 
 	 * @param token - the string to be found as token
@@ -2071,7 +2071,7 @@ public class TokenList implements Comparable<TokenList>{
 	 * {@code token} either in a case-aware ore case-ignorant way, depending on
 	 * {@code matchCase}, or -1 if this list does not contain such a token.<br/>
 	 * More formally, returns the lowest index i such that {@code token.equals(get(i))}
-	 * or {@code token.equalsIgnoreCase(get(i)), or -1 if there is no such index.
+	 * or {@code token.equalsIgnoreCase(get(i))}, or -1 if there is no such index.
 	 * 
 	 * @param token - the string to be found as token
 	 * @param matchCase - whether the comparison has to distinguish case
@@ -2095,7 +2095,7 @@ public class TokenList implements Comparable<TokenList>{
 	 * in this list from index {@code from} on, or -1 if this list does not contain
 	 * the token in the specified subsequence.<br/>
 	 * More formally, returns the lowest index {@code i >= from} such that
-	 * {@code token.equals(get(i))} or {@code token.equalsIgnoreCase(get(i)),
+	 * {@code token.equals(get(i))} or {@code token.equalsIgnoreCase(get(i))},
 	 * or -1 if there is no such index.
 	 * 
 	 * @param token - the string to be found as token

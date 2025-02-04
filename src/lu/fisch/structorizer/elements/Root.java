@@ -194,6 +194,8 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2024-04-17      Issues #161, #1161: Improved reachability check (via mayPassControl())
  *      Kay Gürtzig     2024-10-09      Bugfix #1174: Precaution against NullpPointerException in fetchAuthorDates()
  *      Kay Gürtzig     2024-11-25      Bugfix #1180: Deep test coverage change on undo/redo propagated
+ *      Kay Gürtzig     2025-02-04      Issue #800: Obsolete mechanism in analyse_10_11() revised,
+ *                                      obsolete tests in analyse_13_16_xxxx() mended
  *
  ******************************************************************************************************
  *
@@ -1063,28 +1065,28 @@ public class Root extends Element {
 	}
 	// END KGU#371 2019-03-07
 
-    public void addUpdater(Updater updater)
-    {
-    	// START KGU#48 2015-10-17: While this.updaters is only a Vector, we must avoid multiple registration...
-    	//updaters.add(updater);
-    	if (!updaters.contains(updater))
-    	{
-    		updaters.add(updater);
-    	}
-    	// END KGU#48 2015-10-17
-    }
+	public void addUpdater(Updater updater)
+	{
+		// START KGU#48 2015-10-17: While this.updaters is only a Vector, we must avoid multiple registration...
+		//updaters.add(updater);
+		if (!updaters.contains(updater))
+		{
+			updaters.add(updater);
+		}
+		// END KGU#48 2015-10-17
+	}
 
-    public void removeUpdater(Updater updater)
-    {
-        updaters.remove(updater);
-    }
-    
-    // START KGU#2 (#9) 2015-11-14: We need a way to get the Updaters
-    public Iterator<Updater> getUpdateIterator()
-    {
-    	return updaters.iterator();
-    }
-    // END KGU#2 (#9) 2015-11-14
+	public void removeUpdater(Updater updater)
+	{
+		updaters.remove(updater);
+	}
+
+	// START KGU#2 (#9) 2015-11-14: We need a way to get the Updaters
+	public Iterator<Updater> getUpdateIterator()
+	{
+		return updaters.iterator();
+	}
+	// END KGU#2 (#9) 2015-11-14
 
     // START KGU#48 2015-10-17: Arranger support on Root replacement (e.g. by loading a new file)
     public void notifyReplaced(Root newRoot)
@@ -2003,38 +2005,38 @@ public class Root extends Element {
 	}
 	// END KGU#749 2019-10-15
 
-    @Override
-    public Element copy()
-    {
-            Root ele = new Root(new StringList(this.getText()));
-            copyDetails(ele, false);
-            ele.isBoxed=this.isBoxed;
-            ele.diagrType = this.diagrType;
-            ele.children=(Subqueue) this.children.copy();
-            // START KGU#2 (#9) 2015-11-13: By the above replacement the new children were orphans
-            ele.children.parent = ele;
-            //ele.updaters = this.updaters;	// FIXME: Risks of this?
-            // END KGU#2 (#9) 2015-11-13
-            // START KGU#704 2019-03-30: Bugfix #699 - we must not forget to clone the includeList
-            if (this.includeList != null) {
-                ele.includeList = new StringList(this.includeList);
-            }
-            // END KGU#704 2019-03-30
-            // START KGU#363 2017-03-10: Enh. #372
-            ele.author = this.author;
-            ele.created = this.created;
-            this.modifiedby = Ini.getInstance().getProperty("authorName", System.getProperty("user.name"));
-            if (modifiedby.trim().isEmpty()) {
-            	modifiedby = System.getProperty("user.name");
-            }
-            ele.modified = new Date();
-            // END KGU#363 2017-03-10
-            // START KGU#408 2021-02-22: Enh. #410
-            ele.namespace = this.namespace;
-            // END KGU#408 2021-02-22
-            return ele;
-    }
-    
+	@Override
+	public Element copy()
+	{
+		Root ele = new Root(new StringList(this.getText()));
+		copyDetails(ele, false);
+		ele.isBoxed=this.isBoxed;
+		ele.diagrType = this.diagrType;
+		ele.children=(Subqueue) this.children.copy();
+		// START KGU#2 (#9) 2015-11-13: By the above replacement the new children were orphans
+		ele.children.parent = ele;
+		//ele.updaters = this.updaters;	// FIXME: Risks of this?
+		// END KGU#2 (#9) 2015-11-13
+		// START KGU#704 2019-03-30: Bugfix #699 - we must not forget to clone the includeList
+		if (this.includeList != null) {
+			ele.includeList = new StringList(this.includeList);
+		}
+		// END KGU#704 2019-03-30
+		// START KGU#363 2017-03-10: Enh. #372
+		ele.author = this.author;
+		ele.created = this.created;
+		this.modifiedby = Ini.getInstance().getProperty("authorName", System.getProperty("user.name"));
+		if (modifiedby.trim().isEmpty()) {
+			modifiedby = System.getProperty("user.name");
+		}
+		ele.modified = new Date();
+		// END KGU#363 2017-03-10
+		// START KGU#408 2021-02-22: Enh. #410
+		ele.namespace = this.namespace;
+		// END KGU#408 2021-02-22
+		return ele;
+	}
+
 	// START KGU#119 2016-01-02: Bugfix #78
 	/**
 	 * Returns true iff _another is of same class, all persistent attributes are equal, and
@@ -5124,11 +5126,16 @@ public class Root extends Element {
 		// START KGU#388 2017-09-13: Enh. #423
 		boolean isTypedef = false;
 		// END KGU#388 2017-09-13
-		TokenList inputTokens = Syntax.getSplitKeyword("input");
-		TokenList outputTokens = Syntax.getSplitKeyword("output");
-		// START KGU#297 2016-11-22: Issue #295 - Instructions starting with the return keyword must be handled separately
-		TokenList returnTokens = Syntax.getSplitKeyword("preReturn");
-		// END KGU#297 2016-11-22
+		// START KGU#790 2025-02-04: Issue #800 Now we must check for symbolic internal tokens
+		//TokenList inputTokens = Syntax.getSplitKeyword("input");
+		//TokenList outputTokens = Syntax.getSplitKeyword("output");
+		//// START KGU#297 2016-11-22: Issue #295 - Instructions starting with the return keyword must be handled separately
+		//TokenList returnTokens = Syntax.getSplitKeyword("preReturn");
+		//// END KGU#297 2016-11-22
+		String inputToken = Syntax.key2token("input");
+		String outputToken = Syntax.key2token("output");
+		String returnToken = Syntax.key2token("preReturn");
+		// END KGU#790 2025-02-04
 
 		// Check every instruction line...
 		for(int lnr = 0; lnr < test.size(); lnr++)
@@ -5141,18 +5148,21 @@ public class Root extends Element {
 			Syntax.unifyOperators(tokens, false);
 			// START KGU#297 2016-11-22: Issue #295 - Instructions starting with the return keyword must be handled separately
 			//if (tokens.contains("<-"))
-			boolean isReturn = tokens.indexOf(returnTokens, 0, !Syntax.ignoreCase) == 0;
+			//boolean isReturn = tokens.indexOf(returnToken, 0, !Syntax.ignoreCase) == 0;
+			boolean isReturn = tokens.indexOf(returnToken) == 0;
 			// END KGU#297 2016-11-22
 			// START KGU#1063 2022-09-27: Bugfix #1071 too simple check 10
 			boolean isProc = false;
 			// END KGU#1063 2022-09-27
 			
 			// CHECK: wrong multi-line instruction (#10 - new!)	
-			if (tokens.indexOf(inputTokens, 0, !Syntax.ignoreCase) == 0)
+			//if (tokens.indexOf(inputTokens, 0, !Syntax.ignoreCase) == 0)
+			if (tokens.indexOf(inputToken) == 0)
 			{
 				isInput = true;
 			}
-			else if (tokens.indexOf(outputTokens, 0, !Syntax.ignoreCase) == 0)
+			//else if (tokens.indexOf(outputTokens, 0, !Syntax.ignoreCase) == 0)
+			else if (tokens.indexOf(outputToken) == 0)
 			{
 				isOutput = true;
 			}
@@ -5193,16 +5203,16 @@ public class Root extends Element {
 				addError(_errors, new DetectedError(errorMsg(Menu.error11,""), ele), 11);
 			}
 			
-			// CHECK: wrong multi-line instruction (#10 - new!)	
-			if (tokens.indexOf(inputTokens, 0, !Syntax.ignoreCase) == 0)
-			{
-				isInput = true;
-			}
-			if (tokens.indexOf(outputTokens, 0, !Syntax.ignoreCase) == 0)
-			{
-				isOutput = true;
-			}
-			// END KGU#65/KGU#126 2016-01-06
+//			// CHECK: wrong multi-line instruction (#10 - new!)	
+//			if (tokens.indexOf(inputTokens, 0, !Syntax.ignoreCase) == 0)
+//			{
+//				isInput = true;
+//			}
+//			if (tokens.indexOf(outputTokens, 0, !Syntax.ignoreCase) == 0)
+//			{
+//				isOutput = true;
+//			}
+//			// END KGU#65/KGU#126 2016-01-06
 
 		}
 		// CHECK: wrong multi-line instruction (#10 - new!)
@@ -5345,7 +5355,7 @@ public class Root extends Element {
 		String preReturn = Syntax.getKeywordOrDefault("preReturn", "return");
 		String preLeave = Syntax.getKeywordOrDefault("preLeave", "leave");
 		String preExit = Syntax.getKeywordOrDefault("preExit", "exit");
-		TokenList keyExit = Syntax.getSplitKeyword("preExit");
+		//TokenList keyExit = Syntax.getSplitKeyword("preExit");
 		// START KGU#686 2019-03-18: Enh. #56
 		//String jumpKeywords = "«" + preLeave + "», «" + preReturn +	"», «" + preExit + "»";
 		String preThrow = Syntax.getKeywordOrDefault("preThrow", "throw");
@@ -5425,7 +5435,7 @@ public class Root extends Element {
 			// START KGU#343 2017-02-07: Disabled to suppress the warnings - may there be side-effects?
 			//_resultFlags[0] = true;
 			//_myVars.addIfNew("result");	// FIXME: This caused warnings if e.g. "Result" is used somewhere else
-			if (!line0tokens.getString().substring(preReturn.length()).trim().isEmpty()) {
+			if (!line0tokens.subSequenceToEnd(1).isBlank()) {
 				_resultFlags[0] = true;
 				_myVars.addIfNew("§ANALYSER§RETURNS");
 				// START KGU#78 2015-11-25: Different result mechanisms?
@@ -5470,7 +5480,7 @@ public class Root extends Element {
 		}
 		// CHECK: Exit argument ok? 
 		// FIXME define over tokens
-		else if (isExit && line0tokens.length() > preExit.length())
+		else if (isExit && !line0tokens.subSequenceToEnd(1).isBlank())
 		{
 			// START KGU 2017-04-14: Syntactical restriction loosened
 			//try
@@ -5483,7 +5493,7 @@ public class Root extends Element {
 			//	addError(_errors, new DetectedError(errorMsg(Menu.error16_6, ""), ele), 16);    					    							
 			//}
 			String exprType = Syntax.identifyExprType(this.getTypeInfo(),
-					line0tokens.subSequenceToEnd(keyExit.size()), true);
+					line0tokens.subSequenceToEnd(1), true);
 			if (!exprType.equalsIgnoreCase("int")) {
 				// error = new DetectedError("Wrong argument for this kind of JUMP (should be an integer constant)!",(Element) _node.getElement(i));
 				addError(_errors, new DetectedError(errorMsg(Menu.error16_8, preExit), ele), 16);    					    							
@@ -5523,7 +5533,7 @@ public class Root extends Element {
 		//String patternReturn = Matcher.quoteReplacement(Syntax.ignoreCase ? preReturn.toLowerCase() : preReturn);
 		//String patternLeave = Matcher.quoteReplacement(Syntax.ignoreCase ? preLeave.toLowerCase() : preLeave);
 		//String patternExit = Matcher.quoteReplacement(Syntax.ignoreCase ? preExit.toLowerCase() : preExit);
-		TokenList keyReturn = Syntax.getSplitKeyword("preReturn");
+		//TokenList keyReturn = Syntax.getSplitKeyword("preReturn");
 
 		for (int ls = 0; ls < unbroken.size(); ls++)
 		{
@@ -5543,7 +5553,7 @@ public class Root extends Element {
 			boolean isJump = isLeave || isExit;
 			//if (isReturn && !line.substring(Syntax.getKeywordOrDefault("preReturn", "return").length()).isEmpty())
 			// END KGU#78 2015-11-25
-			if (isReturn && !line.subSequenceToEnd(keyReturn.size()).isBlank())
+			if (isReturn && !line.subSequenceToEnd(1).isBlank())
 			{
 				_resultFlags[0] = true;
 				// START KGU#343 2017-02-07: This could cause case-related warnings if e.g. "Result" is used somewhere 

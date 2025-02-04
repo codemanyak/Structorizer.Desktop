@@ -86,6 +86,7 @@ package lu.fisch.structorizer.elements;
  *                                      issues #161, #1161: Method mayPassControl() overridden
  *      Kay Gürtzig     2025-01-17      Bugfix #1183: updateTypeMap was caught in an eternal loop by assignment
  *                                      lines like "m[i][j] <- something"
+ *      Kay Gürtzig     2025-02-04      Issue #800: Keyword detection adapted.
  *
  ******************************************************************************************************
  *
@@ -730,14 +731,22 @@ public class Instruction extends Element {
 	 */
 	public static boolean isJump(TokenList tokens)
 	{
-		// FIXME: These splitting of tokens might be incompatible with that of the keywords
-		return (tokens.indexOf(Syntax.getSplitKeyword("preReturn"), !Syntax.ignoreCase) == 0 ||
-				tokens.indexOf(Syntax.getSplitKeyword("preLeave"), !Syntax.ignoreCase) == 0 ||
-				// START KGU#686 2019-03-18: Enh. #56 new flavour, for try/catch
-				tokens.indexOf(Syntax.getSplitKeyword("preThrow"), !Syntax.ignoreCase) == 0 ||
-				// END KGU#686 2019-03-18
-				tokens.indexOf(Syntax.getSplitKeyword("preExit"), !Syntax.ignoreCase) == 0
+		// START KGU#790 2025-02-04: Issue #800 obsolete test
+		//return (tokens.indexOf(Syntax.getSplitKeyword("preReturn"), !Syntax.ignoreCase) == 0 ||
+		//		tokens.indexOf(Syntax.getSplitKeyword("preLeave"), !Syntax.ignoreCase) == 0 ||
+		//		// START KGU#686 2019-03-18: Enh. #56 new flavour, for try/catch
+		//		tokens.indexOf(Syntax.getSplitKeyword("preThrow"), !Syntax.ignoreCase) == 0 ||
+		//		// END KGU#686 2019-03-18
+		//		tokens.indexOf(Syntax.getSplitKeyword("preExit"), !Syntax.ignoreCase) == 0
+		//		);
+		String token0;
+		return tokens.size() >= 1 && (
+				(token0 = tokens.get(0)).equals(Syntax.key2token("preReturn"))
+						|| token0.equals(Syntax.key2token("preLeave"))
+						|| token0.equals(Syntax.key2token("preThrow"))
+						|| token0.equals(Syntax.key2token("preExit"))
 				);
+		// END KGU#790 2025-02-04
 	}
 	/**
 	 * @return true if this element is empty or consists of exactly one line and the line

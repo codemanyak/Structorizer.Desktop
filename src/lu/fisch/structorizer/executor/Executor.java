@@ -231,7 +231,8 @@ package lu.fisch.structorizer.executor;
  *      Kay Gürtzig     2024-11-27      Bugfix #1181: Execution highlighting in the code preview was compromised
  *                                      after Calls and within multi-line Calls
  *      Kay Gürtzig     2025-01-21      Enh. #1184: Lazy multi-dimensional array creation on first element assignment
- *      Kay Gürtzig     2025-02-03/04   Issues #30, #343, #800: New mechanism for comparison transformation.
+ *      Kay Gürtzig     2025-02-03/04   Issues #30, #343, #800: New mechanism for comparison transformation,
+ *                                      conversion of Math functions mended.
  *
  ******************************************************************************************************
  *
@@ -1341,11 +1342,11 @@ public class Executor implements Runnable
 		TokenList fn = new TokenList("DUMMY(");
 		for (int f = 0; f < mathFunctions.length; f++)
 		{
-			int pos = 0;
+			int pos = tokens.size();
 			fn.set(0, mathFunctions[f]);
-			while ((pos = tokens.indexOf(fn, pos, true)) >= 0)
+			while ((pos = tokens.lastIndexOf(fn, pos-1, true)) >= 0)
 			{
-				tokens.set(pos, "Math." + mathFunctions[f]);
+				tokens.addAll(pos, MATH_TOKENS);
 			}
 		}
 		//String s = tokens.getString();
@@ -4174,7 +4175,7 @@ public class Executor implements Runnable
 	 * @see #setVarRaw(String, Object)
 	 * @see #setVar(String, Object, boolean)
 	 */
-	@SuppressWarnings("unchecked")
+	//@SuppressWarnings("unchecked")
 	// START KGU#910 2021-01-10: Bugfix #909 - we must be able to postpone the display
 	//private String setVar(String target, Object content, int ignoreLoopStackLevel) throws EvalError
 	private String setVar(String target, Object content, int ignoreLoopStackLevel, boolean displayNow)
@@ -6056,7 +6057,7 @@ public class Executor implements Runnable
 				// but a separator would be fine...
 				else if (Jump.isReturn(tokens))
 				{		 
-					trouble = tryReturn(tokens);
+					trouble = tryReturn(tokens.subSequenceToEnd(1));
 				}
 				else 
 				// START KGU#388 2017-09-13: Enh. #423 We shouldn't do this for type definitions
@@ -6403,7 +6404,7 @@ public class Executor implements Runnable
 			try {
 				// START KGU#417 2017-06-30: Enh. #424
 				//trouble = tryReturn(convert(sl.get(0)));
-				TokenList tokens = convertExpression(sl.get(0));
+				TokenList tokens = convertExpression(sl.get(0).subSequenceToEnd(1));
 				tokens = this.evaluateDiagramControllerFunctions(tokens);
 				trouble = tryReturn(tokens);
 				// END KGU#417 2017-06-30
@@ -6420,7 +6421,8 @@ public class Executor implements Runnable
 			TokenList tokens = sl.get(0);
 			// START KGU#365/KGU#380 2017-04-14: Issues #380, #394 Allow arbitrary integer expressions now
 			//tokens.removeAll("");
-			tokens.remove(0, Syntax.getSplitKeyword("preExit").size());	// Get rid of the keyword...
+			//tokens.remove(0, Syntax.getSplitKeyword("preExit").size());	// Get rid of the keyword...
+			tokens.remove(0);	// Get rid of the keyword...
 			// END KGU#380 2017-04-14
 			// Get exit value
 			int exitValue = 0;
@@ -6487,7 +6489,8 @@ public class Executor implements Runnable
 		// START KGU#686 2019-03-18: Enh. #56 throw instructions introduced
 		else if (element.isThrow()) {
 			try {
-				TokenList tokens = sl.get(0).subSequenceToEnd(Syntax.getSplitKeyword("preThrow").size());
+				//TokenList tokens = sl.get(0).subSequenceToEnd(Syntax.getSplitKeyword("preThrow").size());
+				TokenList tokens = sl.get(0).subSequenceToEnd(1);
 				if (tokens.isBlank()) {
 					// This message can be recognized by an enclosing TRY on stack unwinding.
 					// Hence if it is a rethrow then it will be replaced by the original error message. 
@@ -7100,6 +7103,7 @@ public class Executor implements Runnable
 	/**
 	 * Opens a dialog with input fields for all input items given as {@code targets} and gathers the
 	 * values in array {@code values}.
+	 * 
 	 * @param parent - the {@link Container} this modal dialog is placed relatively to
 	 * @param prompt - the common input prompt string 
 	 * @param targets - the descriptions of the variables to be filled
@@ -7256,12 +7260,20 @@ public class Executor implements Runnable
 		return trouble;
 	}
 
-	// Submethod of stepInstruction(Instruction element), handling a return instruction
-	private String tryReturn(TokenList cmd) throws EvalError
+	/**
+	 * Submethod of stepInstruction(Instruction element) and stepJump(), handling
+	 * a return instruction
+	 * 
+	 * @param expr - the TokenList of only the result expression in the return
+	 *    statement (not the entire command!)
+	 * @return a possible error string
+	 * @throws EvalError
+	 */
+	private String tryReturn(TokenList expr) throws EvalError
 	{
 		String trouble = "";
 		String header = control.lbReturnedResult.getText();
-		cmd = cmd.subSequenceToEnd(Syntax.getSplitKeyword("preReturn").size());
+		//cmd = cmd.subSequenceToEnd(Syntax.getSplitKeyword("preReturn").size());
 		// START KGU#77 (#21) 2015-11-13: We ought to allow an empty return
 		//Object n = interpreter.eval(out);
 		//if (n == null)
@@ -7276,20 +7288,20 @@ public class Executor implements Runnable
 		//			"Returned trouble", 0);
 		//}
 		// START KGU#490 2018-02-07: Bugfix #503 
-		cmd = this.evaluateDiagramControllerFunctions(convertExpression(cmd));
+		expr = this.evaluateDiagramControllerFunctions(convertExpression(expr));
 		// END KGU#490 2018-02-07
 		Object resObj = null;
-		if (!cmd.isBlank())
+		if (!expr.isBlank())
 		{
 			// START KGU#426 2017-09-30: Bugfix #429
 			//resObj = this.evaluateExpression(out);
-			resObj = this.evaluateExpression(cmd, true, false);
+			resObj = this.evaluateExpression(expr, true, false);
 			// END KGU#426 2017-09-30
 			// If this diagram is executed at top level then show the return value
 			if (this.callers.empty())
 			{
 				if (resObj == null)	{
-					trouble = control.msgInvalidExpr.getText().replace("%1", cmd.getString());
+					trouble = control.msgInvalidExpr.getText().replace("%1", expr.getString());
 				} 
 				// START KGU#133 2016-01-29: Arrays should be presented as scrollable list
 				// START KGU#439 2017-10-13: Issue 436 - Structorizer arrays now implemented as ArrayLists rather than Object[] 
@@ -7515,7 +7527,16 @@ public class Executor implements Runnable
 		else {
 			// START KGU#197 2017-06-06: Now localizable
 			//trouble = "<" + cmd + "> is not a correct function!";
-			trouble = control.msgIllFunction.getText().replace("%1", tokens.getString());
+			// START KGU#790 2025-02-04: Issue #800 Mor specific information available?
+			//trouble = control.msgIllFunction.getText().replace("%1", tokens.getString());
+			trouble = f.getError();
+			if (trouble == null || trouble.isBlank()) {
+				trouble = control.msgIllFunction.getText().replace("%1", tokens.getString());
+			}
+			else {
+				trouble += ": " + tokens.getString();
+			}
+			// END KGU#790 2025-0204
 			// END KGU#197 2017-06-06
 		}
 		return trouble;
@@ -7539,12 +7560,12 @@ public class Executor implements Runnable
 
 	private String stepCase(Case element)
 	{
-		// START KGU 2016-09-25: Bugfix #254
-		TokenList[] parserKeys = new TokenList[]{
-				Syntax.getSplitKeyword("preCase"),
-				Syntax.getSplitKeyword("postCase")
-				};
-		// END KGU 2016-09-25
+		// START KGU 2016-09-25: Bugfix #254 / KGU#790 2025-02-04: Obsolete by issue #800
+		//TokenList[] parserKeys = new TokenList[]{
+		//		Syntax.getSplitKeyword("preCase"),
+		//		Syntax.getSplitKeyword("postCase")
+		//		};
+		// END KGU 2016-09-25 / KGU#790 2025-02-04
 		String trouble = new String();
 		try
 		{
@@ -7555,14 +7576,22 @@ public class Executor implements Runnable
 			// START KGU#259 2016-09-25: Bugfix #254
 			//String expression = text.get(0) + " = ";
 			TokenList tokens = text.get(0);
+			// START KGU#790 2025-02-04: Issue #800 Obsolete mechanims
 			// FIXME: Should decorators only be removed at their expected positions (start/end)?
-			for (TokenList key : parserKeys)
-			{
-				if (!key.isBlank() && tokens.indexOf(key, !Syntax.ignoreCase) == 0)
-				{
-					tokens.remove(0, key.size());
-				}		
+			//for (TokenList key : parserKeys)
+			//{
+			//	if (!key.isBlank() && tokens.indexOf(key, !Syntax.ignoreCase) == 0)
+			//	{
+			//		tokens.remove(0, key.size());
+			//	}		
+			//}
+			if (!tokens.isBlank() && tokens.getFirst().equals(Syntax.key2token("preCase"))) {
+				tokens.remove(0);
 			}
+			if (!tokens.isBlank() && tokens.getLast().equals(Syntax.key2token("postCase"))) {
+				tokens.remove(tokens.size() - 1);
+			}
+			// END KGU#790 2025-02-04
 			// START KGU#417 2017-06-30: Enh. #424
 			//String expression = tokens.concatenate() + " = ";
 			TokenList expression = this.evaluateDiagramControllerFunctions(tokens);
@@ -7609,19 +7638,30 @@ public class Executor implements Runnable
 						// START KGU#259 2016-09-25: Bugfix #254
 						//String test = convert(expression + constants[c]);
 						tokens = constants[c];
+						// START KGU#790 2025-02-04: Issue #800 Obsolete mechanism
 						// FIXME: Should decorators only be removed at their expected positions (start/end)?
-						for (TokenList key : parserKeys)
-						{
-							if (!key.isBlank())
-							{
-								int keySize = key.size();
-								int posKey = tokens.size() - key.size();
-								while (posKey >= 0 && (posKey = tokens.lastIndexOf(key, posKey, !Syntax.ignoreCase)) >= 0) {
-									tokens.remove(posKey, posKey + keySize);
-									posKey -= keySize;
-								}
-							}		
+						//for (TokenList key : parserKeys)
+						//{
+						//	if (!key.isBlank())
+						//	{
+						//		int keySize = key.size();
+						//		int posKey = tokens.size() - key.size();
+						//		while (posKey >= 0 && (posKey = tokens.lastIndexOf(key, posKey, !Syntax.ignoreCase)) >= 0) {
+						//			tokens.remove(posKey, posKey + keySize);
+						//			posKey -= keySize;
+						//		}
+						//	}		
+						//}
+						// The postCase key might have been used as constant list prefix as well...
+						if (!tokens.isBlank() && (
+								tokens.getFirst().equals(Syntax.key2token("preCase")))
+								|| tokens.getFirst().equals(Syntax.key2token("postCase"))) {
+							tokens.remove(0);
 						}
+						if (!tokens.isBlank() && tokens.getLast().equals(Syntax.key2token("postCase"))) {
+							tokens.remove(tokens.size() - 1);
+						}
+						// END KGU#790 2025-02-04
 						TokenList test = new TokenList(expression);
 						test.addAll(tokens);
 						test = convertExpression(test);
@@ -7698,21 +7738,29 @@ public class Executor implements Runnable
 //			}
 //
 //			s = convert(s);
-			// FIXME: Should decorators only be removed at their expected positions (start/end)?
-			for (TokenList key : new TokenList[]{
-					Syntax.getSplitKeyword("preAlt"),
-					Syntax.getSplitKeyword("postAlt")})
-			{
-				if (!key.isBlank())
-				{
-					int keySize = key.size();
-					int posKey = condTokens.size() - keySize;
-					while (posKey >= 0 && (posKey = condTokens.lastIndexOf(key, posKey, !Syntax.ignoreCase)) >= 0) {
-						condTokens.remove(posKey, posKey + keySize);
-						posKey -= keySize;
-					}
-				}		
+			// START KGU#790 2025-02-04: Issue #800 Obsolete mechanism
+			//// FIXME: Should decorators only be removed at their expected positions (start/end)?
+			//for (TokenList key : new TokenList[]{
+			//		Syntax.getSplitKeyword("preAlt"),
+			//		Syntax.getSplitKeyword("postAlt")})
+			//{
+			//	if (!key.isBlank())
+			//	{
+			//		int keySize = key.size();
+			//		int posKey = condTokens.size() - keySize;
+			//		while (posKey >= 0 && (posKey = condTokens.lastIndexOf(key, posKey, !Syntax.ignoreCase)) >= 0) {
+			//			condTokens.remove(posKey, posKey + keySize);
+			//			posKey -= keySize;
+			//		}
+			//	}		
+			//}
+			if (!condTokens.isBlank() && condTokens.get(0).equals(Syntax.key2token("preAlt"))) {
+				condTokens.remove(0);
 			}
+			if (!condTokens.isBlank() && condTokens.getLast().equals(Syntax.key2token("postAlt"))) {
+				condTokens.remove(condTokens.size()-1);
+			}
+			// END KGU#790 2025-02-04
 			TokenList tempTokens = convertExpression(condTokens);
 			// END KGU#150 2016-04-03
 
@@ -7827,23 +7875,31 @@ public class Executor implements Runnable
 //				// END KGU#79 2015-11-12
 //				// System.out.println("WHILE: "+condStr);
 				//StringList tokens = Syntax.splitLexically(condStr, true);
+				// START KGU#790 2025-02-04: Issue #800 Obsolete mechanism
 				// FIXME: Should decorators only be removed at their expected positions (start/end)?
-				for (TokenList key : new TokenList[]{
-						Syntax.getSplitKeyword("preWhile"),
-						Syntax.getSplitKeyword("postWhile")})
-				{
-					if (key != null && !key.isBlank())
-					{
-						//condTokens.removeAll(Syntax.splitLexically(key, false), !Syntax.ignoreCase);
-						int keySize = key.size();
-						int posKey = condTokens.size() - keySize;
-						while (posKey >= 0
-								&& (posKey = condTokens.lastIndexOf(key, posKey, !Syntax.ignoreCase)) >= 0) {
-							condTokens.remove(posKey, posKey + keySize);
-							posKey -= keySize;
-						}
-					}		
+				//for (TokenList key : new TokenList[]{
+				//		Syntax.getSplitKeyword("preWhile"),
+				//		Syntax.getSplitKeyword("postWhile")})
+				//{
+				//	if (key != null && !key.isBlank())
+				//	{
+				//		//condTokens.removeAll(Syntax.splitLexically(key, false), !Syntax.ignoreCase);
+				//		int keySize = key.size();
+				//		int posKey = condTokens.size() - keySize;
+				//		while (posKey >= 0
+				//				&& (posKey = condTokens.lastIndexOf(key, posKey, !Syntax.ignoreCase)) >= 0) {
+				//			condTokens.remove(posKey, posKey + keySize);
+				//			posKey -= keySize;
+				//		}
+				//	}		
+				//}
+				if (!condTokens.isBlank() && condTokens.getFirst().equals(Syntax.key2token("preWhile"))) {
+					condTokens.remove(0);
 				}
+				if (!condTokens.isBlank() && condTokens.getLast().equals(Syntax.key2token("postWhile"))) {
+					condTokens.remove(condTokens.size()-1);
+				}
+				// END KGU#790 2025-02-04
 				// START KGU#433 2017-10-11: Bugfix #434 Don't try to be too clever here - variables might change type within the loop..
 				//condStr = convert(tokens.concatenate());
 				//condStr = convert(tokens.concatenate(), false);
@@ -7990,23 +8046,31 @@ public class Executor implements Runnable
 //			}
 //			condStr = convert(condStr, false);
 			//StringList tokens = Syntax.splitLexically(condStr, true);
-			// FIXME: Should decorators only be removed at their expected positions (start/end)?
-			for (TokenList key : new TokenList[]{
-					Syntax.getSplitKeyword("preRepeat"),
-					Syntax.getSplitKeyword("postRepeat")})
-			{
-				if (key != null && !key.isBlank())
-				{
-					//tokens.removeAll(Syntax.splitLexically(key, false), !Syntax.ignoreCase);
-					int keySize = key.size();
-					int posKey = condTokens.size() - keySize;
-					while (posKey >= 0
-							&& (posKey = condTokens.lastIndexOf(key, posKey, !Syntax.ignoreCase)) >= 0) {
-						condTokens.remove(posKey, posKey + keySize);
-						posKey -= keySize;
-					}
-				}		
+			// START KGU#790 2025-02-04: Issue #800 Obsolete mechanism
+			//// FIXME: Should decorators only be removed at their expected positions (start/end)?
+			//for (TokenList key : new TokenList[]{
+			//		Syntax.getSplitKeyword("preRepeat"),
+			//		Syntax.getSplitKeyword("postRepeat")})
+			//{
+			//	if (key != null && !key.isBlank())
+			//	{
+			//		//tokens.removeAll(Syntax.splitLexically(key, false), !Syntax.ignoreCase);
+			//		int keySize = key.size();
+			//		int posKey = condTokens.size() - keySize;
+			//		while (posKey >= 0
+			//				&& (posKey = condTokens.lastIndexOf(key, posKey, !Syntax.ignoreCase)) >= 0) {
+			//			condTokens.remove(posKey, posKey + keySize);
+			//			posKey -= keySize;
+			//		}
+			//	}		
+			//}
+			if (!condTokens.isBlank() && condTokens.getFirst().equals(Syntax.key2token("preRepeat"))) {
+				condTokens.remove(0);
 			}
+			if (!condTokens.isBlank() && condTokens.getLast().equals(Syntax.key2token("postRepeat"))) {
+				condTokens.remove(condTokens.size()-1);
+			}
+			// END KGU#790 2025-02-04
 			// START KGU#433 2017-10-11: Bugfix #434 Don't try to be too clever here - variables might change type within the loop...
 			//condStr = convert(tokens.concatenate());
 			condTokens = convertExpression(condTokens, false);
@@ -9390,23 +9454,23 @@ public class Executor implements Runnable
 	}
 	// END KGU#33/KGU#34 2014-12-05
 	
-	// START KGU#165 2016-04-03: Support keyword case sensitivity
-	/**
-	 * Returns an appropriate match string for the given parser preference string
-	 * (where {@link Syntax#ignoreCase} is paid attention to)
-	 * 
-	 * @param keyword - parser preference string
-	 * @return match pattern
-	 */
-	private String getKeywordPattern(String keyword)
-	{
-		String pattern = Matcher.quoteReplacement(keyword);
-		if (Syntax.ignoreCase)
-		{
-			pattern = BString.breakup(pattern, true);
-		}
-		return pattern;
-	}
+	// START KGU#165 2016-04-03: Support keyword case sensitivity KGU#790 became obsolete
+//	/**
+//	 * Returns an appropriate match string for the given parser preference string
+//	 * (where {@link Syntax#ignoreCase} is paid attention to)
+//	 * 
+//	 * @param keyword - parser preference string
+//	 * @return match pattern
+//	 */
+//	private String getKeywordPattern(String keyword)
+//	{
+//		String pattern = Matcher.quoteReplacement(keyword);
+//		if (Syntax.ignoreCase)
+//		{
+//			pattern = BString.breakup(pattern, true);
+//		}
+//		return pattern;
+//	}
 	// END KGU#165 2016-04-03
 	
 	// START KGU#156 2016-03-10: An interface for an external update trigger was needed
