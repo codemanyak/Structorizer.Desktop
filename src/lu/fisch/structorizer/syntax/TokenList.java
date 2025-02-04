@@ -921,8 +921,8 @@ public class TokenList implements Comparable<TokenList>{
 	/**
 	 * Replaces the token at the specified position in this list with
 	 * the specified string, which should have token properties (i.e.
-	 * should not be fall apart into several tokens if passed to e.g.
-	 * {@link #TokenList(String)}.
+	 * should not fall apart into several tokens if passed to e.g.
+	 * {@link #TokenList(String)}).
 	 * 
 	 * @param index - position of the token to be replaced
 	 * @param token - the new token to replace the one at position {@code index}

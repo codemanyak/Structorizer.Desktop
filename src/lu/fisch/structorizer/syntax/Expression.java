@@ -1294,7 +1294,7 @@ public class Expression {
 	 *     be consumed from {@code tokens}. If being {@code null}, parsing will stop
 	 *     without throwing an exception at the first token not being expected, provided
 	 *     the stack is empty and output is already containing an Expression.
-	 * @param tokenNo - the number of preceding tokens of he line not contained in
+	 * @param tokenNo - the number of preceding tokens of the line not contained in
 	 *     {@code tokens}, i.e. the overall index of the first token within {@code tokens}
 	 * @return the syntax tree or null.
 	 * 
