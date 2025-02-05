@@ -30,8 +30,8 @@ package lu.fisch.structorizer.elements;
  *
  *      Revision List
  *
- *      Author          Date			Description
- *      ------			----			-----------
+ *      Author          Date            Description
+ *      ------          ----            -----------
  *      Bob Fisch       2007-12-13      First Issue
  *      Kay Gürtzig     2015-10-12      Comment drawing centralized and breakpoint mechanism prepared
  *      Kay Gürtzig     2015-11-14      Bugfix #31 = KGU#82 in method copy()
@@ -492,8 +492,9 @@ public class Jump extends Instruction {
 				levelsUp = 1;
 			}
 			else {
-				TokenList keyTokens = Syntax.getSplitKeyword("preLeave");
-				String expr = tokens.subSequenceToEnd(keyTokens.size()).getString().trim();
+				//TokenList keyTokens = Syntax.getSplitKeyword("preLeave");
+				//String expr = tokens.subSequenceToEnd(keyTokens.size()).getString().trim();
+				String expr = tokens.subSequenceToEnd(1).getString().trim();
 				try {
 					if ((levelsUp = Integer.parseInt(expr)) == 0) {
 						levelsUp = -1;

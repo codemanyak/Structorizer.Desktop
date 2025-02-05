@@ -41,6 +41,7 @@ package lu.fisch.structorizer.syntax;
  *                                      embedded Operator class extended with a translation option to function/method
  *      Kay Gürtzig     2021-11-08      Support for ternary conditional operator (? :) added
  *      Kay Gürtzig     2023-11-04      Implementation adapted from StringList to TokenList
+ *      Kay Gürtzig     2025-02-04      Definition and handling of METHOD nodes corrected.
  *
  ******************************************************************************************************
  *
@@ -355,7 +356,7 @@ public class Expression {
 		TERNARY,
 		/** function call (its identifier), parent of argument expressions, data type declared */
 		FUNCTION,
-		/** method call (its name), parent of object and argument expressions, data type declared */
+		/** method call (its name), parent of argument expressions and object (as last), data type declared */
 		METHOD,
 		/** an array initializer, parent of element expressions, data type determined by elements */
 		ARRAY_INITIALIZER,
@@ -891,13 +892,13 @@ public class Expression {
 			break;
 		case METHOD: {
 			// append the target object
-			children.getFirst().appendToTokenList(tokens, alternOprs);
+			children.getLast().appendToTokenList(tokens, alternOprs);
 			tokens.add(".");
 			tokens.add(text);
 			tokens.add("(");
 			int ix = 0;
 			for (Expression child: children) {
-				if (ix > 0) {	// First child was the target object, skip it here
+				if (ix < children.size()-1) {	// Last child is the target object, skip it here
 					tokens.add(sepa);
 					child.appendToTokenList(tokens, alternOprs);
 					sepa = ", ";
@@ -1856,7 +1857,7 @@ public class Expression {
 					complete = false;
 				}
 				else {
-					/* With a METHOD, the first expression is the target object,
+					/* With a METHOD, the last expression is the target object,
 					 * representing a tricky case: may the target object be modified,
 					 * i.e. would it have to count as an assigned variable? For now
 					 * we decided: no. It may contain used variables, though, e.g.

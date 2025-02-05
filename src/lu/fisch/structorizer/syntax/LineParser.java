@@ -554,6 +554,7 @@ public class LineParser /*extends CodeParser*/
 	 * Preprocesses the given element line for the parser, i.e. replaces configured
 	 * keywords by grammar-defined ones, inserts classifying prefixes where needed
 	 * and unifies operator symbols.
+	 * 
 	 * @param _line - the element line to be parsed or checked
 	 * @param _element - the owning NSD element
 	 * @param _lineNo - the line index
@@ -574,6 +575,7 @@ public class LineParser /*extends CodeParser*/
 		if (className.equals("Alternative")
 				|| className.equals("While")
 				|| className.equals("Repeat")) {
+			// FIXME No longer to be found here!
 			Syntax.removeSplitDecorators(tokens);
 			tokens.add(0, "§COND§");
 		}
@@ -582,6 +584,7 @@ public class LineParser /*extends CodeParser*/
 		}
 		else if (className.equals("Case")) {
 			if (_lineNo == 0) {
+				// FIXME No longer to be found here!
 				Syntax.removeDecorators(tokens);
 				tokens.add(0, "§CASE§");
 			}
@@ -596,6 +599,7 @@ public class LineParser /*extends CodeParser*/
 			}
 			else {
 				for (String key: JUMP_KEYS) {
+					// FIXME No longer to be found here!
 					TokenList splitKey = Syntax.getSplitKeyword(key);
 					if (tokens.indexOf(splitKey, 0, !Syntax.ignoreCase) == 0) {
 						tokens.remove(1, splitKey.size());
@@ -635,12 +639,14 @@ public class LineParser /*extends CodeParser*/
 				if (Instruction.isTypeDefinition(_line)) {
 					_unifyOprs = false;
 				}
+				// FIXME No longer to be found here!
 				TokenList splitKey = Syntax.getSplitKeyword("preReturn");
 				if (tokens.indexOf(splitKey, 0, !Syntax.ignoreCase) == 0) {
 					tokens.remove(1, splitKey.size());
 					tokens.set(0, "§RETURN§");
 				}
 				else {
+					// FIXME No longer to be found here!
 					for (String key: IO_KEYS) {
 						splitKey = Syntax.getSplitKeyword(key);
 						if (tokens.indexOf(splitKey, 0, !Syntax.ignoreCase) == 0) {
@@ -686,6 +692,7 @@ public class LineParser /*extends CodeParser*/
 		if (className.equals("Alternative")
 				|| className.equals("While")
 				|| className.equals("Repeat")) {
+			// FIXME No longer to be found here!
 			Syntax.removeDecorators(tokens);
 			tokens.add(0, "§COND§");
 		}
@@ -694,6 +701,7 @@ public class LineParser /*extends CodeParser*/
 		}
 		else if (className.equals("Case")) {
 			if (_lineNo == 0) {
+				// FIXME No longer to be found here!
 				Syntax.removeDecorators(tokens);
 				tokens.add(0, "§CASE§");
 			}

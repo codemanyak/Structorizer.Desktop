@@ -216,7 +216,7 @@ public class Syntax {
 	private static final HashMap<String, String> TOKENS2KEYS = new HashMap<String, String>();
 	static {
 		for (String key: keywordMap.keySet()) {
-			TOKENS2KEYS.put("§" + key.toUpperCase() + "§", key);
+			TOKENS2KEYS.put(key2token(key), key);
 		}
 	}
 	// END KGU#1097 2023-11-14

@@ -30,8 +30,8 @@ package lu.fisch.structorizer.syntax;
  *
  *      Revision List
  *
- *      Author          Date			Description
- *      ------			----			-----------
+ *      Author          Date            Description
+ *      ------          ----            -----------
  *      Bob Fisch                       First Issue
  *      Kay Gürtzig     2015-10-27      For performance reasons, now stores name and parsed parameters
  *      Kay Gürtzig     2015-11-13      KGU#2 (Enhancement #9): No longer automatically renames to lowercase
@@ -45,10 +45,11 @@ package lu.fisch.structorizer.syntax;
  *      Kay Gürtzig     2020-11-02      Issue #800: Completely revised, now using Syntax and Expression
  *      Kay Gürtzig     2021-03-05      Bugfix #961: Method isFunction() extended (for method tests)
  *      Kay Gürtzig     2021-06-06      sgn function added to knownResultTypes
- *      Kay Gürtzig     2021-12-10      New result type mapping for DiagramController routines added
- *      Kay Gürtzig     2021-12-22      Issue #800: parts of builtInFunctions adopted from Executor
- *      Kay Gürtzig     2023-11-02      Issue #800: New method variants based on TokenList arguments
  *      Kay Gürtzig     2021-11-04      Issue #800: methods getParamExpr() and getParamTokens() added
+ *      Kay Gürtzig     2021-12-10      New result type mapping for DiagramController routines added
+ *      Kay Gürtzig     2021-12-22      Issue #800: parts of BUILT_IN_FUNCTIONS adopted from Executor
+ *      Kay Gürtzig     2023-11-02      Issue #800: New method variants based on TokenList arguments
+ *      Kay Gürtzig     2025-02-04      Issue #800: New field error and method getError() added.
  *
  ******************************************************************************************************
  *
@@ -84,7 +85,7 @@ public class Function
 	 * <b>NOTE</b>: Any additions and modifications are to be synchronised with
 	 * {@link #knownResultTypes}!
 	 */
-	private static final String[] builtInFunctions = new String[] {
+	private static final String[] BUILT_IN_FUNCTIONS = new String[] {
 			"public int random(int max) { return (int) (Math.random()*max); }",
 			"public void randomize() {  }",
 			// START KGU#391 2017-05-07: Enh. #398 - we need a sign function to ease the rounding support for COBOL import
@@ -179,7 +180,7 @@ public class Function
 	// START KGU#332 2017-01-29: Enh. #335 - result type forecast
 	/**
 	 * Maps signatures of built-in functions and procedures (see
-	 * {@link #builtInFunctions} and {@link Executor#fileApiRoutines} ) to
+	 * {@link #BUILT_IN_FUNCTIONS} and {@link Executor#fileApiRoutines} ) to
 	 * Java type names (where "void" indicates a procedure).<br/>
 	 * The signature syntax is: {@code "<name>#<arg_count>"}.
 	 */
@@ -263,6 +264,9 @@ public class Function
 	// END KGU#56 2015-10-27
 	private Expression expr = null;			// The parsed input string
 	// END KGU#790 2020-11-02
+	// START KGU#790 2025-02-04: Issue #800 Need more info about failed parsing
+	private String error = null;
+	// END KGU#790 2025-02-04
 
 	/**
 	 * Parses the expression held in string {@code expr} and tries to build a
@@ -338,8 +342,12 @@ public class Function
 					expr = exprs.get(0);
 				}
 			}
-		} catch (SyntaxException exc) {
+		} catch (Exception exc) {
 			// Not a function, it seems.
+			error = exc.getMessage();
+			if (error == null || error.isBlank()) {
+				error = exc.toString();
+			}
 		}
 		// END KGU#790 2002-11-02
 	}
@@ -797,8 +805,8 @@ public class Function
 	 */
 	public static void implementBuiltInFunctions(Interpreter interpreter) throws EvalError
 	{
-		for (int i = 0; i < builtInFunctions.length; i++) {
-			interpreter.eval(builtInFunctions[i]);
+		for (int i = 0; i < BUILT_IN_FUNCTIONS.length; i++) {
+			interpreter.eval(BUILT_IN_FUNCTIONS[i]);
 		}
 	}
 
@@ -900,5 +908,17 @@ public class Function
 		}
 		return 0;
 	}
+	
+	// START KGU#790 2025-02-04: Issue #800 Opportunity to obtain a possible parsing error
+	/**
+	 * In case the probed {@code isFunction} method fails this method might shed
+	 * some light on the causing parser fault.
+	 * 
+	 * @return either an error string or {@code null}
+	 */
+	public String getError() {
+		return error;
+	}
+	// END KGU#790 2025-02-04
 
 }
