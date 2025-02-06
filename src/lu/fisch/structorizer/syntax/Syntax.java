@@ -1704,11 +1704,13 @@ public class Syntax {
 		HashMap<String, String> components = new LinkedHashMap<String, String>();
 		// END KGU#526 2018-08-01
 		int posBrace = _tokens.indexOf("{");
-		if (posBrace != 1) {
+		String typename = "";
+		if (posBrace < 0) {
 			return null;
+		} else if (posBrace == 1) {
+			typename = _tokens.get(0);
+			components.put("§TYPENAME§", typename);
 		}
-		String typename = _tokens.get(0);
-		components.put("§TYPENAME§", typename);
 		ArrayList<TokenList> parts = splitExpressionList(_tokens.subSequenceToEnd(posBrace+1), ",");
 		TokenList tail = parts.get(parts.size()-1);
 		if (!tail.startsWith("}")) {

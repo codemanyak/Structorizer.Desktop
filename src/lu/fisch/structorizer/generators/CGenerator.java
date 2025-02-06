@@ -1379,7 +1379,7 @@ public class CGenerator extends Generator {
 									appendComment(_inst, _indent);
 									_commentInserted = true;
 								}
-								if (exprTokens == null || declItems.size() > 1) {
+								if (exprTokens == null || declItems.size() > 2) {
 									addCode(codeLine + ";", _indent, isDisabled);
 									wasDefHandled(root, declVar, true);
 									codeLine = null;

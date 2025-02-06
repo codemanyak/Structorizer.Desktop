@@ -442,6 +442,7 @@ public class PythonGenerator extends Generator
 	 * @param tokens - the token list of the split line, will be modified.
 	 */
 	private void transformRecordInitializers(TokenList tokens) {
+		// FIXME Doesn't work under #800 conditions
 		int posLBrace = -1;
 		while ((posLBrace = tokens.indexOf("{", posLBrace+1)) > 0) {
 			String prevToken = "";
@@ -458,15 +459,19 @@ public class PythonGenerator extends Generator
 				//HashMap<String, String> comps = Instruction.splitRecordInitializer(tokens.concatenate("", posLBrace));
 				// START KGU#1021 2021-12-05: Bugfix #1024 Instruction might be defective
 				//HashMap<String, String> comps = Instruction.splitRecordInitializer(tokens.concatenate("", posLBrace), typeEntry, false);
-				String tail = tokens.subSequenceToEnd(posLBrace).getString();
-				HashMap<String, String> comps = Instruction.splitRecordInitializer(tail, typeEntry);
+				TokenList tail = tokens.subSequenceToEnd(posLBrace);
+				HashMap<String, String> comps = Syntax.splitRecordInitializer(tail, typeEntry);
 				// END KGU#1021 2021-12-05
 				// END KGU#559 2018-07-20
 				LinkedHashMap<String, TypeMapEntry> compDefs = typeEntry.getComponentInfo(true);
 				// START KGU#1021 2021-12-05: Bugfix #1024 Instruction might be defective
 				//String tail = comps.get("§TAIL§");	// String part beyond the initializer
 				if (comps != null) {
-					tail = comps.get("§TAIL§");	// String part beyond the initializer
+					tail = null;
+					String tailStr = comps.get("§TAIL§"); // Text part beyond the initializer
+					if (tailStr != null) {
+						tail = new TokenList(tailStr);
+					}
 				}
 				// END KGU#1021 2021-12-05
 				// START KGU#795 2020-02-12: Issue #807 - we now use directories instead of recordtype lib
@@ -497,9 +502,9 @@ public class PythonGenerator extends Generator
 				// END KGU#795 2020-02-12
 				tokens.set(pos, prevToken);
 				tokens.remove(pos+1, tokens.size());
+				// restore the tokens of the remaining text.
 				if (tail != null) {
-					// restore the tokens of the remaining text.
-					tokens.add(tail);
+					tokens.addAll(tail);
 				}
 				posLBrace = pos;
 			}
