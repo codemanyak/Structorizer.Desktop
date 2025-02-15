@@ -95,6 +95,7 @@ import java.util.ArrayList;
  *      Kay Gürtzig             2023-10-12/18   Issue #980 Code generation for multi-variable and array declarations revised
  *      Kay Gürtzig             2023-11-08      Bugfix #1109: generateCode(Jump) revised for throw
  *      Kay Gürtzig             2024-04-03      Issue #1148: Optimised code generation for "if else if" chains
+ *      Kay Gürtzig             2025-02-06      Bugfix #1188: The transformation of C-style array initialisations was wrong
  *
  ******************************************************************************************************
  *
@@ -449,7 +450,6 @@ public class PythonGenerator extends Generator
 			TypeMapEntry typeEntry = null;
 			// Go back to the last non-empty token
 			int pos = posLBrace - 1;
-			while (pos >= 0 && (prevToken = tokens.get(pos).trim()).isEmpty()) pos--;
 			if (pos >= 0 && Syntax.isIdentifier(prevToken, false, null)
 					&& (typeEntry = this.typeMap.get(":" + prevToken)) != null
 					// Should be a record type but we better make sure.
@@ -459,7 +459,7 @@ public class PythonGenerator extends Generator
 				//HashMap<String, String> comps = Instruction.splitRecordInitializer(tokens.concatenate("", posLBrace));
 				// START KGU#1021 2021-12-05: Bugfix #1024 Instruction might be defective
 				//HashMap<String, String> comps = Instruction.splitRecordInitializer(tokens.concatenate("", posLBrace), typeEntry, false);
-				TokenList tail = tokens.subSequenceToEnd(posLBrace);
+				TokenList tail = tokens.subSequenceToEnd(pos);
 				HashMap<String, String> comps = Syntax.splitRecordInitializer(tail, typeEntry);
 				// END KGU#1021 2021-12-05
 				// END KGU#559 2018-07-20
@@ -580,6 +580,11 @@ public class PythonGenerator extends Generator
 			// END KGU#689 2019-03-21
 				String[] typeNameIndex = this.lValueToTypeNameIndexComp(lval);
 				String index = typeNameIndex[2];
+				// START KGU#1173 2025-02-06: Bugfix #1188 In case of a declaration suppress the index
+				if (!typeNameIndex[0].isEmpty() && !index.isEmpty()) {
+					index = "";	// It is the size, not an index - drop it
+				}
+				// END KGU#1173 2025-02-06
 				if (!index.isEmpty()) index = "[" + index + "]";
 				// START KGU#388 2017-09-27: Enh. #423
 				//_input = typeNameIndex[1] + index + " <- " + expr;

@@ -196,6 +196,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2024-11-25      Bugfix #1180: Deep test coverage change on undo/redo propagated
  *      Kay Gürtzig     2025-02-04      Issue #800: Obsolete mechanism in analyse_10_11() revised,
  *                                      obsolete tests in analyse_13_16_xxxx() mended
+ *      Kay Gürtzig     2025-02-06      Bugfix #1187 in analyse_31 (complained the closing bracket)
  *
  ******************************************************************************************************
  *
@@ -6040,7 +6041,7 @@ public class Root extends Element {
 								for (String compName: components.keySet()) {
 									if (!compName.startsWith("§") && !compNames.contains(compName)) {
 										//error  = new DetectedError("Record type «"+typeName+"» hasn't got a component «"+compName+"»!", _instr);
-										addError(_errors, new DetectedError(errorMsg(Menu.error24_7, new String[]{typeName, compName}), _instr), 24);																					
+										addError(_errors, new DetectedError(errorMsg(Menu.error24_7, new String[]{typeName, compName}), _instr), 24);
 									}
 								}
 							// START KGU#1021 2021-12-05: Bugfix #1024
@@ -7412,7 +7413,10 @@ public class Root extends Element {
 						if (!"]".equals(sizes.get(sizes.count()-1))) {
 							defective.add(token);
 						}
-						for (int k = 0; k < sizes.count(); k++) {
+						// START KGU#1172 2025-02-06: Bugfix #1187 Analyser complained the "]" tail
+						//for (int k = 0; k < sizes.count(); k++) {
+						for (int k = 0; k < sizes.count() - 1; k++) {
+						// END KGU#1172 2025-02-06
 							String dim = sizes.get(k);
 							if (_constants.containsKey(dim)) {
 								dim = this.getConstValueString(dim);

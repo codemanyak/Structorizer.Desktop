@@ -83,6 +83,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig             2023-10-04      Bugfix #1093 Undue final return 0 on function diagrams
  *      Kay Gürtzig             2024-03-19      Issue #1148: Special indentation for "if else if" chains
  *      Kay Gürtzig             2024-04-02      Bugfix #1156: Handling of typed constants rectified
+ *      Kay Gürtzig             2025-02-06      Bugfix #1188: Export of C-style array initialisations was defective
  *
  ******************************************************************************************************
  *
@@ -637,6 +638,11 @@ public class PHPGenerator extends Generator
 								transTokens.remove(posColon, posEqu);
 								//transTokens.add(posColon, " ");
 							}
+							// START KGU#1173 2025-02-06: Bugfix #1188 Face C-style declarations
+							else if (posVar + 1 < posEqu && "[".equals(transTokens.get(posVar + 1))) {
+								transTokens.remove(posVar + 1, posEqu);
+							}
+							// END KGU#1173 2025-02-06
 							transf = transTokens.getString();
 						}
 						else {
