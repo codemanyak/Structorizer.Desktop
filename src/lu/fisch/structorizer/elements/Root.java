@@ -7022,9 +7022,9 @@ public class Root extends Element {
 		// cf. checkValues
 		for (int i = 1; i < text.count(); i++) {
 			StringList items = Syntax.splitExpressionList(text.get(i), ",");
-			for (int j = 0; j < items.count(); j++) {
+			for (int j = 0; j < items.count()-1; j++) {
 				int val = 0;
-				String item = items.get(j);
+				String item = items.get(j).trim();
 				// Check for duplicates (including the default label)
 				if (!selectors.add(item)) {
 					duplicates.addIfNew(item);

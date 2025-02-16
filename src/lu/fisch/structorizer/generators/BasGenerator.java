@@ -601,6 +601,8 @@ public class BasGenerator extends Generator
 			{
 				// START KGU#779 2019-12-01: Bugfix #790 (enh. #416)
 				TokenList tokens = lines.get(i);
+				// FIXME: Could we provide the typemap or isn't it worth the trouble?
+				boolean isTypeDef = Instruction.isTypeDefinition(lines.get(i), null);
 				Syntax.unifyOperators(tokens, false);
 				boolean done = false;
 				// END KGU#779 2019-12-01
@@ -609,8 +611,7 @@ public class BasGenerator extends Generator
 				// END KGU#171 2016-03-31 / KGU#779 2019-12-01
 				{
 					// START KGU#779 2019-12-01
-					// FIXME: Could we provide the typemap or isn't it worth the trouble?
-					if (Instruction.isTypeDefinition(tokens, null)) {
+					if (isTypeDef) {
 						// In most cases this won't do anything because it's already generated
 						generateTypeDef(tokens, root, _indent, disabled);
 						continue;
@@ -687,6 +688,11 @@ public class BasGenerator extends Generator
 					if (Instruction.isTurtleizerMove(tokens)) {
 						codeLine += " : " + this.commentSymbolLeft() + " color = " + _inst.getHexColor();
 					}
+					// START KGU#1177 2025-02-16: Bugfix #1192 Return instruction keywords weren't transformed
+					else if (Jump.isReturn(tokens)) {
+						codeLine = transformKeyword("RETURN ") + transform(tokens.subSequenceToEnd(1).getString()).trim();
+					}
+					// END KGU#1177 2025-02-16
 					// START KGU#993 2021-10-04: Bugfix #993 We suppress unused declarations
 					//addCode(codeLine, _indent, disabled);
 					if (!Instruction.isMereDeclaration(tokens)) {
@@ -785,7 +791,7 @@ public class BasGenerator extends Generator
 				//addCode(transformKeyword("LET ") + _targetVar + "(indexBase + " + el + ") = " + 
 				addCode(transformKeyword("LET ") + _targetVar + "(" + el + ") = " +
 				// END KGU1175 2025-02-06
-								transform(elements.get(el)), _indent, _disabled);
+								transform(elements.get(el)).getString(), _indent, _disabled);
 				// END KGU#277 2016-10-13
 			}
 		}
@@ -842,75 +848,87 @@ public class BasGenerator extends Generator
 
 	// START KGU#779 2019-12-01: Issue #790 Type (record/enum) definitions hadn't been handled at all
 	/**
-	 * Generates a type definition (as well as possible) from the given token list, depending on
-	 * the export preferences (vintage BASIC / modern BASIC)
+	 * Generates a type definition (as well as possible) from the given token
+	 * list, depending on the export preferences (vintage BASIC / modern BASIC)
+	 * <br/>
+	 * This method tends to get obsolete. It became hardly more than a wrapper
+	 * for {@link #generateTypeDef(String, TypeMapEntry, Root, String, boolean)}
+	 * now.
 	 * @param _tokens - the lexically split type definition line
 	 * @param _root - the owning Root
 	 * @param _indent - the current indentation level
 	 * @param _disabled - whether the element is disabled
+	 * @return {@code false} if the type could not be found in the type map,
+	 *     {@code true} otherwise (no matter whether the type definition was
+	 *     generated or redundant.
 	 */
 	private boolean generateTypeDef(TokenList _tokens, Root _root, String _indent, boolean _disabled) {
 		String typeName = _tokens.get(1);
 		String typeKey = ":" + typeName;
 		TypeMapEntry type = _root.getTypeInfo(routinePool).get(typeKey);
-		String indentPlus1 = _indent + this.getIndent();
-		if (type == null) {
-			return false;
+//		String indentPlus1 = _indent + this.getIndent();
+//		
+//		if (type == null) {
+//			return false;
+//		}
+//		else if (this.wasDefHandled(_root, typeKey, false)) {
+//			// Nothing to do
+//			return true;
+//		}
+//		if (type.isRecord()) {
+//			Map<String, TypeMapEntry> compSpecs = type.getComponentInfo(true);
+//			if (this.optionCodeLineNumbering()) {
+//				// We apply a QBASIC construct (see https://en.wikibooks.org/wiki/QBasic/Arrays_and_Types)
+//				addCode(transformKeyword("TYPE ") + typeName, _indent, _disabled);
+//				for (Entry<String, TypeMapEntry> entry: compSpecs.entrySet()) {
+//					String compTypeName = "???";
+//					if (entry.getValue() != null) {
+//						compTypeName = entry.getValue().getCanonicalType(true, true);
+//					}
+//					addCode(entry.getKey() + transformKeyword(" AS ") + transformType(compTypeName, "???"), indentPlus1, _disabled);
+//				}
+//				addCode(transformKeyword("END TYPE"), _indent, _disabled);
+//			}
+//		}
+//		else if (type.isEnum()) {
+//			StringList enumItems = type.getEnumerationInfo();
+//			if (this.optionCodeLineNumbering()) {
+//				appendComment(_tokens.getString().replace("==", "="), _indent);
+//				// In vintage BASIC, we will just generate separate variable definitions
+//				int offset = 0;
+//				String lastVal = "";
+//				for (int i = 0; i < enumItems.count(); i++) {
+//					String[] itemSpec = enumItems.get(i).split("=", 2);
+//					if (itemSpec.length > 1) {
+//						lastVal = itemSpec[1].trim();
+//						offset = 0;
+//						try {
+//							int code = Integer.parseUnsignedInt(lastVal);
+//							lastVal = "";
+//							offset = code;
+//						}
+//						catch (NumberFormatException ex) {}
+//					}
+//					addCode(transformKeyword("LET ") + itemSpec[0] + " = " + transform(lastVal) + (lastVal.isEmpty() ? "" : "+") + offset, _indent, _disabled);
+//					offset++;
+//				}
+//				appendComment("end type "+ typeName, _indent);
+//			}
+//			else {
+//				// We use a VisualBasic feature here (see https://docs.microsoft.com/de-de/dotnet/visual-basic/language-reference/statements/enum-statement)
+//				addCode(transformKeyword("ENUM ") + typeName, _indent, _disabled);
+//				for (int i = 0; i < enumItems.count(); i++) {
+//					addCode(transform(enumItems.get(i)), indentPlus1, _disabled);
+//				}
+//				addCode(transformKeyword("END ENUM"), _indent, _disabled);
+//			}
+//		}
+//		this.setDefHandled(_root.getSignatureString(false, false), typeKey);
+//		return true;
+		if (type != null && type.isEnum() && this.optionCodeLineNumbering()) {
+			appendComment(_tokens.getString().replace("==",  "="), _indent);
 		}
-		else if (this.wasDefHandled(_root, typeKey, false)) {
-			// Nothing to do
-			return true;
-		}
-		if (type.isRecord()) {
-			Map<String, TypeMapEntry> compSpecs = type.getComponentInfo(true);
-			if (this.optionCodeLineNumbering()) {
-				// We apply a QBASIC construct (see https://en.wikibooks.org/wiki/QBasic/Arrays_and_Types)
-				addCode(transformKeyword("TYPE ") + typeName, _indent, _disabled);
-				for (Entry<String, TypeMapEntry> entry: compSpecs.entrySet()) {
-					String compTypeName = "???";
-					if (entry.getValue() != null) {
-						compTypeName = entry.getValue().getCanonicalType(true, true);
-					}
-					addCode(entry.getKey() + transformKeyword(" AS ") + transformType(compTypeName, "???"), indentPlus1, _disabled);
-				}
-				addCode(transformKeyword("END TYPE"), _indent, _disabled);
-			}
-		}
-		else if (type.isEnum()) {
-			StringList enumItems = type.getEnumerationInfo();
-			if (this.optionCodeLineNumbering()) {
-				appendComment(_tokens.getString().replace("==", "="), _indent);
-				// In vintage BASIC, we will just generate separate variable definitions
-				int offset = 0;
-				String lastVal = "";
-				for (int i = 0; i < enumItems.count(); i++) {
-					String[] itemSpec = enumItems.get(i).split("=", 2);
-					if (itemSpec.length > 1) {
-						lastVal = itemSpec[1].trim();
-						offset = 0;
-						try {
-							int code = Integer.parseUnsignedInt(lastVal);
-							lastVal = "";
-							offset = code;
-						}
-						catch (NumberFormatException ex) {}
-					}
-					addCode(transformKeyword("LET ") + itemSpec[0] + " = " + transform(lastVal) + (lastVal.isEmpty() ? "" : "+") + offset, _indent, _disabled);
-					offset++;
-				}
-				appendComment("end type "+ typeName, _indent);
-			}
-			else {
-				// We use a VisualBasic feature here (see https://docs.microsoft.com/de-de/dotnet/visual-basic/language-reference/statements/enum-statement)
-				addCode(transformKeyword("ENUM ") + typeName, _indent, _disabled);
-				for (int i = 0; i < enumItems.count(); i++) {
-					addCode(transform(enumItems.get(i)), indentPlus1, _disabled);
-				}
-				addCode(transformKeyword("END ENUM"), _indent, _disabled);
-			}
-		}
-		this.setDefHandled(_root.getSignatureString(false, false), typeKey);
-		return true;
+		return generateTypeDef(typeKey, type, _root, _indent, _disabled);
 	}
 	// END KGU#779 2019-12-01
 
@@ -1325,7 +1343,7 @@ public class BasGenerator extends Generator
 	@Override
 	protected void generateCode(Jump _jump, String _indent)
 	{
-		if(!appendAsComment(_jump, _indent)) {
+		if (!appendAsComment(_jump, _indent)) {
 			// START #277 2016-10-13: Enh. #270
 			boolean disabled = _jump.isDisabled(false);
 			// END KGU#277 2016-10-13
@@ -1342,21 +1360,19 @@ public class BasGenerator extends Generator
 
 			// START KGU#779 2019-12-01: Bugfix #790 (enh. #416)
 			//StringList lines = _jump.getText();
-			StringList lines = _jump.getUnbrokenText();
+			ArrayList<TokenList> lines = _jump.getUnbrokenTokenText();
 			// END KGU#779 2019-12-01
-			String preReturn  = Syntax.getKeywordOrDefault("preReturn", "return");
-			String preThrow   = Syntax.getKeywordOrDefault("preThrow", "throw");
-			for (int i = 0; isEmpty && i < lines.count(); i++) {
-				String line = transform(lines.get(i)).trim();
-				if (!line.isEmpty())
+			for (int i = 0; isEmpty && i < lines.size(); i++) {
+				TokenList lineTokens = lines.get(i);
+				if (!lineTokens.isEmpty())
 				{
 					isEmpty = false;
 				}
 				// START KGU#74/KGU#78 2015-11-30: More sophisticated jump handling
 				//code.add(_indent + line + ";");
-				if (Jump.isReturn(line))
+				if (Jump.isReturn(lineTokens))
 				{
-					String argument = line.substring(preReturn.length()).trim();
+					String argument = transform(lineTokens.subSequenceToEnd(1).getString());
 					if (!argument.isEmpty())
 					{
 						//code.add(_indent + this.getLineNumber() + this.procName + " = " + argument + " : END");
@@ -1366,17 +1382,18 @@ public class BasGenerator extends Generator
 						// END KGU#277 2016-10-13
 					}
 				}
-				else if (Jump.isExit(line))
+				else if (Jump.isExit(lineTokens))
 				{
+					// We ignore the exit code here
 					// START KGU#277 2016-10-13: Enh. #270
 					//code.add(this.getLineNumber() + _indent + "STOP");
 					addCode(transformKeyword("STOP"), _indent, disabled);
 					// END KGU#277 2016-10-13
 				}
 				// START KGU#686 2019-03-18: Enh. #56
-				else if (Jump.isThrow(line)) {
+				else if (Jump.isThrow(lineTokens)) {
 					// START KGU#1102 2023-11-08: Bugfix #1109 Rethrow not correctly handled
-					String arg = line.substring(preThrow.length()).trim();
+					String arg = transform(lineTokens.subSequenceToEnd(1).getString());
 					// END KGU#1102 2023-11-08
 					if (this.optionCodeLineNumbering()) {
 						appendComment("FIXME: Only a number is allowed as parameter:", _indent);
@@ -1410,7 +1427,7 @@ public class BasGenerator extends Generator
 					if (ref.intValue() < 0)
 					{
 						appendComment("FIXME: Structorizer detected this illegal jump attempt:", _indent);
-						appendComment(line, _indent);
+						appendComment(lineTokens.getString(), _indent);
 						label = "__ERROR__";
 					}
 					// START KGU#277 2016-10-13: Enh. #270
@@ -1422,7 +1439,7 @@ public class BasGenerator extends Generator
 				else if (!isEmpty)
 				{
 					appendComment("FIXME: Structorizer detected the following illegal jump attempt:", _indent);
-					appendComment(line, _indent);
+					appendComment(lineTokens.getString(), _indent);
 				}
 				// END KGU#74/KGU#78 2015-11-30
 			}
@@ -1921,6 +1938,7 @@ public class BasGenerator extends Generator
 	 * @param _type - the {@link TypeMapEntry} for the type
 	 * @param _root - the owning (defining) {@link Root}
 	 * @param _indent - the current indentation
+	 * @param _isDisabled - whether the originating element is disabled
 	 * @return {@code false} if the type could not be found in the type map,
 	 *     {@code true} otherwise (no matter whether the type definition was
 	 *     generated or redundant.
@@ -1968,7 +1986,7 @@ public class BasGenerator extends Generator
 				}
 				// START KGU#1176 2025-02-07: Bugfix #1190 We need a definition for modern Basic too
 				//addCode(entry.getKey() + transformKeyword(" AS ") + transformType(compTypeName, "???"), indentPlus1, _disabled);
-				addCode(compKeyword + varSpec + transformKeyword(" AS ") +
+				addCode(transformKeyword(compKeyword) + varSpec + transformKeyword(" AS ") +
 						transformType(compTypeName, "???"), indentPlus1, _isDisabled);
 				// END KGU#1176 2025-02-07
 			}

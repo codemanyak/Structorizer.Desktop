@@ -446,11 +446,10 @@ public class PythonGenerator extends Generator
 		// FIXME Doesn't work under #800 conditions
 		int posLBrace = -1;
 		while ((posLBrace = tokens.indexOf("{", posLBrace+1)) > 0) {
-			String prevToken = "";
 			TypeMapEntry typeEntry = null;
 			// Go back to the last non-empty token
-			int pos = posLBrace - 1;
-			if (pos >= 0 && Syntax.isIdentifier(prevToken, false, null)
+			String prevToken = tokens.get(posLBrace-1);
+			if (Syntax.isIdentifier(prevToken, false, null)
 					&& (typeEntry = this.typeMap.get(":" + prevToken)) != null
 					// Should be a record type but we better make sure.
 					&& typeEntry.isRecord()) {
@@ -459,7 +458,7 @@ public class PythonGenerator extends Generator
 				//HashMap<String, String> comps = Instruction.splitRecordInitializer(tokens.concatenate("", posLBrace));
 				// START KGU#1021 2021-12-05: Bugfix #1024 Instruction might be defective
 				//HashMap<String, String> comps = Instruction.splitRecordInitializer(tokens.concatenate("", posLBrace), typeEntry, false);
-				TokenList tail = tokens.subSequenceToEnd(pos);
+				TokenList tail = tokens.subSequenceToEnd(posLBrace-1);
 				HashMap<String, String> comps = Syntax.splitRecordInitializer(tail, typeEntry);
 				// END KGU#1021 2021-12-05
 				// END KGU#559 2018-07-20
@@ -500,13 +499,13 @@ public class PythonGenerator extends Generator
 				//prevToken += ")";
 				prevToken += "}";
 				// END KGU#795 2020-02-12
-				tokens.set(pos, prevToken);
-				tokens.remove(pos+1, tokens.size());
+				tokens.set(posLBrace - 1, prevToken);
+				tokens.remove(posLBrace , tokens.size());
 				// restore the tokens of the remaining text.
 				if (tail != null) {
 					tokens.addAll(tail);
 				}
-				posLBrace = pos;
+				posLBrace--;
 			}
 		}
 	}
