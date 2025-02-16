@@ -95,10 +95,10 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig         2021-12-05      Bugfix #1024: Precautions against defective record initializers
  *      Kay Gürtzig         2023-09-28      Bugfix #1092: Sensible export of alias type definitions enabled
  *      Kay Gürtzig         2023-10-04      Bugfix #1093 Undue final return 0 on function diagrams
- *      Kay Gürtzig             2024-03-18/19   Bugfix #1146 Wrong END between THEN and ELSE on Alternative export,
- *                                              missed opportunity to use ELSIF in IF chains now implemented
- *      Kay Gürtzig             2024-03-19      Issue #1148 Auxiliary methods markElementStart() and markElementEnds()
- *                                              moved up to Generator, reaction to disabled state improved
+ *      Kay Gürtzig         2024-03-18/19   Bugfix #1146 Wrong END between THEN and ELSE on Alternative export,
+ *                                          missed opportunity to use ELSIF in IF chains now implemented
+ *      Kay Gürtzig         2024-03-19      Issue #1148 Auxiliary methods markElementStart() and markElementEnds()
+ *      Kay Gürtzig         2025-02-16      Issue #800 + bugfix #1192: Handling of return statements in Instructions revised
  *
  ******************************************************************************************************
  *
@@ -727,7 +727,12 @@ public class OberonGenerator extends Generator {
 							transline += " " + this.commentSymbolLeft() + " color = " + _inst.getHexColor() + " " + this.commentSymbolRight();
 						}
 						// START KGU 2017-01-31: return must be capitalized here
-						transline = transline.replaceFirst("^" + BString.breakup(Syntax.getKeywordOrDefault("preReturn", "return"), true) + "($|\\W+.*)", "RETURN$1");
+						// START KGU#1177 2025-02-16: Bugfix #1192 We have to face internal key
+						//transline = transline.replaceFirst("^" + BString.breakup(Syntax.getKeywordOrDefault("preReturn", "return"), true) + "($|\\W+.*)", "RETURN$1");
+						else if (Jump.isReturn(tokens)) {
+							transline = ("RETURN " + transTokens.subSequenceToEnd(1).getString()).trim() + ";";
+						}
+						// END KGU#1177 2025-02-16
 						// END KGU 2017-01-31
 						// START KGU#261/KGU#504 2018-03-13: Enh. #259/#335, bugfix #521
 						//addCode(transline, _indent, isDisabled);

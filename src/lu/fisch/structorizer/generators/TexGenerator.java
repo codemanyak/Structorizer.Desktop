@@ -52,6 +52,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig     2021-06-06      Bugfix #975: ^ within tokens replaced by \textasciicircum rather than \hat{}
  *                                      method transformText extracted for the token-internal substitution
  *      Kay Gürtzig     2022-08-23      Structorizer version inserted as LaTeX comment
+ *      Kay Gürtzig     2025-02-16      Bugfix #1192: Export instructions with (tail) return statements as exit structure
  *
  ******************************************************************************************************
  *
@@ -367,6 +368,11 @@ public class TexGenerator extends Generator {
 					code.add(_indent+this.getIndent() + "\\end{declaration}");
 					code.add(_indent + "}");
 				}
+				// START KGU#1177 2025-02-16: Bugfix #1192: display return statement as exit
+				else if (Jump.isReturn(tokens)) {
+					code.add(_indent+ "\\exit{\\("+transform(tokens.getString())+"\\)}");
+				}
+				// END KGU#1177 2025-02-16
 				else if (!Instruction.isAssignment(tokens) && Instruction.isDeclaration(tokens)) {
 					code.add(_indent+"\\assign{%");
 					code.add(_indent+this.getIndent() + "\\begin{declaration}[variable:]");

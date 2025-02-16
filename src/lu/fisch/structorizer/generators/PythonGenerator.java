@@ -96,6 +96,7 @@ import java.util.ArrayList;
  *      Kay Gürtzig             2023-11-08      Bugfix #1109: generateCode(Jump) revised for throw
  *      Kay Gürtzig             2024-04-03      Issue #1148: Optimised code generation for "if else if" chains
  *      Kay Gürtzig             2025-02-06      Bugfix #1188: The transformation of C-style array initialisations was wrong
+ *      Kay Gürtzig             2025-02-16      Bugfix #1192: Translation of tail return instruction keywords
  *
  ******************************************************************************************************
  *
@@ -728,7 +729,12 @@ public class PythonGenerator extends Generator
 						}
 					}
 					// END KGUU#799 2020-02-13
-				// START KGU#1053 2022-08-14: Bugfix #1061 - hands off in "no conversion" mode!
+					// START KGU#1177 2025-02-16: Bugfix #1192: Transform return keyword
+					else if (Jump.isReturn(tokens)) {
+						codeLine = "return " + transform(tokens.subSequenceToEnd(1).getString());
+					}
+					// END KGU#1177 2025-02-16
+							// START KGU#1053 2022-08-14: Bugfix #1061 - hands off in "no conversion" mode!
 				}
 				// END KGU#1053 2022-08-14
 				// START KGU#1089 2023-10-18: Issue #980 Reject a multi-var declaration
@@ -1268,7 +1274,7 @@ public class PythonGenerator extends Generator
 	 * @param _root - the originating Root
 	 * @param _type - the type map entry the definition for which is requested here
 	 * @param _indent - the current indentation
-	 * @param _asComment - if the type deinition is only to be added as comment (disabled)
+	 * @param _asComment - if the type definition is only to be added as comment (disabled)
 	 */
 	protected boolean generateTypeDef(Root _root, String _typeName, TypeMapEntry _type, String _indent, boolean _asComment) {
 		boolean done = false;

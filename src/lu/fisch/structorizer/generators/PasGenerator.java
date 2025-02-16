@@ -104,6 +104,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig         2024-04-02      Bugfix #1155: Risk of stack overflow on type conversion averted
  *      Kay Gürtzig         2024-04-03      Issue #1148: Optimised code generation for "if else if" chains
  *      Kay Gürtzig         2024-12-18      Issue #423: Force pointer symbols in directly recursive record definitions
+ *      Kay Gürtzig         2025-02-16      Issue #800 + bugfix #1192: Handling of return statements in Instructions revised
  *
  ******************************************************************************************************
  *
@@ -757,8 +758,6 @@ public class PasGenerator extends Generator
 			boolean commentInserted = false;
 			// END KGU#424 2017-09-25
 
-			String preReturn = Syntax.getKeywordOrDefault("preReturn", "return");
-			Pattern preReturnMatch = Pattern.compile(getKeywordPattern(preReturn)+"([\\W].*|$)");
 			ArrayList<TokenList> lines = _inst.getUnbrokenTokenText();
 			// START KGU#424 2017-09-25: Put the comment if the element doesn't contain anything else
 			if (lines.isEmpty() || TokenList.concatenate(lines, null).isBlank()) {
@@ -776,7 +775,7 @@ public class PasGenerator extends Generator
 				TokenList tokens = lines.get(i);
 				if (Jump.isReturn(tokens))
 				{
-					String argument = tokens.getString().trim().substring(preReturn.length()).trim();
+					String argument = tokens.subSequenceToEnd(1).getString().trim();
 					if (!argument.isEmpty())
 					{
 						// START KGU#424 2017-09-25: Put the comment on substantial content

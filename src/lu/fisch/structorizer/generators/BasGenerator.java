@@ -80,6 +80,7 @@ package lu.fisch.structorizer.generators;
  *                                          processed. Array declarations for vintage BASIC no longer suppressed
  *      Kay Gürtzig         2025-02-07/08   Bugfix #1190: Includables now fully involved. Declaration placement
  *                                          fundamentally revised, record and array inits now recursive.
+ *      Kay Gürtzig         2025-02-16      Bugfix #1192: Return keywords in Instruction elements weren't transformed
  *
  ******************************************************************************************************
  *
