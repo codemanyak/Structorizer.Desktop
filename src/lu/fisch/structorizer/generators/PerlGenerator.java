@@ -680,8 +680,8 @@ public class PerlGenerator extends Generator {
 					// END KGU#787 2019-12-03
 				}
 				// START KGU#1177 2025-02-16: Bugfix #1192: Translate the return keyword
-				else if (Jump.isReturn(line)) {
-					line = "return " + line.substring(CodeParser.getKeyword("preReturn").length()).trim();
+				else if (Jump.isReturn(tokens)) {
+					tokens.set(0, "return");
 				}
 				// END KGU#1177  2025-02-16
 				if (text == null) {
