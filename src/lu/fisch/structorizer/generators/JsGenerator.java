@@ -240,11 +240,8 @@ public class JsGenerator extends CGenerator {
 				else if (posBrace == 0) {
 					// Array initializer
 					ArrayList<TokenList> exprs = Syntax.splitExpressionList(tokens.subSequence(1, tokens.size()-1), ",");
-					StringList items = new StringList();
-					for (int i = 0; i < exprs.size() - 1; i++) {
-						items.add(exprs.get(i).getString());
-					}
-					return this.transformOrGenerateArrayInit("", items, null, false, null, false);
+					TokenList tail = exprs.remove(exprs.size()-1);
+					return transformOrGenerateArrayInit("", exprs, null, false, null, false) + transformTokens(tail);
 				}
 			}
 		}
@@ -265,6 +262,22 @@ public class JsGenerator extends CGenerator {
 		// END KGU#1112 2023-12-17
 		return super.transformTokens(tokens);
 	}
+	
+	@Override
+	protected String transformOutput(String _interm)
+	{
+		String outputToken = Syntax.key2token("output");
+		TokenList tokens = new TokenList(_interm);
+		if (tokens.indexOf(outputToken) == 0) {
+			if (tokens.size() == 1) {
+				return "document.write(\"<br/>\")";
+			}
+			ArrayList<TokenList> expressions = Syntax.splitExpressionList(tokens.subSequenceToEnd(1), ",", true);
+			String tail = expressions.remove(expressions.size()-1).getString();
+			_interm = outputToken + TokenList.concatenate(expressions, ") + (").getString().trim() + tail;
+		}
+		return super.transformOutput(_interm);
+	}
 
 	/**
 	 * Composes and returns a syntax-conform array initializer expression for the
@@ -274,18 +287,19 @@ public class JsGenerator extends CGenerator {
 	 * return the transformed initializer.
 	 * 
 	 * @param _lValue - the left side of the assignment (ignored here)
-	 * @param _arrayItems - the {@link StringList} of element expressions to be
-	 *    applied (in index order)
+	 * @param _arrayItems - the {@link ArrayList} of tokenised element expressions
+	 *    to be applied (in index order)
 	 * @param _indent - the current indentation level (ignored here)
 	 * @param _isDisabled - whether the code is commented out (ignored here)
 	 * @param _elemType - the {@link TypeMapEntry} of the element type is available
 	 * @param _isDecl - if this is part of a declaration (i.e. a true initialization)
 	 */
-	protected String transformOrGenerateArrayInit(String _lValue, StringList _arrayItems, String _indent, boolean _isDisabled, String _elemType, boolean _isDecl)
+	@Override
+	protected String transformOrGenerateArrayInit(String _lValue, ArrayList<TokenList> _arrayItems, String _indent, boolean _isDisabled, String _elemType, boolean _isDecl)
 	{
 		StringList transItems = new StringList();
-		for (int i = 0; i < _arrayItems.count(); i++) {
-			transItems.add(this.transform(_arrayItems.get(i), false));
+		for (int i = 0; i < _arrayItems.size(); i++) {
+			transItems.add(this.transform(_arrayItems.get(i).getString(), false));
 		}
 		return "[" + transItems.concatenate(", ") + "]";
 	}

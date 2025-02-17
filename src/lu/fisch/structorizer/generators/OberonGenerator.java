@@ -569,7 +569,6 @@ public class OberonGenerator extends Generator {
 			
 			appendComment(_inst, _indent);
 
-			TokenList outputKey = Syntax.getSplitKeyword("output");
 			ArrayList<TokenList> lines = _inst.getUnbrokenTokenText();
 			for (int i = 0; i < lines.size(); i++)
 			{
@@ -610,10 +609,10 @@ public class OberonGenerator extends Generator {
 					//addCode(transf, _indent, isDisabled);
 					StringList inputItems = Instruction.getInputItems(tokens);
 					if (inputItems.count() > 2) {
-						String inputKey = Syntax.getKeyword("input");
+						String inputKey = Syntax.key2token("input");
 						String prompt = inputItems.get(0);
 						if (!prompt.isEmpty()) {
-							generateTypeSpecificOutput(new TokenList(prompt), _indent, isDisabled, outputKey.getString());
+							generateTypeSpecificOutput(new TokenList(prompt), _indent, isDisabled);
 						}
 						//appendComment("TODO: Replace \"TYPE\" by the the actual In procedure name for the respective type!", _indent);
 						for (int j = 1; j < inputItems.count(); j++) {
@@ -640,13 +639,13 @@ public class OberonGenerator extends Generator {
 				}
 				else if (Instruction.isOutput(tokens))
 				{
-					ArrayList<TokenList> expressions = Syntax.splitExpressionList(tokens.subSequenceToEnd(outputKey.size()), ",");
+					ArrayList<TokenList> expressions = Syntax.splitExpressionList(tokens.subSequenceToEnd(1), ",");
 					// Produce an output instruction for every expression (according to type)
 					for (int j = 0; j < expressions.size(); j++)
 					{
 						// START KGU#236 2016-10-15: Issue #227 - For literals, we can of course determine the type...
 						//addCode(transform(outputKey + " " + expressions.get(j)) + ";", _indent, isDisabled);
-						generateTypeSpecificOutput(expressions.get(j), _indent, isDisabled, outputKey.getString());
+						generateTypeSpecificOutput(expressions.get(j), _indent, isDisabled);
 						// END KGU#236 2016-10-15
 					}
 					addCode("Out.Ln;", _indent, isDisabled);
@@ -818,10 +817,9 @@ public class OberonGenerator extends Generator {
 	 * @param _expression - tokenized expression the value of which is to be output
 	 * @param _indent - current source line indentation (as string)
 	 * @param _isDisabled - whether the element is disabled
-	 * @param _outputKey - a general output keyword (still to be transformed)
 	 */
-	protected void generateTypeSpecificOutput(TokenList _expression, String _indent, boolean _isDisabled,
-			String _outputKey) {
+	protected void generateTypeSpecificOutput(TokenList _expression, String _indent, boolean _isDisabled) {
+		// FIXME: Rewrite this type induction based on Expression class
 		String procName = "";
 		String length = "";
 		if (_expression.size() == 1) {
@@ -895,7 +893,7 @@ public class OberonGenerator extends Generator {
 		}
 		// END KGU#332 2017-01-30
 		// FIXME Don't descend to string level
-		String codeLine = transform(_outputKey + " " + exprStr).replace("%LEN%", length) + ";";
+		String codeLine = transform(Syntax.key2token("output") + " " + exprStr).replace("%LEN%", length) + ";";
 		if (!procName.isEmpty()) {
 			codeLine = codeLine.replace("Out.TYPE(", "Out."+procName+"(");
 		}
@@ -1395,42 +1393,39 @@ public class OberonGenerator extends Generator {
 		// Only EXIT (= break) and RETURN exist, no further jump allowed
 		boolean isEmpty = true;
 
-		StringList lines = _jump.getUnbrokenText();
-		for (int i = 0; isEmpty && i < lines.count(); i++) {
-			String line = transform(lines.get(i)).trim();
-			if (!line.isEmpty())
+		ArrayList<TokenList> tokenLines = _jump.getUnbrokenTokenText();
+		for (int i = 0; isEmpty && i < tokenLines.size(); i++) {
+			TokenList tokens = tokenLines.get(i);
+			if (!tokens.isBlank())
 			{
 				isEmpty = false;
 			}
 			// START KGU#74/KGU#78 2015-11-30: More sophisticated jump handling
 			//code.add(_indent + line + ";");
-			String preReturn = Syntax.getKeywordOrDefault("preReturn", "return");
-			String preExit   = Syntax.getKeywordOrDefault("preExit", "exit");
-			String preLeave  = Syntax.getKeywordOrDefault("preLeave", "leave");
-			if (line.matches(Matcher.quoteReplacement(preReturn)+"([\\W].*|$)"))
+			if (Jump.isReturn(tokens))
 			{
-				addCode("RETURN " + line.substring(preReturn.length()).trim() + ";",
+				addCode("RETURN " + transform(tokens.subSequenceToEnd(1).getString()).trim() + ";",
 						_indent, isDisabled);
 			}
-			else if (line.matches(Matcher.quoteReplacement(preExit)+"([\\W].*|$)"))
+			else if (Jump.isExit(tokens))
 			{
 				appendComment("FIXME: Find a solution to exit the program here!", _indent);
-				appendComment(line, _indent);
+				appendComment("EXITPROG " + transform(tokens.subSequenceToEnd(1).getString()).trim(), _indent);
 			}
-			else if (line.matches(Matcher.quoteReplacement(preLeave)+"([\\W].*|$)"))
+			else if (Jump.isLeave(tokens))
 			{
-				String argument = line.substring(preLeave.length()).trim();
+				String argument = transform(tokens.subSequenceToEnd(1).getString()).trim();
 				if (!argument.isEmpty() && !argument.equals("1"))
 				{
 					appendComment("FIXME: No multi-level EXIT in OBERON; reformulate your loops to leave " + argument + " levels!", _indent);
-					appendComment(line, _indent);
+					appendComment("EXIT " + argument, _indent);
 				}
 				code.add(_indent + "EXIT;");
 			}
 			else if (!isEmpty)
 			{
 				appendComment("FIXME: jump/exit instruction of unrecognised kind!", _indent);
-				appendComment(line, _indent);
+				appendComment(Syntax.decodeLine(tokens).getString(), _indent);
 			}
 		}
 		if (isEmpty) {

@@ -26,6 +26,8 @@
 
 package lu.fisch.structorizer.generators;
 
+import java.util.ArrayList;
+
 /******************************************************************************************************
  *
  *      Author:         Markus Grundner
@@ -1182,17 +1184,14 @@ public class BASHGenerator extends Generator {
 			boolean disabled = _inst.isDisabled(false);
 			// END KGU 2014-11-16
 			// FIXME: KGU#1097 / Issue #800 We should preferably work over TokenLists
-			StringList text = _inst.getUnbrokenText(); 
-			// START KGU#803 2020-02-16: Issue #816
-			String preReturn = Syntax.getKeywordOrDefault("preReturn","return").trim();
-			// END KGU#803 2020-02-16
-			int nLines = text.count();
+			ArrayList<TokenList> tokenLines = _inst.getUnbrokenTokenText(); 
+			int nLines = tokenLines.size();
 			for (int i = 0; i < nLines; i++) {
 				// START KGU#277/KGU#284 2016-10-13/16: Enh. #270 + Enh. #274
 				//code.add(_indent + transform(_inst.getText().get(i)));
-				String line = text.get(i);
+				TokenList tokens = tokenLines.get(i);
 				// START KGU#653 2019-02-15: Enh. #680 - special treatment for mult-variable input instructions
-				StringList inputItems = Instruction.getInputItems(line);
+				StringList inputItems = Instruction.getInputItems(tokens);
 				// START KGU#803 2020-02-17: Issue #816 ensure local declaration where necessary
 				if (inputItems != null) {
 					for (int j = 1; j < inputItems.count(); j++) {
@@ -1225,13 +1224,13 @@ public class BASHGenerator extends Generator {
 				// END KGU#653 2019-02-15
 				// START KGU#388/KGU#772 2017-10-24/2019-11-24: Enh. #423/bugfix #784 ignore type definitions and mere variable declarations
 				//if (Instruction.isTypeDefinition(line)) {
-				if (Instruction.isMereDeclaration(line)) {
+				if (Instruction.isMereDeclaration(tokens)) {
 					// local declaration should have been handled by generateCode(Root)
 					continue;
 				}
 				// START KGU#803 2020-02-16: Issue #816 A return has to be handled specifically
-				if (root.isSubroutine() && (line.matches("^" + Matcher.quoteReplacement(preReturn) + "(\\W.*|$)"))) {
-					String expr = line.substring(preReturn.length()).trim();
+				if (root.isSubroutine() && Jump.isReturn(tokens)) {
+					String expr = tokens.subSequenceToEnd(1).getString().trim();
 					generateResultVariables(expr, _indent, disabled);
 					// In case of an endstanding return we don't need a formal return command
 					if (i < nLines-1 || root.children.getElement(root.children.getSize()-1) != _inst) {
@@ -1241,7 +1240,7 @@ public class BASHGenerator extends Generator {
 				}
 				// END KGU#803 2020-02-16
 				// END KGU#388/KGU#772 2017-10-24/2019-11-24
-				String codeLine = transform(line);
+				String codeLine = transform(tokens.getString());
 				/* FIXME KGU#803 2020-02-16: Issue #816 - we should mark local variables as local
 				 * This requires to check whether line is an assignment, that the target variable
 				 * is not a parameter or input variable (how to declare these?) and it hasn't been
@@ -1250,14 +1249,14 @@ public class BASHGenerator extends Generator {
 				// START KGU#311 2017-01-05: Enh. #314: We should at least put some File API remarks
 				if (this.usesFileAPI && !disabled) {
 					for (int j = 0; j < Executor.fileAPI_names.length; j++) {
-						if (line.contains(Executor.fileAPI_names[j] + "(")) {
+						if (tokens.contains(new TokenList(Executor.fileAPI_names[j] + "("), true)) {
 							appendComment("TODO File API: Replace the \"" + Executor.fileAPI_names[j] + "\" call by an appropriate shell construct", _indent);
 							break;
 						}
 					}
 				}
 				// END KGU#311 2017-01-05
-				if (Instruction.isTurtleizerMove(line)) {
+				if (Instruction.isTurtleizerMove(tokens)) {
 					codeLine += " " + this.commentSymbolLeft() + " color = " + _inst.getHexColor();
 				}
 				// START KGU#383 2017-04-18: Bugfix #386 - suppress sole empty line
@@ -1393,8 +1392,8 @@ public class BASHGenerator extends Generator {
 		//code.add(_indent+"case "+transform(_case.getText().get(0))+" in");
 		// START KGU#453 2017-11-02: Issue #447
 		//addCode("case "+transform(_case.getText().get(0))+" in", _indent, disabled);
-		StringList unbrokenText = _case.getUnbrokenText();
-		addCode("case "+transform(unbrokenText.get(0))+" in", _indent, disabled);
+		ArrayList<TokenList> tokenLines = _case.getUnbrokenTokenText();
+		addCode("case "+transform(tokenLines.get(0).getString())+" in", _indent, disabled);
 		// END KGU#453 2017-11-02
 		// END KGU#277 2016-10-14
 		
@@ -1408,13 +1407,14 @@ public class BASHGenerator extends Generator {
 			//addCode(this.getIndent() + _case.getText().get(i+1).trim().replace(",", "|") + ")", _indent, disabled);
 			// START KGU#755 2019-11-08: Bugfix #769 - more precise splitting necessary
 			//addCode(this.getIndent() + unbrokenText.get(i+1).trim().replace(",", "|") + ")", _indent, disabled);
-			StringList items = Syntax.splitExpressionList(unbrokenText.get(i+1).trim(), ",");
-			addCode(this.getIndent() + items.concatenate("|", 0, items.count() - 1) + ")", _indent, disabled);
+			ArrayList<TokenList> items = Syntax.splitExpressionList(tokenLines.get(i+1), ",", true);
+			items.remove(items.size()-1);	// Get rid of tail
+			addCode(this.getIndent() + TokenList.concatenate(items, "|").getString() + ")", _indent, disabled);
 			// END KGU#755 2019-11-08
 			// END KGU#453 2017-11-02
 			// END KGU#277 2016-10-14
 			// START KGU#15 2015-11-02
-			generateCode((Subqueue) _case.qs.get(i), _indent+this.getIndent()+this.getIndent()+this.getIndent());
+			generateCode((Subqueue) _case.qs.get(i), _indent + this.getIndent().repeat(3));
 			addCode(";;", _indent + this.getIndent(), disabled);
 		}
 		
@@ -1745,33 +1745,30 @@ public class BASHGenerator extends Generator {
 			// START KGU#277 2016-10-14: Enh. #270
 			boolean disabled = _jump.isDisabled(false);
 			// END KGU#277 2016-10-14
-			// START KGU#803 2020-02-16: Issue #816
-			String preReturn = Syntax.getKeywordOrDefault("preReturn","return").trim();
-			// END KGU#803 2020-02-16
-			StringList jumpText = _jump.getUnbrokenText();
-			for (int i=0; i < jumpText.count(); i++)
+			ArrayList<TokenList> tokenLines = _jump.getUnbrokenTokenText();
+			for (int i=0; i < tokenLines.size(); i++)
 			{
-				String line = jumpText.get(i);
+				TokenList tokens = tokenLines.get(i);
 				// FIXME (KGU 2016-03-25): Handle the kinds of exiting jumps!
 				// START KGU#803 2020-02-16: Issue #816
-				if (root.isSubroutine() && (line.matches("^" + Matcher.quoteReplacement(preReturn) + "(\\W.*|$)"))) {
-					String expr = line.substring(preReturn.length()).trim();
+				if (root.isSubroutine() && Jump.isReturn(tokens)) {
+					String expr = tokens.subSequenceToEnd(1).getString().trim();
 					generateResultVariables(expr, _indent, disabled);
 					// In case of an endstanding return we don't need a formal return command
-					if (i < jumpText.count()-1 || root.children.getElement(root.children.getSize()-1) != _jump) {
+					if (i < tokenLines.size()-1 || root.children.getElement(root.children.getSize()-1) != _jump) {
 						addCode("return 0", _indent, disabled);
 					}
 				}
 				// START KGU#1102 2023-11-07: Bugfix #1109 There is such thing as try/catch/throw in bash
-				else if (Jump.isThrow(line)) {
-					appendComment(line + " (FIXME!)", _indent);
+				else if (Jump.isThrow(tokens)) {
+					appendComment("throw " + transform(tokens.subSequenceToEnd(1).getString()) + " (FIXME!)", _indent);
 				}
 				// END KGU#1102 2023-11-07
 				else
 				// END KGU#803 2020-02-16
 				// START KGU#277 2016-10-14: Enh. #270
 				//code.add(_indent+transform(_jump.getText().get(i)));
-				addCode(transform(line), _indent, disabled);
+				addCode(transform(tokens.getString()), _indent, disabled);
 				// END KGU#277 2016-10-14
 			}
 		}

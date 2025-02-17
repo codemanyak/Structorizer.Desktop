@@ -1472,8 +1472,38 @@ public class Syntax {
 	 *     separated by paddings larger or equal to the {@code _listSeparator} in length. Gaps
 	 *     between parentheses, brackets or braces will be ignored.
 	 * @return a list consisting of the separated tokenized expressions and the tail.
+	 * 
+	 * @see #splitExpressionList(TokenList, String, boolean)
 	 */
 	public static ArrayList<TokenList> splitExpressionList(TokenList _tokens, String _listSeparator)
+	{
+		return splitExpressionList(_tokens, _listSeparator, false);
+	}
+		
+	/**
+	 * Splits the token list {@code _tokens}, which is supposed to represent a sequence of
+	 * expressions separated by separators {@code _listSeparator}, into a list of
+	 * {@link TokenList}s, each comprising one of the listed expressions in tokenized form.<br/>
+	 * This is aware of string literals, argument lists of function calls etc. (These must
+	 * not be broken.)
+	 * The analysis stops as soon as there is a level underflow (i.e. an unmatched right
+	 * parenthesis, bracket, or the like).<br/>
+	 * The list of the remaining tokens from the unsatisfied right parenthesis, bracket, or
+	 * brace on will be added as last element to the result.
+	 * If the last result element is empty then the expression list was syntactically "clean".<br/>
+	 * 
+	 * @param _tokens - {@link StringList} containing one or more expressions in tokenized form
+	 * @param _listSeparator - a character sequence serving as separator among the expressions
+	 *     (default: ","). It should form a single token on being split (otherwise it would not
+	 *     be recognised, it must not be any of "(", ")", "[", "]", "{", "}", but it may also be
+	 *     a series of whitespace characters, in which case the expressions would be token lists
+	 *     separated by paddings larger or equal to the {@code _listSeparator} in length. Gaps
+	 *     between parentheses, brackets or braces will be ignored.
+	 * @param _trim - if {@code true} then the resulting member TokenLists will be trimmed at
+	 *     start and end.
+	 * @return a list consisting of the separated tokenized expressions and the tail.
+	 */
+	public static ArrayList<TokenList> splitExpressionList(TokenList _tokens, String _listSeparator, boolean _trim)
 	{
 		ArrayList<TokenList> expressionList = new ArrayList<TokenList>();
 		if (_listSeparator == null) _listSeparator = ",";
@@ -1497,6 +1527,9 @@ public class Syntax {
 			int gap = _tokens.getPadding(i)[0];
 			if (token.equals(_listSeparator) && enclosings.isEmpty()) {
 				// store the current expression and start a new one
+				if (_trim) {
+					currExpr.trim();
+				}
 				expressionList.add(currExpr);
 				currExpr = new TokenList();
 				gap = 0;
@@ -1504,6 +1537,9 @@ public class Syntax {
 			else { 
 				if (gap >= wsLen && enclosings.isEmpty()) {
 					// store the current expression and start a new one
+					if (_trim) {
+						currExpr.trim();
+					}
 					expressionList.add(currExpr);
 					currExpr = new TokenList();
 					gap = 0;
@@ -1548,6 +1584,9 @@ public class Syntax {
 		// add the last expression if it's not empty
 		if (!currExpr.isBlank())
 		{
+			if (_trim) {
+				currExpr.trim();
+			}
 			expressionList.add(currExpr);
 		}
 		// Add the tail. Empty if there is no bad tail

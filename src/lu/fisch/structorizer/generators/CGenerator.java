@@ -2364,117 +2364,59 @@ public class CGenerator extends Generator {
 	@Override
 	protected void generateCode(Jump _jump, String _indent)
 	{
-		// START KGU 2015-10-18: The "export instructions as comments"
-		// configuration had been ignored here
-		// insertComment(_jump, _indent);
-		// for(int i=0;i<_jump.getText().count();i++)
-		// {
-		// code.add(_indent+transform(_jump.getText().get(i))+";");
-		// }
 		if (!appendAsComment(_jump, _indent)) {
 			
 			boolean isDisabled = _jump.isDisabled(false);
 
 			appendComment(_jump, _indent);
 
-			// START KGU#380 2017-04-14: Bugfix #394 Done in another way now
-			// KGU 2015-10-18: In case of an empty text generate a break
-			// instruction by default.
-			//boolean isEmpty = true;
-			// END KGU#380 207-04-14
-			
-			StringList lines = _jump.getText();
-			boolean isEmpty = lines.getLongString().trim().isEmpty();
-			String preReturn = Syntax.getKeywordOrDefault("preReturn", "return").trim();
-			String preExit   = Syntax.getKeywordOrDefault("preExit", "exit").trim();
-			// START KGU#380 2017-04-14: Bugfix #394 - We don't consider superfluous lines anymore
-			//String preLeave  = CodeParser.getKeywordOrDefault("preLeave", "leave").trim();
-			//String preReturnMatch = Matcher.quoteReplacement(preReturn)+"([\\W].*|$)";
-			//String preExitMatch   = Matcher.quoteReplacement(preExit)+"([\\W].*|$)";
-			//String preLeaveMatch  = Matcher.quoteReplacement(preLeave)+"([\\W].*|$)";
-			//for (int i = 0; isEmpty && i < lines.count(); i++) {
-			//	String line = transform(lines.get(i)).trim();
-			//	if (!line.isEmpty())
-			//	{
-			//		isEmpty = false;
-			//	}
-			String line = "";
-			if (!isEmpty) {
-				line = lines.get(0).trim();
+			ArrayList<TokenList> tokenLines = _jump.getUnbrokenTokenText();
+			TokenList tokens = null;
+			for (int i = 0; (tokens == null || tokens.isBlank()) && i < tokenLines.size(); i++) {
+				tokens = tokenLines.get(i);
 			}
-				// START KGU#74/KGU#78 2015-11-30: More sophisticated jump handling
-				//code.add(_indent + line + ";");
-				//if (line.matches(preReturnMatch))
-				if (_jump.isReturn())
-				{
-					// START KGU#989 2021-10-01: Bugfix #989 missing expression translation
-					//addCode("return " + line.substring(preReturn.length()).trim() + ";",
-					addCode("return " + transform(line.substring(preReturn.length()).trim()) + ";",
-					// END KGU#989 2021-10-01
-							_indent, isDisabled);
-				}
-				//else if (line.matches(preExitMatch))
-				else if (_jump.isExit())
-				{
-					// START KGU#989 2021-10-01: Bugfix #989 missing expression translation
-					//appendExitInstr(line.substring(preExit.length()).trim(), _indent, isDisabled);
-					appendExitInstr(transform(line.substring(preExit.length()).trim()), _indent, isDisabled);
-					// END KGU#989 2021-10-01
-				}
-				// START KGU#686 2019-03-20: Enh. #56 Throw has to be implemented
-				else if (_jump.isThrow() && this.getTryCatchLevel() != TryCatchSupportLevel.TC_NO_TRY) {
-					// START KGU#989 2021-10-01: Bugfix #989 missing expression translation
-					//this.generateThrowWith(line.substring(
-					//		Syntax.getKeywordOrDefault("preThrow", "throw").length()).trim(), _indent, isDisabled);
-					this.generateThrowWith(transform(line.substring(
-							Syntax.getKeywordOrDefault("preThrow", "throw").length()).trim()), _indent, isDisabled);
-					// END KGU#989 2021-10-01
-				}
-				// END KGU#686 2019-03-20
-				// Has it already been matched with a loop? Then syntax must have been okay...
-				else if (this.jumpTable.containsKey(_jump))
-				{
-					Integer ref = this.jumpTable.get(_jump);
-					String label = this.labelBaseName + ref;
-					if (ref.intValue() < 0)
-					{
-						appendComment("FIXME: Structorizer detected this illegal jump attempt:", _indent);
-						appendComment(line, _indent);
-						label = "__ERROR__";
-					}
-					addCode(this.getMultiLevelLeaveInstr() + " " + label + ";", _indent, isDisabled);
-				}
-				//else if (line.matches(preLeaveMatch))
-				else if (_jump.isLeave())
-				{
-					// START KGU 2017-02-06: The "funny comment" was irritating and dubious itself
-					// Seems to be an ordinary one-level break without need to concoct a jump statement
-					// (Are there also strange cases - neither matched nor rejected? And how could this happen?)
-					//addCode("break;\t// FIXME: Dubious occurrence of break instruction!", _indent, isDisabled);
-					addCode("break;", _indent, isDisabled);
-					// END KGU 2017-02-06
-				}
-				else if (!isEmpty)
-				{
-					appendComment("FIXME: jump/exit instruction of unrecognised kind!", _indent);
-					appendComment(line, _indent);
-				}
-				// END KGU#74/KGU#78 2015-11-30
+			boolean isEmpty = tokens == null || tokens.isBlank();
+			if (_jump.isReturn() || _jump.isExit())
+			{
+				addCode("return " + transform(tokens.subSequenceToEnd(1).getString()) + ";",
+						_indent, isDisabled);
 			}
-//			if (isEmpty) {
-//				addCode("break;", _indent, isDisabled);
-//			}
-//			// END KGU 2015-10-18
-//		}
-		// END KGU#380 207-04-14
+			else if (_jump.isThrow() && this.getTryCatchLevel() != TryCatchSupportLevel.TC_NO_TRY)
+			{
+				this.generateThrowWith(transform(tokens.subSequenceToEnd(1).getString()).trim(), _indent, isDisabled);
+			}
+			// Has it already been matched with a loop? Then syntax must have been okay...
+			else if (this.jumpTable.containsKey(_jump))
+			{
+				Integer ref = this.jumpTable.get(_jump);
+				String label = this.labelBaseName + ref;
+				if (ref.intValue() < 0)
+				{
+					appendComment("FIXME: Structorizer detected this illegal jump attempt:", _indent);
+					appendComment("throw " + tokens.subSequenceToEnd(1).getString(), _indent);
+					label = "__ERROR__";
+				}
+				addCode(this.getMultiLevelLeaveInstr() + " " + label + ";", _indent, isDisabled);
+			}
+			else if (_jump.isLeave())
+			{
+				addCode("break;", _indent, isDisabled);
+			}
+			else if (!isEmpty)
+			{
+				appendComment("FIXME: jump/exit instruction of unrecognised kind!", _indent);
+				appendComment(Syntax.decodeLine(tokens).getString(), _indent);
+			}
+		}
 	}
 
 	/**
 	 * This method is to be overridden by the subclasses to append a suited throw
 	 * instruction from string {@code _thrown} as taken from the Jump element text
 	 * line (after the "preThrow" keyword).<br/>
-	 * If the throw occurs with in a catch block then field {@link #caughtException}
+	 * If the throw occurs within a catch block then field {@link #caughtException}
 	 * will contain the exception to be rethrown if {@code _thrown} is empty.
+	 * 
 	 * @param _thrown - the text line tail after the "preThrow" keyword.
 	 * @param _indent - the current indentation
 	 * @param _asComment - whether the throw instruction is to be exported as comment

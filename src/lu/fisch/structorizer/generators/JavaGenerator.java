@@ -503,15 +503,16 @@ public class JavaGenerator extends CGenerator
 	{
 		// START KGU#101 2015-12-12: Enh. #54 - support lists of expressions
 		if (_doInputOutput) {
-			String outputKey = Syntax.getKeyword("output").trim(); 
-			if (_input.matches("^" + getKeywordPattern(outputKey) + "[ ](.*?)"))
+			String outputToken = Syntax.key2token("output");
+			TokenList tokens = new TokenList(_input);
+			if (!tokens.isBlank() && tokens.getFirst().equals(outputToken))
 			{
-				StringList expressions = 
-						Syntax.splitExpressionList(_input.substring(outputKey.length()), ",");
-				expressions.remove(expressions.count()-1);	// Get rid of the tail
+				ArrayList<TokenList> expressions = 
+						Syntax.splitExpressionList(tokens.subSequenceToEnd(1), ",", true);
+				String tail = expressions.remove(expressions.size()-1).getString();	// Get rid of the tail
 				// Some of the expressions might be sums, so better put parentheses around them
-				if (expressions.count() > 1) {
-					_input = outputKey + " (" + expressions.concatenate(") + (") + ")";
+				if (expressions.size() > 1) {
+					_input = outputToken + " (" + TokenList.concatenate(expressions, ") + (").getString() + ")" + tail;
 				}
 			}
 		}

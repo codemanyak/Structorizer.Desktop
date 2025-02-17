@@ -339,38 +339,24 @@ public class CSharpGenerator extends CGenerator
 	{
 		String subst = getOutputReplacer();
 		String subst0 = subst.replaceAll("Line", "");
-		// Between the input keyword and the variable name there MUST be some blank...
-		// START KGU#1097 2024-01-22: Issue #800 expect an internal keyword marker now
-		//String keyword = Syntax.getKeyword("output").trim();
-		//if (!keyword.isEmpty() && _interm.startsWith(keyword))
-		String keyword = "§OUTPUT§";
-		if (_interm.startsWith(keyword))
-		// END KGU#1097 2024-01-22
+		String keyToken = Syntax.key2token("output");
+		TokenList tokens = new TokenList(_interm);
+		if (tokens.indexOf(keyToken) == 0)
 		{
-			String matcher = Matcher.quoteReplacement(keyword);
-			if (Character.isJavaIdentifierPart(keyword.charAt(keyword.length()-1)))
-			{
-				matcher = matcher + "[ ]";
+			ArrayList<TokenList> expressions = Syntax.splitExpressionList(tokens.subSequenceToEnd(1), ",");
+			String tail = expressions.remove(expressions.size() - 1).getString(); 
+			StringBuilder result = new StringBuilder();
+			for (int i = 0; i < expressions.size()-1; i++) {
+				result.append(subst0.replace("$1", expressions.get(i).getString().trim()));
+				result.append("; ");
 			}
-
-			// Start - BFI (#51 - Allow empty output instructions)
-			if(!_interm.matches("^" + matcher + "(.*)"))
-			{
-				_interm += " ";
-			}
-			// End - BFI (#51)
-			
-			String argstr = _interm.replaceFirst("^" + matcher + "(.*)", "$1");
-			StringList args = Syntax.splitExpressionList(argstr, ",");
-			String result = "";
-			for (int i = 0; i < args.count()-1; i++) {
-				result += subst0.replace("$1", args.get(i).trim()) + "; ";
-			}
-			if (args.count() > 1) { 
-				_interm = result + subst.replace("$1", args.get(args.count()-1));
+			if (expressions.size() > 0) {
+				result.append(subst.replace("$1", expressions.get(expressions.size()-1).getString().trim()));
+				result.append(tail);
+				_interm = result.toString();
 			}
 			else {
-				_interm = _interm.replaceFirst("^" + matcher + "(.*)", subst);
+				_interm = subst.replace("$1", "") + tail;
 			}
 		}
 		return _interm;

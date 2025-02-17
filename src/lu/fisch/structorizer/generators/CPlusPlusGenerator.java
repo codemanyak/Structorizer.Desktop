@@ -285,12 +285,14 @@ public class CPlusPlusGenerator extends CGenerator {
 	protected String transform(String _input)
 	{
 		// START KGU#101 2015-12-11: Enh. #54 - support lists of expressions
-		String outputKey = Syntax.getKeyword("output").trim();
-		if (_input.matches("^" + getKeywordPattern(outputKey) + "[ ](.*?)"))
+		String outputToken = Syntax.key2token("output");
+		TokenList tokens = new TokenList(_input);
+		if (!tokens.isBlank() && tokens.getFirst().equals(outputToken))
 		{
-			StringList expressions = 
-					Syntax.splitExpressionList(_input.substring(outputKey.length()), ",");
-			_input = outputKey + " " + expressions.subSequence(0, expressions.count()-1).concatenate(" << ");
+			ArrayList<TokenList> expressions = 
+					Syntax.splitExpressionList(tokens.subSequenceToEnd(1), ",");
+			String tail = expressions.remove(expressions.size()-1).getString();	// Get rid of tail
+			_input = outputToken + " " + TokenList.concatenate(expressions, " <<").getString() + tail;
 		}
 		// END KGU#101 2015-12-11
 		

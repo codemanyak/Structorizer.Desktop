@@ -475,13 +475,15 @@ public class BasGenerator extends Generator
 	{
 		// START KGU#101 2015-12-19: Enh. #54 - support lists of output expressions
 		// FIXME: Fails if there is no gap between then keyword and the first expression.
-		if (_input.matches("^" + getKeywordPattern(Syntax.getKeyword("output").trim()) + "[ ](.*?)"))
+		String outputToken = Syntax.key2token("output");
+		TokenList tokens = new TokenList(_input);
+		if (!tokens.isBlank() && tokens.get(0).equals(outputToken))
 		{
 			// Replace commas by semicolons to avoid tabulation
-			StringList expressions = 
-					Syntax.splitExpressionList(_input.substring(Syntax.getKeyword("output").trim().length()), ",");
-			expressions.remove(expressions.count()-1);	// Get rid of line tail
-			_input = Syntax.getKeyword("output").trim() + " " + expressions.getText().replace("\n", "; ");
+			ArrayList<TokenList> expressions = 
+					Syntax.splitExpressionList(tokens.subSequenceToEnd(1), ",");
+			String tail = expressions.remove(expressions.size()-1).getString();	// Get rid of line tail
+			_input = outputToken + " " + TokenList.concatenate(expressions, ";").getString() + tail;
 		}
 		// END KGU#101 2015-12-19
 
