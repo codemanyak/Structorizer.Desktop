@@ -74,6 +74,8 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2022-08-15      Bugfix #997: Collateral damage of previous bugfix version mended.
  *      Kay Gürtzig     2023-11-07      Issue #800 Method getValueListItems() fundamentally revised
  *      Kay Gürtzig     2024-04-22      Inheritance modified (instead of implementing ILoop now extends Loop)
+ *      Kay Gürtzig     2025-06-26      Issue #800: Constructors For(String, String, String, int) and
+ *                                      For(String, String) revised.
  *
  ******************************************************************************************************
  *
@@ -193,8 +195,9 @@ public class For extends Loop {
 	
 	// START KGU#354 2017-04-30: Enh. #354 Further facilitation of import
 	/**
-	 * This is a high-level structured constructor version and produces a fully classified
-	 * counting loop. 
+	 * This is a high-level structured constructor version and produces a fully
+	 * classified counting loop.
+	 * 
 	 * @param varName - the counter variable name
 	 * @param startValStr - the expression for the initial counting value
 	 * @param endValStr - the expression for the final counting value
@@ -202,22 +205,33 @@ public class For extends Loop {
 	 */
 	public For(String varName, String startValStr, String endValStr, int stepVal)
 	{
-		this(Syntax.getKeywordOrDefault("preFor", "for") + " " + varName
+		// START KGU#790 2025-06-26: Issue #800 Now we have to use internal keys
+		//this(Syntax.getKeywordOrDefault("preFor", "for") + " " + varName
+		//		+ " <- " + startValStr + " "
+		//		+ Syntax.getKeywordOrDefault("postFor", "to") + " " + endValStr
+		//		+ (stepVal != 1 ? (" " + Syntax.getKeywordOrDefault("stepFor", "by") + " " + stepVal) : ""));
+		this(forSeparatorPre + " " + varName
 				+ " <- " + startValStr + " "
-				+ Syntax.getKeywordOrDefault("postFor", "to") + " " + endValStr
-				+ (stepVal != 1 ? (" " + Syntax.getKeywordOrDefault("stepFor", "by") + " " + stepVal) : ""));
+				+ forSeparatorTo + " " + endValStr
+				+ (stepVal != 1 ? (" " + forSeparatorBy + " " + stepVal) : ""));
+		// END KGU#790 2025-06-26
 	}
 	
 	/**
-	 * This is a high-level structured constructor version and produces a fully classified
-	 * traversing loop. 
+	 * This is a high-level structured constructor version and produces a fully
+	 * classified traversing loop.
+	 * 
 	 * @param varName - the loop variable name
 	 * @param startValStr - the expression representing the value list
 	 */
 	public For(String varName, String valueList)
 	{
-		this(Syntax.getKeywordOrDefault("preForIn", "foreach") + " " + varName + " "
-				+ Syntax.getKeywordOrDefault("postForIn", "in") + " " + valueList);
+		// START KGU#790 2025-06-26: Issue #800 Now we have to use internal keys
+		//this(Syntax.getKeywordOrDefault("preForIn", "foreach") + " " + varName + " "
+		//		+ Syntax.getKeywordOrDefault("postForIn", "in") + " " + valueList);
+		this(forInSeparatorPre + " " + varName + " "
+				+ forInSeparatorIn + " " + valueList);
+		// END KGU#790 2025-06-26
 	}
 	// END KGU#354 2017-04-30
 	
@@ -831,14 +845,16 @@ public class For extends Loop {
 	
 
 	/**
-	 * Splits the contained text (after operator unification, see unifyOperators for details)
-	 * into an array consisting of six strings meant to have following meaning:<br/>
+	 * Splits the contained text (after operator unification, see
+	 * {@link Syntax#unifyOperators(TokenList, boolean)} for details), which
+	 * must be based on internal separator keys, into an array consisting
+	 * of six strings meant to have following meaning:<br/>
 	 * 0. counter variable name<br/>
 	 * 1. expression representing the initial value<br/>
 	 * 2. expression representing the final value<br/>
 	 * 3. Integer literal representing the increment value ("1" if the substring can't be parsed)<br/>
 	 * 4. Substring for increment section as found on splitting (no integer coercion done)<br/>
-	 * 5. Substring representing the set of values to be traversed (FOR-IN loop) or null<br/>
+	 * 5. Substring representing the set of values to be traversed (FOR-IN loop) or {@code null}<br/>
 	 * @return String array consisting of the four parts explained above
 	 */
 	public String[] splitForClause()
@@ -853,17 +869,18 @@ public class For extends Loop {
 	}
 	
 	/**
-	 * Splits a potential FOR clause (after operator unification, see unifyOperators
-	 * for details) into an array consisting of six strings meant to have following
-	 * meaning:<br/>
+	 * Splits a potential FOR clause (after operator unification, see
+	 * {@link Syntax#unifyOperators(TokenList, boolean)} for details) into an
+	 * array consisting of six strings meant to have following meaning:<br/>
 	 * 0. counter variable name<br/>
 	 * 1. expression representing the initial value<br/>
 	 * 2. expression representing the final value<br/>
 	 * 3. Integer literal representing the increment value ("1" if the substring can't be parsed)<br/>
 	 * 4. Substring for increment section as found on splitting (no integer coercion done)<br/>
-	 * 5. Substring representing the set of values to be traversed (FOR-IN loop) or null<br/>
+	 * 5. Substring representing the set of values to be traversed (FOR-IN loop) or {@code null}<br/>
 	 * 
-	 * @param _text the FOR clause to be split (something like "for i <- 1 to n")
+	 * @param _text - the FOR clause to be split (something like "for i <- 1 to n"), may
+	 *     use either user-configured keywords or internal separator keys.
 	 * @return String array consisting of the four parts explained above. Some parts might be
 	 *      {@code null}, though!
 	 */
@@ -885,15 +902,17 @@ public class For extends Loop {
 	}
 	
 	/**
-	 * Splits a potential FOR clause (after operator unification, see unifyOperators
-	 * for details) and keyowrd encoding into an array consisting of six strings meant
+	 * Splits a tokenised potential FOR clause (after operator unification,
+	 * see {@link Syntax#unifyOperators(TokenList, boolean)} for details) and
+	 * keyword encoding into an array consisting of six strings meant
 	 * to have following meaning:<br/>
 	 * 0. counter variable name<br/>
 	 * 1. expression representing the initial value<br/>
 	 * 2. expression representing the final value<br/>
 	 * 3. Integer literal representing the increment value ("1" if the substring can't be parsed)<br/>
 	 * 4. Substring for increment section as found on splitting (no integer coercion done)<br/>
-	 * 5. Substring representing the set of values to be traversed (FOR-IN loop) or null<br/>
+	 * 5. Substring representing the set of values to be traversed (FOR-IN loop) or {@code null}<br/>
+	 * The TokenList must contain internal keys as separators.
 	 * 
 	 * @param _tokens - the tokenized FOR clause to be split with keyword tokens;
 	 * @return String array consisting of the four parts explained above. Some parts might be
@@ -933,7 +952,7 @@ public class For extends Loop {
 		// END KGU#61 2016-03-20
 	}
 	
-	// START KGU#61 2016-03-20: Enh. #84/#135 - outsourced from splitForClause(String)
+	// START KGU#61 2016-03-20: Enh. #84/#135 - outsourced from splitForClause(TokenList)
 	private static String[] splitForCounter(TokenList _tokens, int _posFor, int _posTo, int _posBy)
 	{
 		String[] forParts = { "dummy_counter", "1", null, "1", "", null};

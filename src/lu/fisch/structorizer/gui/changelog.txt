@@ -26,7 +26,7 @@ Known issues (also see https://github.com/fesch/Structorizer.Desktop/issues):
 - ARM export is still experimental and relies on a specific and very restricted
   syntax for the element contents in order to produce meaningful results.
 
-Current development version 3.32-28 (2025-06-25)
+Current development version 3.32-28 (2025-06-26)
 - 01: Bugfix #987: Duplicate subroutine comment export by Pascal generator <2>
 - 01: Bugfix #988: Syntax error in Structorizer.bat and Arranger.bat fixed <2>
 - 01: Bugfix #989: Expressions in EXIT elements (e.g. return) were forgotten
@@ -288,6 +288,7 @@ Current development version 3.32-28 (2025-06-25)
 - 28: List splitting mechanisms of FOR-IN loops unified between Editor,
       Executor, and code generators, expression detection <2>
 - 28: Issue #800 An NSD load bug and many code export glitches fixed <2>
+- 28: Issue #800 For statement import failed to split the clause properly <2>
 
 Version 3.32 (2021-09-19) requiring Java 11 or newer
 - 01: Bugfix #851/2: SPECIAL-NAMES sections caused COBOL parser abort <2>
