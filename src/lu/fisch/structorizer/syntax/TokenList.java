@@ -40,6 +40,7 @@ package lu.fisch.structorizer.syntax;
  *                                      System.isIdentifier(...) and code import.
  *                                      New methods removePaddings(), removePaddings(int, int)
  *      Kay Gürtzig     2024-12-03/05   Attribute newlines added and functional integration begun
+ *      Kay Gürtzig     2025-06-25      New methods concerning newline markers
  *
  ******************************************************************************************************
  *
@@ -755,19 +756,25 @@ public class TokenList implements Comparable<TokenList>{
 	}
 	
 	/**
-	 * Concatenates the token lists held in collection {@code tokenLists} into a single token
-	 * list according to the order of the token lists in {@code tokenLists}, possibly inserting
-	 * the tokens and whitespace emerging from {@code separator} between them unless
-	 * {@code separator} is {@code null}.
+	 * Concatenates the token lists held in collection {@code tokenLists} into
+	 * a single token list according to the order of the token lists in
+	 * {@code tokenLists}, possibly inserting the tokens and whitespace
+	 * emerging from {@code separator} between them unless {@code separator}
+	 * is {@code null}.
 	 * 
 	 * @param tokenLists - a collection of {@link TokenList}s
-	 * @param separator - if it contains only whitespace then this amount of blanks will be
-	 *    garanteed between the original token lists, otherwise (and if not {@code null}) the
-	 *    token sequence derived from {@code separator} will be inserted between the token lists
-	 *    contained in {@code tokenLists}. If {@code tokenLists} is empty then {@code separator}
-	 *    will not be used.
+	 * @param separator - if it contains only whitespace then this amount of
+	 *    blanks will be garanteed between the original token lists, otherwise
+	 *    (and if not {@code null}) the token sequence derived from
+	 *    {@code separator} will be inserted between the token lists
+	 *    contained in {@code tokenLists}. If {@code tokenLists} is empty then
+	 *    {@code separator} will not be used. If the {@code separator} string
+	 *    contains newlines then a newline marker will be placed between all
+	 *    the concatenated TokenLists from {@code tokenLists}.
 	 * 
 	 * @return the composed concatenation from {@code tokenLists} and {@code separator}
+	 * 
+	 * @see #getTokenLines()
 	 */
 	public static TokenList concatenate(Collection<? extends TokenList> tokenLists, String separator)
 	{
@@ -991,8 +998,8 @@ public class TokenList implements Comparable<TokenList>{
 
 	/**
 	 * Returns the total number of blanks the paddings at the beginning, the end,
-	 * and between the tokens amount to. Will not report blanks inside tokens
-	 * (tokens are assumed to be contiguous).
+	 * and between the tokens amount to. Will not report blanks inside tokens,
+	 * e.g. within a string literal (tokens are assumed to be contiguous).
 	 * 
 	 * @return total padding (number of inter-token blanks)
 	 * 
@@ -1028,7 +1035,9 @@ public class TokenList implements Comparable<TokenList>{
 	
 	/**
 	 * Removes all (but necessary) inter-token whitespace and trims the token
-	 * list at the beginning and the end.
+	 * list at the beginning and the end.<br/>
+	 * Will also remove newline markers wherever the respective gap was shrunk
+	 * to 0.
 	 * 
 	 * @return change of the number of whitespace characters (likely to be a
 	 *     negative result, but could even be positive, if more necessary gaps
@@ -1062,7 +1071,8 @@ public class TokenList implements Comparable<TokenList>{
 	 * Eliminates absolutely all whitespace around the tokens without ensuring
 	 * minimum gaps between tokens that would amalgamate with {@link #getString()}.<br/>
 	 * <b>Hint:</b> Necessary gaps can be automatically restored with
-	 * {@link #shrink()} or, individually, by {@link #setPadding(int, int, int)}.
+	 * {@link #shrink()} or, individually, by {@link #setPadding(int, int, int)}.<br/>
+	 * <b>Note:</b> This will also wipe off any newline markers!
 	 * 
 	 * @param fromIndex - index of the token before the wiping
 	 * @param toIndex - index of the token behind the wiping
@@ -1094,6 +1104,7 @@ public class TokenList implements Comparable<TokenList>{
 	 * {@link #removePaddings()}.<br/>
 	 * <b>Hint:</b> Necessary gaps can be automatically restored with
 	 * {@link #shrink()} or, individually, by {@link #setPadding(int, int, int)}.
+	 * <br/><b>Note:</b> This will also wipe off any internal newline markers!
 	 * 
 	 * @param fromIndex - index of the token before the wiping
 	 * @param toIndex - index of the token behind the wiping
@@ -1117,7 +1128,8 @@ public class TokenList implements Comparable<TokenList>{
 	}
 	
 	/**
-	 * Removes white space characters from the beginning and end of the token list.
+	 * Removes white space characters from the beginning and end of the token
+	 * list and, with them, possible newline markers at front and end.
 	 *
 	 * @return the number of removed blanks
 	 * 
@@ -1134,7 +1146,8 @@ public class TokenList implements Comparable<TokenList>{
 	}
 	
 	/**
-	 * Removes trailing white space characters from the end of the token list.
+	 * Removes trailing white space characters from the end of the token list.<br/>
+	 * <b>Note:</b> This will also remove a final newline marker!
 	 *
 	 * @return the number of removed blanks
 	 * 
@@ -1150,7 +1163,8 @@ public class TokenList implements Comparable<TokenList>{
 	}
 	
 	/**
-	 * Removes white space characters from the beginning of the token list.
+	 * Removes white space characters from the beginning of the token list.<br/>
+	 * <b>Note:</b> This will also remove an initial newline marker!
 	 *
 	 * @return the number of removed blanks
 	 * 
@@ -1522,7 +1536,7 @@ public class TokenList implements Comparable<TokenList>{
 	 * @return the removed token sequence from this list
 	
 	 * @throws IndexOutOfBoundsException for an illegal endpoint index value
-	 *    (fromIndex < 0 || toIndex > size ||fromIndex > toIndex)
+	 *    (fromIndex < 0 || toIndex > size || fromIndex > size)
 	 * @throws IllegalArgumentException if the endpoint indices are out of
 	 *    order (fromIndex > toIndex).
 	 * 
@@ -1550,7 +1564,7 @@ public class TokenList implements Comparable<TokenList>{
 	 *    trimmed
 
 	 * @throws IndexOutOfBoundsException for an illegal endpoint index value
-	 *    (fromIndex < 0 || toIndex > size ||fromIndex > toIndex)
+	 *    (fromIndex < 0 || toIndex > size || fromIndex > size)
 	 * @throws IllegalArgumentException if the endpoint indices are out of
 	 *    order (fromIndex > toIndex).
 	 * 
@@ -1580,6 +1594,20 @@ public class TokenList implements Comparable<TokenList>{
 			}
 		}
 		return removed;
+	}
+	
+	/**
+	 * Wipes off all newline markers at the padding positions.
+	 * 
+	 * @return the number of newline markers that had been there.
+	 * 
+	 * @see #hasNewlineBefore(int)
+	 */
+	public int removeNewlines()
+	{
+		int nNl = this.newlines.size();
+		this.newlines.clear();
+		return nNl;
 	}
 	
 	/**
@@ -2383,8 +2411,8 @@ public class TokenList implements Comparable<TokenList>{
 	
 	/**
 	 * Compares the contained tokens between this and {@code other}
-	 * TokenList for sequential equality. The paddings don't play a
-	 * role in the comparison.<br/>
+	 * TokenList for sequential equality. Neither paddings nor
+	 * newline markers play a role in the comparison.<br/>
 	 * To compare for exact string equality use {@code
 	 * getString().equals(other.getString())}
 	 * 
@@ -2413,8 +2441,8 @@ public class TokenList implements Comparable<TokenList>{
 	
 	/**
 	 * Compares the contained tokens between this and {@code other}
-	 * TokenList for sequential case-ignorant equality. The paddings
-	 * don't play a role in the comparison.<br/>
+	 * TokenList for sequential case-ignorant equality. Neither paddings
+	 * nor newline positions play a role in the comparison.<br/>
 	 * To compare for case-insensitive string equality in including
 	 * whitespace use {@code getString().equalsIgoreCase(other.getString())}
 	 * 
@@ -2446,7 +2474,9 @@ public class TokenList implements Comparable<TokenList>{
 	 * lexicographic order in case-sensitive way. Returns a negative
 	 * integer, zero, or a positive integer as this object is
 	 * lexicographically less than, equal to, or greater than the
-	 * {@code other} token list.
+	 * {@code other} token list.<br/>
+	 * Note that neither paddings nor newline positions are significant
+	 * for this comparison.
 	 * 
 	 * @param other - a TokenList object
 	 * @return an int < 0 if this String is less than the specified String,
@@ -2473,7 +2503,9 @@ public class TokenList implements Comparable<TokenList>{
 	 * lexicographic order in case-insensitive way. Returns a negative
 	 * integer, zero, or a positive integer as this object is
 	 * lexicographically less than, equal to, or greater than the
-	 * {@code other} token list.
+	 * {@code other} token list.<br/>
+	 * Note that neither paddings nor newline positions are significant
+	 * for this comparison.
 	 * 
 	 * @param other - a TokenList object
 	 * @return an int < 0 if this String is less than the specified String,
@@ -2697,6 +2729,50 @@ public class TokenList implements Comparable<TokenList>{
 			}
 		}
 		return broken;
+	}
+	
+	/**
+	 * @return the list of sub-TokenLists representing the token sequences
+	 *    around and between retained newline positions.
+	 * 
+	 * @see #hasNewlineBefore(int)
+	 * @see #concatenate(Collection, String)
+	 */
+	public ArrayList<TokenList> getTokenLines()
+	{
+		int lastPos = 0;
+		ArrayList<TokenList> tokenLines = new ArrayList<TokenList>();
+		TokenList tokenLine;
+		for (int nlPos: newlines) {
+			tokenLine = this.subSequence(lastPos, nlPos);
+			// Preserve start padding.
+			tokenLine.paddings.set(0, this.paddings.get(lastPos));
+			tokenLines.add(tokenLine);
+			lastPos = nlPos;
+		}
+		tokenLine = this.subSequenceToEnd(lastPos);
+		if (!tokenLine.isEmpty()) {
+			// Preserve start and end padding.
+			tokenLine.paddings.set(0, this.paddings.get(lastPos));
+			tokenLine.paddings.set(tokenLine.size(), this.paddings.get(this.size()));
+			tokenLines.add(tokenLine);
+		}
+		return tokenLines;
+	}
+	
+	/**
+	 * Checks whether there is a retained newline before token with given
+	 * {@code index}.
+	 * 
+	 * @param index
+	 * @return {@code true} if the {@code index}th token follows to a newline
+	 *    (and possibly some indent), otherwies {@code false}
+	 * 
+	 * @see #getTokenLines()
+	 */
+	public boolean hasNewlineBefore(int index)
+	{
+		return this.newlines.contains(index);
 	}
 
 //	@Override

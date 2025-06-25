@@ -64,6 +64,7 @@ package lu.fisch.structorizer.parsers;
  *      Kay Gürtzig     2024-03-17      Bugfix #1141: Measures against stack overflow in buildNSD_R()
  *      Kay Gürtzig     2024-04-17/18   Bugfix #1163: Import of non-trivial switch structures improved
  *      Kay Gürtzig     2024-04-18      Bugfix #1164: Adapted to new grammar version (1.6)
+ *      Kay Gürtzig     2025-06-24      Workaround #690 revised (also referred by #1087)
  *
  ******************************************************************************************************
  *
@@ -104,6 +105,7 @@ import lu.fisch.structorizer.elements.Subqueue;
 import lu.fisch.structorizer.elements.TypeMapEntry;
 import lu.fisch.structorizer.elements.While;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.StringList;
 
 /**
@@ -1150,11 +1152,20 @@ public class C99Parser extends CPreParser
 			else {
 				// FIXME: We might need a more intelligent type analysis
 				content = getContent_R(typeToken.asReduction(), "").trim() + " ";
-				content = content.replaceAll("(^|.*\\W)static(\\s+.*)", "$1$2");
-				content = content.replaceAll("(^|.*\\W)const(\\s+.*)", "$1$2");
+				TokenList tokens = new TokenList(content);
+				int removed = 0;
+				removed += tokens.removeAll("static");
+				removed += tokens.removeAll("const");
 				// START KGU#668 2019-02-28: Workaround #690 to get rid of struct keywords here
-				content = content.replaceAll("(^|.*\\W)struct(\\s+.*)", "$1$2");
+				removed += tokens.removeAll("struct");
+				// START KGU#668 2025-06-25: Workaround #690 extended
+				removed += tokens.removeAll("enum");
+				removed += tokens.removeAll("union");
+				// END KGU#668 2025-06-25
 				// END KGU#668 2019-02-28
+				if (removed > 0) {
+					content = tokens.getString();
+				}
 			}
 			content += prefix.concatenate(" ").trim();
 			content = content.trim();
@@ -1322,9 +1333,13 @@ public class C99Parser extends CPreParser
 	}
 	
 	/**
+	 * Extracts the type specification string from the given Reduction
+	 * {@code _declSpecRed}, which is expected to represent some
+	 * "<Decl Specifiers>" rule.
 	 * 
-	 * @param _declSpecRed
-	 * @return
+	 * @param _declSpecRed - an appropriate "<Decl Specifiers>" Reduction
+	 * @return the extracted string
+	 * 
 	 * @throws ParserCancelled when the user aborted the import
 	 */
 	private String getTypeSpec(Reduction _declSpecRed) throws ParserCancelled {
@@ -2438,7 +2453,7 @@ public class C99Parser extends CPreParser
 	/**
 	 * Processes a {@code <Direct Decl>} or {@code <Direct Abstr Decl>} rule, extracts the declared name and
 	 * fills the given {@link StringList}s with the surrounding text fragments.
-	 * @param _reduction - a reduction dreived from of either {@code <Direct Decl>} or {@code <Direct Abstr Decl>}
+	 * @param _reduction - a reduction derived from of either {@code <Direct Decl>} or {@code <Direct Abstr Decl>}
 	 * @param _pointers - the {@link StringList} intended for the prefix of the name
 	 * @param _arrays - the {@link StringList} intended for the postfix of the name (index ranges, arg lists)
 	 * @param _asPascal - a {@link StringList} intended to accumulate a Pascal-like notation
@@ -2552,6 +2567,7 @@ public class C99Parser extends CPreParser
 	 * @throws ParserCancelled 
 	 */
 	private String getParamList(Reduction _paramReduc, Subqueue _parentNode, boolean _pascalStyle, Reduction _declListRed) throws ParserCancelled {
+		final String[] typePrefixes = {"struct", "union", "enum"};
 		String params = ""; 
 		StringList paramList = new StringList();
 		String ellipse = "";
@@ -2605,9 +2621,24 @@ public class C99Parser extends CPreParser
 			// START KGU#668 2019-02-28: Workaround #690 - Suppress struct keywords in parameter lists (FIXME)
 			for (int i = 0; i < paramList.count(); i++) {
 				String param = paramList.get(i);
-				if (param.startsWith("struct ")) {
-					paramList.set(i, param.substring(7));
+				// START KGU#668/KGU#1077 2025-06-24: Workaround #690, #1087
+				// There could also be "union" or "enum", and it might be preceded by e.g. "const"
+				//if (param.startsWith("struct ")) {
+				//	paramList.set(i, param.substring(7));
+				//}
+				TokenList pTokens = new TokenList(param);
+				for (String prefix: typePrefixes) {
+					int pos = pTokens.indexOf(prefix);
+					if (pos >= 0 && pos+1 < pTokens.size()) {
+						String typeName = pTokens.get(pos+1);
+						if (Syntax.isIdentifier(typeName, false, null)) {
+							pTokens.remove(pos);
+							paramList.set(i, pTokens.getString());
+							break;
+						}
+					}
 				}
+				// END KGU#668/KGU#1077 2025-06-24
 			}
 			// END KGU#668 2019-02-28
 			params = paramList.reverse().concatenate(", ") + ellipse;
@@ -2923,7 +2954,7 @@ public class C99Parser extends CPreParser
 		if (pos >= 0) {
 			compDecl = compDecl.substring(0, pos);
 		}
-		if (!compDecl.trim().isEmpty()) {
+		if (!compDecl.isBlank()) {
 			String ptrs = "";
 			if (MATCH_PTR_DECL.reset(compDecl).matches()) {
 				ptrs = MATCH_PTR_DECL.group(1);
@@ -2974,12 +3005,14 @@ public class C99Parser extends CPreParser
 
 	// START KGU#652 2019-02-13: Issue #679: Started to convert some functions
 	/**
-	 * Tries to convert the function or procedure given by name {@code funcName} and parameters {@code arguments}
-	 * into an equivalent built-in routine if available 
+	 * Tries to convert the function or procedure given by name {@code funcName}
+	 * and parameters {@code arguments} into an equivalent built-in routine if
+	 * available 
 	 * @param funcName - name of the function
 	 * @param arguments - arguments (as strings) of the function
-	 * @param resultNeeded - whether the routine is called within an expression (this may restrict the conversion
-	 * options due to assumed result type incompatibility)
+	 * @param resultNeeded - whether the routine is called within an expression
+	 *    (this may restrict the conversion options due to assumed result type
+	 *    incompatibility
 	 * @return either a converted call string or null (if no built-in routine was found)
 	 */
 	private String convertBuiltInRoutine(String funcName, StringList arguments, boolean resultNeeded) {
@@ -3043,6 +3076,7 @@ public class C99Parser extends CPreParser
 			String fnName = getContent_R(_reduction.get(0).asReduction(), "");
 			StringList args = new StringList();
 			if (rule_id ==	RuleConstants.PROD_POSTFIXEXP_LPAREN_RPAREN) {
+				// FIXME!
 				args = this.getExpressionList(_reduction.get(2).asReduction());
 			}
 			String builtin = this.convertBuiltInRoutine(fnName,  args, true);
@@ -3177,8 +3211,9 @@ public class C99Parser extends CPreParser
 	}
 
 	/**
-	 * Routine will return the list of the (translated) expressions (at top level, if a tree is needed,
-	 * than keep with the reduction tree.)
+	 * Routine will return the list of the (translated) expressions (at top
+	 * level, if a tree is needed, than keep with the reduction tree.)
+	 * 
 	 * @param _reduc - a rule with head &lt;Expr&gt; or &lt;ExprIni&gt; 
 	 * @return the list of expressions as strings
 	 * @throws ParserCancelled 
