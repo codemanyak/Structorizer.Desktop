@@ -26,7 +26,7 @@ Known issues (also see https://github.com/fesch/Structorizer.Desktop/issues):
 - ARM export is still experimental and relies on a specific and very restricted
   syntax for the element contents in order to produce meaningful results.
 
-Current development version 3.32-29 (2025-08-01)
+Current development version 3.32-31 (2025-08-04)
 - 01: Bugfix #987: Duplicate subroutine comment export by Pascal generator <2>
 - 01: Bugfix #988: Syntax error in Structorizer.bat and Arranger.bat fixed <2>
 - 01: Bugfix #989: Expressions in EXIT elements (e.g. return) were forgotten
@@ -288,16 +288,22 @@ Current development version 3.32-29 (2025-08-01)
       Element editor unduly showed "disabled" check state in such a case,
       some generators (ARM, StrukTex, TextAlgo) behaved inconsistently <2>
 - 28: Enh. #1196 New controller-routine-related Analyser checks 32 and 33 <2>
-- 28: Enh. #1197 Independent branch header colouring enabled [brucetrask2]<2>
+- 28: Enh. #1197 Independent branch header colouring enabled [brucetrask2]2
 - 28: Enh. #1198 Third choice option for CASE editing introduced <2>
-- 29: Issue #800 Parts of the new expression parsing mechanism established,
+- 29: Bugfix #1197 Selecting the FALSE triangle in widened Alternatives
+      could fail <2>
+- 29: Enh. #1198 Version hint for the special CASE editor was obsolete <2>
+- 29: Issue #1200 Ensures content assist and undo/redo in CASE editor <2>
+- 30: Bugfix #1197 It wasn't possible to save an Alternative anymore <2>
+- 31: Issue #800 Parts of the new expression parsing mechanism established,
       new grammar-based line syntax check in Analyser. <2>
-- 29: Issue #800 Text processing now more consistently based on new class
+- 31: Issue #800 Text processing now more consistently based on new class
       TokenList. <2>
-- 29: List splitting mechanisms of FOR-IN loops unified between Editor,
+- 31: List splitting mechanisms of FOR-IN loops unified between Editor,
       Executor, and code generators, expression detection <2>
-- 29: Issue #800 An NSD load bug and many code export glitches fixed <2>
-- 29: Issue #800 For statement import failed to split the clause properly <2>
+- 31: Issue #800 An NSD load bug and many code export glitches fixed <2>
+- 31: Issue #800 For statement import failed to split the clause properly <2>
+
 
 Version 3.32 (2021-09-19) requiring Java 11 or newer
 - 01: Bugfix #851/2: SPECIAL-NAMES sections caused COBOL parser abort <2>
