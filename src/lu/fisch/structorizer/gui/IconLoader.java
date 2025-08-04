@@ -1007,7 +1007,7 @@ public class IconLoader {
 			int iMin = _insets + size/2 - offset;
 			int iMax = _insets + size/2 + offset;
 			graphics.drawLine(iMin, iMin, iMax, iMax);
-			graphics.drawLine(iMin, iMax, iMax, iMin);			
+			graphics.drawLine(iMin, iMax, iMax, iMin);
 		}
 		// END KGU#1182 2025-08-01
 		// START KGU 2018-09-17 free resources no longer needed
@@ -1026,20 +1026,20 @@ public class IconLoader {
 		
 		BufferedImage image = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
 		Graphics2D graphics = (Graphics2D) image.getGraphics();
-        
-        graphics.setColor(Color.WHITE);
-        graphics.fillRect(1, 1, size-2, size-2);
-        
-        graphics.setColor(Color.BLACK);
-        graphics.drawRect(1, 1, size-2, size-2);
-        
-        graphics.setColor(Color.RED);
-        
-        graphics.setStroke(stroke);
-        graphics.drawLine(padding, padding, size - padding, size - padding);
-        graphics.drawLine(padding, size - padding, size - padding, padding);
-        
-        graphics.dispose(); // free resources no longer needed
+
+		graphics.setColor(Color.WHITE);
+		graphics.fillRect(1, 1, size-2, size-2);
+
+		graphics.setColor(Color.BLACK);
+		graphics.drawRect(1, 1, size-2, size-2);
+
+		graphics.setColor(Color.RED);
+
+		graphics.setStroke(stroke);
+		graphics.drawLine(padding, padding, size - padding, size - padding);
+		graphics.drawLine(padding, size - padding, size - padding, padding);
+
+		graphics.dispose(); // free resources no longer needed
 		return new ImageIcon(image);
 	}
 	

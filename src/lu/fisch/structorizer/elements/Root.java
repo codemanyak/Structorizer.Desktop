@@ -199,6 +199,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2025-02-06      Bugfix #1187: in analyse_31 (complained the closing bracket)
  *      Kay Gürtzig     2025-02-27      Bugfix #1193: Flaws in detection of arguments and results on outsourcing
  *      Kay Gürtzig     2025-07-10      Enh. #1196: New Analyser checks 32, 33
+ *      Kay Gürtzig     2025-08-04      Partial indentation revision (blanks -> tabs)
  *
  ******************************************************************************************************
  *
@@ -3971,7 +3972,7 @@ public class Root extends Element {
 			// END KGU#790 2021-12-04
 
 			// START KGU#1012 2021-11-14: Enh. #967
-			if (pluginSyntaxCheckers != null && !eleClassName.equals("Root") && !eleClassName.equals("Parallel")) {
+			if (pluginSyntaxCheckers != null && /*!eleClassName.equals("Root") &&*/ !eleClassName.equals("Parallel")) {
 				for (Map.Entry<String, GeneratorSyntaxChecker> chkEntry: pluginSyntaxCheckers.entrySet()) {
 					if (pluginChecks.get(chkEntry.getKey()) == true) {
 						GeneratorSyntaxChecker checker = chkEntry.getValue();
@@ -3984,8 +3985,9 @@ public class Root extends Element {
 								String line = lines.get(l);
 								String error = checker.checkSyntax(line, ele, l);
 								if (error != null) {
-									// FIXME: Fetch the plugin-configured message
-									addError(_errors, new DetectedError(error.replace("error.syntax", "ARM syntax violation"), ele), -2);
+									// FIXME: Fetch the plugin-configured messages
+									addError(_errors, new DetectedError(error.replace("error.syntax", "ARM syntax violation")
+											.replace("error.lexical", "ARM-unsupported symbol"), ele), -2);
 								}
 							}
 							break;
