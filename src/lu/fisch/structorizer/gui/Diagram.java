@@ -253,6 +253,8 @@ package lu.fisch.structorizer.gui;
  *      Kay Gürtzig     2024-10-06      Bugfix #1172: replaceTurtleizerAPI() failed to redraw the diagram after changes
  *      Kay Gürtzig     2024-10-09      Issue #1173: exportSWF() marked as deprecated
  *      Kay Gürtzig     2024-11-27      Bugfix #1181: Ensure clean exec highlighting in redraw(Element)
+ *      Kay Gürtzig     2025-07-10      Enh. #1196: Some methods made static/public for new Analyser checks
+ *      Kay Gürtzig     2025-08-01      Enh. #915/#1198: Adaptations for new Case editor choice option
  *
  ******************************************************************************************************
  *
@@ -1491,6 +1493,14 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 					}
 					// END KGU#87 2015-11-23
 				}
+				// START KGU#1182 2025-07-31: Enh. #1197 Allow to subselect headers in IFork
+				else if (ele instanceof IFork) {
+					// Element had already been selected, now check branch head
+					if (((IFork)selected).selectBranchHead(selX, selY)) {
+						redraw();
+					}
+				}
+				// END KGU#1182 2025-07-31
 				//redraw();
 				// START KGU#926 2021-02-04: Enh. #926
 				scrollErrorListToSelected();
@@ -8278,7 +8288,10 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		preferences.edtRoot.setText(Element.preImport);
 		// END KGU#376 2017-07-02
 		// START KGU#916 2021-01-25: Enh. #915
-		preferences.chkCaseEditor.setSelected(Element.useInputBoxCase);
+		// START KGU#997 2025-08-01: Enh. #1198
+		//preferences.chkCaseEditor.setSelected(Element.useInputBoxCase);
+		preferences.cbCaseEditor.setSelectedItem(Element.useInputBoxCase);
+		// END KGU#997 2025-08-01
 		// END KGU#916 2021-01-25
 
 		// START KGU#686 2019-03-22: Enh. #56
@@ -8328,7 +8341,10 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 			Element.caseShrinkByRot = newShrinkThreshold;
 			// END KGU#401 2017-05-18
 			// START KGU#916 2021-01-25: Enh. #915
-			Element.useInputBoxCase = preferences.chkCaseEditor.isSelected();
+			// START KGU#997 2025-08-01: Enh. #1198 More options
+			//Element.useInputBoxCase = preferences.chkCaseEditor.isSelected();
+			Element.useInputBoxCase = (CaseEditorChoice)preferences.cbCaseEditor.getSelectedItem();
+			// END KGU#997 2025-08-01
 			// END KGU#916 2021-01-25
 			// START KGU#376 2017-07-02: Enh. #389
 			Element.preImport = preferences.edtRoot.getText();
@@ -9933,14 +9949,14 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 	 * Opens the appropriate element editor version for element type
 	 * {@code _elementType} and gathers the editing results in {@code _data}.
 	 *
-	 * @param _data - container for the content transfer between the element and
-	 * the InputBox
-	 * @param _elementType - Class name of the {@link Element} we offer editing
-	 * for
+	 * @param _data - container for the content transfer between the element
+	 *    and the InputBox
+	 * @param _elementType - Class name of the {@link Element} we offer
+	 *    editing for
 	 * @param _isInsertion - Indicates whether or not the element is a new
-	 * object
-	 * @param _allowCommit - Whether the OK button is enabled (not for immutable
-	 * elements)
+	 *    object
+	 * @param _allowCommit - Whether the OK button is enabled (not for
+	 *    immutable elements)
 	 */
 	public void showInputBox(EditData _data, String _elementType, boolean _isInsertion, boolean _allowCommit) // END KGU 2015-10-14
 	{
@@ -10004,7 +10020,15 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 			}
 			// END KGU#363 2017-03-13
 			// START KGU#916 2021-01-24: Enh. #915
-			else if (_elementType.equals("Case") && Element.useInputBoxCase) {
+			// START KGU#997 2025-08-01: Enh. #1198
+			//else if (_elementType.equals("Case") && Element.useInputBoxCase) {
+			else if (_elementType.equals("Case") && (
+					Element.useInputBoxCase == CaseEditorChoice.ALWAYS
+					|| Element.useInputBoxCase == CaseEditorChoice.NON_EMPTY &&
+							_data.branchOrder != null &&
+							Arrays.stream(_data.branchOrder).sum() > 0)
+					) {
+			// END KGU#997 2025-08-01
 				// START KGU#927 2021-02-06: Enh. #915
 				//inputbox = new InputBoxCase(getFrame(), true);
 				inputbox = new InputBoxCase(getFrame(), true, new CaseEditHelper(root));
@@ -10536,7 +10560,9 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 	 */
 	// START KGU#911 2021-01-10: Enh. #910 Result type changed
 	//protected ArrayList<DiagramController> getDiagramControllers() {
-	protected LinkedHashMap<DiagramController, Root> getDiagramControllers() {
+	// START KGU#1181 2025-07-10: Enh. #1196 made public and static
+	//protected LinkedHashMap<DiagramController, Root> getDiagramControllers() {
+	public static LinkedHashMap<DiagramController, Root> getDiagramControllers() {
 	// END KGU#911 2021-01-10
 		if (diagramControllers != null) {
 			return diagramControllers;
@@ -10556,7 +10582,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		if (plugins.isEmpty()) {
 			BufferedInputStream buff = null;
 			try {
-				buff = new BufferedInputStream(getClass().getResourceAsStream("controllers.xml"));
+				buff = new BufferedInputStream(Diagram.class.getResourceAsStream("controllers.xml"));
 				GENParser genp = new GENParser();
 				plugins = genp.parse(buff);
 			} catch (Exception ex) {
@@ -10602,7 +10628,10 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 		}
 		if (!errors.isEmpty()) {
 			errors = Menu.msgTitleLoadingError.getText() + errors;
-			JOptionPane.showMessageDialog(this.getFrame(), errors,
+			// START KGU#1181 2025-07-10: Enh. #1196 no parentComponent in a static routine
+			//JOptionPane.showMessageDialog(this.getFrame(), errors,
+			JOptionPane.showMessageDialog(null, errors,
+			// END KGU#1181 2025-07-10
 					Menu.msgTitleParserError.getText(), JOptionPane.ERROR_MESSAGE);
 		}
 		return diagramControllers;
@@ -10617,7 +10646,8 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 	 * @param controller - a {@link DiagramController} implementor instance
 	 * @return a special immutable Includable
 	 */
-	private Root constructDiagrContrIncludable(DiagramController controller) {
+	// KGU#1181 2025-07-10: Enh. #1196 Made static
+	private static Root constructDiagrContrIncludable(DiagramController controller) {
 		Root incl = new Root(StringList.getNew("$" + controller.getName().replace(" ", "_")));
 		incl.setInclude(false);
 		StringList comment = new StringList();
@@ -10679,7 +10709,8 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 	 * be added to
 	 * @return number of routines
 	 */
-	public int addRoutineSignatures(HashMap<String, Method> routines, StringList comment) {
+	// KGU#1181 2025-07-10: Enh. #1196 made static
+	public static int addRoutineSignatures(HashMap<String, Method> routines, StringList comment) {
 		int count = 0;
 		for (Map.Entry<String, Method> entry : routines.entrySet()) {
 			String[] parts = entry.getKey().split("#", -1);
@@ -10713,7 +10744,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 	 * @see #enableController(String, boolean)
 	 */
 	private DiagramController[] getEnabledControllers() {
-		this.getDiagramControllers();
+		getDiagramControllers();
 		LinkedList<DiagramController> controllers = new LinkedList<DiagramController>();
 		// START KGU#911 2021-01-09: Enh. #910 status now coded in the Includables
 		//long mask = 1;
@@ -11390,7 +11421,7 @@ public class Diagram extends JPanel implements MouseMotionListener, MouseListene
 	 */
 	public boolean enableController(String className, boolean selected) {
 		// Ensure diagramControllers is initialised 
-		this.getDiagramControllers();
+		getDiagramControllers();
 		// START KGU#911 2021-01-10: Enh. #910 Status now held in associated Includables
 		//long mask = 1;
 		//for (DiagramController controller: diagramControllers) {

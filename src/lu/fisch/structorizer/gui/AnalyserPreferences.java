@@ -59,6 +59,7 @@ package lu.fisch.structorizer.gui;
  *      Kay Gürtzig     2021-11-14      Enh. #967: Mechanism for new plugin-specific analyser checks added
  *      Kay Gürtzig     2021-12-04      Enh. #800: Grammar-based general syntax check added
  *      Kay Gürtzig     2023-10-13      Issue #980 New syntax check for variable declarations added
+ *      Kay Gürtzig     2025-07-10      Enh. #1196: New controller-related name checks (32, 33).
  *
  ******************************************************************************************************
  *
@@ -128,7 +129,9 @@ public class AnalyserPreferences extends LangDialog {
 		/*29*/"Check that the CASE choice value is not of a structured type.",
 		/*30*/"Check that brackets are balanced and correctly nested.",
 		/*31*/"Check variable declaration and initialisation syntax.",
-		/*32*/"Perform a grammar-based line syntax check."
+		/*32*/"Check if an identifier might collide with diagram controller routines.",
+		/*33*/"Warn on usage of pixel-rounding Turtleizer procedures «fd», «bk».",
+		/*34*/"Perform a grammar-based line syntax check."
 		// Just append the descriptions for new check types here and insert their
 		// numbers at the appropriate place in array checkboxOrder below.
 		// DON'T FORGET to add a new entry to Root.analyserChecks for every
@@ -149,14 +152,14 @@ public class AnalyserPreferences extends LangDialog {
 				0,// loops
 				1, 14, 2,
 				0,// functions and calls
-				20, 13,	15, 23,
+				20, 13,	15, 23, 33,
 				0,// jumps and parallel sections
 				16, 17
 		});
 		// START KGU#992 2021-10-05: Enh. #992
 		checkboxTabs.put("General Syntax", new int[]{
 				30, 31,
-				32,
+				34,
 				// START KGU#1012 2021-11-14: Enh. #967: New plugin-specific syntax checks
 				0,// plugin-specific syntax checks
 				-2
@@ -164,7 +167,7 @@ public class AnalyserPreferences extends LangDialog {
 		});
 		checkboxTabs.put("Naming / Conventions", new int[]{
 				// identifiers and naming conventions
-				7, 9, 18, 19, 21,
+				7, 9, 18, 19, 21, 32,
 				0/*LUX/MEN*/,
 				5, 6, 12,
 				0,// multiple command types

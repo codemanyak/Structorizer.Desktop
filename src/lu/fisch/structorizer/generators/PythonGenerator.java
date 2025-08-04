@@ -88,15 +88,16 @@ import java.util.ArrayList;
  *      Kay Gürtzig         2021-12-05      Bugfix #1024: Precautions against defective record initializers
  *      Kay Gürtzig	        2022-07-04      Issue #1041: Unnecessary nesting of try blocks with finally clause
  *                                          Bugfix #1042: Wrong syntax for catch clauses with variable
- *      Kay Gürtzig             2022-08-14      Bugfix #1061: Suppression of content conversions #423, #623, #680, #782, #812
- *      Kay Gürtzig             2022-08-23      Issue #1068: transformIndexLists() inserted in transformTokens()
- *      Kay Gürtzig             2023-09-29      Issues #1091, #1092: Alias and array type defs now simply suppressed
- *      Kay Gürtzig             2023-10-04      Bugfix #1093 Undue final return 0 on function diagrams eliminated
- *      Kay Gürtzig             2023-10-12/18   Issue #980 Code generation for multi-variable and array declarations revised
- *      Kay Gürtzig             2023-11-08      Bugfix #1109: generateCode(Jump) revised for throw
- *      Kay Gürtzig             2024-04-03      Issue #1148: Optimised code generation for "if else if" chains
- *      Kay Gürtzig             2025-02-06      Bugfix #1188: The transformation of C-style array initialisations was wrong
- *      Kay Gürtzig             2025-02-16      Bugfix #1192: Translation of tail return instruction keywords
+ *      Kay Gürtzig         2022-08-14      Bugfix #1061: Suppression of content conversions #423, #623, #680, #782, #812
+ *      Kay Gürtzig         2022-08-23      Issue #1068: transformIndexLists() inserted in transformTokens()
+ *      Kay Gürtzig         2023-09-29      Issues #1091, #1092: Alias and array type defs now simply suppressed
+ *      Kay Gürtzig         2023-10-04      Bugfix #1093 Undue final return 0 on function diagrams eliminated
+ *      Kay Gürtzig         2023-10-12/18   Issue #980 Code generation for multi-variable and array declarations revised
+ *      Kay Gürtzig         2023-11-08      Bugfix #1109: generateCode(Jump) revised for throw
+ *      Kay Gürtzig         2024-04-03      Issue #1148: Optimised code generation for "if else if" chains
+ *      Kay Gürtzig         2025-02-06      Bugfix #1188: The transformation of C-style array initialisations was wrong
+ *      Kay Gürtzig         2025-02-16      Bugfix #1192: Translation of tail return instruction keywords
+ *      Kay Gürtzig         2025-07-03      Several missing Override annotations added.
  *
  ******************************************************************************************************
  *
@@ -157,21 +158,25 @@ public class PythonGenerator extends Generator
 {
 		
 	/************ Fields ***********************/
+	@Override
 	protected String getDialogTitle()
 	{
 		return "Export Python ...";
 	}
 
+	@Override
 	protected String getFileDescription()
 	{
 		return "Python Source Code";
 	}
 
+	@Override
 	protected String getIndent()
 	{
 		return "    ";
 	}
 
+	@Override
 	protected String[] getFileExtensions()
 	{
 		String[] exts = {"py"};
@@ -224,6 +229,7 @@ public class PythonGenerator extends Generator
 	 * construction in the target language.
 	 * @return a {@link TryCatchSupportLevel} value
 	 */
+	@Override
 	protected TryCatchSupportLevel getTryCatchLevel()
 	{
 		return TryCatchSupportLevel.TC_TRY_CATCH_FINALLY;
@@ -1087,6 +1093,7 @@ public class PythonGenerator extends Generator
 	}
 
 	// START KGU#47 2015-12-17: Offer at least a sequential execution (which is one legal execution order)
+	@Override
 	protected void generateCode(Parallel _para, String _indent)
 	{
 		boolean isDisabled = _para.isDisabled(false);
@@ -1214,6 +1221,7 @@ public class PythonGenerator extends Generator
 	// END KGU#47/KGU#348 2017-02-19
 	
 	// START KGU#686 2019-03-21: Enh. #56
+	@Override
 	protected void generateCode(Try _try, String _indent)
 	{
 		boolean isDisabled = _try.isDisabled(false);
@@ -1341,6 +1349,7 @@ public class PythonGenerator extends Generator
 	/* (non-Javadoc)
 	 * @see lu.fisch.structorizer.generators.Generator#appendGlobalInitialisations(java.lang.String)
 	 */
+	@Override
 	protected void appendGlobalInitialisations(Root _root, String _indent) {
 		if (topLevel) {
 			// START KGU#852 2020-04-22: Don't leave a foreign typeMap here

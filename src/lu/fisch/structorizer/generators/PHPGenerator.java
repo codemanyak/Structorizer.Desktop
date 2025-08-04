@@ -85,6 +85,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig             2024-04-02      Bugfix #1156: Handling of typed constants rectified
  *      Kay Gürtzig             2025-02-06      Bugfix #1188: Export of C-style array initialisations was defective
  *      Kay Gürtzig             2025-02-16      Bugfix #1192: Translation of tail return instruction keywords
+ *      Kay Gürtzig             2025-07-03      Some missing Override annotations added
  *
  ******************************************************************************************************
  *
@@ -957,20 +958,20 @@ public class PHPGenerator extends Generator
 		// END KGU#162 2016-04-01
 	}
 
-    @Override
-    protected void generateCode(Forever _forever, String _indent)
-    {
-        boolean isDisabled = _forever.isDisabled(false);
-        
-        // START KGU 2014-11-16
-        appendComment(_forever, _indent);
-        // END KGU 2014-11-16
+	@Override
+	protected void generateCode(Forever _forever, String _indent)
+	{
+		boolean isDisabled = _forever.isDisabled(false);
 
-        addCode("while (true)", _indent, isDisabled);
-        addCode("{", _indent, isDisabled);
-        generateCode(_forever.getBody(),_indent+this.getIndent());
-        addCode("}", _indent, isDisabled);
-    }
+		// START KGU 2014-11-16
+		appendComment(_forever, _indent);
+		// END KGU 2014-11-16
+
+		addCode("while (true)", _indent, isDisabled);
+		addCode("{", _indent, isDisabled);
+		generateCode(_forever.getBody(),_indent+this.getIndent());
+		addCode("}", _indent, isDisabled);
+	}
 
 	@Override
 	protected void generateCode(Call _call, String _indent)
@@ -1091,6 +1092,7 @@ public class PHPGenerator extends Generator
 	}
 	
 	// START KGU#686 2019-03-21: Enh. #56
+	@Override
 	protected void generateCode(Try _try, String _indent)
 	{
 		boolean isDisabled = _try.isDisabled(false);
@@ -1320,6 +1322,7 @@ public class PHPGenerator extends Generator
 	}
 
 	// START KGU#839 2020-04-06: Enh. #389 + issue #782
+	@Override
 	protected void appendDefinitions(Root _root, String _indent, StringList _varNames, boolean _force) {
 		if (topLevel) {
 			for (int i = 0; i < _varNames.count(); i++) {

@@ -86,6 +86,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig             2023-10-15      Bugfix #1096: Initialisation for multidimensional arrays fixed
  *      Kay Gürtzig             2023-12-25      Issue #1121: Scanner method should be type-specific where possible
  *      Kay Gürtzig             2023-12-27      Issue #1123: Translation of built-in function random() added.
+ *      Kay Gürtzig             2025-07-03      Missing Override annotations added
  *
  ******************************************************************************************************
  *
@@ -152,21 +153,25 @@ public class JavaGenerator extends CGenerator
 {
 
 	/************ Fields ***********************/
+	@Override
 	protected String getDialogTitle()
 	{
 		return "Export Java ...";
 	}
 
+	@Override
 	protected String getFileDescription()
 	{
 		return "Java Source Code";
 	}
 
+	@Override
 	protected String getIndent()
 	{
 		return "\t";
 	}
 
+	@Override
 	protected String[] getFileExtensions()
 	{
 		String[] exts = {"java"};
@@ -198,6 +203,7 @@ public class JavaGenerator extends CGenerator
 	 * @return a {@link TryCatchSupportLevel} value
 	 * @see #appendCatchHeading(Try, String)
 	 */
+	@Override
 	protected TryCatchSupportLevel getTryCatchLevel()
 	{
 		return TryCatchSupportLevel.TC_TRY_CATCH_FINALLY;
@@ -371,6 +377,7 @@ public class JavaGenerator extends CGenerator
 	 * @param _includeFileName a string from the user include configuration
 	 * @return the pre-processed string as to be actually inserted
 	 */
+	@Override
 	protected String prepareUserIncludeItem(String _includeFileName)
 	{
 		return _includeFileName;
@@ -388,6 +395,7 @@ public class JavaGenerator extends CGenerator
 	 * @param _includeName a generic (language-independent) string for the generator include configuration
 	 * @return the converted string as to be actually added to {@link #generatorIncludes}
 	 */
+	@Override
 	protected String prepareGeneratorIncludeItem(String _includeName)
 	{
 		return _includeName;
@@ -1631,6 +1639,7 @@ public class JavaGenerator extends CGenerator
 	 * @param _indent - current indentation
 	 * @see #appendGlobalInitialisations(Root, String)
 	 */
+	@Override
 	protected void appendGlobalInitialisationsLib(String _indent) {
 		// We simply call the global initialisation function of the library
 		addCode(this.libModuleName + ".initialize" + this.libModuleName + "();", _indent, false);

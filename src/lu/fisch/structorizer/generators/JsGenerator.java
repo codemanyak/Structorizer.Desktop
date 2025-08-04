@@ -46,6 +46,7 @@ import java.util.ArrayList;
  *      Kay Gürtzig     2023-10-16      Bugfix #1098: Recursive application of initializer transformation ensured
  *      Kay Gürtzig     2023-12-26      Bugfix #1122: getInputReplacer() was defective for promptless input.
  *      Kay Gürtzig     2023-12-27      Issue #1123: Translation of built-in function random() added.
+ *      Kay Gürtzig     2025-07-03      Some missing Override annotation added
  *
  ******************************************************************************************************
  *
@@ -450,6 +451,7 @@ public class JsGenerator extends CGenerator {
 	 * @param _indent - the current indentation level
 	 * @return true iff the method created some loop code (sensible or not)
 	 */
+	@Override
 	protected boolean generateForInCode(For _for, String _indent)
 	{
 		String var = _for.getCounterVar();
@@ -688,6 +690,7 @@ public class JsGenerator extends CGenerator {
 	 * @param _indent - the current indentation (as String)
 	 * @param _fullDecl - whether the declaration is to be forced in full format
 	 */
+	@Override
 	protected void appendDeclaration(Root _root, String _name, String _indent, boolean _fullDecl)
 	{
 		if (wasDefHandled(_root, _name, false)) {

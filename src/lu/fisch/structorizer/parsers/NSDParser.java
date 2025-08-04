@@ -57,6 +57,7 @@ package lu.fisch.structorizer.parsers;
  *      Kay Gürtzig     2019-03-17      Enh. #56: Import of new Try element implemented
  *      Kay Gürtzig     2020-08-12      Enh. #800: Started to redirect syntactic analysis to class Syntax
  *      Kay Gürtzig     2021-02-22      Enh. #410: New Root field "namespace" supported
+ *      Kay Gürtzig     2025-07-31      Enh. #1197: Branch selector colouring and its re-import enabled
  *
  ******************************************************************************************************
  *
@@ -378,6 +379,17 @@ public class NSDParser extends DefaultHandler {
 			
 			// read attributes
 			readBaseAttributes(attributes, ele);
+			// START KGU#1182 2025-07-31: Enh. #1197 Support for brach head colours
+			if (attributes.getIndex("branch_colors") != -1 && !attributes.getValue("branch_colors").equals("")) {
+				StringList colorList = StringList.explode(attributes.getValue("branch_colors"), ",");
+				for (int i = 0; i < Math.min(2, colorList.count()); i++) {
+					String hexCol = colorList.get(i).trim();
+					if (!hexCol.isEmpty()) {
+						ele.setBranchHeadColor(i, Color.decode("0x" + hexCol));
+					}
+				}
+			}
+			// END KGU#1182 2025-07-31
 			
 			// START KGU#258 2016-09-25: Enh. #253
 			if (this.refactorKeywords)
@@ -588,7 +600,25 @@ public class NSDParser extends DefaultHandler {
 
 			// read attributes
 			readBaseAttributes(attributes, ele);
+			// START KGU#1182 2025-07-31: Enh. #1197: Temporarily we must establish empty branches
+			//ele.qs.clear();	// We want to add the parsed branches
+			if (attributes.getIndex("text") != -1) {
+				StringList text = new StringList();
+				text.setCommaText(attributes.getValue("text"));
+				ele.setText(text);
+			}
+			if (attributes.getIndex("branch_colors") != -1 && !attributes.getValue("branch_colors").equals("")) {
+				StringList colorList = StringList.explode(attributes.getValue("branch_colors"), ",");
+				int nColors = Math.min(ele.getBranchCount(), colorList.count());
+				for (int i = 0; i < nColors; i++) {
+					String hexCol = colorList.get(i).trim();
+					if (!hexCol.isEmpty()) {
+						ele.setBranchHeadColor(i, Color.decode("0x" + hexCol));
+					}
+				}
+			}
 			ele.qs.clear();
+			// END KGU#1182 2025-07-31
 
 			// START KGU#258 2016-09-25: Enh. #253
 			if (this.refactorKeywords)

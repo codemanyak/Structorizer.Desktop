@@ -103,6 +103,7 @@ import java.util.ArrayList;
  *      Kay Gürtzig         2023-10-16      Bugfx #1096: transformTokens revised for mixed C / Java declarations
  *      Kay Gürtzig         2023-11-06      Issue #800: First bugfixing after code revision towards TokenList
  *      Kay Gürtzig         2023-11-08      Bugfix #1109: Code generation for throw suppressed
+ *      Kay Gürtzig         2025-07-03      Bugfix #447: Potential bug for Case elements with broken lines fixed
  *
  ******************************************************************************************************
  *
@@ -1115,6 +1116,7 @@ public class BASHGenerator extends Generator {
 	// END KGU#101 2015-12-22
 	
 	// START KGU#18/KGU#23 2015-11-02: Most of the stuff became obsolete by subclassing
+	@Override
 	protected String transform(String _input)
 	{
 		String intermed = super.transform(_input);
@@ -1167,6 +1169,7 @@ public class BASHGenerator extends Generator {
 	 * Generates a ":" line if the Subqueue contains only empty instructions
 	 * @see lu.fisch.structorizer.generators.Generator#generateCode(lu.fisch.structorizer.elements.Subqueue, java.lang.String)
 	 */
+	@Override
 	protected void generateCode(Subqueue _subqueue, String _indent)
 	{
 		super.generateCode(_subqueue, _indent);
@@ -1175,7 +1178,7 @@ public class BASHGenerator extends Generator {
 		}
 	}
 
-	
+	@Override
 	protected void generateCode(Instruction _inst, String _indent) {
 		
 		if (!appendAsComment(_inst, _indent)) {
@@ -1317,6 +1320,7 @@ public class BASHGenerator extends Generator {
 		addCode(resultName + codeLine.substring(codeLine.indexOf("=")), _indent, disabled);
 	}
 
+	@Override
 	protected void generateCode(Alternative _alt, String _indent) {
 		
 		boolean disabled = _alt.isDisabled(false);
@@ -1379,6 +1383,7 @@ public class BASHGenerator extends Generator {
 		
 	}
 	
+	@Override
 	protected void generateCode(Case _case, String _indent) {
 		
 		boolean disabled = _case.isDisabled(false);
@@ -1397,7 +1402,7 @@ public class BASHGenerator extends Generator {
 		// END KGU#453 2017-11-02
 		// END KGU#277 2016-10-14
 		
-		for (int i=0; i<_case.qs.size()-1; i++)
+		for (int i = 0; i<_case.qs.size()-1; i++)
 		{
 			// START KGU#277 2016-10-14: Enh. #270
 			//code.add("");
@@ -1418,7 +1423,11 @@ public class BASHGenerator extends Generator {
 			addCode(";;", _indent + this.getIndent(), disabled);
 		}
 		
-		if(!_case.getText().get(_case.qs.size()).trim().equals("%"))
+		// START KGU#1178 2025-07-03: Bugfix #447 This might have gone wrong with broken lines...
+		//if(!_case.getText().get(_case.qs.size()).trim().equals("%"))
+		TokenList lastLine = tokenLines.get(_case.qs.size());
+		if(lastLine.size() != 1 || !lastLine.get(0).equals("%"))
+		// END KGU#1178 2025-07-03
 		{
 			addCode("", "", disabled);
 			addCode("*)", _indent+this.getIndent(), disabled);
@@ -1429,7 +1438,7 @@ public class BASHGenerator extends Generator {
 		addCode("", "", disabled);
 	}
 	
-	
+	@Override
 	protected void generateCode(For _for, String _indent) {
 
 		// START KGU#277 2016-10-13: Enh. #270
@@ -1542,6 +1551,8 @@ public class BASHGenerator extends Generator {
 		// END KGU#277 2016-10-14
 
 	}
+	
+	@Override
 	protected void generateCode(While _while, String _indent) {
 		
 		// START KGU#277 2016-10-14: Enh. #270
@@ -1590,6 +1601,7 @@ public class BASHGenerator extends Generator {
 		
 	}
 	
+	@Override
 	protected void generateCode(Repeat _repeat, String _indent) {
 		
 		// START KGU#277 2016-10-14: Enh. #270
@@ -1635,6 +1647,7 @@ public class BASHGenerator extends Generator {
 		
 	}
 
+	@Override
 	protected void generateCode(Forever _forever, String _indent) {
 		
 		// START KGU#277 2016-10-14: Enh. #270
@@ -1662,6 +1675,7 @@ public class BASHGenerator extends Generator {
 		
 	}
 	
+	@Override
 	protected void generateCode(Call _call, String _indent) {
 		if (!appendAsComment(_call, _indent)) {
 			// START KGU 2014-11-16
@@ -1737,6 +1751,7 @@ public class BASHGenerator extends Generator {
 		}
 	}
 	
+	@Override
 	protected void generateCode(Jump _jump, String _indent) {
 		if(!appendAsComment(_jump, _indent)) {
 			// START KGU 2014-11-16
@@ -1775,6 +1790,7 @@ public class BASHGenerator extends Generator {
 	}
 	
 	// START KGU#174 2016-04-05: Issue #153 - export had been missing
+	@Override
 	protected void generateCode(Parallel _para, String _indent)
 	{
 		// START KGU#277 2016-10-14: Enh. #270
@@ -1827,6 +1843,7 @@ public class BASHGenerator extends Generator {
 //	}
 
 	// TODO: Decompose this - Result mechanism is missing!
+	@Override
 	public String generateCode(Root _root, String _indent, boolean _public) {
 		root = _root;
 		// START KGU#405 2017-05-19: Issue #237

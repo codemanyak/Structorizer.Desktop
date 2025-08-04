@@ -99,6 +99,7 @@ package lu.fisch.structorizer.generators;
  *                                          missed opportunity to use ELSIF in IF chains now implemented
  *      Kay Gürtzig         2024-03-19      Issue #1148 Auxiliary methods markElementStart() and markElementEnds()
  *      Kay Gürtzig         2025-02-16      Issue #800 + bugfix #1192: Handling of return statements in Instructions revised
+ *      Kay Gürtzig         2025-07-03      Missing Override annotations added
  *
  ******************************************************************************************************
  *
@@ -143,41 +144,45 @@ import lu.fisch.structorizer.syntax.Function;
 public class OberonGenerator extends Generator {
 	
 	/************ Fields ***********************/
+	@Override
 	protected String getDialogTitle()
 	{
 		return "Export Oberon Code ...";
 	}
 	
+	@Override
 	protected String getFileDescription()
 	{
 		return "Oberon Source Code";
 	}
 	
+	@Override
 	protected String getIndent()
 	{
 		return "  ";
 	}
 	
+	@Override
 	protected String[] getFileExtensions()
 	{
 		String[] exts = {"Mod"};
 		return exts;
 	}
 
-    // START KGU 2015-10-18: New pseudo field
-    @Override
-    protected String commentSymbolLeft()
-    {
-    	return "(*";
-    }
+	// START KGU 2015-10-18: New pseudo field
+	@Override
+	protected String commentSymbolLeft()
+	{
+		return "(*";
+	}
 
-    @Override
-    protected String commentSymbolRight()
-    {
-    	return "*)";
-    }
-    // END KGU 2015-10-18
-	
+	@Override
+	protected String commentSymbolRight()
+	{
+		return "*)";
+	}
+	// END KGU 2015-10-18
+
 	// START KGU#78 2015-12-18: Enh. #23 We must know whether to create labels for simple breaks
 	/* (non-Javadoc)
 	 * @see lu.fisch.structorizer.generators.Generator#supportsSimpleBreak()
@@ -205,6 +210,7 @@ public class OberonGenerator extends Generator {
 	 * construction in the target language.
 	 * @return a {@link TryCatchSupportLevel} value
 	 */
+	@Override
 	protected TryCatchSupportLevel getTryCatchLevel()
 	{
 		return TryCatchSupportLevel.TC_NO_TRY;
@@ -328,6 +334,7 @@ public class OberonGenerator extends Generator {
 	 * @param _default - a default string returned if _type happens to be null
 	 * @return a type identifier (or the unchanged _type value if matching failed)
 	 */
+	@Override
 	protected String transformType(String _type, String _default) {
 		if (_type == null)
 			_type = _default;
@@ -554,7 +561,7 @@ public class OberonGenerator extends Generator {
 	}
 	// END KGU#61 2016-03-23
 
-	
+	@Override
 	protected void generateCode(Instruction _inst, String _indent)
 	{
 		// START KGU 2015-10-18: The "export instructions as comments" configuration had been ignored here
@@ -982,7 +989,7 @@ public class OberonGenerator extends Generator {
 	 * @param _indent - current indentation level (as String)
 	 * @param _isDisabled - indicates whether the code is o be commented out
 	 */
-    private void generateAssignment(String _target, TokenList _exprTokens, String _indent, boolean _isDisabled) {
+	private void generateAssignment(String _target, TokenList _exprTokens, String _indent, boolean _isDisabled) {
 		if (_exprTokens.contains("{") && _exprTokens.endsWith("}")) {
 			int posBrace = _exprTokens.indexOf("{");
 			if (_exprTokens.size() >= 3 && posBrace <= 1) {
@@ -1009,6 +1016,7 @@ public class OberonGenerator extends Generator {
 	}
 	// END KGU#560 2018-07-22
 
+	@Override
 	protected void generateCode(Alternative _alt, String _indent)
 	{
 		boolean isDisabled = _alt.isDisabled(false);
@@ -1055,6 +1063,7 @@ public class OberonGenerator extends Generator {
 		// END KGU#1135 2024-03-18
 	}
 
+	@Override
 	protected void generateCode(Case _case, String _indent)
 	{
 		boolean isDisabled = _case.isDisabled(false);
@@ -1095,6 +1104,7 @@ public class OberonGenerator extends Generator {
 		// END KGU 2014-11-16
 	}
 	
+	@Override
 	protected void generateCode(For _for, String _indent)
 	{
 		// START KGU 2014-11-16
@@ -1287,6 +1297,7 @@ public class OberonGenerator extends Generator {
 	}
 	// END KGU#61 2016-03-23
 
+	@Override
 	protected void generateCode(While _while, String _indent)
 	{
 		boolean isDisabled = _while.isDisabled(false);
@@ -1301,6 +1312,7 @@ public class OberonGenerator extends Generator {
 		addCode("END;", _indent, isDisabled);
 	}
 	
+	@Override
 	protected void generateCode(Repeat _repeat, String _indent)
 	{
 		boolean isDisabled = _repeat.isDisabled(false);
@@ -1315,6 +1327,7 @@ public class OberonGenerator extends Generator {
 				_indent, isDisabled);
 	}
 	
+	@Override
 	protected void generateCode(Forever _forever, String _indent)
 	{
 		boolean isDisabled = _forever.isDisabled(false);
@@ -1326,6 +1339,7 @@ public class OberonGenerator extends Generator {
 		addCode("END;", _indent, isDisabled);
 	}
 	
+	@Override
 	protected void generateCode(Call _call, String _indent)
 	{
 		boolean isDisabled = _call.isDisabled(false);
@@ -1378,6 +1392,7 @@ public class OberonGenerator extends Generator {
 		}
 	}
 	
+	@Override
 	protected void generateCode(Jump _jump, String _indent)
 	{
 		boolean isDisabled = _jump.isDisabled(false);
@@ -1435,6 +1450,7 @@ public class OberonGenerator extends Generator {
 	}
 	
 	// START KGU#47 2015-12-20: Offer at least a sequential execution (which is one legal execution order)
+	@Override
 	protected void generateCode(Parallel _para, String _indent)
 	{
 		boolean isDisabled = _para.isDisabled(false);
