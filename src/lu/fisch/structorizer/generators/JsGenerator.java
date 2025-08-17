@@ -265,19 +265,20 @@ public class JsGenerator extends CGenerator {
 	}
 	
 	@Override
-	protected String transformOutput(String _interm)
+	protected String transformOutput(TokenList _tokens)
 	{
 		String outputToken = Syntax.key2token("output");
-		TokenList tokens = new TokenList(_interm);
-		if (tokens.indexOf(outputToken) == 0) {
-			if (tokens.size() == 1) {
-				return "document.write(\"<br/>\")";
-			}
-			ArrayList<TokenList> expressions = Syntax.splitExpressionList(tokens.subSequenceToEnd(1), ",", true);
-			String tail = expressions.remove(expressions.size()-1).getString();
-			_interm = outputToken + TokenList.concatenate(expressions, ") + (").getString().trim() + tail;
+		if (_tokens.size() == 1) {
+			// No expressions to write - just produce a newline
+			return "document.write(\"<br/>\")";
 		}
-		return super.transformOutput(_interm);
+		ArrayList<TokenList> expressions = Syntax.splitExpressionList(_tokens.subSequenceToEnd(1), ",", true);
+		String tail = expressions.remove(expressions.size()-1).getString();
+		TokenList transf = TokenList.concatenate(expressions, ") + (");
+		transf.trim();
+		transf.add(0, outputToken);
+		transf.add(tail);
+		return super.transformOutput(transf);
 	}
 
 	/**

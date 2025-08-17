@@ -501,9 +501,9 @@ public class PerlGenerator extends Generator {
 	 * @see lu.fisch.structorizer.generators.Generator#transformInput(java.lang.String)
 	 */
 	@Override
-	protected String transformInput(String _interm)
+	protected String transformInput(TokenList _tokens)
 	{
-		String transformed = super.transformInput(_interm);
+		String transformed = super.transformInput(_tokens);
 		if (transformed.startsWith(" = <STDIN>"))
 		{
 			transformed = "my $dummy = <STDIN>";
@@ -521,9 +521,9 @@ public class PerlGenerator extends Generator {
 	 * @see lu.fisch.structorizer.generators.Generator#transformInput(java.lang.String)
 	 */
 	@Override
-	protected String transformOutput(String _interm)
+	protected String transformOutput(TokenList _tokens)
 	{
-		String transformed = super.transformOutput(_interm);
+		String transformed = super.transformOutput(_tokens);
 		if (transformed.startsWith("print , "))
 		{
 			transformed = transformed.replace("print , ", "print ");

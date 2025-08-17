@@ -41,6 +41,8 @@ package lu.fisch.structorizer.syntax;
  *                                      New methods removePaddings(), removePaddings(int, int)
  *      Kay Gürtzig     2024-12-03/05   Attribute newlines added and functional integration begun
  *      Kay Gürtzig     2025-06-25      New methods concerning newline markers
+ *      Kay Gürtzig     2025-08-16/17   ensureGap() modified such that keyword tokens are padded;
+ *                                      padding strategy in method addAll mended for index = 0 or size
  *
  ******************************************************************************************************
  *
@@ -1622,7 +1624,12 @@ public class TokenList implements Comparable<TokenList>{
 			String token0 = tokens.get(i);
 			String token1 = tokens.get(i+1);
 			if (Character.isJavaIdentifierPart(token0.charAt(token0.length()-1))
-					&& Character.isJavaIdentifierPart(token1.charAt(0))) {
+					&& Character.isJavaIdentifierPart(token1.charAt(0))
+					// START KGU#790 2025-08-16: Issue #800 ensure gaps around keywords
+					|| isKeywordToken(token0)
+					|| isKeywordToken(token1)
+					// END KGU#790 2025-08-16
+					) {
 				paddings.set(i+1, 1);
 				len++;
 				return true;
@@ -1780,19 +1787,31 @@ public class TokenList implements Comparable<TokenList>{
 	 * @return {@code true} if at least one token could be added.
 	 */
 	public boolean addAll(int index, TokenList other) {
+		if (other.isEmpty()) {
+			return false;
+		}
 		synchronized (this) {
 			int otherSize = other.size();
 			int pad0 = other.paddings.get(0);
 			int padI = paddings.get(index);
 			// We split the padding at the insertion position into halves
-			int pad1 = padI/2 + pad0;
-			int pad2 = padI/2 + padI%2;
+			int pad1 = padI/2 + pad0;	// The padding to ensure before the first other token
+			int pad2 = padI/2 + padI%2;	// The padding to ensure after the last other token
 			// Don't eliminate a previous pre-token padding
 			if (pad1 > 0) {
 				len += pad1 - paddings.set(index, pad1);
 			}
 			else {
 				pad1 = padI;
+			}
+			// If index is either 0 or size then the above rule is nonsense
+			if (index == 0) {
+				pad1 = pad0;	// the left padding of other will be the new left padding
+				pad2 = padI;	// add the own left padding to the right padding of other
+			}
+			else if (index == tokens.size()) {
+				pad1 = padI + pad0;	// add the own right padding to the left padding of other
+				pad2 = 0;			// the right padding of other will be the final right padding
 			}
 			// Increase all newline positions >= index by other.size()
 			int iNl1 = newlines.size();
@@ -2826,5 +2845,31 @@ public class TokenList implements Comparable<TokenList>{
 		sb.append(']');
 		return sb.toString();
 	}
+	
+	// START KGU#790 2025-08-16
+	/**
+	 * Checks whether the given token may be a Structorizer keyword token
+	 * 
+	 * @param _token - the token to analyse
+	 * @return {@code true} if {@code token} starts and ends with a '§'
+	 */
+	private static boolean isKeywordToken(String _token)
+	{
+		return _token.length() > 2 && _token.charAt(0) == '§' && _token.charAt(_token.length()-1) == '§';
+	}
+
+	/**
+	 * Checks whether the token at position {@code index} may be a Structorizer
+	 * keyword token.
+	 * 
+	 * @param index - index of the token to analyse
+	 * @return {@code true} if token at position {@code index} exists and
+	 *    starts and ends with a '§'.
+	 */
+	public boolean isKeywordToken(int index)
+	{
+		return index >= 0 && index < this.tokens.size() && isKeywordToken(this.tokens.get(index));
+	}
+	// END KGU#790 2025-08-16
 
 }

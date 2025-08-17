@@ -75,6 +75,7 @@ package lu.fisch.structorizer.generators;
  *                                      for INPUT instructions
  *      Kay Gürtzig     2023-02-24      Bugfix #1074: Check for ARM INSTRUCTION syntax refined.
  *      Kay Gürtzig     2025-07-03      Bugfix #1195: All checks for disabled state extended to inherited
+ *      Kay Gürtzig     2025-08-15      Issue #800 inputPattern, outputPattern and returnPattern adapted
  *
  ******************************************************************************************************
  *
@@ -173,9 +174,6 @@ public class ArmGenerator extends Generator {
     private static Pattern inputPattern = null;
     private static Pattern outputPattern = null;
     // END KGU#968 2021-04-24
-    // START KGU#1017 2021-11-17: Issue #1020
-    private static Pattern returnPattern = null;
-    // END KGU#1017 2021-11-17
     
     // START KGU#1012 2021-11-14: Restrictive mode
     /** May hold a restricting line parser */
@@ -486,20 +484,14 @@ public class ArmGenerator extends Generator {
         }
         // END KGU#1000 2021-10-29
         // START KGU#968 2021-04-24: Enh. #967 - prepare correct keyword comparison
-        String inputKeyword = Syntax.getKeywordOrDefault("input", "input");
-        String outputKeyword = Syntax.getKeywordOrDefault("output", "output");
         String procName = _root.getMethodName();
         // START KGU#968 2021-11-14: More precise pattern
         //inputPattern = Pattern.compile(getKeywordPattern(inputKeyword) + "([\\W].*|$)");
-        inputPattern = Pattern.compile(getKeywordPattern(inputKeyword)
+        inputPattern = Pattern.compile(Syntax.key2token("input")
                 + String.format("( *((%s|%s) *,?)? *%s( *, *%s)*|$)",
                         stringLiteral2Pattern, stringLiteral1Pattern, variablePattern, variablePattern));
         // END KGU#968 2021-11-14
-        outputPattern = Pattern.compile(getKeywordPattern(outputKeyword) + "([\\W].*|$)");
-        // START KGU#1017 2021-11-17: Issue #1020 Support terminal return instructions
-        String returnKeyword = Syntax.getKeywordOrDefault("preReturn", "return");
-        returnPattern = Pattern.compile(getKeywordPattern(returnKeyword) + "([\\W].*|$)");
-        // END KGU#1017 2021-11-17
+        outputPattern = Pattern.compile(Syntax.key2token("output") + "([\\W].*|$)");
         alwaysReturns = mapJumps(_root.children);
         this.varNames = _root.retrieveVarNames().copy();
         this.isResultSet = varNames.contains("result", false);
@@ -665,13 +657,13 @@ public class ArmGenerator extends Generator {
                 // END KGU#1012 2021-11-14
                 // START KGU#968 2021-10-06: skip type definitions and declarations
                 //generateInstructionLine(line, isDisabled);
-                if (!Instruction.isMereDeclaration(line)) {
+                TokenList tokens = new TokenList(line);
+                if (!Instruction.isMereDeclaration(tokens)) {
                     // START KGU#1017 2021-11-17: Issue #1020 care for terminal return
                     //generateInstructionLine(line, isDisabled, _inst);
                     if (isLastRoutineElement && i == lines.count()-1
-                            && returnPattern.matcher(line).matches()) {
-                        // FIXME there might be a little lower/upper case length bias!
-                        String expr = line.substring(Syntax.getKeywordOrDefault("preReturn", "return").length());
+                            && Jump.isReturn(tokens)) {
+                        String expr = tokens.subSequenceToEnd(1).getString();
                         generateCodeReturn(_inst, expr.trim());
                     }
                     else {
@@ -1329,8 +1321,8 @@ public class ArmGenerator extends Generator {
             else
             {
                 Root root = Element.getRoot(_jump);
-                String preReturn = Syntax.getKeywordOrDefault("preReturn", "return");
-                String preExit   = Syntax.getKeywordOrDefault("preExit", "exit");
+                String preReturn = Syntax.key2token("preReturn");
+                String preExit   = Syntax.key2token("preExit");
                 //String preThrow  = CodeParser.getKeywordOrDefault("preThrow", "throw");
                 for (int i = 0; isEmpty && i < lines.count(); i++) {
                     String line = transform(lines.get(i)).trim();

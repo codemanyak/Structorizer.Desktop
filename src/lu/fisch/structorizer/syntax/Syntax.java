@@ -1492,7 +1492,7 @@ public class Syntax {
 	 * brace on will be added as last element to the result.
 	 * If the last result element is empty then the expression list was syntactically "clean".<br/>
 	 * 
-	 * @param _tokens - {@link StringList} containing one or more expressions in tokenized form
+	 * @param _tokens - {@link TokenList} containing one or more expressions in tokenized form
 	 * @param _listSeparator - a character sequence serving as separator among the expressions
 	 *     (default: ","). It should form a single token on being split (otherwise it would not
 	 *     be recognised, it must not be any of "(", ")", "[", "]", "{", "}", but it may also be

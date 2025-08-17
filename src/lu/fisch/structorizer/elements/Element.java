@@ -4735,57 +4735,17 @@ public abstract class Element {
         return interTt;
     }
     
-//    /**
-//     * Translates the Pascal procedure calls {@code inc(var), inc(var, offs), dec(var)},
-//     * and {@code dec(var, offs)} into simple assignments in Structorizer syntax.
-//     * 
-//     * @param code - the piece of text possibly containing {@code inc} or {@code dec} references
-//     * @return the transformed string.
-//     * 
-//     * @deprecated prefer {@link #transform_inc_dec(TokenList)}
-//     */
-//    public static String transform_inc_dec(String code)
-//    {
-//        code = INC_PATTERN1.matcher(code).replaceAll("$1 <- $1 + $2");
-//        code = INC_PATTERN2.matcher(code).replaceAll("$1 <- $1 + 1");
-//        code = DEC_PATTERN1.matcher(code).replaceAll("$1 <- $1 - $2");
-//        code = DEC_PATTERN2.matcher(code).replaceAll("$1 <- $1 - 1");
-//        return code;
-//    }
-    
 	/**
-	 * Translates the Pascal procedure calls {@code inc(var), inc(var, offs), dec(var)},
-	 * and {@code dec(var, offs)} into simple assignments in Structorizer syntax.
+	 * Translates the Pascal procedure calls {@code inc(var), inc(var, offs),
+	 * dec(var)}, and {@code dec(var, offs)} into simple assignments in
+	 * Structorizer syntax.
 	 * 
-	 * @param code - the piece of text possibly containing {@code inc} or {@code dec} references
-	 * @return the transformed string.
+	 * @param code - the piece of text possibly containing {@code inc} or
+	 *    {@code dec} references
+	 * @return the transformed tokens.
 	 */
 	public static TokenList transform_inc_dec(TokenList code)
 	{
-//		TokenList argListEnd = new TokenList(")");
-//		TokenList transf = new TokenList(code); // Avoid to backfeed argument modifications
-//		for (String[] pair: substPairs) {
-//			TokenList funcPattern = new TokenList(pair[0] + "(");
-//			while ((pos = transf.indexOf(funcPattern, pos+1, false)) >= 0) {
-//				ArrayList<TokenList> argExprs = Syntax.splitExpressionList(transf.subSequenceToEnd(pos + 2), ",");
-//				int nArgs = argExprs.size() - 1;
-//				if (argExprs.get(nArgs).startsWith(argListEnd, true) &&
-//						nArgs >= 1 && nArgs <= 2) {
-//					transf.remove(pos, pos + argExprs.get(0).size() + 1);
-//					if (nArgs == 1) {
-//						transf.add(pos, "1");
-//					}
-//					else {
-//						transf.addAll(pos, argExprs.get(1));
-//					}
-//					transf.add(pos, pair[1]);
-//					transf.addAll(pos, argExprs.get(0));
-//					transf.add(pos, " <- ");
-//					transf.addAll(pos, argExprs.get(0));
-//				}
-//			}
-//		}
-//		return transf;
 		// Since inc and dec are procedures they can only be placed at the very beginning
 		Function incOrDec = new Function(code);
 		int arity = 0;

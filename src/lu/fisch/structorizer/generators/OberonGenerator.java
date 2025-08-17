@@ -100,6 +100,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig         2024-03-19      Issue #1148 Auxiliary methods markElementStart() and markElementEnds()
  *      Kay Gürtzig         2025-02-16      Issue #800 + bugfix #1192: Handling of return statements in Instructions revised
  *      Kay Gürtzig         2025-07-03      Missing Override annotations added
+ *      Kay Gürtzig         2025-08-16      Issue #800 + bugfix #1206: Proper translation of exit instructions
  *
  ******************************************************************************************************
  *
@@ -137,8 +138,10 @@ import java.util.regex.Matcher;
 import lu.fisch.utils.*;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.structorizer.syntax.TokenList;
+import lu.fisch.structorizer.syntax.Expression.Operator;
 import lu.fisch.structorizer.elements.*;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
+import lu.fisch.structorizer.syntax.Expression;
 import lu.fisch.structorizer.syntax.Function;
 
 public class OberonGenerator extends Generator {
@@ -259,6 +262,102 @@ public class OberonGenerator extends Generator {
 	// END KGU#815/KGU#836 2020-03-18
 	
 	/************ Code Generation **************/
+
+	// START KGU#790 2025-08-15: Issue #800
+	/**
+	 * Maps operator symbols from the key set of {@link #OPERATOR_PRECEDENCE} to
+	 * pairs of an alternative (more verbose equivalent) symbol and precedence,
+	 * e.g. to be used with {@link #transform(Expression)}
+	 */
+	@SuppressWarnings("serial")
+	public static final HashMap<String, Operator> oberonOperators = new HashMap<String, Operator>() {{
+		put("<-", new Operator(":=", 0));
+		put("or", new Operator("OR", 9));
+		put("||", new Operator("OR", 9));
+		put("and", new Operator("&", 10));
+		put("&&", new Operator("&", 10));
+		put("|", new Operator("bitOr"));	// FIXME provide an implementation over Sets
+		put("^", new Operator("bitXor"));	// FIXME provide an implementation over Sets
+		put("xor", new Operator("bitXor"));	// FIXME provide an implementation over Sets
+		put("&", new Operator("bitAnd"));	// FIXME provide an implementation over Sets
+		//put("=", new Operator("=", 6));	// Does not change anything
+		put("==", new Operator("=", 6));
+		put("<>", new Operator("#", 6));
+		put("!=", new Operator("#", 6));
+		put("<", new Operator("<", 6));
+		put(">", new Operator(">", 6));
+		put("<=", new Operator("<=", 6));
+		put(">=", new Operator(">=", 6));
+		put("shl", new Operator("ASH"));
+		put("<<", new Operator("ASH"));
+		put("shr", new Operator("ASH", null, new String[] {"", "-($)"}));
+		put(">>", new Operator("ASH", null, new String[] {"", "-($)"}));
+		put(">>>", new Operator("ASH", null, new String[] {"", "-($)"}));
+		//put("+", new Operator("+", 9));		// redundant
+		//put("-", new Operator("-", 9));		// redundant
+		//put("*", new Operator("*", 10));		// redundant
+		//put("/", new Operator("/", 10));		// redundant
+		put("div", new Operator("DIV", 10));
+		put("mod", new Operator("MOD", 10));
+		put("%", new Operator("MOD", 10));
+		put("not", new Operator("~", 11));
+		put("!", new Operator("~", 11));
+		put("+1", new Operator("+1", 11));	// sign
+		put("-1", new Operator("-1", 11));	// sign
+		put("*1", new Operator("1^", 11));	// pointer deref (C)
+		put("&1", new Operator("SYSTEM.ADD"));	
+		//put("[]", new Operator("[]", 12));	// redundant
+		//put(".", new Operator(".", 12));		// redundant
+	}};
+	
+	@Override
+	protected HashMap<String, Operator> getOperatorMap() {
+		return oberonOperators;
+	}
+	
+	/**
+	 * The implementation of a workaround for bit OR
+	 * @see #BIT_AND
+	 */
+	private static final String[] BIT_OR = {
+			"FUNCTION bitOr(opd1, opd2: INTEGER): INTEGER",
+			"  VAR s1, s2: SET;",
+			"BEGIN",
+			"  s1 := SYSTEM.VAL(SET, opd1);",
+			"  s2 := SYSTEM.VAL(SET, opd2);",
+			"  RETURN SYSTEM.VAL(INTEGER, s1 + s2)",
+			"END bitOr"
+	};
+	/**
+	 * The implementation of a workaround for bit OR
+	 * @see #BIT_OR
+	 */
+	private static String[] BIT_AND = {
+			"FUNCTION bitAnd(opd1, opd2: INTEGER): INTEGER",
+			"  VAR s1, s2: SET;",
+			"BEGIN",
+			"  s1 := SYSTEM.VAL(SET, opd1);",
+			"  s2 := SYSTEM.VAL(SET, opd2);",
+			"  RETURN SYSTEM.VAL(INTEGER, s1 * s2)",
+			"END bitAnd"
+	};
+	/**
+	 * The implementation of a workaround for bit OR
+	 * @see #BIT_OR
+	 */
+	private static String[] BIT_XOR = {
+			"FUNCTION bitXor(opd1, opd2: INTEGER): INTEGER",
+			"  VAR s1, s2: SET;",
+			"BEGIN",
+			"  s1 := SYSTEM.VAL(SET, opd1);",
+			"  s2 := SYSTEM.VAL(SET, opd2);",
+			"  RETURN SYSTEM.VAL(INTEGER, s1 / s2)",
+			"END bitXor"
+	};
+	private boolean needsBitOr = false;
+	private boolean needsBitAnd = false;
+	private boolean needsBitXor = false;
+	// END KGU#790 2025-08-15
 
 	// START KGU#332 2017-01-30: Enh. #335
 	private Map<String,TypeMapEntry> typeMap;
@@ -531,7 +630,25 @@ public class OberonGenerator extends Generator {
 
 		return transline.trim();
 	}
-	
+
+	// START KGU#790 2025-08-15: Issue #800
+	@Override
+	protected TokenList transform(Expression _expr)
+	{
+		TokenList transformed = _expr.asTokenList(getOperatorMap());
+		if (transformed.contains("bitOr")) {
+			needsBitOr = true;
+		}
+		if (transformed.contains("bitAnd")) {
+			needsBitAnd = true;
+		}
+		if (transformed.contains("bitXor")) {
+			needsBitXor = true;
+		}
+		return transformed;
+	}
+	// END KGU#790 2025-08-15
+
 
 	// START KGU#61 2016-03-23: New for enh. #84
 	private void insertDeclaration(String _category, String text, int _maxIndent)
@@ -647,13 +764,17 @@ public class OberonGenerator extends Generator {
 				else if (Instruction.isOutput(tokens))
 				{
 					ArrayList<TokenList> expressions = Syntax.splitExpressionList(tokens.subSequenceToEnd(1), ",");
-					// Produce an output instruction for every expression (according to type)
-					for (int j = 0; j < expressions.size(); j++)
+					// Produce an output instruction for every expression except the tail (according to type)
+					for (int j = 0; j < expressions.size() - 1; j++)
 					{
 						// START KGU#236 2016-10-15: Issue #227 - For literals, we can of course determine the type...
 						//addCode(transform(outputKey + " " + expressions.get(j)) + ";", _indent, isDisabled);
 						generateTypeSpecificOutput(expressions.get(j), _indent, isDisabled);
 						// END KGU#236 2016-10-15
+					}
+					TokenList tail = expressions.get(expressions.size()-1);
+					if (!tail.isBlank()) {
+						this.appendComment("FIXME: doubious line part «" + tail.getString() + "» ignored.", _indent);
 					}
 					addCode("Out.Ln;", _indent, isDisabled);
 				}
@@ -1424,8 +1545,12 @@ public class OberonGenerator extends Generator {
 			}
 			else if (Jump.isExit(tokens))
 			{
-				appendComment("FIXME: Find a solution to exit the program here!", _indent);
-				appendComment("EXITPROG " + transform(tokens.subSequenceToEnd(1).getString()).trim(), _indent);
+				// START KGU#1189 2025-08-16: Bugfix #1206
+				//appendComment("FIXME: Find a solution to exit the program here!", _indent);
+				//appendComment("EXITPROG " + transform(tokens.subSequenceToEnd(1).getString()).trim(), _indent);
+				addCode ("HALT(" + transform(tokens.subSequenceToEnd(1).getString()).trim() + ");",
+						_indent, isDisabled);
+				// END KGU#1189 2025-08-16
 			}
 			else if (Jump.isLeave(tokens))
 			{
@@ -2337,44 +2462,66 @@ public class OberonGenerator extends Generator {
 			addSepaLine();
 		}
 		// END KGU#178 2016-07-20
+
 		// START KGU#236 2016-08-10: Issue #227 - create an additional MODULE context
 		// FIXME: An include diagram should be handled in yet another way (separate file)...
-		else if (!_root.isProgram() /*&& this.optionExportSubroutines()*/)
+		// START KGU#790 2025-08-16: Issue #800
+		//else if (!_root.isProgram() /*&& this.optionExportSubroutines()*/)
 		{
-			// We are at top level here!
-			// START KGU#815/KGU#824 2020-03-19: Enh. #828, bugfix #836
-			libraryInsertionLine = code.count();
-			// END KGU#815/KGU#824 2020-03-19
+			if (needsBitOr) {
+				for (String line: BIT_OR) {
+					this.insertCode(this.subroutineIndent + line, this.subroutineInsertionLine);
+				}
+			}
+			if (needsBitAnd) {
+				for (String line: BIT_AND) {
+					this.insertCode(this.subroutineIndent + line, this.subroutineInsertionLine);
+				}
+			}
+			if (needsBitXor) {
+				for (String line: BIT_XOR) {
+					this.insertCode(this.subroutineIndent + line, this.subroutineInsertionLine);
+				}
+			}
+			if (!_root.isProgram() /*&& this.optionExportSubroutines()*/) {
+		// END KGU#790 2025-08-16
+				// We are at top level here!
+				// START KGU#815/KGU#824 2020-03-19: Enh. #828, bugfix #836
+				libraryInsertionLine = code.count();
+				// END KGU#815/KGU#824 2020-03-19
 
-			// Additionally append an empty module body as initialization code if we export a
-			// potential bunch of routines (module without program)
-			addSepaLine();
-			code.add(_indent + "BEGIN");
-			// FIXME: We should make sure that subroutines don't open the streams again
-			if (this.hasInput())
-			{
-				code.add(_indent + this.getIndent() + "In.Open;");
-			}
-			if (this.hasOutput())
-			{
-				code.add(_indent + this.getIndent() + "Out.Open;");	// This is optional, actually
-			}
-			// START KGU#816/KGU#824 2020-03-18: Enh. #828, bugfix #837
-			String indentPlusOne = _indent + this.getIndent();
-			this.appendGlobalInitialisations(_root, indentPlusOne);
-			if (_root.isInclude() && !includedRoots.contains(_root)) {
-				Queue<Root> origIncludes = includedRoots;
-				try {
-					includedRoots = new LinkedList<Root>();
-					includedRoots.add(_root);
-					this.appendGlobalInitialisations(_root, indentPlusOne);
+				// Additionally append an empty module body as initialization code if we export a
+				// potential bunch of routines (module without program)
+				addSepaLine();
+				code.add(_indent + "BEGIN");
+				// FIXME: We should make sure that subroutines don't open the streams again
+				if (this.hasInput())
+				{
+					code.add(_indent + this.getIndent() + "In.Open;");
 				}
-				finally {
-					includedRoots = origIncludes;
+				if (this.hasOutput())
+				{
+					code.add(_indent + this.getIndent() + "Out.Open;");	// This is optional, actually
 				}
-			}
+				// START KGU#816/KGU#824 2020-03-18: Enh. #828, bugfix #837
+				String indentPlusOne = _indent + this.getIndent();
+				this.appendGlobalInitialisations(_root, indentPlusOne);
+				if (_root.isInclude() && !includedRoots.contains(_root)) {
+					Queue<Root> origIncludes = includedRoots;
+					try {
+						includedRoots = new LinkedList<Root>();
+						includedRoots.add(_root);
+						this.appendGlobalInitialisations(_root, indentPlusOne);
+					}
+					finally {
+						includedRoots = origIncludes;
+					}
+				}
 			// END KGU#816/KGU#824 2020-03-18
 			code.add(_indent + "END " + this.getModuleName() + ".");
+			// START KGU#790 2025-08-16: Issue #800
+			}
+			// END KGU#790 2025-08-16
 		}
 		// END KGU#236 2016-08-10
 

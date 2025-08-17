@@ -323,9 +323,9 @@ public class CSharpGenerator extends CGenerator
 	 * @see lu.fisch.structorizer.generators.Generator#transformInput(java.lang.String)
 	 */
 	@Override
-	protected String transformInput(String _interm)
+	protected String transformInput(TokenList _tokens)
 	{
-		String transf = super.transformInput(_interm);
+		String transf = super.transformInput(_tokens);
 		if (transf.trim().startsWith("= ")) {
 			transf = transf.trim().substring(2);
 		}
@@ -337,35 +337,31 @@ public class CSharpGenerator extends CGenerator
 	/**
 	 * Detects whether the given code line starts with the configured output keystring
 	 * and if so replaces it according to the regex pattern provided by getOutputReplacer()
-	 * @param _interm - a code line in intermediate syntax
+	 * @param _tokens - a tokenized code line in intermediate syntax
 	 * @return transformed output instruction or _interm unchanged
 	 */
 	@Override
-	protected String transformOutput(String _interm)
+	protected String transformOutput(TokenList _tokens)
 	{
 		String subst = getOutputReplacer();
 		String subst0 = subst.replaceAll("Line", "");
-		String keyToken = Syntax.key2token("output");
-		TokenList tokens = new TokenList(_interm);
-		if (tokens.indexOf(keyToken) == 0)
-		{
-			ArrayList<TokenList> expressions = Syntax.splitExpressionList(tokens.subSequenceToEnd(1), ",");
-			String tail = expressions.remove(expressions.size() - 1).getString(); 
-			StringBuilder result = new StringBuilder();
-			for (int i = 0; i < expressions.size()-1; i++) {
-				result.append(subst0.replace("$1", expressions.get(i).getString().trim()));
-				result.append("; ");
-			}
-			if (expressions.size() > 0) {
-				result.append(subst.replace("$1", expressions.get(expressions.size()-1).getString().trim()));
-				result.append(tail);
-				_interm = result.toString();
-			}
-			else {
-				_interm = subst.replace("$1", "") + tail;
-			}
+		String transf;
+		ArrayList<TokenList> expressions = Syntax.splitExpressionList(_tokens.subSequenceToEnd(1), ",");
+		String tail = expressions.remove(expressions.size() - 1).getString(); 
+		StringBuilder result = new StringBuilder();
+		for (int i = 0; i < expressions.size()-1; i++) {
+			result.append(subst0.replace("$1", expressions.get(i).getString().trim()));
+			result.append("; ");
 		}
-		return _interm;
+		if (expressions.size() > 0) {
+			result.append(subst.replace("$1", expressions.get(expressions.size()-1).getString().trim()));
+			result.append(tail);
+			transf = result.toString();
+		}
+		else {
+			transf = subst.replace("$1", "") + tail;
+		}
+		return transf;
 	}
 	// END KGU#321 2017-01-04
 

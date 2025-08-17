@@ -525,7 +525,7 @@ public class PythonGenerator extends Generator
 	 * @see lu.fisch.structorizer.generators.Generator#transformInput(java.lang.String)
 	 */
 	@Override
-	protected String transformInput(String _interm)
+	protected String transformInput(TokenList _interm)
 	{
 		String transformed = super.transformInput(_interm);
 		if (transformed.startsWith(" = input("))
@@ -541,7 +541,7 @@ public class PythonGenerator extends Generator
 	 * @see lu.fisch.structorizer.generators.Generator#transformOutput(java.lang.String)
 	 */
 	@Override
-	protected String transformOutput(String _interm)
+	protected String transformOutput(TokenList _interm)
 	{
 		String transf = super.transformOutput(_interm);
 		if (this.getOutputReplacer().replace("$1", "").equals(transf)) {

@@ -132,6 +132,7 @@ package lu.fisch.structorizer.generators;
  *                                              correctly translated (pointer insertion failed)
  *      Kay Gürtzig             2025-02-05      Bugfix #1186: The initialisation part of C-Style declarations got lost
  *      Kay Gürtzig             2025-02-16      Bugfix #1192: Translation of tail return instruction keywords
+ *      Kay Gürtzig             2025-08-15      Issue #800: getOperatorMap() implementation introduced
  *
  ******************************************************************************************************
  *
@@ -213,6 +214,7 @@ import java.util.logging.Level;
 import lu.fisch.utils.*;
 import lu.fisch.structorizer.syntax.Syntax;
 import lu.fisch.structorizer.syntax.TokenList;
+import lu.fisch.structorizer.syntax.Expression.Operator;
 import lu.fisch.structorizer.elements.*;
 import lu.fisch.structorizer.syntax.Function;
 
@@ -340,6 +342,60 @@ public class CGenerator extends Generator {
 
 	/************ Code Generation **************/
 
+	// START KGU#790 2025-08-15: Issue #800
+	/**
+	 * Maps operator symbols from the key set of {@link #OPERATOR_PRECEDENCE} to
+	 * pairs of an alternative (more verbose equivalent) symbol and precedence,
+	 * e.g. to be used with {@link #transform(Expression)}
+	 */
+	@SuppressWarnings("serial")
+	public static final HashMap<String, Operator> c99Operators = new HashMap<String, Operator>() {{
+		put("<-", new Operator("=", 0));
+		put(":=", new Operator("=", 0));
+		put("or", new Operator("||", 1));
+		//put("||", new Operator("||", 1));	// redundant
+		put("and", new Operator("&&", 2));
+		//put("&&", new Operator("&&", 2));		// redundant
+		//put("|", new Operator("|", 3));		// redundant
+		//put("^", new Operator("^", 4));		// redundant
+		put("xor", new Operator("^", 4));
+		//put("&", new Operator("&", 5));		// redundant
+		put("=", new Operator("==", 6));
+		//put("==", new Operator("==", 6));		// redundant
+		put("<>", new Operator("!=", 6));
+		//put("!=", new Operator("=", 6));		// redundant
+		//put("<", new Operator("<", 7));		// redundant
+		//put(">", new Operator(">", 7));		// redundant
+		//put("<=", new Operator("<=", 7));		// redundant
+		//put(">=", new Operator(">=", 7));		// redundant
+		put("shl", new Operator("<<", 8));
+		//put("<<", new Operator("<<", 8));		// redundant
+		put("shr", new Operator(">>", 8));
+		//put(">>", new Operator(">>", 8));		// redundant
+		//put(">>>", new Operator(">>>", 8));	// redundant
+		//put("+", new Operator("+", 9));		// redundant
+		//put("-", new Operator("-", 9));		// redundant
+		//put("*", new Operator("*", 10));		// redundant
+		//put("/", new Operator("/", 10));		// redundant
+		put("div", new Operator("/", 10));		// FIXME: requires an (int) casting
+		put("mod", new Operator("%", 10));
+		//put("%", new Operator("%", 10));		// redundant
+		put("not", new Operator("!", 11));		// redundant
+		//put("!", new Operator("!", 11));
+		//put("+1", new Operator("+1", 11));	// sign (redundant)
+		//put("-1", new Operator("-1", 11));	// sign (redundant)
+		//put("*1", new Operator("*1", 11));	// pointer deref (redundant)
+		//put("&1", new Operator("&1", 11));	// address (redundant)
+		//put("[]", new Operator("[]", 12));	// redundant
+		//put(".", new Operator(".", 12));		// redundant
+	}};
+	
+	@Override
+	protected HashMap<String, Operator> getOperatorMap() {
+		return c99Operators;
+	}
+	// END KGU#790 2025-08-15
+	
 	// START KGU#311/KGU#828 2020-03-22: Enh. #314, #828
 	protected static final String FILE_API_CLASS_NAME = "StructorizerFileAPI";
 	// END KGU#311/KGU#828 2020-03-22
@@ -638,7 +694,8 @@ public class CGenerator extends Generator {
 			}
 		}
 		// END KGU#342 2017-02-07
-		return tokens.getString().trim();
+		tokens.trim();
+		return tokens.getString();
 	}
 	// END KGU#93 2015-12-21
 

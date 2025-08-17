@@ -221,6 +221,14 @@ public class Expression {
 		public final byte[] argumentOrder;
 		
 		/**
+		 * Specifies possible operand-modifying expressions to be applied before
+		 * an specified operand reordering takes place. The array elements may be
+		 * {@link TokenList}s where there must be a token "$" as place holder for
+		 * the respective operand.
+		 */
+		public final TokenList[] operandConversions;
+		
+		/**
 		 * Specifies an (infix) operator with given {@code symbol} and {@code precedence}.
 		 * @param symbol - the operator symbol (a leading '1' will make it a
 		 * postfix operator, if unary).
@@ -232,6 +240,30 @@ public class Expression {
 			this.symbol = symbol;
 			this.precedence = (byte)precedence;
 			this.argumentOrder = null;
+			this.operandConversions = null;
+		}
+		
+		/**
+		 * Specifies an (infix) operator with given {@code symbol} and {@code precedence}.
+		 * @param symbol - the operator symbol (a leading '1' will make it a
+		 * postfix operator, if unary).
+		 * @param precedence - the priority (the higher the more precedent)
+		 * @param operandPreparations - a String array containing possible operand-
+		 *    preprocessing expressions in order of occurrence where "$" serves as
+		 *    operand placeholder, e.g. "abs($)" to apply the abs function to the
+		 *    operand before applying the operator itself.
+		 * @see #Operator(String)
+		 * @see #Operator(String, int[])
+		 */
+		public Operator(String symbol, int precedence, String[] operandPreparations) {
+			this.symbol = symbol;
+			this.precedence = (byte)precedence;
+			this.argumentOrder = null;
+			this.operandConversions = new TokenList[operandPreparations.length];
+			int i = 0;
+			for (String op: operandPreparations) {
+				this.operandConversions[i++] = new TokenList(op);
+			}
 		}
 		
 		/**
@@ -246,6 +278,7 @@ public class Expression {
 			this.symbol = name;
 			this.precedence = Byte.MAX_VALUE;
 			this.argumentOrder = new byte[]{};
+			this.operandConversions = null;
 		}
 		
 		/**
@@ -264,8 +297,44 @@ public class Expression {
 			for (int i = 0; i < argOrder.length; i++) {
 				this.argumentOrder[i] = (byte)argOrder[i];
 			}
+			this.operandConversions = null;
 		}
-		
+
+		/**
+		 * Specifies a function or method with given {@code name} that is to replace
+		 * an operator, with the operands as arguments in the order specified by
+		 * {@code argOrder}. It will automatically get highest priority.
+		 * @param name - the function name
+		 * @param argOrder - array of operand position numbers, see #argumentOrder;
+		 *     in case of {@code null} an empty array will be saved (preserving the
+		 *     original argument order).
+		 * @param aegPreparations - a String array containing possible argument-
+		 *    preprocessing expressions in order of original occurrence where "$"
+		 *    serves as operand placeholder, e.g. "abs($)" to apply the abs function
+		 *    to the respective argument before applying the function itself.
+		 * @see #Operator(String)
+		 * @see #Operator(String, int)
+		 * @see #Operator(String, int, String[])
+		 */
+		public Operator(String name, int[] argOrder, String[] argPreparations) {
+			this.symbol = name;
+			this.precedence = Byte.MAX_VALUE;
+			if (argOrder == null) {
+				this.argumentOrder = new byte[]{};
+			}
+			else {
+				this.argumentOrder = new byte[argOrder.length];
+				for (int i = 0; i < argOrder.length; i++) {
+					this.argumentOrder[i] = (byte)argOrder[i];
+				}
+			}
+			this.operandConversions = new TokenList[argPreparations.length];
+			int i = 0;
+			for (String op: argPreparations) {
+				this.operandConversions[i++] = new TokenList(op);
+			}
+		}
+
 		@Override
 		public String toString()
 		{
@@ -278,6 +347,10 @@ public class Expression {
 			if (this.argumentOrder != null) {
 				sb.append(",");
 				sb.append(Arrays.toString(this.argumentOrder));
+			}
+			if (this.operandConversions != null) {
+				sb.append(",");
+				sb.append(Arrays.toString(this.operandConversions));
 			}
 			sb.append(")");
 			return sb.toString();
@@ -736,7 +809,18 @@ public class Expression {
 					}
 					int pos = opr.argumentOrder[i] - 1;
 					if (pos < this.children.size()) {
+						TokenList preTokens = new TokenList();
+						TokenList postTokens = new TokenList();
+						if (opr.operandConversions != null && pos < opr.operandConversions.length) {
+							int posOpd = opr.operandConversions[pos].indexOf("$");
+							if (posOpd >= 0) {
+								preTokens = opr.operandConversions[pos].subSequence(0, posOpd);
+								postTokens = opr.operandConversions[pos].subSequenceToEnd(posOpd+1);
+							}
+						}
+						tokens.addAll(preTokens);
 						this.children.get(pos).appendToTokenList(tokens, alternOprs);
+						tokens.addAll(postTokens);
 					}
 				}
 			}
@@ -744,9 +828,21 @@ public class Expression {
 				// Standard processing for operators and functions
 				boolean isFirst = true;
 				final String comma =  ", ";
+				int i = 0;
 				for (Expression child: children) {
 					tokens.add(sepa);
+					TokenList preTokens = new TokenList();
+					TokenList postTokens = new TokenList();
+					if (opr != null && opr.operandConversions != null && i < opr.operandConversions.length) {
+						int posOpd = opr.operandConversions[i].indexOf("$");
+						if (posOpd >= 0) {
+							preTokens = opr.operandConversions[i].subSequence(0, posOpd);
+							postTokens = opr.operandConversions[i].subSequenceToEnd(posOpd+1);
+						}
+					}
+					tokens.addAll(preTokens);
 					child.appendToTokenList(tokens, asFunc ? 0 : myPrec, alternOprs);
+					tokens.addAll(postTokens);
 					if (asFunc) {
 						sepa = comma;
 					}

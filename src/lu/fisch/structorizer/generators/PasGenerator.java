@@ -106,6 +106,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig         2024-12-18      Issue #423: Force pointer symbols in directly recursive record definitions
  *      Kay Gürtzig         2025-02-16      Issue #800 + bugfix #1192: Handling of return statements in Instructions revised
  *      Kay Gürtzig         2025-07-03      Some missing Override annotations added
+ *      Kay Gürtzig         2025-08-16      Issue #800 generateCode(Jump, ...) provisionally adapted
  *
  ******************************************************************************************************
  *
@@ -315,38 +316,38 @@ public class PasGenerator extends Generator
 		//put("=", new Operator("=", 6));	// Does not change anything
 		put("==", new Operator("=", 6));
 		//put("<>", new Operator("<>", 6));	// Does not change anything
-		put("!=", new Operator("=", 6));
+		put("!=", new Operator("<>", 6));
 		put("<", new Operator("<", 6));
 		put(">", new Operator(">", 6));
 		put("<=", new Operator("<=", 6));
 		put(">=", new Operator(">=", 6));
-		//put("shl", new Operator("shl", 8));
-		//put("<<", new Operator("<<", 8));
-		//put("shr", new Operator("shr", 8));
-		//put(">>", new Operator(">>", 8));
-		//put(">>>", new Operator(">>>", 8));
-		//put("+", new Operator("+", 9));
-		//put("-", new Operator("-", 9));
-		//put("*", new Operator("*", 10));
-		//put("/", new Operator("/", 10));
-		//put("div", new Operator("div", 10));
-		//put("mod", new Operator("mod", 10));
+		//put("shl", new Operator("shl", 8));	// redundant
+		put("<<", new Operator("shl", 8));
+		//put("shr", new Operator("shr", 8));	// redundant
+		put(">>", new Operator("shr", 8));
+		//put(">>>", new Operator(">>>", 8));	// FIXME
+		//put("+", new Operator("+", 9));		// redundant
+		//put("-", new Operator("-", 9));		// redundant
+		//put("*", new Operator("*", 10));		// redundant
+		//put("/", new Operator("/", 10));		// redundant
+		//put("div", new Operator("div", 10));	// redundant
+		//put("mod", new Operator("mod", 10));	// redundant
 		put("%", new Operator("mod", 10));
-		//put("not", new Operator("not", 11));
+		//put("not", new Operator("not", 11));	// redundant
 		put("!", new Operator("not", 11));
 		put("+1", new Operator("+1", 11));	// sign
 		put("-1", new Operator("-1", 11));	// sign
 		put("*1", new Operator("1^", 11));	// pointer deref (C)
 		put("&1", new Operator("@1", 11));	// address (C)
-		//put("[]", new Operator("[]", 12));
-		//put(".", new Operator(".", 12));
+		//put("[]", new Operator("[]", 12));	// redundant
+		//put(".", new Operator(".", 12));		// redundant
 	}};
 	
 	@Override
 	protected HashMap<String, Operator> getOperatorMap() {
 		return pascalOperators;
 	}
-		// END KGU#790 2020-10-31
+	// END KGU#790 2020-10-31
 	
 	// START KGU#559/KGU#560 2018-07-22: Enh. #563, bugfix #564
 	private Map<String,TypeMapEntry> typeMap;
@@ -1556,9 +1557,9 @@ public class PasGenerator extends Generator
 			else
 			{
 			// END KGU#142 2016-01-17
-				String preReturn = Syntax.getKeywordOrDefault("preReturn", "return");
-				String preExit   = Syntax.getKeywordOrDefault("preExit", "exit");
-				String preThrow  = Syntax.getKeywordOrDefault("preThrow", "throw");
+				String preReturn = Syntax.key2token("preReturn");
+				String preExit   = Syntax.key2token("preExit");
+				String preThrow  = Syntax.key2token("preThrow");
 				for (int i = 0; isEmpty && i < lines.count(); i++) {
 					String line = transform(lines.get(i)).trim();
 					if (!line.isEmpty())

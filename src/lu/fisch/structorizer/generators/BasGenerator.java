@@ -794,7 +794,7 @@ public class BasGenerator extends Generator
 				//addCode(transformKeyword("LET ") + _targetVar + "(indexBase + " + el + ") = " + 
 				addCode(transformKeyword("LET ") + _targetVar + "(" + el + ") = " +
 				// END KGU1175 2025-02-06
-								transform(elements.get(el)).getString(), _indent, _disabled);
+								transform(elements.get(el)), _indent, _disabled);
 				// END KGU#277 2016-10-13
 			}
 		}

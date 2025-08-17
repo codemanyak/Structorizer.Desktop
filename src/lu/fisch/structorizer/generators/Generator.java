@@ -131,6 +131,7 @@ package lu.fisch.structorizer.generators;
  *                                      moved up to Generator in order to facilitate IF ELSE IF chains
  *      Kay Gürtzig     2025-02-06      Bugfix #1189: lvalue splitting returned wrong result with Java-style declarations
  *      Kay Gürtzig     2025-02-07      Bugfix #1190: wasDefHandled now fully recursive (not efficient but effective)
+ *      Kay Gürtzig     2025-08-15      Issue #800: mapJumps() revised, first steps to replace transform(String)
  *
  ******************************************************************************************************
  *
@@ -189,7 +190,6 @@ import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.SortedMap;
@@ -235,6 +235,7 @@ import lu.fisch.structorizer.syntax.Expression.Operator;
 import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.structorizer.syntax.Line;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.SyntaxException;
 import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.BString;
 import lu.fisch.utils.BTextfile;
@@ -1735,7 +1736,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		// Dummy implementation
 		ArrayList<TokenList> result = new ArrayList<TokenList>();
 		if (_line.getType() == Line.LineType.LT_RAW) {
-			result.add(transform(_rawLineTokens));
+			result.add(new TokenList(transform(_rawLineTokens)));
 		}
 		else {
 			for (int i = 0; i < _line.getExprCount(); i++) {
@@ -1750,8 +1751,10 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	 * Transforms the given expression {@code _expr} into an equivalent expression
 	 * TokenList for this language.
 	 * 
-	 * @param _expr - a syntax tree representing an expression in Structorizer syntax
-	 * @return the respectively transformed expression represented by a {@link TokenList}.
+	 * @param _expr - a syntax tree representing an expression in Structorizer
+	 *    syntax
+	 * @return the respectively transformed expression represented by a
+	 *    {@link TokenList}.
 	 */
 	protected TokenList transform(Expression _expr)
 	{
@@ -1777,7 +1780,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	 *      <li>"postAlt", "postCase", "postWhile", "postRepeat";</li>
 	 *      </ul></li>
 	 * <li> Tokenizes the result, processes the tokens by an overridable method
-	 *      {@link #transformTokens(StringList)}, and re-concatenates the result;</li>
+	 *      {@link #transformTokens(TokenList)}, and re-concatenates the result;</li>
 	 * <li> Transforms Input and Output lines according to regular replacement
 	 *      expressions defined
 	 *      by {@link #getInputReplacer(boolean)} and {@link #getOutputReplacer()},
@@ -1793,7 +1796,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	 * @return the transformed line (target language line)
 	 * 
 	 * @see #transform(String, boolean)
-	 * @see #transformTokens(StringList)   
+	 * @see #transformTokens(TokenList)   
 	 * @see #transformInput(String)
 	 * @see #transformOutput(String)
 	 * @see #transformType(String, String)
@@ -1813,7 +1816,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	 *      <li>"postAlt", "postCase", "postWhile", "postRepeat";</li>
 	 *      </ul></li>
 	 * <li> Tokenizes the result, processes the tokens by an overridable method
-	 *    {@link #transformTokens(StringList)}, and re-concatenates the result;</li>
+	 *    {@link #transformTokens(TokenList)}, and re-concatenates the result;</li>
 	 * <li> Transforms Input and Output lines if {@code _doInputOutput} is {@code true}.
 	 *    This is only done if {@code _input} starts with one of the configured Input
 	 *    and Output keywords.</i>
@@ -1824,13 +1827,17 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	 * @return the transformed line (target language line)
 	 * 
 	 * @see #transform(String)
-	 * @see #transformTokens(StringList)   
+	 * @see #transform(TokenList, boolean)
+	 * @see #transformTokens(TokenList)   
 	 * @see #transformInput(String)
 	 * @see #transformOutput(String)
 	 * @see #transformType(String, String)
 	 * @see #suppressTransformation
 	 * @see lu.fisch.Structorizer.elements.Element#unifyOperators(java.lang.String)
+	 * 
+	 * @deprecated use/override {@link #transform(TokenList, boolean)} instead
 	 */
+	@Deprecated
 	protected String transform(String _input, boolean _doInputOutput)
 	{
 
@@ -1844,99 +1851,192 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 		// START KGU#162 2016-03-31: Enh. #144
 		//StringList tokens = Element.transformIntermediate(_input);
 		TokenList tokens = new TokenList(_input);
-		if (this.suppressTransformation)
-		{
-			// Suppress all syntax changes, just cut out decorators.
-			// START KGU#884 2021-10-25: Issue #800
-			//Element.cutOutRedundantMarkers(tokens);
-			Syntax.removeDecorators(tokens);
-			// END KGU#884 2021-10-25
-		}
-		else
-		{
-			// convert to tokens into a common intermediate language
-			tokens = Element.transformIntermediate(tokens);
-		}
-		// END KGU#162 2016-03-31
-		
-// START KGU#1097 2024-01-22: Issue #800 Expect internal keys, nothing to replace
-//		// START KGU 2016-03-29: Unify all parser keywords
-//		/* This is somewhat redundant because most of the keywords have already been cut out
-//		 * but it's still needed for the meaningful ones.
-//		 */
-//		for (Map.Entry<String, String> keyEntry: Syntax.getPropertyMap(false).entrySet())
+		// KGU#790 2025-08-16 Issue #800 we delegate to transform(tokens, _doInputOutput) now!
+		return this.transform(tokens, _doInputOutput);
+//		if (this.suppressTransformation)
 //		{
-//			String keyword = keyEntry.getValue();
-//			String key = keyEntry.getKey();
-//			if (keyword.trim().length() > 0)
-//			{
-//				TokenList keyTokens = Syntax.getSplitKeyword(key);
-//				int keySize = keyTokens.size();
-//				int posKey = tokens.size() - keySize;
-//				while (posKey >= 0 && (posKey = tokens.lastIndexOf(keyTokens, posKey, !Syntax.ignoreCase)) >= 0)
-//				{
-//					// Replace the first token of the keyword by the entire keyword
-//					tokens.set(posKey, keyword);
-//					// Remove the remaining tokens of the split keyword
-//					tokens.remove(posKey+1, posKey + keySize);
-//					posKey -= keySize;
-//				}
-//			}
+//			// Suppress all syntax changes, just cut out decorators.
+//			// START KGU#884 2021-10-25: Issue #800
+//			//Element.cutOutRedundantMarkers(tokens);
+//			Syntax.removeDecorators(tokens);
+//			// END KGU#884 2021-10-25
 //		}
-//		// END KGU 2016-03-29
-// END KGU#1097 2024-01-22
-		// START KGU#162 2016-03-31: Enh. #144
-		//String transformed = transformTokens(tokens);
-		String transformed = "";
-		if (this.suppressTransformation) {
-			// Just re-concatenate the tokens if no conversion is wanted
-			transformed = tokens.getString();
-		}
-		else {
-			transformed = transformTokens(tokens);
-		}
-		// END KGU#162 2016-03-31
-		// END KGU#93 2015-12-21
-
-		if (_doInputOutput)
-		{
-			// START KGU 2015-12-22: Avoid unnecessary transformation attempts
-			//// input instruction transformation
-			//transformed = transformInput(transformed);
-			//// output instruction transformation
-			//transformed = transformOutput(transformed);
-			if (transformed.indexOf("§INPUT§") >= 0)
-			{
-				transformed = transformInput(transformed);
-			}
-			else if (transformed.indexOf("§OUTPUT§") >= 0)
-			{
-				transformed = transformOutput(transformed);
-			}
-			// END KGU 2015-12-22
-		}
-
-		return transformed.trim();
+//		else
+//		{
+//			// convert into a common intermediate language
+//			tokens = Element.transformIntermediate(tokens);
+//		}
+//		// END KGU#162 2016-03-31
+//		
+//// START KGU#1097 2024-01-22: Issue #800 Expect internal keys, nothing to replace
+////		// START KGU 2016-03-29: Unify all parser keywords
+////		/* This is somewhat redundant because most of the keywords have already been cut out
+////		 * but it's still needed for the meaningful ones.
+////		 */
+////		for (Map.Entry<String, String> keyEntry: Syntax.getPropertyMap(false).entrySet())
+////		{
+////			String keyword = keyEntry.getValue();
+////			String key = keyEntry.getKey();
+////			if (keyword.trim().length() > 0)
+////			{
+////				TokenList keyTokens = Syntax.getSplitKeyword(key);
+////				int keySize = keyTokens.size();
+////				int posKey = tokens.size() - keySize;
+////				while (posKey >= 0 && (posKey = tokens.lastIndexOf(keyTokens, posKey, !Syntax.ignoreCase)) >= 0)
+////				{
+////					// Replace the first token of the keyword by the entire keyword
+////					tokens.set(posKey, keyword);
+////					// Remove the remaining tokens of the split keyword
+////					tokens.remove(posKey+1, posKey + keySize);
+////					posKey -= keySize;
+////				}
+////			}
+////		}
+////		// END KGU 2016-03-29
+//// END KGU#1097 2024-01-22
+//		// START KGU#162 2016-03-31: Enh. #144
+//		//String transformed = transformTokens(tokens);
+//		String transformed = "";
+//		if (this.suppressTransformation) {
+//			// Just re-concatenate the tokens if no conversion is wanted
+//			transformed = tokens.getString();
+//		}
+//		else {
+//			transformed = transformTokens(tokens);
+//		}
+//		// END KGU#162 2016-03-31
+//		// END KGU#93 2015-12-21
+//
+//		if (_doInputOutput)
+//		{
+//			// START KGU 2015-12-22: Avoid unnecessary transformation attempts
+//			//// input instruction transformation
+//			//transformed = transformInput(transformed);
+//			//// output instruction transformation
+//			//transformed = transformOutput(transformed);
+//			if (transformed.indexOf("§INPUT§") >= 0)
+//			{
+//				transformed = transformInput(transformed);
+//			}
+//			else if (transformed.indexOf("§OUTPUT§") >= 0)
+//			{
+//				transformed = transformOutput(transformed);
+//			}
+//			// END KGU 2015-12-22
+//		}
+//
+//		return transformed.trim();
 	}
 	
 	// START KGU#790 2024-01-29: Issue #800 Consequent use of TokenLists and Expressions
-	protected TokenList transform(TokenList tokens)
+	/**
+	 * Overridable general text transformation routine, performing the following steps:<ol>
+	 * <li> Eliminates decorator keywords listed below and unifies all operators
+	 *      (see {@link lu.fisch.Structorizer.elements.Element#unifyOperators(java.lang.String)}).<ul>
+	 *      <li>"§PREALT§", "§PRECASE§", "§PREWHILE§", "§PREREPEAT§",</li>
+	 *      <li>"§POSTALT§", "§POSTCASE§", "§POSTWHILE§", "§POSTREPEAT§";</li>
+	 *      </ul></li>
+	 * <li> Processes the tokens by an overridable method
+	 *      {@link #transformTokens(TokenList)};</li>
+	 * <li> Transforms Input and Output lines according to regular replacement
+	 *      expressions defined by {@link #getInputReplacer(boolean)} and
+	 *      {@link #getOutputReplacer()}, respectively. This is done by overridable
+	 *      methods {@link #transformInput(TokenList)} and
+	 *      {@link #transformOutput(TokenList)}, respectively.
+	 *      This is only done if {@code _tokens} starts with either the "§INPUT§"
+	 *      or the "§OUTPUT§" token</li>
+	 * </ol>
+	 * <b>Note:</b> Of course steps 1 through 3 will only be done if the overriding method
+	 * calls this parent method at some suited point.
+	 * 
+	 * @param _tokens - a line or the concatenated lines of an Element's text
+	 *     as {@link TokenList}
+	 * @return the transformed line (target language line) as String
+	 * 
+	 * @see #transform(TokenList, boolean)
+	 * @see #transformTokens(TokenList)   
+	 * @see #transformInput(TokenList)
+	 * @see #transformOutput(TokenList)
+	 * @see #transformType(String, String)
+	 * @see #suppressTransformation
+	 */
+	protected String transform(TokenList _tokens)
 	{
-		return tokens;
+		return transform(_tokens, true);
 	}
 	// END KGU#790 2024-01-29
+	// START KGU#790 2025-08-15: Issue #800 Is to replace transform(String, boolean)
+	/**
+	 * Overridable general text transformation routine, performing the following steps:
+	 * <ol>
+	 * <li> Eliminates decorator keywords listed below and unifies all operators.
+	 *      (see {@link lu.fisch.Structorizer.elements.Element#unifyOperators(java.lang.String)}).<ul>
+	 *      <li>"§PREALT§", "§PRECASE§", "§PREWHILE§", "§PREREPEAT§",</li>
+	 *      <li>"§POSTALT§", "§POSTCASE§", "§POSTWHILE§", "§POSTREPEAT§";</li>
+	 *      </ul></li>
+	 * <li> tokenizes the result, processes the tokens by an overridable method
+	 *    {@link #transformTokens(TokenList)}, and re-concatenates the result;</li>
+	 * <li> transforms Input and Output lines if {@code _doInputOutput} is {@code true}.
+	 *    This is only done if {@code _tokens} starts with one of the configured Input
+	 *    and Output keywords.</i>
+	 * </ol>
+	 * 
+	 * @param _tokens - a tokenized line or the concatenated lines of an Element's
+	 *    text - <b>will be modified, i.e., transformed, here!</b>
+	 * @param _doInputOutput - whether the third transformations are to be performed
+	 * @return the transformed line (target language line) as String
+	 * 
+	 * @see #transform(String)
+	 * @see #transformTokens(TokenList)   
+	 * @see #transformInput(TokenList)
+	 * @see #transformOutput(TokenList)
+	 * @see #transformType(String, String)
+	 * @see #suppressTransformation
+	 * @see lu.fisch.Structorizer.elements.Element#unifyOperators(java.lang.String)
+	 */
+	protected String transform(TokenList _tokens, boolean _doInputOutput)
+	{
+		String transformed = "";
+		if (this.suppressTransformation)
+		{
+			// Suppress all syntax changes, just cut out decorators.
+			Syntax.removeDecorators(_tokens);
+			transformed = _tokens.getString();
+		}
+		else
+		{
+			// convert into a common intermediate language
+			_tokens = Element.transformIntermediate(_tokens);
+			transformed = transformTokens(_tokens);
+		}
+		if (_doInputOutput)
+		{
+			if (_tokens.indexOf("§INPUT§") == 0)
+			{
+				transformed = transformInput(_tokens);
+			}
+			else if (_tokens.indexOf("§OUTPUT§") == 0)
+			{
+				transformed = transformOutput(_tokens);
+			}
+			// END KGU 2015-12-22
+		}
+		return transformed;
+	}
+	// END KGU#790 2025-08-15
 	
 	// START KGU#93 2015-12-21: Bugfix #41/#68/#69
 	/**
 	 * Transforms operators and other tokens from the given intermediate
-	 * language into tokens of the target language and returns the result
-	 * as string.<br/>
-	 * <b>OVERRIDE this!</b> (Method just returns the re-concatenated tokens)
+	 * language into tokens of the target language (modifies {@code tokens})
+	 * and also returns the result concatenated to a string.<br/>
+	 * <b>OVERRIDE this!</b> (Method just returns the concatenated tokens)
 	 * This method is called by {@link #transform(String, boolean)} but may
 	 * also be used elsewhere for a specific token list.
 	 * 
-	 * @param tokens - Sequence of tokens representing the unified line (intermediate syntax)
-	 * @return transformed string
+	 * @param tokens - Sequence of tokens representing the unified line
+	 *    (intermediate syntax) - <b>will be modified!</b>
+	 * @return transformed tokens concatenated to a string
 	 * 
 	 * @see #transform(String, boolean)
 	 * @see #transformInput(String)
@@ -1964,7 +2064,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	 * 
 	 * @see #getTransformedTypes(TypeMapEntry, boolean)
 	 * @see #transform(String, boolean)
-	 * @see #transformTokens(StringList)
+	 * @see #transformTokens(TokenList)
 	 * @see #transformInput(String)
 	 * @see #transformOutput(String)
 	 * @see #suppressTransformation
@@ -2091,151 +2191,221 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	}
 	// END KGU#653 2019-02-14
 	
+//	/**
+//	 * Detects whether the given code line starts with the configured input keystring
+//	 * and if so replaces it according to the regex pattern provided by
+//	 * {@link #getInputReplacer(boolean)}.
+//	 * 
+//	 * @param _interm - a code line in intermediate syntax
+//	 * @return transformed input instruction or _interm unchanged
+//	 * 
+//	 * @see #getInputReplacer(boolean)
+//	 * @see #transformOutput(String)
+//	 * @see #transform(String, boolean)
+//	 * 
+//	 * @deprecated use {@link #transformInput(TokenList)} instead
+//	 */
+//	@Deprecated
+//	protected String transformInput(String _interm)
+//	{
+//		// START KGU#281 2016-10-15: for enh. #271 (input with prompt)
+//		//String subst = getInputReplacer();
+//		// END KGU#281 2016-10-15
+//		// Between the input keyword and the variable name there MUST be some blank...
+//// START KGU#1097 2024-01-22: Issue #800 now expect internal markers
+////		String keyword = Syntax.getKeyword("input").trim();
+////		// START KGU#399 2017-05-16: bugfix #403
+////		//if (!keyword.isEmpty() && _interm.startsWith(keyword))
+////		String gap = (!keyword.isEmpty() && Character.isJavaIdentifierPart(keyword.charAt(keyword.length()-1)) ? "[\\W]" : "");
+////		String pattern = "^" + getKeywordPattern(keyword) + "(" + gap + ".*|$)";
+////		if (!keyword.isEmpty() && _interm.matches(pattern))
+////		// END KGU#399 2017-05-16
+//		String pattern = "^§INPUT§(.*|$)";
+//// END KGU#1097 2024-01-22
+//		{
+//			// START KGU#281 2016-10-15: for enh. #271 (input with prompt)
+//			String quotes = "";
+//			// START KGU#399 2017-05-16: bugfix #403
+//			//String tail = _interm.substring(keyword.length()).trim();
+//			String tail = _interm.replaceFirst(pattern, "$1").trim();
+//			// END KGU#399 2017-05-16
+//			if (tail.startsWith("\"")) {
+//				quotes = "\"";
+//			}
+//			else if (tail.startsWith("'")) {
+//				quotes = "'";
+//			}
+//			// END KGU#281 2016-10-15
+//			// START KGU#399 2017-05-16: Bugfix #403
+//			//String matcher = Matcher.quoteReplacement(keyword);
+//			//if (Character.isJavaIdentifierPart(keyword.charAt(keyword.length()-1)))
+//			//{
+//			//	matcher = matcher + "[ ]";
+//			//}
+//			//
+//			// Start - BFI (#51 - Allow empty input instructions)
+//			//if(!_interm.matches("^" + matcher + "(.*)"))
+//			//{
+//			//	_interm += " ";
+//			//}
+//			// End - BFI (#51)
+//			// END KGU#399 2017-05-16
+//			
+//			// START KGU#281 2016-10-15: Enh. #271 (input instructions with prompt
+//			//_interm = _interm.replaceFirst("^" + matcher + "(.*)", subst);
+//			if (quotes.isEmpty()) {
+//				String subst = getInputReplacer(false);
+//				// START KGU#399 2017-05-16: bugfix #51, #403
+//				//_interm = _interm.replaceFirst("^" + matcher + "[ ]*(.*)", subst);
+//				// START KGU#653 2019-02-14: Enh. #680
+//				//_interm = _interm.replaceFirst(pattern, subst);
+//				_interm = subst.replace("$1", tail);
+//				// END KGU#653 3019-02-14
+//				// END KGU#399 2017-05-16
+//			}
+//			else {
+//				String subst = getInputReplacer(true);
+//				// START KGU#399 2017-05-16: bugfix #51, #403				
+//				//_interm = _interm.replaceFirst("^" + matcher + "\\h*("+quotes+".*"+quotes+")[, ]*(.*)", subst);
+//				// START KGU#653 2019-02-14: Enh. #680
+//				//pattern = "^" + getKeywordPattern(keyword) + "\\h*("+quotes+".*"+quotes+")[,]?\\s*(.*)";
+//				//_interm = _interm.replaceFirst(pattern, subst);
+//				pattern = "^" + "\\h*("+quotes+".*"+quotes+")[,]?\\s*(.*)";
+//				_interm = tail.replaceFirst(pattern, subst);
+//				// END KGU#653 2019-02-14
+//				// END KGU#399 2017-05-16
+//			}
+//			// END KGU#281 2016-10-15
+//		}
+//		return _interm;
+//	}
+
+	// START KGU#790 2025-08-11: Issue #800
 	/**
-	 * Detects whether the given code line starts with the configured input keystring
-	 * and if so replaces it according to the regex pattern provided by
-	 * {@link #getInputReplacer(boolean)}.
+	 * Derives a language-specific instruction sequence from the
+	 * passed-in intermediate token list of an INPUT instruction
+	 * (which is supposed to start with the §INPUT§ token) by means
+	 * of {@link #getInputReplacer(boolean)}.
 	 * 
-	 * @param _interm - a code line in intermediate syntax
-	 * @return transformed input instruction or _interm unchanged
+	 * @param _interm - an input token list in intermediate syntax
+	 * @return transformed input instruction as String
 	 * 
 	 * @see #getInputReplacer(boolean)
-	 * @see #transformOutput(String)
+	 * @see #transformOutput(TokenList)
 	 * @see #transform(String, boolean)
 	 */
-	protected String transformInput(String _interm)
+	protected String transformInput(TokenList _interm)
 	{
-		// START KGU#281 2016-10-15: for enh. #271 (input with prompt)
-		//String subst = getInputReplacer();
-		// END KGU#281 2016-10-15
-		// Between the input keyword and the variable name there MUST be some blank...
-// START KGU#1097 2024-01-22: Issue #800 now expect internal markers
-//		String keyword = Syntax.getKeyword("input").trim();
-//		// START KGU#399 2017-05-16: bugfix #403
-//		//if (!keyword.isEmpty() && _interm.startsWith(keyword))
-//		String gap = (!keyword.isEmpty() && Character.isJavaIdentifierPart(keyword.charAt(keyword.length()-1)) ? "[\\W]" : "");
-//		String pattern = "^" + getKeywordPattern(keyword) + "(" + gap + ".*|$)";
-//		if (!keyword.isEmpty() && _interm.matches(pattern))
-//		// END KGU#399 2017-05-16
-		String pattern = "^§INPUT§(.*|$)";
-// END KGU#1097 2024-01-22
-		{
-			// START KGU#281 2016-10-15: for enh. #271 (input with prompt)
-			String quotes = "";
-			// START KGU#399 2017-05-16: bugfix #403
-			//String tail = _interm.substring(keyword.length()).trim();
-			String tail = _interm.replaceFirst(pattern, "$1").trim();
-			// END KGU#399 2017-05-16
-			if (tail.startsWith("\"")) {
-				quotes = "\"";
+		String result = "";
+		String prompt = null;
+		_interm.remove(0);	// Should be the "§INPUT§" token
+		if (_interm.size() > 0) {
+			String token0 = _interm.get(0);
+			if (token0.startsWith("\"") || token0.startsWith("'")) {
+				if (_interm.size() > 1 && _interm.get(1).equals(",")) {
+					_interm.remove(1);
+				}
+				prompt = _interm.remove(0);
 			}
-			else if (tail.startsWith("'")) {
-				quotes = "'";
-			}
-			// END KGU#281 2016-10-15
-			// START KGU#399 2017-05-16: Bugfix #403
-			//String matcher = Matcher.quoteReplacement(keyword);
-			//if (Character.isJavaIdentifierPart(keyword.charAt(keyword.length()-1)))
-			//{
-			//	matcher = matcher + "[ ]";
-			//}
-			//
-			// Start - BFI (#51 - Allow empty input instructions)
-			//if(!_interm.matches("^" + matcher + "(.*)"))
-			//{
-			//	_interm += " ";
-			//}
-			// End - BFI (#51)
-			// END KGU#399 2017-05-16
-			
-			// START KGU#281 2016-10-15: Enh. #271 (input instructions with prompt
-			//_interm = _interm.replaceFirst("^" + matcher + "(.*)", subst);
-			if (quotes.isEmpty()) {
-				String subst = getInputReplacer(false);
-				// START KGU#399 2017-05-16: bugfix #51, #403
-				//_interm = _interm.replaceFirst("^" + matcher + "[ ]*(.*)", subst);
-				// START KGU#653 2019-02-14: Enh. #680
-				//_interm = _interm.replaceFirst(pattern, subst);
-				_interm = subst.replace("$1", tail);
-				// END KGU#653 3019-02-14
-				// END KGU#399 2017-05-16
-			}
-			else {
-				String subst = getInputReplacer(true);
-				// START KGU#399 2017-05-16: bugfix #51, #403				
-				//_interm = _interm.replaceFirst("^" + matcher + "\\h*("+quotes+".*"+quotes+")[, ]*(.*)", subst);
-				// START KGU#653 2019-02-14: Enh. #680
-				//pattern = "^" + getKeywordPattern(keyword) + "\\h*("+quotes+".*"+quotes+")[,]?\\s*(.*)";
-				//_interm = _interm.replaceFirst(pattern, subst);
-				pattern = "^" + "\\h*("+quotes+".*"+quotes+")[,]?\\s*(.*)";
-				_interm = tail.replaceFirst(pattern, subst);
-				// END KGU#653 2019-02-14
-				// END KGU#399 2017-05-16
-			}
-			// END KGU#281 2016-10-15
 		}
-		return _interm;
+		_interm.trim();
+		// FIXME think of an expression transformation!
+		if (prompt == null) {
+			String subst = getInputReplacer(false);
+			result = subst.replace("$1", _interm.getString());
+		}
+		else {
+			String subst = getInputReplacer(true);
+			// First replace the variables lest the prompt should interfere with an included "$2"
+			result = subst.replace("$2", _interm.getString()).replace("$1", prompt);
+		}
+		return result;
 	}
+	// END KGU#790 2025-08-11
 
+//	/**
+//	 * Detects whether the given code line starts with the configured output keystring
+//	 * and if so replaces it according to the regex pattern provided by
+//	 * {@link #getOutputReplacer()}.
+//	 * 
+//	 * @param _interm - a code line in intermediate syntax
+//	 * @return transformed output instruction, or {@code _interm} unchanged
+//	 * 
+//	 * @see #getOutputReplacer()
+//	 * @see #transformInput(String)
+//	 * @see #transform(String, boolean)
+//	 * @deprecated use {@link #transformOutput(TokenList)} instead
+//	 */
+//	@Deprecated
+//	protected String transformOutput(String _interm)
+//	{
+//		String subst = getOutputReplacer();
+//// START KGU#1097 2024-01-22: Issue #800 Expect internal keys now
+////		String keyword = Syntax.getKeyword("output").trim();
+////		// START KGU#399 2017-05-16: bugfix #403
+////		//if (!keyword.isEmpty() && _interm.startsWith(keyword))
+////		// Between the input keyword and a variable name there must be some blank unless the keyword itself ends
+////		// with a blank or some non-identifier character. On the other hand, the expression might start with an
+////		// operator symbol or a parenthesis... We try to approach this uncertainty with the gap variable.
+////		// As a result, however, a superfluous blank may remain in front of the first expression.
+////		String gap = (!keyword.isEmpty() && Character.isJavaIdentifierPart(keyword.charAt(keyword.length()-1)) ? "[\\W]" : "");
+////		// START KGU#505 2018-03-13: The substitution mechanism introduced with #403 left a leading blank in the expression
+////		//String pattern = "^" + getKeywordPattern(keyword) + "\\s*(" + gap + ".*|$)";
+////		//if (!keyword.isEmpty() && _interm.matches(pattern))
+////		Matcher matcher = Pattern.compile("^" + getKeywordPattern(keyword) + "\\s*(" + gap + ".*|$)").matcher(_interm);
+////		if (!keyword.isEmpty() && matcher.matches())
+//		Matcher matcher = Pattern.compile("^§OUTPUT§\\s*(.*|$)").matcher(_interm);
+//		if (matcher.matches())
+//			// END KGU#1097 2024-01-22
+//		// END KGU#505 2018-03-13
+//		// END KGU#399 2017-05-16
+//		{
+//			// START KGU#399 201-05-16: bugfix #51, #403
+//			//String matcher = Matcher.quoteReplacement(keyword);
+//			//if (Character.isJavaIdentifierPart(keyword.charAt(keyword.length()-1)))
+//			//{
+//			//	matcher = matcher + "[ ]";
+//			//}
+//			//
+//			// Start - BFI (#51 - Allow empty output instructions)
+//			//if(!_interm.matches("^" + matcher + "(.*)"))
+//			//{
+//			//	_interm += " ";
+//			//}
+//			// End - BFI (#51)
+//			//
+//			//_interm = _interm.replaceFirst("^" + matcher + "(.*)", subst);
+//			// START KGU#505 2018-03-13: trim the expressions before insertion
+//			//_interm = _interm.replaceFirst(pattern, subst);
+//			_interm = subst.replace("$1", matcher.group(1).trim());
+//			// END KGU#505 2018-03-13
+//			// END KGU#399 2017-05-16
+//		}
+//		return _interm;
+//	}
+//	// END KGU#18/KGU#23 2015-11-01
+	
+	// START KGU#790 2025-08-15: Issue #800
 	/**
-	 * Detects whether the given code line starts with the configured output keystring
-	 * and if so replaces it according to the regex pattern provided by
-	 * {@link #getOutputReplacer()}.
+	 * Derives a language-specific instruction sequence from the
+	 * passed-in intermediate token list of an OUTPUT instruction
+	 * (which is supposed to start with the §OUTPUT§ token) by means
+	 * of {@link #getOutputReplacer()}.
 	 * 
-	 * @param _interm - a code line in intermediate syntax
-	 * @return transformed output instruction, or {@code _interm} unchanged
+	 * @param _interm - a tokenized code line in intermediate syntax
+	 * @return transformed output instruction as String
 	 * 
 	 * @see #getOutputReplacer()
-	 * @see #transformInput(String)
-	 * @see #transform(String, boolean)
+	 * @see #transformInput(TokenList)
+	 * @see #transform(TokenList, boolean)
 	 */
-	protected String transformOutput(String _interm)
+	protected String transformOutput(TokenList _interm)
 	{
 		String subst = getOutputReplacer();
-// START KGU#1097 2024-01-22: Issue #800 Expect internal keys now
-//		String keyword = Syntax.getKeyword("output").trim();
-//		// START KGU#399 2017-05-16: bugfix #403
-//		//if (!keyword.isEmpty() && _interm.startsWith(keyword))
-//		// Between the input keyword and a variable name there must be some blank unless the keyword itself ends
-//		// with a blank or some non-identifier character. On the other hand, the expression might start with an
-//		// operator symbol or a parenthesis... We try to approach this uncertainty with the gap variable.
-//		// As a result, however, a superfluous blank may remain in front of the first expression.
-//		String gap = (!keyword.isEmpty() && Character.isJavaIdentifierPart(keyword.charAt(keyword.length()-1)) ? "[\\W]" : "");
-//		// START KGU#505 2018-03-13: The substitution mechanism introduced with #403 left a leading blank in the expression
-//		//String pattern = "^" + getKeywordPattern(keyword) + "\\s*(" + gap + ".*|$)";
-//		//if (!keyword.isEmpty() && _interm.matches(pattern))
-//		Matcher matcher = Pattern.compile("^" + getKeywordPattern(keyword) + "\\s*(" + gap + ".*|$)").matcher(_interm);
-//		if (!keyword.isEmpty() && matcher.matches())
-		Matcher matcher = Pattern.compile("^§OUTPUT§\\s*(.*|$)").matcher(_interm);
-		if (matcher.matches())
-			// END KGU#1097 2024-01-22
-		// END KGU#505 2018-03-13
-		// END KGU#399 2017-05-16
-		{
-			// START KGU#399 201-05-16: bugfix #51, #403
-			//String matcher = Matcher.quoteReplacement(keyword);
-			//if (Character.isJavaIdentifierPart(keyword.charAt(keyword.length()-1)))
-			//{
-			//	matcher = matcher + "[ ]";
-			//}
-			//
-			// Start - BFI (#51 - Allow empty output instructions)
-			//if(!_interm.matches("^" + matcher + "(.*)"))
-			//{
-			//	_interm += " ";
-			//}
-			// End - BFI (#51)
-			//
-			//_interm = _interm.replaceFirst("^" + matcher + "(.*)", subst);
-			// START KGU#505 2018-03-13: trim the expressions before insertion
-			//_interm = _interm.replaceFirst(pattern, subst);
-			_interm = subst.replace("$1", matcher.group(1).trim());
-			// END KGU#505 2018-03-13
-			// END KGU#399 2017-05-16
-		}
-		return _interm;
+		_interm.remove(0);	// Should be the "§OUTPUT§" token
+		return subst.replace("$1", _interm.getString().trim());
 	}
-	// END KGU#18/KGU#23 2015-11-01
+	// END KGU#790 2025-08-11
 	
 	// START KGU#165 2016-04-03: Support keyword case sensitivity
 	/**
@@ -2283,10 +2453,10 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	{
 		boolean surelyReturns = false;
 //		String preLeave  = CodeParser.getKeywordOrDefault("preLeave", "leave");
-		String preReturn = Syntax.getKeywordOrDefault("preReturn", "return");
+//		String preReturn = Syntax.getKeywordOrDefault("preReturn", "return");
 //		String preExit   = CodeParser.getKeywordOrDefault("preExit", "exit");
 //		String patternLeave = getKeywordPattern(preLeave) + "([\\W].*|$)";
-		String patternReturn = getKeywordPattern(preReturn) + "([\\W].*|$)";
+//		String patternReturn = getKeywordPattern(preReturn) + "([\\W].*|$)";
 //		String patternExit = getKeywordPattern(preExit) + "([\\W].*|$)";
 		Iterator<Element> iter = _squeue.getIterator();
 		while (iter.hasNext() && !surelyReturns)
@@ -2296,18 +2466,15 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 			// and label both
 			if (elem instanceof Jump && !elem.isDisabled(false))
 			{
-				// START KGU#413 2017-06-09: Enh. #416: There might be line continuation
-				//String jumpText = elem.getText().getLongString().trim();
-				String jumpText = elem.getUnbrokenText().getLongString();
-				// END KGU#413 2017-06-09
-				// START KGU#380 2017-04-14: Bugfix #394 Code revision, simplification
-				//if (jumpText.matches(patternReturn))
-				
 				Jump jump = (Jump)elem;
 				if (jump.isReturn())
 				// END KGU#380 2017-04-14
 				{
-					boolean hasResult = !jumpText.substring(preReturn.length()).trim().isEmpty();
+					// START KGU#790 2025-08-15: Issue #800 no more keywords in the texts
+					//boolean hasResult = !jumpText.substring(preReturn.length()).trim().isEmpty();
+					TokenList jumpTokens = elem.getUnbrokenTokenText().get(0);
+					boolean hasResult = jumpTokens.size() > 1;
+					// END KGU#790 2025-8-15
 					if (hasResult) this.returns = true;
 					// Further investigation would be done in vain - the remaining sequence is redundant
 					return hasResult;
@@ -2452,14 +2619,17 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 			{
 				// START KGU#413 2017-06-09: Enh. #416
 				//StringList text = elem.getText();
-				StringList text = elem.getUnbrokenText();
+				ArrayList<TokenList> tokenLines = elem.getUnbrokenTokenText();
 				// END KGU#413 2017-06-09
-				for (int i = 0; i < text.count(); i++)
+				for (int i = 0; i < tokenLines.size(); i++)
 				{
-					String line = text.get(i);
-					if (line.matches(patternReturn))
+					TokenList tokens = tokenLines.get(i);
+					if (Jump.isReturn(tokens))
 					{
-						boolean hasResult = !line.substring(preReturn.length()).trim().isEmpty();
+						// START KGU#790 2025-08-15: Issue #800
+						//boolean hasResult = !line.substring(preReturn.length()).trim().isEmpty();
+						boolean hasResult = tokens.size() > 1;
+						// END KGU#790 2025-08-15
 						if (hasResult)
 						{
 							this.returns = true;

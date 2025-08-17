@@ -104,6 +104,8 @@ import java.util.ArrayList;
  *      Kay Gürtzig         2023-11-06      Issue #800: First bugfixing after code revision towards TokenList
  *      Kay Gürtzig         2023-11-08      Bugfix #1109: Code generation for throw suppressed
  *      Kay Gürtzig         2025-07-03      Bugfix #447: Potential bug for Case elements with broken lines fixed
+ *      Kay Gürtzig         2025-08-17      Bugfix #1207: Wrong results on output instructions with expression list
+ *                                          (intermediate version --> should use transform(Expression))
  *
  ******************************************************************************************************
  *
@@ -184,6 +186,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Vector;
@@ -206,8 +209,10 @@ import lu.fisch.structorizer.elements.TypeMapEntry;
 import lu.fisch.structorizer.elements.While;
 import lu.fisch.structorizer.executor.Executor;
 import lu.fisch.structorizer.generators.Generator.TryCatchSupportLevel;
+import lu.fisch.structorizer.syntax.Expression;
 import lu.fisch.structorizer.syntax.Function;
 import lu.fisch.structorizer.syntax.Syntax;
+import lu.fisch.structorizer.syntax.SyntaxException;
 import lu.fisch.structorizer.syntax.TokenList;
 import lu.fisch.utils.StringList;
 
@@ -631,7 +636,7 @@ public class BASHGenerator extends Generator {
 		}
 		// END KGU#388 2017-10-24
 		// START KGU#161 2016-03-24: Bugfix #135/#92 - variables in read instructions must not be prefixed!
-		if (tokens.contains(Syntax.getKeyword("input")))
+		if (tokens.indexOf(Syntax.key2token("input")) == 0)
 		{
 			// Hide the text from the replacement, except for occurrences as index
 			posAsgnOpr = tokens.size();
@@ -683,17 +688,22 @@ public class BASHGenerator extends Generator {
 		{
 			// Since keywords have already been replaced by super.transform(String), this is quite fine
 			// 
-			String[] keywords = Syntax.getAllProperties();
-			boolean startsWithKeyword = false;
+			//String[] keywords = Syntax.getAllProperties();
+//			boolean startsWithKeyword = false;
 			String firstToken = tokens.get(0);
-			for (int kwi = 0; !startsWithKeyword && kwi < keywords.length; kwi++)
-			{
-				if (firstToken.equals(keywords[kwi]))
-				{
-					lval = firstToken + " ";
-					tokens.remove(0);
-					startsWithKeyword = true;
-				}
+//			for (int kwi = 0; !startsWithKeyword && kwi < keywords.length; kwi++)
+//			{
+//				if (firstToken.equals(keywords[kwi]))
+//				{
+//					lval = firstToken + " ";
+//					tokens.remove(0);
+//					startsWithKeyword = true;
+//				}
+//			}
+			boolean startsWithKeyword = tokens.isKeywordToken(0);
+			if (startsWithKeyword) {
+				lval = firstToken + " ";
+				tokens.remove(0);
 			}
 		}
 		// Trim the tokens (at front)
@@ -792,7 +802,7 @@ public class BASHGenerator extends Generator {
 				&& tokens.get(1).equals("{") && expr.endsWith("}")
 				// START KGU#559 2018-07-20: Enh. #  Try to fetch sufficient type info
 				//&& (recordIni = Element.splitRecordInitializer(expr, null)) != null) {
-				&& (recordIni = Element.splitRecordInitializer(expr, this.typeMap.get(":"+tokens.get(0)))) != null) {
+				&& (recordIni = Syntax.splitRecordInitializer(new TokenList(expr), this.typeMap.get(":"+tokens.get(0)))) != null) {
 				// END KGU#559 2018-07-20
 			// Record initializer
 			// START KGU#388 2019-11-28: Bugfix #423 - record initializations must not be separated from the declaration
@@ -867,7 +877,11 @@ public class BASHGenerator extends Generator {
 		if (!declarator.isEmpty() && Syntax.isIdentifier(varName, false, null)) {
 			wasDefHandled(root, varName, true);	// Set the handled flag
 		}
-		return declarator + lval + expr;
+		// FIXME The above code should have manipulated tokens directly!
+		String result = declarator + lval + expr;
+		tokens.clear();
+		tokens.add(result);
+		return result;
 		// END KGU#164 2016-03-29
 	}
 	// END KGU#93 2015-12-21
@@ -1087,39 +1101,80 @@ public class BASHGenerator extends Generator {
 			}
 		}
 	}
-
 	// END KGU#167 2016-03-30
 
 	// START KGU#101 2015-12-22: Enh. #54 - handling of multiple expressions
-	/* (non-Javadoc)
-	 * @see lu.fisch.structorizer.generators.Generator#transformInput(java.lang.String)
-	 */
 	@Override
-	protected String transformOutput(String _interm)
+	protected String transformOutput(TokenList _tokens)
 	{
-		String output = Syntax.getKeyword("output").trim();
-		if (_interm.matches("^" + output + "[ ](.*?)"))
-		{
-			StringList expressions = 
-					Syntax.splitExpressionList(_interm.substring(output.length()), ",");
+		// START KGU#790 2025-08-17: Experimental issue #800 adaptation
+		//StringList expressions = 
+		//		Syntax.splitExpressionList(_tokens.subSequenceToEnd(1).getString(), ",");
+		//expressions.removeBlanks();
+		//String interm = _tokens.get(0) + " " + expressions.getLongString();
+		//String transformed = super.transformOutput(interm);
+		//if (transformed.startsWith("print , "))
+		//{
+		//	transformed = transformed.replace("print , ", "print ");
+		//}
+		//return transformed;
+		StringList expressions = new StringList();	// transfered expressions
+		String dummyVar = "dummy" + Integer.toHexString(this.hashCode());
+		try {
+			LinkedList<Expression> exprs = Expression.parse(_tokens.subSequenceToEnd(1), null, (short)1);
+			for (int i = 0; i < exprs.size(); i++) {
+				TokenList exprTokens = exprs.get(i).asTokenList();
+				exprTokens.add(0, dummyVar + " <- ");
+				String expr = transform(exprTokens, false);
+				if (expr.startsWith(dummyVar+"=")) {
+					expr = expr.substring(dummyVar.length()+1);
+				}
+				expressions.add(expr.trim());
+			}
+		} catch (SyntaxException e) {
+			// Workaround for failed expression parsing
+			expressions = 
+					Syntax.splitExpressionList(_tokens.subSequenceToEnd(1).getString(), ",");
 			expressions.removeBlanks();
-			_interm = output + " " + expressions.getLongString();
+			for (int i = 0; i < expressions.count(); i++) {
+				String expr = this.transform(new TokenList(dummyVar + " <- " + expressions.get(i)), false);
+				if (expr.startsWith(dummyVar+"=")) {
+					expr = expr.substring(dummyVar.length()+1);
+				}
+				expressions.set(i, expr.trim());
+			}
 		}
-		
-		String transformed = super.transformOutput(_interm);
-		if (transformed.startsWith("print , "))
-		{
-			transformed = transformed.replace("print , ", "print ");
-		}
-		return transformed;
+		expressions.insert(Syntax.key2token("output"), 0);
+		return super.transformOutput(new TokenList(expressions.concatenate(" ")));
+		// END KGU#790 2025-08-17
 	}
 	// END KGU#101 2015-12-22
 	
+	// START KGU#790 2025-08-17: Issue #800 We need to override this for type-specific transformation
+	protected TokenList transform(Expression _expr)
+	{
+		// FIXME: This must be implemented and consequently used 
+		/*
+		 * First inferType() should be applied - which requires a TypeRegistry rather than TypeMap
+		 * Then transformation ought to depend on the structure and inferred type, e.g.
+		 * numerical and arithmetic or relational operator -> "(( ... ))" etc.
+		 * the call of super may only be sensible for some residual cases or to ensure padded
+		 * operator symbols.
+		 */
+		return super.transform(_expr);
+	}
+	// END KGU#790 2025-08-17
+	
 	// START KGU#18/KGU#23 2015-11-02: Most of the stuff became obsolete by subclassing
 	@Override
-	protected String transform(String _input)
+	// START KGU#1190 2025-08-17: Bugfix #1207 More appropriate overriding
+	//protected String transform(String _input)
+	//{
+	//	String intermed = super.transform(_input);
+	protected String transform(TokenList _tokens, boolean _doInputOutput)
 	{
-		String intermed = super.transform(_input);
+		String intermed = super.transform(_tokens, _doInputOutput);
+	// END KGU#1190 2025-08-17
 		
 		// START KGU#162 2016-03-31: Enh. #144
 		if (!this.suppressTransformation)
@@ -1135,9 +1190,14 @@ public class BASHGenerator extends Generator {
 			//String preLeave = CodeParser.keywordMap.getOrDefault("preLeave","").trim();
 			//String preReturn = CodeParser.keywordMap.getOrDefault("preReturn","").trim();
 			//String preExit = CodeParser.keywordMap.getOrDefault("preExit","").trim();
-			String preLeave = Syntax.getKeywordOrDefault("preLeave","leave").trim();
-			String preReturn = Syntax.getKeywordOrDefault("preReturn","return").trim();
-			String preExit = Syntax.getKeywordOrDefault("preExit","exit").trim();
+			// START KGU#790 2025-08-16: Issue #800 Check for internal key tokens
+			//String preLeave = Syntax.getKeywordOrDefault("preLeave","leave").trim();
+			//String preReturn = Syntax.getKeywordOrDefault("preReturn","return").trim();
+			//String preExit = Syntax.getKeywordOrDefault("preExit","exit").trim();
+			String preLeave = Syntax.key2token("preLeave");
+			String preReturn = Syntax.key2token("preReturn");
+			String preExit = Syntax.key2token("preExit");
+			// END KGU#790 2025-08-16
 			// END KGU#288 2016-11-06
 			if (intermed.matches("^" + Matcher.quoteReplacement(preLeave) + "(\\W.*|$)"))
 			{
@@ -1211,7 +1271,7 @@ public class BASHGenerator extends Generator {
 				if (inputItems != null && inputItems.count() > 2) {
 					String prompt = inputItems.get(0);
 					if (!prompt.isEmpty()) {
-						addCode(transform(Syntax.getKeyword("output") + " " + prompt), _indent, disabled);
+						addCode(transform(Syntax.key2token("output") + " " + prompt), _indent, disabled);
 					}
 					for (int j = 1; j < inputItems.count(); j++) {
 						String item = transform(inputItems.get(j) + " <-");
@@ -1243,7 +1303,14 @@ public class BASHGenerator extends Generator {
 				}
 				// END KGU#803 2020-02-16
 				// END KGU#388/KGU#772 2017-10-24/2019-11-24
-				String codeLine = transform(tokens.getString());
+				// START KGU#790/#1190 2025-08-17: Bugfix #1207: We must handle output explicitly
+				if (tokens.indexOf(Syntax.key2token("output")) == 0) {
+					String transf = this.transformOutput(tokens);
+					addCode (transf, _indent, disabled);
+					continue;
+				}
+				// END KGU#790/#1190 2025-08-17
+				String codeLine = transform(new TokenList(tokens));
 				/* FIXME KGU#803 2020-02-16: Issue #816 - we should mark local variables as local
 				 * This requires to check whether line is an assignment, that the target variable
 				 * is not a parameter or input variable (how to declare these?) and it hasn't been
@@ -1336,7 +1403,7 @@ public class BASHGenerator extends Generator {
 		//code.add(_indent+"if (( "+BString.replace(transform(_alt.getText().getText()),"\n","").trim() + " ))");
 		// START KGU#453 2017-11-02: Issue #447
 		//String condition = transform(_alt.getText().getLongString()).trim();
-		String condition = transform(_alt.getUnbrokenText().getLongString()).trim();
+		String condition = transform(TokenList.concatenate(_alt.getUnbrokenTokenText(), " "), false).trim();
 		// END KGU#453 2017-11-02
 		// START KGU#311 2017-01-05: Enh. #314: We should at least put some File API remarks
 		if (this.usesFileAPI && !disabled) {
