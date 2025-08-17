@@ -295,11 +295,14 @@ Current development version 3.32-32 (2025-08-17)
 - 29: Enh. #1198 Version hint for the special CASE editor was obsolete <2>
 - 29: Issue #1200 Ensures content assist and undo/redo in CASE editor <2>
 - 30: Bugfix #1197 It wasn't possible to save Alternatives/CASE anymore <2>
+- 31: Enh. #1198 The initial preference for the CASE editor was defective <2>
 - 31: Bugfix #1203 Analyser got out of date after Find&Replace action <2>
 - 31: Issue #1204 Caret positioning in element editor didn't work for '?'
       at line start and neither for the initial diagram name "???". <2>
 - 31: Issue #1205 Analyser constantly decried loops with fileEOF tests or
       Turtleizer position conditions as endless <2>
+- 31: Bugfix #1206: Oberon export of exit instruction wasn't implemented <2>
+- 31: Bugfix #1207: Defective bash export on multi-expression output <2>
 - 32: Issue #800 Parts of the new expression parsing mechanism established,
       new grammar-based line syntax check in Analyser. <2>
 - 32: Issue #800 Text processing now more consistently based on new class

@@ -132,6 +132,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig     2025-02-06      Bugfix #1189: lvalue splitting returned wrong result with Java-style declarations
  *      Kay Gürtzig     2025-02-07      Bugfix #1190: wasDefHandled now fully recursive (not efficient but effective)
  *      Kay Gürtzig     2025-08-15      Issue #800: mapJumps() revised, first steps to replace transform(String)
+ *      Kay Gürtzig     2025-08-17      Bugfix #1207: method unifyKeywords extracted from transform(...) to fix the bash bug
  *
  ******************************************************************************************************
  *

@@ -101,6 +101,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig         2025-02-16      Issue #800 + bugfix #1192: Handling of return statements in Instructions revised
  *      Kay Gürtzig         2025-07-03      Missing Override annotations added
  *      Kay Gürtzig         2025-08-16      Issue #800 + bugfix #1206: Proper translation of exit instructions
+ *      Kay Gürtzig             2025-08-16      Bugfix #1206: Proper translation for exit instructions implemented
  *
  ******************************************************************************************************
  *
@@ -1548,7 +1549,7 @@ public class OberonGenerator extends Generator {
 				// START KGU#1189 2025-08-16: Bugfix #1206
 				//appendComment("FIXME: Find a solution to exit the program here!", _indent);
 				//appendComment("EXITPROG " + transform(tokens.subSequenceToEnd(1).getString()).trim(), _indent);
-				addCode ("HALT(" + transform(tokens.subSequenceToEnd(1).getString()).trim() + ");",
+				addCode ("HALT(" + transform(tokens.subSequenceToEnd(1)).trim() + ");",
 						_indent, isDisabled);
 				// END KGU#1189 2025-08-16
 			}

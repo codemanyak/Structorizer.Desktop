@@ -894,7 +894,7 @@ public class BASHGenerator extends Generator {
 	 * arguments of a routine CALL, in which case array and record variables have
 	 * to be passed by name, such that "dollaring" must be undone.
 	 * @param exprTokens - the lexically split expression, may contain blanks
-	 * @param isAssigned TODO
+	 * @param isAssigned - if the expression is used as right term of an assignment
 	 * @param asArgument - if the expression is an argument for a routine CALL
 	 * @return the transformed expression
 	 */
@@ -1253,7 +1253,7 @@ public class BASHGenerator extends Generator {
 				// START KGU#277/KGU#284 2016-10-13/16: Enh. #270 + Enh. #274
 				//code.add(_indent + transform(_inst.getText().get(i)));
 				TokenList tokens = tokenLines.get(i);
-				// START KGU#653 2019-02-15: Enh. #680 - special treatment for mult-variable input instructions
+				// START KGU#653 2019-02-15: Enh. #680 - special treatment for multi-variable input instructions
 				StringList inputItems = Instruction.getInputItems(tokens);
 				// START KGU#803 2020-02-17: Issue #816 ensure local declaration where necessary
 				if (inputItems != null) {
@@ -1266,24 +1266,24 @@ public class BASHGenerator extends Generator {
 							addCode(getLocalDeclarator(false, typeMap.get(target)) + target, _indent, disabled);
 						}
 					}
+					if (inputItems.count() > 2) {
+						String prompt = inputItems.get(0);
+						if (!prompt.isEmpty()) {
+							addCode(transform(Syntax.key2token("output") + " " + prompt), _indent, disabled);
+						}
+						for (int j = 1; j < inputItems.count(); j++) {
+							String item = transform(inputItems.get(j) + " <-");
+							int posEq = item.lastIndexOf("=");
+							if (posEq > 0) {
+								item = item.substring(0, posEq);
+							}
+							inputItems.set(j, item);
+						}
+						addCode(this.getInputReplacer(false).replace("$1", inputItems.concatenate(" ", 1)), _indent, disabled);
+						continue;
+					}
 				}
 				// END KGU#803 2020-02-17
-				if (inputItems != null && inputItems.count() > 2) {
-					String prompt = inputItems.get(0);
-					if (!prompt.isEmpty()) {
-						addCode(transform(Syntax.key2token("output") + " " + prompt), _indent, disabled);
-					}
-					for (int j = 1; j < inputItems.count(); j++) {
-						String item = transform(inputItems.get(j) + " <-");
-						int posEq = item.lastIndexOf("=");
-						if (posEq > 0) {
-							item = item.substring(0, posEq);
-						}
-						inputItems.set(j, item);
-					}
-					addCode(this.getInputReplacer(false).replace("$1", inputItems.concatenate(" ", 1)), _indent, disabled);
-					continue;
-				}
 				// END KGU#653 2019-02-15
 				// START KGU#388/KGU#772 2017-10-24/2019-11-24: Enh. #423/bugfix #784 ignore type definitions and mere variable declarations
 				//if (Instruction.isTypeDefinition(line)) {
