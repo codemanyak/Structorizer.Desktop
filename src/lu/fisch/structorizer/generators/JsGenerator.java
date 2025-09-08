@@ -47,6 +47,8 @@ import java.util.ArrayList;
  *      Kay Gürtzig     2023-12-26      Bugfix #1122: getInputReplacer() was defective for promptless input.
  *      Kay Gürtzig     2023-12-27      Issue #1123: Translation of built-in function random() added.
  *      Kay Gürtzig     2025-07-03      Some missing Override annotation added
+ *      Kay Gürtzig     2025-09-04      Bugfix #1216: Translation of random() function was deficient
+ *      Kay Gürtzig     2025-09-05      Bugfix #1217: Undue copying of FileAPI.h/FileAPI.h averted
  *
  ******************************************************************************************************
  *
@@ -255,7 +257,15 @@ public class JsGenerator extends CGenerator {
 			if (exprs.size() == 2 && !exprs.get(1).isBlank() && exprs.get(1).get(0).equals(")")) {
 				tokens.remove(pos, tokens.size());
 				tokens.addAll(new TokenList("Math.floor(Math.random() * "));
-				tokens.addAll(exprs.get(0));
+				// START KGU#1198 2025-09-04: Bugfix #1216 the argument expr. may need parentheses
+				//tokens.addAll(exprs.get(0));
+				TokenList expr0Tokens = exprs.get(0);
+				if (expr0Tokens.size() > 1 && !Element.isParenthesized(expr0Tokens)) {
+					tokens.add("(");
+					expr0Tokens.add(")");
+					tokens.addAll(expr0Tokens);
+				}
+				// END KGU#1198 2025-09-04
 				tokens.addAll(exprs.get(1));
 				pos += 9;
 			}
@@ -843,5 +853,13 @@ public class JsGenerator extends CGenerator {
 //		}
 	}
 
+	// START KGU#1190 2025-09-05: Bugfix #1217 Unduly copied C recources
+	@Override
+	protected boolean copyFileAPIResources(String _filePath)
+	{
+		// FIXME: We might have to provide files on behalf of issue #1218
+		return true;
+	}
+	// END KGU#1190 2025-09-05
 	
 }

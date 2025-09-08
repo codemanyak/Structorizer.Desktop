@@ -107,6 +107,8 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig         2025-02-16      Issue #800 + bugfix #1192: Handling of return statements in Instructions revised
  *      Kay Gürtzig         2025-07-03      Some missing Override annotations added
  *      Kay Gürtzig         2025-08-16      Issue #800 generateCode(Jump, ...) provisionally adapted
+ *      Kay Gürtzig         2025-08-30      Bugfix #1210: Free-text FOR loops caused errors in suppressTransition mode,
+ *                                          bugfix #1213: Unnecessary parentheses around condition, wrong "until" indentation
  *
  ******************************************************************************************************
  *
@@ -903,7 +905,9 @@ public class PasGenerator extends Generator
 						// END KGU#311 2016-12-26
 						// START KGU#277/KGU#284 2016-10-13/16: Enh. #270 + Enh. #274
 						//code.add(_indent + transline + ";");
-						transline += ";";
+						if (!transline.endsWith(";")) {
+							transline += ";";
+						}
 						if (Instruction.isTurtleizerMove(tokens)) {
 							transline += " " + this.commentSymbolLeft() + " color = " + _inst.getHexColor() + " " + this.commentSymbolRight();
 						}
@@ -1162,9 +1166,11 @@ public class PasGenerator extends Generator
 			}
 		}
 		// END KGU#311 2016-12-26
-		if (!condition.startsWith("(") && !condition.endsWith(")")) {
-			condition = "(" + condition + ")";
-		}
+		// START KGU#1195 2025-08-30: Bugfix #1213 This was unnecessary
+		//if (!condition.startsWith("(") && !condition.endsWith(")")) {
+		//	condition = "(" + condition + ")";
+		//}
+		// END KGU#1195 2025-08-30
 		return condition;
 	}
 	// END KGU#1137 2024-04-03
@@ -1181,13 +1187,15 @@ public class PasGenerator extends Generator
 		// START KGU#453 2017-11-02: Issue #447
 		//String condition = transform(_case.getText().get(0));
 		StringList unbrokenText = _case.getUnbrokenText();
-		String condition = transform(unbrokenText.get(0));
+		String discriminator = transform(unbrokenText.get(0));
 		// END KGU#453 2017-11-02
-		if (!condition.startsWith("(") && !condition.endsWith(")")) {
-			condition = "("+condition+")";
-		}
+		// START KGU#1195 2025-08-30: Bugfix #1213 This was unnecessary
+		//if (!discriminator.startsWith("(") && !discriminator.endsWith(")")) {
+		//	discriminator = "("+discriminator+")";
+		//}
+		// END KGU#1195 2025-08-30
 
-		addCode("case "+condition+" of", _indent, isDisabled);
+		addCode("case "+discriminator+" of", _indent, isDisabled);
 
 		for (int i = 0; i < _case.qs.size()-1; i++)
 		{
@@ -1231,24 +1239,42 @@ public class PasGenerator extends Generator
 		//code.add(_indent+"for "+BString.replace(transform(_for.getText().getText()),"\n","").trim()+" do");
 		//code.add(_indent + "begin");
 		//generateCode(_for.q, _indent+this.getIndent());
-		String counter = _for.getCounterVar();
-		int step = _for.getStepConst();
-		if (Math.abs(step) == 1)
-		{
-			// We may employ a For loop
-			String incr = (step == 1) ? " to " : " downto ";
-			addCode("for " + counter + " := " + transform(_for.getStartValue(), false) +
-					incr + transform(_for.getEndValue(), false) + " do",
-					_indent, isDisabled);
+		// START KGU#1193 2025-08-30: Bugfix #1210 With suppressTransformation this may crash
+		//int step = _for.getStepConst();
+		//String counter = _for.getCounterVar();
+		int step = 1;
+		String counter = "";
+		if (_for.style == For.ForLoopStyle.COUNTER) {
+			step = _for.getStepConst();
+		// END KGU#1193 2025-08-30
+			counter = _for.getCounterVar();
+			if (Math.abs(step) == 1)
+			{
+				// We may employ a For loop
+				String incr = (step == 1) ? " to " : " downto ";
+				addCode("for " + counter + " := " + transform(_for.getStartValue(), false) +
+						incr + transform(_for.getEndValue(), false) + " do",
+						_indent, isDisabled);
+			}
+			else
+			{
+				// While loop required
+				addCode(counter + " := " + transform(_for.getStartValue(), false),
+						_indent, isDisabled);
+				addCode("while " + counter + ((step > 0) ? " <= " : " >= ") + transform(_for.getEndValue(), false) + " do",
+						_indent, isDisabled);
+			}
+		// START KGU#1193 2025-08-30: Bugfix #1210 see above
 		}
-		else
-		{
-			// While loop required
-			addCode(counter + " := " + transform(_for.getStartValue(), false),
-					_indent, isDisabled);
-			addCode("while " + counter + ((step > 0) ? " <= " : " >= ") + transform(_for.getEndValue(), false) + " do",
-					_indent, isDisabled);
+		else {
+			String text = _for.getUnbrokenText().getLongString();
+			this.appendComment("FIXME: Unrecognised loop header - requires manual translation.", _indent);
+			if (!suppressTransformation) {
+				text = transform(text);
+			}
+			addCode(text, _indent, isDisabled);
 		}
+		// END KGU#1193 2025-08-30
 		addCode("begin", _indent, isDisabled);
 		generateCode(_for.getBody(), _indent+this.getIndent());
 		if (Math.abs(step) != 1)
@@ -1441,7 +1467,9 @@ public class PasGenerator extends Generator
 
 		//String condition = BString.replace(transform(_while.getUnbrokenText().getText()),"\n","").trim();
 		String condition = transform(_while.getUnbrokenText().getLongString()).trim();
-		if (!condition.startsWith("(") && !condition.endsWith(")")) condition = "("+condition+")";
+		// START KGU#1195 2025-08-30: Bugfix #1213 This was unnecessary
+		//if (!condition.startsWith("(") && !condition.endsWith(")")) condition = "("+condition+")";
+		// END KGU#1195 2025-08-30
 
 		addCode("while " + condition + " do", _indent, isDisabled);
 		addCode("begin", _indent, isDisabled);
@@ -1467,11 +1495,16 @@ public class PasGenerator extends Generator
 
 		//String condition = BString.replace(transform(_repeat.getUnbrokenText().getText()),"\n","").trim();
 		String condition = transform(_repeat.getUnbrokenText().getLongString()).trim();
-		if(!condition.startsWith("(") && !condition.endsWith(")")) condition="("+condition+")";
+		// START KGU#1195 2025-08-30: Bugfix #1213 This was unnecessary
+		//if (!condition.startsWith("(") && !condition.endsWith(")")) condition="("+condition+")";
+		// END KGU#1195 2025-08-30
 
 		addCode("repeat", _indent, isDisabled);
-		generateCode(_repeat.getBody(),_indent+this.getIndent());
-		addCode(_indent+"until "+condition+";", _indent, isDisabled);
+		generateCode(_repeat.getBody(), _indent+this.getIndent());
+		// START KGU#1195 2025-08-30: Bugfix #1213 Wrong indentation
+		//addCode(_indent+"until "+condition+";", _indent, isDisabled);
+		addCode("until "+condition+";", _indent, isDisabled);
+		// END KGU#1195 2025-08-30
 
 		// START KGU#74 2015-11-30: The following instruction is goto target
 		if (this.jumpTable.containsKey(_repeat))
@@ -1545,6 +1578,12 @@ public class PasGenerator extends Generator
 				if (ref.intValue() < 0)
 				{
 					appendComment("FIXME: Structorizer detected this illegal jump attempt:", _indent);
+					// START KGU#1193 2025-08-30: Issue #1210 Mind suppressTransformation
+					if (suppressTransformation && !_jump.isLeave()) {
+						addCode(lines.getLongString(), _indent, isDisabled);
+						return;
+					}
+					// END KGU#1193 2025-08-30
 					appendComment(lines.getLongString(), _indent);
 					label = "__ERROR__";
 				}
@@ -1609,8 +1648,17 @@ public class PasGenerator extends Generator
 					// END KGU#686 2019-03-20
 					else if (!isEmpty)
 					{
-						appendComment("FIXME: Structorizer detected the following illegal jump attempt:", _indent);
-						appendComment(line, _indent);
+						// START KGU#1193 2025-08-30: Issue #1210 Minde suppressTransformation
+						//appendComment("FIXME: Structorizer detected the following illegal jump attempt:", _indent);
+						//appendComment(line, _indent);
+						if (suppressTransformation) {
+							addCode(line, _indent, isDisabled);
+						}
+						else {
+							appendComment("FIXME: Structorizer detected the following illegal jump attempt:", _indent);
+							appendComment(line, _indent);
+						}
+						// END KGU#1193 2025-08-30
 					}
 					// END KGU#74/KGU#78 2015-11-30
 				}
@@ -1622,7 +1670,7 @@ public class PasGenerator extends Generator
 			}
 			// END KGU#142 2016-01-17
 		}
-    }
+	}
 
 	// START KGU#47 2015-11-30: Offer at least a sequential execution (which is one legal execution order)
 	@Override

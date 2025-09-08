@@ -133,6 +133,9 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig             2025-02-05      Bugfix #1186: The initialisation part of C-Style declarations got lost
  *      Kay Gürtzig             2025-02-16      Bugfix #1192: Translation of tail return instruction keywords
  *      Kay Gürtzig             2025-08-15      Issue #800: getOperatorMap() implementation introduced
+ *      Kay Gürtzig             2025-08-25/29   Bugfix #1210: suppressTransformation mode wasn't consistently observed
+ *      Kay Gürtzig             2025-09-04      Issue #1123 slightly revised on occasion of bugfix #1216 (JsGenerator)
+ *      Kay Gürtzig             2025-09-05      Bugfix #1219: Revision of generateCode(Try, String) to avoid sticky disabling of Try elements
  *
  ******************************************************************************************************
  *
@@ -654,9 +657,13 @@ public class CGenerator extends Generator {
 			ArrayList<TokenList> exprs = Syntax.splitExpressionList(tokens.subSequence(pos+2, tokens.size()), ",");
 			if (exprs.size() == 2 && !exprs.get(1).isBlank() && exprs.get(1).get(0).equals(")")) {
 				tokens.remove(pos, tokens.size());
-				tokens.addAll(new TokenList("(rand() % ("));
-				tokens.addAll(exprs.get(0));
-				tokens.add(")");
+				tokens.addAll(new TokenList("(rand() %"));
+				TokenList expr0Tokens = exprs.get(0);
+				if (expr0Tokens.size() > 1 && !Element.isParenthesized(expr0Tokens)) {
+					tokens.add("(");
+					expr0Tokens.add(")");
+				}
+				tokens.addAll(expr0Tokens);
 				tokens.addAll(exprs.get(1));
 				pos += 5;
 			}
@@ -2019,7 +2026,7 @@ public class CGenerator extends Generator {
 					+ increment + ")";
 		}
 		else {
-			appendComment("TODO: No automatic FOR loop conversion found!", _indent);
+			appendComment("FIXME: No automatic FOR loop conversion found!", _indent);
 		}
 		appendBlockHeading(_for, header, _indent);
 		// END KGU#934 2021-02-13
@@ -2287,8 +2294,23 @@ public class CGenerator extends Generator {
 		//	condition = "(" + condition + ")";
 		//}
 		//appendBlockTail(_repeat, "while (!" + condition + ")", _indent);
-		String condition = Element.negateCondition(_repeat.getUnbrokenText().getLongString().trim());
-		appendBlockTail(_repeat, "while (" + transform(condition) + ")", _indent);
+		// START KGU#1193 2025-08-25: Issue #1210 Respect suppressTransformation
+		//String condition = Element.negateCondition(_repeat.getUnbrokenText().getLongString().trim());
+		//appendBlockTail(_repeat, "while (" + transform(condition) + ")", _indent);
+		String condition = _repeat.getUnbrokenText().getLongString().trim();
+		if (suppressTransformation) {
+			if (Element.isParenthesized(condition)) {
+				condition = "!" + condition;
+			}
+			else {
+				condition = "!(" + condition + ")";
+			}
+		}
+		else {
+			condition = transform(Element.negateCondition(condition));
+		}
+		appendBlockTail(_repeat, "while (" + condition + ")", _indent);
+		// END KGU#1193 2025-08-25
 		// END KGU#811 2020-02-21
 		// END KGU#301 2016-12-01
 	}
@@ -2433,10 +2455,18 @@ public class CGenerator extends Generator {
 				tokens = tokenLines.get(i);
 			}
 			boolean isEmpty = tokens == null || tokens.isBlank();
-			if (_jump.isReturn() || _jump.isExit())
+			
+			if (_jump.isReturn())
 			{
 				addCode("return " + transform(tokens.subSequenceToEnd(1).getString()) + ";",
 						_indent, isDisabled);
+			}
+			else if (_jump.isExit())
+			{
+				// START KGU#989 2021-10-01: Bugfix #989 missing expression translation
+				//appendExitInstr(line.substring(preExit.length()).trim(), _indent, isDisabled);
+				appendExitInstr(transform(tokens.subSequenceToEnd(1)).trim(), _indent, isDisabled);
+				// END KGU#989 2021-10-01
 			}
 			else if (_jump.isThrow() && this.getTryCatchLevel() != TryCatchSupportLevel.TC_NO_TRY)
 			{
@@ -2447,23 +2477,53 @@ public class CGenerator extends Generator {
 			{
 				Integer ref = this.jumpTable.get(_jump);
 				String label = this.labelBaseName + ref;
-				if (ref.intValue() < 0)
-				{
-					appendComment("FIXME: Structorizer detected this illegal jump attempt:", _indent);
-					appendComment("throw " + tokens.subSequenceToEnd(1).getString(), _indent);
-					label = "__ERROR__";
+				// START KGU#1193 2025-08-29: Issue #1210 Respect suppressTransformation
+				if (suppressTransformation && !_jump.isLeave()) {
+					if (!tokens.get(tokens.size()-1).equals(";")) {
+						tokens.add(";");
+					}
+					addCode(tokens.getString(), _indent, isDisabled);
 				}
-				addCode(this.getMultiLevelLeaveInstr() + " " + label + ";", _indent, isDisabled);
+				else {
+				// END KGU#1193 2025-08-29
+					if (ref.intValue() < 0)
+					{
+						appendComment("FIXME: Structorizer detected this illegal jump attempt:", _indent);
+						appendComment("throw " + tokens.subSequenceToEnd(1).getString(), _indent);
+						label = "__ERROR__";
+					}
+					addCode(this.getMultiLevelLeaveInstr() + " " + label + ";", _indent, isDisabled);
+				// START KGU#1193 2025-08-29: Issue #1210 Respect suppressTransformation
+				}
+				// END KGU#1193 2025-08-29
 			}
 			else if (_jump.isLeave())
 			{
+				// START KGU 2017-02-06: The "funny comment" was irritating and dubious itself
+				// Seems to be an ordinary one-level break without need to concoct a jump statement
+				// (Are there also strange cases - neither matched nor rejected? And how could this happen?)
+				//addCode("break;\t// FIXME: Dubious occurrence of break instruction!", _indent, isDisabled);
 				addCode("break;", _indent, isDisabled);
+				// END KGU 2017-02-06
 			}
 			else if (!isEmpty)
 			{
-				appendComment("FIXME: jump/exit instruction of unrecognised kind!", _indent);
-				appendComment(Syntax.decodeLine(tokens).getString(), _indent);
+				// START KGU#1193 2025-08-29: Issue #1210 Respect suppressTransformation
+				if (suppressTransformation) {
+					if (!tokens.get(tokens.size()-1).equals(";")) {
+						tokens.add(";");
+					}
+					addCode(tokens.getString(), _indent, isDisabled);
+				}
+				else {
+				// END KGU#1193 2025-08-29
+					appendComment("FIXME: jump/exit instruction of unrecognised kind!", _indent);
+					appendComment(tokens.getString(), _indent);
+				// START KGU#1193 2025-08-29: Issue #1210 (see above)
+				}
+				// END KGU#1193 2025-08-29
 			}
+			// END KGU#74/KGU#78 2015-11-30
 		}
 	}
 
@@ -2523,6 +2583,9 @@ public class CGenerator extends Generator {
 	{
 
 		boolean isDisabled = _try.isDisabled(false);
+		// START KGU#1201 2025-09-05: Bugfix #1219 We must restore the individual state!
+		boolean meDisabled = _try.isDisabled(true);
+		// END KGU#1201 2025-09-05
 		appendComment(_try, _indent);
 	
 		TryCatchSupportLevel trySupport = this.getTryCatchLevel();
@@ -2530,10 +2593,14 @@ public class CGenerator extends Generator {
 			this.appendComment("TODO: Find an equivalent for this non-supported try / catch block!", _indent);
 		}
 		// We will temporarily modify the disabled status depending on the language capabilities
+		// FIXME: This is not actually thread-safe! Cf. ARMGenerator
 		_try.setDisabled(isDisabled || trySupport == TryCatchSupportLevel.TC_NO_TRY);
 		try {
 			this.appendBlockHeading(_try, "try", _indent);
-			_try.setDisabled(isDisabled);
+			// START KGU#1201 2025-09-05: The recent mechanism could permanently change disabled state
+			//_try.setDisabled(isDisabled);
+			_try.setDisabled(meDisabled);
+			// END KGU#1201 2025-09-05
 
 			generateCode(_try.qTry, _indent + this.getIndent());
 
@@ -2550,7 +2617,10 @@ public class CGenerator extends Generator {
 			if (_try.qFinally.getSize() > 0) {
 				_try.setDisabled(isDisabled || trySupport != TryCatchSupportLevel.TC_TRY_CATCH_FINALLY);
 				this.appendBlockHeading(_try, "finally", _indent);
-				_try.setDisabled(isDisabled);
+				// START KGU#1201 2025-09-05: The recent mechanism could permanently change disabled state
+				//_try.setDisabled(isDisabled);
+				_try.setDisabled(meDisabled);
+				// END KGU#1201 2025-09-05
 
 				generateCode(_try.qFinally, _indent + this.getIndent());
 
@@ -2560,7 +2630,10 @@ public class CGenerator extends Generator {
 		}
 		finally {
 			// Restore the original disabled status
-			_try.setDisabled(isDisabled);
+			// START KGU#1201 2025-09-05: The recent mechanism could permanently change disabled state
+			//_try.setDisabled(isDisabled);
+			_try.setDisabled(meDisabled);
+			// END KGU#1201 2025-09-05
 		}
 	}
 

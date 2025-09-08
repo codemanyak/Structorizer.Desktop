@@ -76,6 +76,9 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig     2023-02-24      Bugfix #1074: Check for ARM INSTRUCTION syntax refined.
  *      Kay Gürtzig     2025-07-03      Bugfix #1195: All checks for disabled state extended to inherited
  *      Kay Gürtzig     2025-08-15      Issue #800 inputPattern, outputPattern and returnPattern adapted
+ *      Kay Gürtzig     2025-09-02/05   Bugfix #1210 (trouble with FOR loops and suppressTransformation),
+ *                                      bugfix #1214 (too radical code denial on condition faults),
+ *                                      bugfix #1215 (defective FOREVER and REPEAT loop exits)
  *
  ******************************************************************************************************
  *
@@ -636,7 +639,10 @@ public class ArmGenerator extends Generator {
     protected void generateCode(Instruction _inst, String _indent) {
         appendComment(_inst, _indent + getIndent());
 
-        boolean isDisabled = _inst.isDisabled(false);
+        // START KGU#1070 2025-09-05: Issue #1214 Consider temporary disabling
+        //boolean isDisabled = _inst.isDisabled(false);
+        boolean isDisabled = isDisabled(_inst);
+        // END KGU#1070 2025-09-05
         Subqueue sq = (Subqueue)_inst.parent;
         boolean isLastRoutineElement = sq.parent instanceof Root
                 && _inst == sq.getElement(sq.getSize() - 1);
@@ -681,7 +687,10 @@ public class ArmGenerator extends Generator {
         String colon = syntaxDiffs[gnuEnabled ? 0 : 1][0];
         
         // the local caching of the COUNTER variable is essential
-        boolean isDisabled = _alt.isDisabled(false);
+        // START KGU#1070 2025-09-05: Bugfix #1214 - Consider temporary disabling
+        //boolean isDisabled = _alt.isDisabled(false);
+        boolean isDisabled =  isDisabled(_alt);
+        // END KGU#1070 2025-09-05
         appendComment(_alt, _indent + getIndent());
         // START KGU#1012 2021-11-14: Issue #967 Syntax restrictions
         if (checker != null && !isDisabled) {
@@ -689,6 +698,7 @@ public class ArmGenerator extends Generator {
             if (problem != null) {
                 appendComment(problem.replace("error.syntax", "Syntax rejected")
                         .replace("error.lexical", "Unexpected symbol"), getIndent());
+                // FIXME: This should be handled similar to issue #1214
                 return;
             }
         }
@@ -708,39 +718,56 @@ public class ArmGenerator extends Generator {
         // Generate the alternative code with multiCondition
         String c = processCondition(_alt, "if", keys, true);
         if (c == null) {
-            return;
+            // START KGU#1070 2025-09-02: Issue #1214 We should at least generate the substructure (as disabled)
+            //return;
+            COUNTER++;
+            disable(_alt);
+            // END KGU#1070 2025-09-02
         }
-
-        // START KGU#968 2021-04-25: Issue #967 c might contain newlines - which compromises line mapping
-        //addCode(c, "", isDisabled);
-        String[] cSplit = c.split("\\n");
-        for (int i = 0; i < cSplit.length; i++) {
-            addCode(cSplit[i], "", isDisabled);
-        }
-        // END KGU#968 2021-04-25
-
-        if (_alt.qTrue.getSize() != 0) {
-            // If "then" block is not empty then we add the label
-            addCode("then_" + counter + colon, "", isDisabled);
-            // Generate the code in the then block
-            generateCode(_alt.qTrue, "");
-
-            if (_alt.qFalse.getSize() != 0) {
-                addCode("B end_" + counter, getIndent(), isDisabled);
+        // START KGU#1070 2025-09-02: Issue #1214 We should at least generate the substructure (as disabled)
+        else {
+        // END KGU#1070 2025-09-02
+            // START KGU#968 2021-04-25: Issue #967 c might contain newlines - which compromises line mapping
+            //addCode(c, "", isDisabled);
+            String[] cSplit = c.split("\\n");
+            for (int i = 0; i < cSplit.length; i++) {
+                addCode(cSplit[i], "", isDisabled);
             }
+            // END KGU#968 2021-04-25
+        // START KGU#1070 2025-09-02: Issue #1214 (see above)
         }
+        try {
+        // END KGU#1070 2025-09-02
 
-        // Check the empty blocks for adding the right labels and the branch instructions
-        // FIXME The branch statement should better be enclosed in a block.
-        // We don't understand
-        if (_alt.qFalse.getSize() != 0) {
-            addCode("else_" + counter + colon, "", isDisabled);
-            generateCode(_alt.qFalse, "");
+            if (_alt.qTrue.getSize() != 0) {
+                // If "then" block is not empty then we add the label
+                addCode("then_" + counter + colon, "", isDisabled);
+                // Generate the code in the then block
+                generateCode(_alt.qTrue, "");
+
+                if (_alt.qFalse.getSize() != 0) {
+                    addCode("B end_" + counter, getIndent(), isDisabled);
+                }
+            }
+
+            // Check the empty blocks for adding the right labels and the branch instructions
+            // FIXME The branch statement should better be enclosed in a block.
+            // We don't understand
+            if (_alt.qFalse.getSize() != 0) {
+                addCode("else_" + counter + colon, "", isDisabled);
+                generateCode(_alt.qFalse, "");
+            }
+            // Adding the end labels at the end of the code
+            addCode("end_" + counter + colon, "", isDisabled);
+            // Remove the empty labels that were added (we could do it better)
+            unifyFlow();
+        // START KGU#1070 2025-09-02: Issue #1214 (see above)
         }
-        // Adding the end labels at the end of the code
-        addCode("end_" + counter + colon, "", isDisabled);
-        // Remove the empty labels that were added (we could do it better)
-        unifyFlow();
+        finally {
+            // Restore original state
+            reenable(_alt);
+        }
+        // END KGU#1070 2025-09-02
     }
 
     @Override
@@ -749,7 +776,10 @@ public class ArmGenerator extends Generator {
 
         String colon = syntaxDiffs[gnuEnabled ? 0 : 1][0];
 
-        boolean isDisabled = _case.isDisabled(false);
+        // START KGU#1070 2025-09-05: Issue #1214 Consider temporary disabling
+        //boolean isDisabled = _case.isDisabled(false);
+        boolean isDisabled = isDisabled(_case);
+        // END KGU#1070 2025-09-05
 
         // Extract the text in the block
         StringList lines = _case.getUnbrokenText();
@@ -760,6 +790,7 @@ public class ArmGenerator extends Generator {
                 if (problem != null) {
                     appendComment(problem.replace("error.syntax", "Syntax rejected")
                             .replace("error.lexical", "Unexpected symbol"), getIndent());
+                    // FIXME This should be handled similar to issue #1214
                     return;
                 }
             }
@@ -822,11 +853,25 @@ public class ArmGenerator extends Generator {
         for (int i = 0; i < _case.qs.size() - 1; i++) {
             count = "" + counter + "_" + i + "";
             // Here we go
-            addCode("block_" + count + ":" + getIndent(), "", isDisabled);
+            addCode("block_" + count + colon + getIndent(), "", isDisabled);
             // And then we generate the code in the block
-            generateCode(_case.qs.get(i), "");
-
-            addCode("B end_" + counter, getIndent(), isDisabled);
+            Subqueue branch = _case.qs.get(i);
+            generateCode(branch, "");
+            // START KGU#1196 2025-09-02: Issue #1215 On this occasion we avoid unnecessary jumps
+            //addCode("B end_" + counter, getIndent(), isDisabled);
+            Element lastEl = null;
+            for (int j = branch.getSize() - 1; lastEl == null && j >= 0; j--) {
+                if ((lastEl = branch.getElement(j)).isDisabled(true)) {
+                    lastEl = null;
+                }
+            }
+            // We will not check if in case of a forking last element all branches exit etc.
+            Integer label = null;
+            if (lastEl == null || !(lastEl instanceof Jump)
+                    || (label = this.jumpTable.get(lastEl)) != null && label == -1) {
+                addCode("B end_" + counter, getIndent(), isDisabled);
+            }
+            // END KGU#1196 2025-09-02
 
         }
 
@@ -849,7 +894,10 @@ public class ArmGenerator extends Generator {
 
         // START KGU 2021-04-14 Argument was wrong
         //boolean isDisabled = _for.isDisabled(true);
-        boolean isDisabled = _for.isDisabled(false);
+        // START KGU#1070 2025-09-05: Issue #1214 Consider temporary disabling
+        //boolean isDisabled = _for.isDisabled(false);
+        boolean isDisabled = isDisabled(_for);
+        // END KGU#1070 2025-09-05
         // END KGU 2021-04-14
 
         // START KGU#1012 2021-11-14: Issue #967 Syntax restrictions
@@ -858,6 +906,7 @@ public class ArmGenerator extends Generator {
             if (problem != null) {
                 appendComment(problem.replace("error.syntax", "Syntax rejected")
                         .replace("error.lexical", "Unexpected symbol"), getIndent());
+                // FIXME: This should be handled similar to issue #1214
                 return;
             }
         }
@@ -941,7 +990,11 @@ public class ArmGenerator extends Generator {
             }
             stepValueStr = "#1";	// We assume word as element type...
             // END KGU#1001 2021-10-28
-        } else {
+        }
+        // START KGU#1193 2025-09-02: Bugfix #1210: suppressTransformation caused errors here
+        //else {
+        else if (_for.style == For.ForLoopStyle.COUNTER) {
+        // END KGU#1193 2025-09-02
             // START KGU#1001 2021-10-28: Bugfix #1005 We don't cope with complex expressions
             //String startValueStr = _for.getStartValue();
             //String endValueStr = _for.getEndValue();
@@ -985,6 +1038,12 @@ public class ArmGenerator extends Generator {
             stepValueStr = "#" + stepValueStr;
 
         }
+        // START KGU#1193 2025-09-02: Bugfix #1210: suppressTransformation caused errors
+        else {
+            appendComment("FIXME: No automatic conversion for loop header available:", getIndent());
+            appendComment(_for.getUnbrokenText().getLongString(), getIndent());
+        }
+        // END KGU#1193 2025-09-02
         //Write the code for the For
         // START KGU#1001 2021-10-28: Bugix #1005 We don't cope with complex expressions
         if (startValueComplex) {
@@ -1002,12 +1061,11 @@ public class ArmGenerator extends Generator {
         // START KGU#1001 2021-10-28: Bugfix #1005 Wrong loop test
         //addCode("BGE end_" + counter, getIndent(), isDisabled);
         addCode(test + " end_" + counter, getIndent(), isDisabled);
-        
+
         if (access != null) {
             this.generateArrayExpr(access, isDisabled);
         }
         // END KGU#1001 2021-10-28
-        
         // Generate the code into the block
         generateCode(_for.getBody(), "");
         addCode(op + " " + counterStr + ", " + counterStr + ", " + stepValueStr,
@@ -1062,7 +1120,10 @@ public class ArmGenerator extends Generator {
     protected void generateCode(While _while, String _indent) {
         String colon = syntaxDiffs[gnuEnabled ? 0 : 1][0];
 
-        boolean isDisabled = _while.isDisabled(false);
+        // START KGU#1070 2025-09-05: Issue #1214 Consider temporary disabling
+        //boolean isDisabled = _while.isDisabled(false);
+        boolean isDisabled = isDisabled(_while);
+        // END KGU#1070 2025-09-05
         appendComment(_while, _indent + getIndent());
         // START KGU#1012 2021-11-14: Issue #967 Syntax restrictions
         if (checker != null && !isDisabled) {
@@ -1070,6 +1131,7 @@ public class ArmGenerator extends Generator {
             if (problem != null) {
                 appendComment(problem.replace("error.syntax", "Syntax rejected")
                         .replace("error.lexical", "Unexpected symbol"), getIndent());
+                // FIXME: This should be handled similar to issue #1214
                 return;
             }
         }
@@ -1079,9 +1141,11 @@ public class ArmGenerator extends Generator {
         String[] keys = {"end", "code"};
 
         String c = processCondition(_while, "while", keys, true);
-        if (c == null) {
-            return;
-        }
+        // START KGU#1070 2025-09-02: Issue #1214 Export the substructure in disabled state
+        //if (c == null) {
+        //    return;
+        //}
+        // END KGU#1070 2025-0902
 
         // Add the label
         addCode("while_" + counter + colon, "", isDisabled);
@@ -1089,37 +1153,63 @@ public class ArmGenerator extends Generator {
         // Add the code
         // START KGU#968 2021-04-25: Issue #967 c might contain newlines - which compromises line mapping
         //addCode(c, "", isDisabled);
-        String[] cSplit = c.split("\\n");
-        for (int i = 0; i < cSplit.length; i++) {
-            addCode(cSplit[i], "", isDisabled);
+        // START KGU#1070 2025-09-02: Issue #1214 
+        if (c == null) {
+            // Comment about inappropriate condition was already given
+            COUNTER++;
+            disable(_while);
         }
+        else {
+        // END KGU#1070 2025-09-02
+            String[] cSplit = c.split("\\n");
+            for (int i = 0; i < cSplit.length; i++) {
+                addCode(cSplit[i], "", isDisabled);
+            }
+        // START KGU#1070 2025-09-02: Issue #1214 (see above)
+        }
+        try {
+        // END KGU1070 2025-09-21
         // END KGU#968 2021-04-25
-        // START KGU#968 2021-05-02: Map the jumpTable entry to the end label
-        Integer labelRef = jumpTable.get(_while);
-        if (labelRef != null && labelRef >= 0) {
-            this.breakLabels[labelRef] = "end_" + counter;
+            // START KGU#968 2021-05-02: Map the jumpTable entry to the end label
+            Integer labelRef = jumpTable.get(_while);
+            if (labelRef != null && labelRef >= 0) {
+                this.breakLabels[labelRef] = "end_" + counter;
+            }
+            // END KGU#968 2021-05-02
+            // Generate the code into the block
+            generateCode(_while.getBody(), _indent);
+            // Add the label and the branch instruction
+            // START KGU#1070 2025-09-05: Issue #1214 Disable this if _while is defective
+            //addCode("B while_" + counter, getIndent(), isDisabled);
+            addCode("B while_" + counter, getIndent(), isDisabled || c == null);
+            // END KGU#1070 2025-09-05
+            addCode("end_" + counter + colon, "", isDisabled);
+        // START KGU#1070 2025-09-02: Issue #1214 (see above)
         }
-        // END KGU#968 2021-05-02
-        // Generate the code into the block
-        generateCode(_while.getBody(), _indent);
-        // Add the label and the branch instruction
-        addCode("B while_" + counter, getIndent(), isDisabled);
-        addCode("end_" + counter + colon, "", isDisabled);
+        finally {
+            // Restore original state
+            reenable(_while);
+        }
+        // END KGU1070 2025-09-21
     }
 
     @Override
     protected void generateCode(Repeat _repeat, String _indent) {
         String colon = syntaxDiffs[gnuEnabled ? 0 : 1][0];
 
-        boolean isDisabled = _repeat.isDisabled(false);
+        // START KGU#1070 2025-09-05: Issue #1214 Consider temporary disabling
+        //boolean isDisabled = _repeat.isDisabled(false);
+        boolean isDisabled = isDisabled(_repeat);
+        // END KGU#1070 2025-09-05
 
-        appendComment(_repeat, _indent + getIndent());
+        appendComment(_repeat, getIndent());
         // START KGU#1012 2021-11-14: Issue #967 Syntax restrictions
         if (checker != null && !isDisabled) {
             String problem = checker.checkSyntax(_repeat.getUnbrokenText().get(0), _repeat, 0);
             if (problem != null) {
                 appendComment(problem.replace("error.syntax", "Syntax rejected")
                         .replace("error.lexical", "Unexpected symbol"), getIndent());
+                // FIXME: We ought yet to generate the body as disabled code
                 return;
             }
         }
@@ -1130,9 +1220,13 @@ public class ArmGenerator extends Generator {
         String[] keys = {"do", "continue"};
         // START KGU#968 2021-05-02: Map the jumpTable entry to the end label (and add one for breaks)
         Integer labelRef = jumpTable.get(_repeat);
+        String endLabel = null;
         if (labelRef != null && labelRef >= 0) {
-            addCode("end_" + counter + colon, "", isDisabled);
-            this.breakLabels[labelRef] = "end_" + counter;
+            endLabel = "end_" + counter;
+            // START KGU#1196 2025-09-02: Bugfix #1215: We must place this label at the end
+            //addCode(endLabel + colon, "", isDisabled);
+            // END KGU#1196 2025-09-02
+            this.breakLabels[labelRef] = endLabel;
         }
         // END KGU#968 2021-05-02
 
@@ -1141,31 +1235,72 @@ public class ArmGenerator extends Generator {
         String c = processCondition(_repeat, "until", keys, true);
         // END KGU#1005 2021-10-31
         if (c == null) {
-            return;
+            // START KGU#1070 2025-09-02: Issue #1214 Export the substructure in disabled state
+            //return;
+            COUNTER++;
+            // Export the substructure in disabled state
+            disable(_repeat);
+            // END KGU#1070 2025-09-02
         }
+        // START KGU#1070 2025-09-02: Issue #1214 (see above)
+        try {
+        // END KGU1070 2025-09-02
 
-        addCode("do_" + counter + colon, "", isDisabled);
+            addCode("do_" + counter + colon, "", isDisabled);
 
-        generateCode(_repeat.getBody(), "");
+            generateCode(_repeat.getBody(), "");
 
-        // START KGU#968 2021-04-25: Issue #967 c might contain newlines - which compromises line mapping
-        //addCode(c, "", isDisabled);
-        String[] cSplit = c.split("\\n");
-        for (int i = 0; i < cSplit.length; i++) {
-            addCode(cSplit[i], "", isDisabled);
+            // START KGU#968 2021-04-25: Issue #967 c might contain newlines - which compromises line mapping
+            //addCode(c, "", isDisabled);
+            // START KGU#1070 2025-09-02: Issue #1214 Only a transformed condition can be written
+            if (c == null) {
+                appendComment("until " + _repeat.getUnbrokenText().getLongString().trim(), getIndent());
+            }
+            else {
+            // END KGU#1070 2025-09-02: Issue #1214 (see above)
+                String[] cSplit = c.split("\\n");
+                for (int i = 0; i < cSplit.length; i++) {
+                    addCode(cSplit[i], "", isDisabled);
+                }
+            // START KGU#1070 2025-09-02: Issue #1214 Only a transformed condition can be written
+            }
+            // END KGU#1070 2025-09-02: Issue #1214 (see above)
+            // END KGU#968 2021-04-25
+            // START KGU#1196 2025-09-02: Bugfix #1215: We must place this label after the end
+            if (endLabel != null) {
+                addCode(endLabel + colon, "", isDisabled);
+            }
+            // END KGU#1196 2025-09-02
+        // START KGU#1070 2025-09-02: Issue #1214 Only a transformed condition can be written
         }
-        // END KGU#968 2021-04-25
+        finally {
+            // Restore original state
+            reenable(_repeat);
+        }
+        // END KGU#1070 2025-09-02
     }
 
     @Override
     protected void generateCode(Forever _forever, String _indent) {
         String colon = syntaxDiffs[gnuEnabled? 0 : 1][0];
 
-        boolean isDisabled = _forever.isDisabled(false);
-        appendComment(_forever, _indent + getIndent());
+        // START KGU#1070 2025-09-05: Issue #1214 Consider temporary disabling
+        //boolean isDisabled = _forever.isDisabled(false);
+        boolean isDisabled = isDisabled(_forever);
+        // END KGU#1070 2025-09-05
+        appendComment(_forever, getIndent());
 
         int counter = COUNTER;
         COUNTER++;
+
+        // START KGU#968/KGU#1196 2025-09-02: Bugfix #1215 Map the jumpTable entry here
+        String endLabel = null;
+        Integer labelRef = jumpTable.get(_forever);
+        if (labelRef != null && labelRef >= 0) {
+            endLabel = "end_" + counter;
+            this.breakLabels[labelRef] = endLabel;
+        }
+        // END KGU#1196 2025-09-02
 
         // Create While True Block
         addCode("whileTrue_" + counter + colon, "", isDisabled);
@@ -1176,19 +1311,27 @@ public class ArmGenerator extends Generator {
 
         addSepaLine();
         // START KGU#968 2021-05-02: Map the jumpTable entry to the end label (and add one for breaks)
-        Integer labelRef = jumpTable.get(_forever);
-        if (labelRef != null && labelRef >= 0) {
-            addCode("end_" + counter + colon, "", isDisabled);
-            this.breakLabels[labelRef] = "end_" + counter;
+        // START KGU#1196 2025-09-02: Bugfix #1215 Part of this has to be done before the body
+        //Integer labelRef = jumpTable.get(_forever);
+        //if (labelRef != null && labelRef >= 0) {
+        //    addCode("end_" + counter + colon, "", isDisabled);
+        //    this.breakLabels[labelRef] = "end_" + counter;
+        //}
+        if (endLabel != null) {
+            addCode(endLabel + colon, "", isDisabled);
         }
+        // END KGU#1196 2025-09-02
         // END KGU#968 2021-05-02
     }
 
     @Override
     protected void generateCode(Call _call, String _indent) {
         if (!appendAsComment(_call, _indent)) {
-            boolean isDisabled = _call.isDisabled(true);
-            appendComment(_call, _indent + getIndent());
+            // START KGU#1070 2025-09-05: Issue #1214 Wrong argument; consider temporary disabling
+            //boolean isDisabled = _call.isDisabled(true);
+            boolean isDisabled = isDisabled(_call);
+            // END KGU#1070 2025-09-05
+            appendComment(_call, getIndent());
             StringList lines = _call.getUnbrokenText();
             // START KGU#1012 2021-11-14: Issue #967 Syntax restrictions
             if (checker != null && !isDisabled) {
@@ -1300,7 +1443,10 @@ public class ArmGenerator extends Generator {
     protected void generateCode(Jump _jump, String _indent) {
         String colon = syntaxDiffs[gnuEnabled? 0 : 1][0];
         if (!appendAsComment(_jump, _indent)) {
-            boolean isDisabled = _jump.isDisabled(false);
+            // START KGU#1070 2025-09-05: Issue #1214 Consider temporary disabling
+            //boolean isDisabled = _jump.isDisabled(false);
+            boolean isDisabled = isDisabled(_jump);
+            // END KGU#1070 2025-09-05
             appendComment(_jump, _indent);
             boolean isEmpty = true;
 
@@ -1313,8 +1459,8 @@ public class ArmGenerator extends Generator {
                 if (ref.intValue() >= 0) {
                     label = breakLabels[ref];
                 } else {
-                    appendComment("FIXME: Structorizer detected this illegal jump attempt:", _indent);
-                    appendComment(lines.getLongString(), _indent);
+                    appendComment("FIXME: Structorizer detected this illegal jump attempt:", getIndent());
+                    appendComment(lines.getLongString(), getIndent());
                 }
                 addCode("B " + label + colon, getIndent(), isDisabled);
             }
@@ -1379,18 +1525,18 @@ public class ArmGenerator extends Generator {
                     }
                     else if (Jump.isThrow(line)) {
                         appendComment("================= NOT SUPPORTED, FIND AN EQUIVALENT =================", "");
-                        appendComment(_jump.getUnbrokenText().getText(), _indent);
+                        appendComment(_jump.getUnbrokenText().getText(), getIndent());
                     }
                     else if (!isEmpty)
                     {
-                        appendComment("FIXME: Structorizer detected the following illegal jump attempt:", _indent);
-                        appendComment(line, _indent);
+                        appendComment("FIXME: Structorizer detected the following illegal jump attempt:", getIndent());
+                        appendComment(line, getIndent());
                     }
                     // END KGU#74/KGU#78 2015-11-30
                 }
                 if (isEmpty) {
                     appendComment("FIXME: An empty jump was found here! Cannot be translated to " +
-                            this.getFileDescription(), _indent);
+                            this.getFileDescription(), getIndent());
                 }
 
             }
@@ -1406,7 +1552,10 @@ public class ArmGenerator extends Generator {
      * @param _valueExpr - the expression to compute the return value
      */
     private void generateCodeReturn(Instruction _jump, String _valueExpr) {
-        boolean isDisabled = _jump.isDisabled(false);
+        // START KGU#1070 2025-09-05: Issue #1214 Consider temporary disabling
+        //boolean isDisabled = _jump.isDisabled(false);
+        boolean isDisabled = isDisabled(_jump);
+        // END KGU#1070 2025-09-05
         if (!_valueExpr.isEmpty())
         {
             // FIXME The expression will have to be compiled!
@@ -1457,7 +1606,10 @@ public class ArmGenerator extends Generator {
      */
     @Override
     protected void generateCode(Try _try, String _indent) {
-        boolean isDisabled = _try.isDisabled(false);
+        // START KGU#1070 2025-09-05: Issue #1214 Consider temporary disabling
+        //boolean isDisabled = _try.isDisabled(false);
+        boolean isDisabled = isDisabled(_try);
+        // END KGU#1070 2025-09-05
         appendComment(_try, getIndent());
         addCode("LDMFD sp!,{R0-R12,pc}^", getIndent(), isDisabled);
         generateCode(_try.qTry, _indent);

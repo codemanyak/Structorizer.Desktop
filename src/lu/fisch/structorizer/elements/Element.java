@@ -148,6 +148,7 @@ package lu.fisch.structorizer.elements;
  *      Kay Gürtzig     2025-08-01      Enh. #1197: Support/precaution for IFork branch colouring,
  *                                      Enh. #1198: Case editor choice option changed from boolean to enum
  *      Kay Gürtzig     2025-08-13      Enh. #1198: Defective initial preference for useInputBoxCase mended
+ *      Kay Gürtzig     2025-09-06      Issue #1221: Comment lines should neither be trimmed nor skipped
  *
  ******************************************************************************************************
  *
@@ -324,7 +325,7 @@ public abstract class Element {
 	public static final long E_HELP_FILE_SIZE = 12300000;
 	public static final String E_DOWNLOAD_PAGE = "https://www.fisch.lu/Php/download.php";
 	// END KGU#791 2020-01-20
-	public static final String E_VERSION = "3.32-31";
+	public static final String E_VERSION = "3.32-34";
 	public static final String E_THANKS =
 	"Developed and maintained by\n"+
 	" - Robert Fisch <robert.fisch@education.lu>\n"+
@@ -4515,19 +4516,30 @@ public abstract class Element {
 		Font backupFont = _canvas.getFont();
 		_canvas.setFont(smallFont);
 		_canvas.setColor(Color.DARK_GRAY);
-		int nLines = this.getComment().count();
+		StringList lines = this.getComment();
+		int nLines = lines.count();
+		// START KGU#1203 2025-09-06: Issue #1221: A trailing empty line should be suppressed.
+		if (nLines > 0 && lines.get(nLines-1).isBlank()) {
+			nLines--;
+		}
+		// END KGU#1203 2025-09-06
 		for (int i = 0; i < nLines; i++)
 		{
-			String line = this.getComment().get(i).trim();
-			if (!line.isEmpty())
+			// START KGU#1203 2025-09-06: Issue #1221 Lines should neither be trimmed nor skipped.
+			//String line = this.getComment().get(i).trim();
+			//if (!line.isEmpty())
+			//{
+			String line = lines.get(i);
+			// END KGU#1203 2025-09-06
+			height += fontHeight;
+			width = Math.max(width, _canvas.stringWidth(line));
+			if (_actuallyDraw)
 			{
-				height += fontHeight;
-				width = Math.max(width, _canvas.stringWidth(line));
-				if (_actuallyDraw)
-				{
-					_canvas.writeOut(_x, _y + height + extraHeight, line);
-				}
+				_canvas.writeOut(_x, _y + height + extraHeight, line);
 			}
+			// START KGU#1203 2025-09-06: Issue #1221 (see above)
+			//}
+			// END KGU#1203 2025-09-06
 		}
 		
 		_canvas.setFont(backupFont);
@@ -5017,13 +5029,18 @@ public abstract class Element {
 
 	// START KGU#301 2016-12-01: Bugfix #301
 	/**
-	 * Helper method to detect exactly whether the given {@code expression} is enclosed in parentheses.
-	 * Simply check whether it starts with "(" and ends with ")" is NOT sufficient because the expression
-	 * might look like this: {@code (4 + 8) * sqrt(3.5)}, which starts and ends with parentheses without
-	 * being parenthesized.
+	 * Helper method to detect exactly whether the given {@code expression} is
+	 * enclosed in parentheses.<br/>
+	 * Simply to check whether it starts with "(" and ends with ")" is <b>not</b>
+	 * sufficient because the expression might e.g. look like this:
+	 * {@code (4 + 8) * sqrt(3.5)},
+	 * which starts and ends with parentheses without being parenthesized.
+	 * 
 	 * @param expression - the expression to be analysed as string
-	 * @return true if the expression is properly parenthesized. (Which is to be ensured e.g for conditions
-	 * in C and derived languages.
+	 * @return {@code true} if the expression is properly parenthesized. (Which
+	 *    is to be ensured e.g. for conditions in C and derived languages.)
+	 * 
+	 * @see #isParenthesized(StringList)
 	 */
 	public static boolean isParenthesized(String expression)
 	{
@@ -5038,25 +5055,37 @@ public abstract class Element {
 	
 	// START KGU#301 2017-09-19: Issue #302: Method isParenthesized(String expression) decomposed
 	/**
-	 * Helper method to detect exactly whether expression represented by the given {@code tokens} is enclosed
-	 * in parentheses.<br>
-	 * Simply to check whether it starts with "(" and ends with ")" is NOT sufficient because the expression
-	 * might look like this: {@code (4 + 8) * sqrt(3.5)}, which starts and ends with parentheses without
-	 * being parenthesized.
+	 * Helper method to detect exactly whether expression represented by the
+	 * given {@code tokens} is enclosed in parentheses.<br/>
+	 * Simply to check whether it starts with "(" and ends with ")" is <b>not</b>
+	 * sufficient because the expression might e.g. look like this:
+	 * {@code (4 + 8) * sqrt(3.5)},
+	 * which starts and ends with parentheses without being parenthesized.
+	 * 
 	 * @param tokens - the tokenised expression to be analysed as StringList
-	 * @return true if the expression is properly parenthesized. (Which is to be ensured e.g for conditions
-	 * in C and derived languages.
+	 * @return {@code true} if the expression is properly parenthesized. (Which
+	 *    is to be ensured e.g. for conditions in C and derived languages.)
 	 */
 	public static boolean isParenthesized(TokenList tokens)
 	{
-		return tokens.size() > 1 && tokens.get(0).equals("(") && tokens.get(tokens.size()-1).equals(")")
+		return tokens.size() > 1 && tokens.get(0).equals("(")
+				&& tokens.get(tokens.size()-1).equals(")")
 				&& isParenthesized0(tokens);
 	}
 	
-	// Internal check for both public isParenthesized() methods
+	/**
+	 * Internal check for both public isParenthesized() methods. Check
+	 * the interior of {@code tokens}, i.e., the sequence of the second
+	 * through the pen-ultimate token against unbalanced parentheses.
+	 * 
+	 * @param tokens - a tokenized expression to be checked
+	 * @return {@code true} if the interior of the expression is contiguous
+	 *    w.r.t. parentheses
+	 */
 	private static boolean isParenthesized0(TokenList tokens) {
 		boolean isEnclosed;
 		int level = 0;
+		// The loop is left as soon as there is a level underflow
 		for (int i = 1; level >= 0 && i < tokens.size()-1; i++) {
 			String token = tokens.get(i);
 			if (token.equals("(")) {

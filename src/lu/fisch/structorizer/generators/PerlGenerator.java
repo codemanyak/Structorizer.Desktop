@@ -93,6 +93,8 @@ import java.util.ArrayList;
  *      Kay Gürtzig         2024-04-02  Bugfix #1156: Proper handling of constant definitions (new export option)
  *      Kay Gürtzig         2025-02-16  Bugfix #1192: Return statements in Instruction elements weren't transformed
  *      Kay Gürtzig         2025-07-03  Some missing Override annotations added
+ *      Kay Gürtzig         2025-08-28  Bugfix #1210: suppressTransformation wasn't consistently considered
+ *      Kay Gürtzig         2025-09-02  Issue #1215: Coding of loop exits (leave) revised (goto eliminated)
  *
  ******************************************************************************************************
  *
@@ -487,6 +489,7 @@ public class PerlGenerator extends Generator {
 		if (!this.suppressTransformation)
 		{
 		// END KGU#162 2016-04-01
+			// FIXME: Isn't this done by super, anyway?
 			_input = Syntax.unifyOperators(_input);
 		// START KGU#162 2016-04-01: Enh. #144 - hands off in "no conversion" mode
 		}
@@ -533,14 +536,33 @@ public class PerlGenerator extends Generator {
 	// END KGU#108 2015-12-22
 	
 	// START KGU#78 2015-12-17: Enh. #23 (jump translation)
-	// Places a label with empty instruction into the code if elem is an exited loop
-	protected void appendLabel(Element elem, String _indent)
+	// START KGU#1196 2025-09-02: Issue #1215 Better strategy to export leave'
+	///** Places a label with empty instruction into the code if elem is an exited loop */
+	//protected void appendLabel(Element elem, String _indent)
+	//{
+	//	if (elem instanceof Loop && this.jumpTable.containsKey(elem)) {
+	//		addCode(this.labelBaseName + this.jumpTable.get(elem) + ": ;",
+	//				_indent, elem.isDisabled(false));
+	//	}
+	//}
+	/**
+	 * Checks whether this given {@link Loop} element {@code _loop} is
+	 * prematurely exited by some "leave" element and if so provides
+	 * a generic loop label to be inserted before the loop keyword,
+	 * otherwise the result willbe empty.
+	 * 
+	 * @param _loop - a {@link Loop element}
+	 * @return either a label (with colon an blank) or the empty string
+	 */
+	private String getStartLabel(Loop _loop)
 	{
-		if (elem instanceof Loop && this.jumpTable.containsKey(elem)) {
-			addCode(this.labelBaseName + this.jumpTable.get(elem) + ": ;",
-					_indent, elem.isDisabled(false));
+		String label = "";
+		if (this.jumpTable.containsKey(_loop)) {
+			label = this.labelBaseName + this.jumpTable.get(_loop) + ": ";
 		}
+		return label;
 	}
+	// END KGU#1196 2025-09-02
 	// END KGU#78 2015-12-17
 
 	// START KGU#388/KGU#542 2019-11-19: Enh. #423, #739
@@ -623,6 +645,7 @@ public class PerlGenerator extends Generator {
 			for (int i = 0; i < lines.size(); i++)
 			{
 				TokenList tokens = lines.get(i);
+				String text = null;
 				boolean isAsgn = Instruction.isAssignment(tokens);
 				// START KGU#1143 2024-04-02 Bugfx #1156: typed constants caused error
 				//boolean isDecl = Instruction.isDeclaration(tokens);
@@ -646,8 +669,12 @@ public class PerlGenerator extends Generator {
 				}
 				// END KGU#653 219-02-15
 				// START KGU#388/KGU#542 2019-11-19: Enh. #423, #739
-				else if (Instruction.isTypeDefinition(tokens, null)) {
-					String typeName = tokens.subSequence(1, tokens.indexOf("=")).getString().trim();
+				// START KGU#1193 2025-08-28: Issue #1210 Mind supressTransformation
+				//else if (Instruction.isTypeDefinition(tokens, null)) {
+				else if (!suppressTransformation) {
+					if (Instruction.isTypeDefinition(tokens, null)) {
+				// END KGU#1193 2025-08-28
+					String typeName =  tokens.subSequence(1, tokens.indexOf("=")).getString().trim();;
 					TypeMapEntry type = this.typeMap.get(":" + typeName);
 					this.generateTypeDef(root, typeName, type, _indent, isDisabled);
 					continue;
@@ -661,7 +688,6 @@ public class PerlGenerator extends Generator {
 				}
 				// END KGU#388/KGU#542 2019-11-19
 
-				String text = null;
 				if (isAsgn) {
 					Syntax.unifyOperators(tokens, true);
 					int posAsgn = tokens.indexOf("<-");
@@ -688,16 +714,29 @@ public class PerlGenerator extends Generator {
 					// END KGU#787 2019-12-03
 				}
 				// START KGU#1177 2025-02-16: Bugfix #1192: Translate the return keyword
-				else if (Jump.isReturn(tokens)) {
+				// START KGU#1193 2025-08-28: Issue #1210 Mind suppressTransformation
+				//else if (Jump.isReturn(line)) {
+				}
+				if (!isAsgn && Jump.isReturn(tokens)) {
+				// END KGU#1193 2025-08-28
 					tokens.set(0, "return");
 				}
 				// END KGU#1177  2025-02-16
 				if (text == null) {
-					text = transform(tokens.getString());
+					// START KGU#1193 2025-08-28: Issue #1210 Mind suppressTransformation
+					text = transform(tokens);
+//					text = line;
+//					if (!suppressTransformation) {
+//						text = transform(line);
+//					}
+					// END KGU#1193 2025-08-28
 				}
 				if (!text.endsWith(";")) { text += ";"; }
 				// START KGU#311 2017-01-04: Enh. #314 - steer the user through the File API implications
 				//if (this.usesFileAPI) {	// KGU#832 2020-03-23: Bugfix #840 - transform even in disabled case
+				// START KGU#1193 2025-08-28: Issue #1201 ... but in case of suppressTransformation
+				if (!suppressTransformation) {
+				// END KGU#1193 2025-08-28
 					if (text.contains("fileOpen(")) {
 						String pattern = "(.*?)\\s*=\\s*fileOpen\\((.*)\\)(.*);";
 						if (text.matches(pattern)) {
@@ -778,13 +817,18 @@ public class PerlGenerator extends Generator {
 						text = text.replace("fileClose(", "close(");
 					}
 				//}
+				// START KGU#1193 2025-08-28: Issue #1210 (see above)
+				}
+				// END KGU#1193 2025-08-28		
 				// END KGU#311 2017-01-04
 				
 				// START KGU#277/KGU#284 2016-10-13/16: Enh. #270 + Enh. #274
 				//code.add(_indent + text);
 				if (Instruction.isTurtleizerMove(tokens)) {
+					// Doesn't cause harm in case of mode suppressTransformation...
 					text += " " + this.commentSymbolLeft() + " color = " + _inst.getHexColor();
 				}
+				// FIXME: Is this replacement still appropriate? (might even cause harm in literals)
 				addCode(text.replace("\t", this.getIndent()), _indent, isDisabled);
 				// END KGU#277/KGU#284 2016-10-13
 			}
@@ -803,7 +847,7 @@ public class PerlGenerator extends Generator {
 
 		String condition = extractCondition(_alt, _indent);
 		addCode("if " + condition + " {", _indent, isDisabled);
-		generateCode(_alt.qTrue,_indent+this.getIndent());
+		generateCode(_alt.qTrue, _indent+this.getIndent());
 		addCode("}", _indent, isDisabled);
 
 		// START KGU#1137 2024-03-19: Issue #1148 We ought to make use of the ELSIF if possible
@@ -858,12 +902,14 @@ public class PerlGenerator extends Generator {
 		//code.add(_indent+"if ( "+BString.replace(transform(_alt.getText().getText()),"\n","").trim()+" ) {");
 		String condition = transform(_ele.getUnbrokenText().getLongString()).trim();
 		// START KGU#311 2017-01-04: Enh. #314 - steer the user through the File API implications
-		if (this.usesFileAPI && !isDisabled) {
+		// START KGU#1193 2025-08-28: Isue #1210 Mind suppressTransformation
+		//if (this.usesFileAPI && !isDisabled) {
+		if (this.usesFileAPI && !isDisabled && !suppressTransformation) {
+		// END KGU#1193 2025-08-28
 			if (condition.contains("fileEOF(")) {
 				this.appendComment("TODO FileAPI: Replace the fileEOF test by something like «<DATA>» in combination with «$_» for the next fileRead", _indent);
 			}
-			// TODO Why was this test resticted to Alternatives? Is it irrelevant/wrong for loops?
-			else /*if (_ele instanceof Alternative)*/ {
+			else {
 				for (int k = 0; k < this.fileVars.count(); k++) {
 					if (condition.contains(this.fileVars.get(k))) {
 						this.appendComment("TODO FileAPI: Consider replacing / dropping this now inappropriate file test.", _indent);
@@ -874,7 +920,10 @@ public class PerlGenerator extends Generator {
 		// END KGU#311 2017-01-04
 		// START KGU#301 2016-12-01: Bugfix #301
 		//if (!this.suppressTransformation || !(condition.startsWith("(") && condition.endsWith(")")))
-		if (!this.suppressTransformation && !isParenthesized(condition))
+		// START KGU#1193 2025-08-28: Issue #1210 This is rather a structural aspect
+		//if (!this.suppressTransformation && !isParenthesized(condition))
+		if (!isParenthesized(condition))
+		// END KGU#1193 2025-08-28
 		// END KGU#301 2016-12-01
 		{
 			condition = "( " + condition + " )";
@@ -902,7 +951,10 @@ public class PerlGenerator extends Generator {
 		// END KGU#453 2017-11-02
 		// START KGU#301 2016-12-01: Bugfix #301
 		//if (!this.suppressTransformation || !(selector.startsWith("(") && selector.endsWith(")")))
-		if (!this.suppressTransformation || !isParenthesized(discriminator))
+		// START KGU#1193 2025-08-28: Issue #1210 This is a structural syntax aspect
+		//if (!this.suppressTransformation || !isParenthesized(discriminator))
+		if (!isParenthesized(discriminator))
+		// END KGU#1193 2025-08-28
 		// END KGU#301 2016-12-01
 		{
 			discriminator = "( " + discriminator + " )";			
@@ -966,6 +1018,9 @@ public class PerlGenerator extends Generator {
 			var = "$" + var;
 		}
 		// END KGU#162 2016-04-01
+		// START KGU#1196 2025-09-02: Issue #1215 Prefer a start label with last
+		String startLabel = getStartLabel(_for);
+		// END KGU#1196 2025-09-02
 		// START KGU#61 2016-03-23: Enh. 84 - FOREACH support
 		if (_for.isForInLoop())
 		{
@@ -987,12 +1042,18 @@ public class PerlGenerator extends Generator {
 			}
 			// START KGU#162 2016-04-01: Enh. #144 new restrictive export mode
 			//code.add(_indent + "foreach $"+ var + " (" + valueList + ") {");
-			addCode("foreach "+ var + " (" + valueList + ") {", _indent, isDisabled);
+			// START KGU#1196 2025-09-02: Issue #1215 Prefer a start label with last
+			//addCode("foreach "+ var + " (" + valueList + ") {", _indent, isDisabled);
+			addCode(startLabel + "foreach "+ var + " (" + valueList + ") {", _indent, isDisabled);
+			// END KGU#1196 2025-09-02
 			// END KGU#162
 		}
-		else
+		// START KGU#1193 2025-08-28: Bugfix #1210 Too rash a decision
+		//else
+		else if (_for.style == For.ForLoopStyle.COUNTER)
+		// END KGU#1193 2025-08-28
 		{
-			// END KGU#61 2016-03-23
+		// END KGU#61 2016-03-23
 			int step = _for.getStepConst();
 			String compOp = (step > 0) ? " <= " : " >= ";
 			// START KGU#162 2016-04-01: Enh. #144 var syntax already handled 
@@ -1003,21 +1064,47 @@ public class PerlGenerator extends Generator {
 			//		increment +
 			//		") {");
 			String increment = var + " += (" + step + ")";
-			addCode("for (" +
-					var + " = " + transform(_for.getStartValue(), false) + "; " +
-					var + compOp + transform(_for.getEndValue(), false) + "; " +
+			// START KGU#1193 2025-08-28: Issue #1210: Respect suppressTransform
+			String startValue = _for.getStartValue();
+			String endValue = _for.getEndValue();
+			if (!suppressTransformation) {
+				startValue = transform(startValue, false);
+				endValue = transform(endValue, false);
+			}
+			// END KGU#1193 2025-08-28
+			// START KGU#1196 2025-09-02: Issue #1215 Prefer a start label with last
+			//addCode("for (" +
+			addCode(startLabel + "for (" +
+			// END KGU#1196 2025-09-02
+					var + " = " + startValue + "; " +
+					var + compOp + endValue + "; " +
 					increment +
 					") {", _indent, isDisabled);
 			// END KGU#162 2016-04-01
-			// START KGU#61 2016-03-23: Enh. 84 - FOREACH support (part 2)
+		// START KGU#61 2016-03-23: Enh. 84 - FOREACH support (part 2)
 		}
 		// END KGU#61 2016-03-23
+		// START KGU#1193 2025-08-28: Bugfix #1210 Consider FREETEXT and suppressTransformation
+		else {
+			// Must be a free-text loop
+			String loopText = _for.getUnbrokenText().getLongString().trim();
+			if (!suppressTransformation) {
+				loopText = transform(loopText, false);
+			}
+			// START KGU#1196 2025-09-02: Issue #1215 Prefer a start label with last
+			//addCode(loopText + "{", _indent, isDisabled);
+			addCode(startLabel + loopText + "{", _indent, isDisabled);
+			// END KGU#1196 2025-09-02
+		}
+		// END KGU#1193 2025-08-28
 		// END KGU#3 2015-11-02
 		generateCode(_for.getBody(), _indent+this.getIndent());
 		addCode("}", _indent, isDisabled);
-		// START KGU#78 2015-12-17: Enh. #23 Put a trailing label if this is a jump target
-		appendLabel(_for, _indent);
-		// END KGU#78 2015-12-17
+		// END KGU#1196 2025-09-02
+		//// START KGU#78 2015-12-17: Enh. #23 Put a trailing label if this is a jump target
+		//appendLabel(_for, _indent);
+		//// END KGU#78 2015-12-17
+		// END KGU#1196 2025-09-02
 		addCode("", "", isDisabled);
 	
 	}
@@ -1029,13 +1116,18 @@ public class PerlGenerator extends Generator {
 		addCode("", "", isDisabled);
 		appendComment(_while, _indent);
 		String condition = extractCondition(_while, _indent);
-		addCode("while " + condition + " {", _indent, isDisabled);
-		// END KGU#162 2016-04-01
+		// START KGU#1196 2025-09-02: Issue #1215 Prefer a start label with last
+		//addCode("while " + condition + " {", _indent, isDisabled);
+		String startLabel = getStartLabel(_while);
+		addCode(startLabel + "while " + condition + " {", _indent, isDisabled);
+		// END KGU#1196 2025-09-02
 		generateCode(_while.getBody(), _indent+this.getIndent());
 		addCode("}", _indent, isDisabled);
-		// START KGU#78 2015-12-17: Enh. #23 Put a trailing label if this is a jump target
-		appendLabel(_while, _indent);
-		// END KGU#78 2015-12-17
+		//// START KGU#1196 2025-09-02: Issue #1215 The following became obsolete
+		//// START KGU#78 2015-12-17: Enh. #23 Put a trailing label if this is a jump target
+		//appendLabel(_while, _indent);
+		//// END KGU#78 2015-12-17
+		// END KGU#1196 2025-09-02
 		addCode("", "", isDisabled);
 		
 	}
@@ -1049,14 +1141,20 @@ public class PerlGenerator extends Generator {
 
 		appendComment(_repeat, _indent);
 
-		addCode("do {", _indent, isDisabled);
+		// START KGU#1196 2025-09-02: Issue #1215 Prefer a start label with last
+		//addCode("do {", _indent, isDisabled);
+		String startLabel = getStartLabel(_repeat);
+		addCode(startLabel + "do {", _indent, isDisabled);
+		// END KGU#1196 2025-09-02
 		generateCode(_repeat.getBody(), _indent + this.getIndent());
 		String condition = extractCondition(_repeat, _indent + this.getIndent());
 		addCode("} while (!" + condition + ");", _indent, isDisabled);
 		// END KGU#162 2016-04-01
-		// START KGU#78 2015-12-17: Enh. #23 Put a trailing label if this is a jump target
-		appendLabel(_repeat, _indent);
-		// END KGU#78 2015-12-17
+		//// START KGU#1196 2025-09-02: Issue #1215 The following became obsolete
+		//// START KGU#78 2015-12-17: Enh. #23 Put a trailing label if this is a jump target
+		////appendLabel(_repeat, _indent);
+		//// END KGU#78 2015-12-17
+		// END KGU#1196 2025-09-02
 		addCode("", "", isDisabled);
 		
 	}
@@ -1069,12 +1167,18 @@ public class PerlGenerator extends Generator {
 
 		appendComment(_forever, _indent);
 
-		addCode("while (1) {", _indent, isDisabled);		
+		// START KGU#1196 2025-09-02: Issue #1215 Prefer a start label with last
+		//addCode("while (1) {", _indent, isDisabled);
+		String startLabel = getStartLabel(_forever);
+		addCode(startLabel + "while (1) {", _indent, isDisabled);
+		// END KGU#1196 2025-09-02
 		generateCode(_forever.getBody(), _indent+this.getIndent());
 		addCode("}", _indent, isDisabled);
+		// START KGU#1196 2025-09-02: Issue #1215 The following became obsolete
 		// START KGU#78 2015-12-17: Enh. #23 Put a trailing label if this is a jump target
-		appendLabel(_forever, _indent);
+		//appendLabel(_forever, _indent);
 		// END KGU#78 2015-12-17
+		// END KGU#1196 2025-09-02
 		addCode("", "", isDisabled);
 		
 	}
@@ -1094,7 +1198,10 @@ public class PerlGenerator extends Generator {
 			{
 				// START KGU#1143 2024-04-03: Bugfix #1156/2 Optional constant handling
 				TokenList tokens = tokenLines.get(i);
-				if (optionPragmaUseConstant() && Instruction.isAssignment(tokens)) {
+				// START KGU#1193 2025-08-28: Issue #1210
+				//if (optionPragmaUseConstant() && Instruction.isAssignment(tokens)) {
+				if (!suppressTransformation && optionPragmaUseConstant() && Instruction.isAssignment(tokens)) {
+				// END KGU#1193 2025-08-28
 					if (tokens.get(0).equalsIgnoreCase("const")) {
 						String constName = Instruction.getAssignedVarname(tokens, false);
 						TypeMapEntry typeEntry = this.typeMap.get(constName);
@@ -1174,7 +1281,10 @@ public class PerlGenerator extends Generator {
 						appendComment(line, _indent);
 						label = "__ERROR__";
 					}
-					addCode("goto " + label + ";", _indent, isDisabled);
+					// START KGU#1196 2025-09-02: Bugfix #1215 We may use "last" instead
+					//addCode("goto " + label + ";", _indent, isDisabled);
+					addCode("last " + label + ";", _indent, isDisabled);
+					// END KGU#1196 2025-09-02
 				}
 				else if (line.matches(Matcher.quoteReplacement(preLeave)+"([\\W].*|$)"))
 				{
@@ -1437,22 +1547,28 @@ public class PerlGenerator extends Generator {
 		constantInsertionLine = code.count();
 		constantIndent = _indent;
 		// END KGU#1143 2024-04-02
-		for (int v = 0; v < _varNames.count(); v++) {
-			String varName = _varNames.get(v);
-			TypeMapEntry typeEntry = this.typeMap.get(varName);
-			// START KGU#375/KGU#542 2019-12-01: Enh. #388, #739 - Don't declare enum constants here!
-			//String prefix = (typeEntry != null && typeEntry.isArray()) ? "@" : "$";
-			//code.add(_indent + "my " + prefix + varName + ";");
-			String constVal = _root.constants.get(varName);
-			// START KGU#1143 2024-04-02: Bugfix #1156/2 Special constant handling
-			//if (constVal == null || !constVal.startsWith(":")) {
-			if (constVal == null || !constVal.startsWith(":") && !optionPragmaUseConstant()) {
-			// END KGU#1143 2024-04-02
-				String prefix = (typeEntry != null && typeEntry.isArray()) ? "@" : "$";
-				addCode("my " + prefix + varName + ";", _indent, false);
+		// START KGU#1193 2025-08-28: Issue #1210 Mind suppressTransformation
+		if (!suppressTransformation) {
+		// END KGU#1193 2025-08-28
+			for (int v = 0; v < _varNames.count(); v++) {
+				String varName = _varNames.get(v);
+				TypeMapEntry typeEntry = this.typeMap.get(varName);
+				// START KGU#375/KGU#542 2019-12-01: Enh. #388, #739 - Don't declare enum constants here!
+				//String prefix = (typeEntry != null && typeEntry.isArray()) ? "@" : "$";
+				//code.add(_indent + "my " + prefix + varName + ";");
+				String constVal = _root.constants.get(varName);
+				// START KGU#1143 2024-04-02: Bugfix #1156/2 Special constant handling
+				//if (constVal == null || !constVal.startsWith(":")) {
+				if (constVal == null || !constVal.startsWith(":") && !optionPragmaUseConstant()) {
+				// END KGU#1143 2024-04-02
+					String prefix = (typeEntry != null && typeEntry.isArray()) ? "@" : "$";
+					addCode("my " + prefix + varName + ";", _indent, false);
+				}
+				// END KGU#375/KGU#542 2019-11-19
 			}
-			// END KGU#375/KGU#542 2019-11-19
+		// START KGU#1193 2025-08-28: Issue #1210 Mind suppressTransformation
 		}
+		// END KGU#1193 2025-08-28
 		// END KGU#352 2017-02-26
 		addSepaLine();
 		// START KGU 2015-11-02: Now fetch all variable names from the entire diagram
@@ -1467,6 +1583,12 @@ public class PerlGenerator extends Generator {
 	@Override
 	protected String generateResult(Root _root, String _indent, boolean alwaysReturns, StringList varNames)
 	{
+		// START KGU#1193 2025-08-28: Issue #1210 Consider suppressTransformation
+		if (suppressTransformation) {
+			// Don't do anything at all here
+			return _indent;
+		}
+		// END KGU1193 2025-08-28
 		if (_root.isSubroutine() && (returns || _root.getResultTypeDescr() != null || isFunctionNameSet || isResultSet) && !alwaysReturns)
 		{
 			String result = "";
