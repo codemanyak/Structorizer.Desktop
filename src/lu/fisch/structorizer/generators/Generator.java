@@ -138,7 +138,7 @@ package lu.fisch.structorizer.generators;
  *
  *      Comment:
  *      2025-09-05 - Issue #1214 (Kay Gürtzig)
- *      - For the case that a generator ha the need temporarily to disable structured elements such that the
+ *      - For the case that a generator has the need temporarily to disable structured elements such that the
  *        code for the entire substructure (or parts of it) may be outcommented, new methods
  *        isDsabled(Element), disable(Element), and reenable(Element) were introduced.
  *      - See ArmGenerator for

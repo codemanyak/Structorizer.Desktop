@@ -131,7 +131,8 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig             2025-02-16      Bugfix #1192: Translation of tail return instruction keywords
  *      Kay Gürtzig             2025-08-25/29   Bugfix #1210: suppressTransformation mode wasn't consistently observed
  *      Kay Gürtzig             2025-09-04      Issue #1123 slightly revised on occasion of bugfix #1216 (JsGenerator)
- *      Kay Gürtzig             2025-09-05      Bugfix #1219: Revision of generateCode(Try, String) to avoid sticky disabling of Try elements
+ *      Kay Gürtzig             2025-09-05      Bugfix #1219: generateCode(Try, String) must avoid sticky Try element disabling
+ *      Kay Gürtzig             2025-09-24      Bugfix #1219: Thread-safe version
  *
  ******************************************************************************************************
  *
@@ -940,7 +941,10 @@ public class CGenerator extends Generator {
 
 	protected void appendBlockHeading(Element elem, String _headingText, String _indent)
 	{
-		boolean isDisabled = elem.isDisabled(false);
+		// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+		//boolean isDisabled = elem.isDisabled(false);
+		boolean isDisabled = isDisabled(elem);
+		// END KGU#1201 2025-09-24
 		if (elem instanceof Loop && this.jumpTable.containsKey(elem) && this.isLabelAtLoopStart())  
 		{
 				_headingText = this.labelBaseName + this.jumpTable.get(elem) + ": " + _headingText;
@@ -958,7 +962,10 @@ public class CGenerator extends Generator {
 
 	protected void appendBlockTail(Element elem, String _tailText, String _indent)
 	{
-		boolean isDisabled = elem.isDisabled(false);
+		// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+		//boolean isDisabled = elem.isDisabled(false);
+		boolean isDisabled = isDisabled(elem);
+		// END KGU#1201 2025-09-24
 		if (_tailText == null) {
 			addCode("}", _indent, isDisabled);
 		}
@@ -1275,7 +1282,10 @@ public class CGenerator extends Generator {
 		// 3. type definition
 		// 4. Input / output
 		// 5. tail return statement
-		boolean isDisabled = _inst.isDisabled(false); 
+		// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+		//boolean isDisabled = _inst.isDisabled(false);
+		boolean isDisabled = isDisabled(_inst);
+		// END KGU#1201 2025-09-24
 		StringList tokens = Element.splitLexically(_line.trim(), true);
 		// START KGU#796 2020-02-10: Bugfix #808
 		Element.unifyOperators(tokens, false);
@@ -1855,7 +1865,10 @@ public class CGenerator extends Generator {
 	@Override
 	protected void generateCode(Case _case, String _indent) {
 		
-		boolean isDisabled = _case.isDisabled(false);
+		// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+		//boolean isDisabled = _case.isDisabled(false);
+		boolean isDisabled = isDisabled(_case);
+		// END KGU#1201 2025-09-24
 		appendComment(_case, _indent);
 		
 		// START KGU#453 2017-11-02: Issue #447
@@ -1993,7 +2006,10 @@ public class CGenerator extends Generator {
 		String indent = _indent + this.getIndent();
 		String startValStr = "0";
 		String endValStr = "???";
-		boolean isDisabled = _for.isDisabled(false);
+		// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+		//boolean isDisabled = _for.isDisabled(false);
+		boolean isDisabled = isDisabled(_for);
+		// END KGU#1201 2025-09-24
 		// START KGU#640 2019-01-21: Bugfix #669
 		boolean isLoopConverted = false;
 		// END KGU#640 2019-01-21
@@ -2255,7 +2271,10 @@ public class CGenerator extends Generator {
 
 			boolean commentInserted = false;
 
-			boolean isDisabled = _call.isDisabled(false);
+			// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+			//boolean isDisabled = _call.isDisabled(false);
+			boolean isDisabled = isDisabled(_call);
+			// END KGU#1201 2025-09-24
 
 			// START KGU#1065 2022-09-29: Bugfix #1073 Case comments occurred twice
 			//appendComment(_call, _indent);
@@ -2367,7 +2386,10 @@ public class CGenerator extends Generator {
 		// }
 		if (!appendAsComment(_jump, _indent)) {
 			
-			boolean isDisabled = _jump.isDisabled(false);
+			// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+			//boolean isDisabled = _jump.isDisabled(false);
+			boolean isDisabled = isDisabled(_jump);
+			// END KGU#1201 2025-09-24
 
 			appendComment(_jump, _indent);
 
@@ -2505,7 +2527,10 @@ public class CGenerator extends Generator {
 	protected void generateCode(Parallel _para, String _indent)
 	{
 
-		boolean isDisabled = _para.isDisabled(false);
+		// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+		//boolean isDisabled = _para.isDisabled(false);
+		boolean isDisabled = isDisabled(_para);
+		// END KGU#1201 2025-09-24
 		appendComment(_para, _indent);
 
 		addCode("", "", isDisabled);
@@ -2541,10 +2566,10 @@ public class CGenerator extends Generator {
 	protected void generateCode(Try _try, String _indent)
 	{
 
-		boolean isDisabled = _try.isDisabled(false);
-		// START KGU#1201 2025-09-05: Bugfix #1219 We must restore the individual state!
-		boolean meDisabled = _try.isDisabled(true);
-		// END KGU#1201 2025-09-05
+		// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+		//boolean isDisabled = _try.isDisabled(false);
+		boolean isDisabled = isDisabled(_try);
+		// END KGU#1201 2025-09-24
 		appendComment(_try, _indent);
 	
 		TryCatchSupportLevel trySupport = this.getTryCatchLevel();
@@ -2552,18 +2577,27 @@ public class CGenerator extends Generator {
 			this.appendComment("TODO: Find an equivalent for this non-supported try / catch block!", _indent);
 		}
 		// We will temporarily modify the disabled status depending on the language capabilities
-		// FIXME: This is not actually thread-safe! Cf. ARMGenerator
-		_try.setDisabled(isDisabled || trySupport == TryCatchSupportLevel.TC_NO_TRY);
+		// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+		//_try.setDisabled(isDisabled || trySupport == TryCatchSupportLevel.TC_NO_TRY);
+		if (trySupport == TryCatchSupportLevel.TC_NO_TRY) {
+			disable(_try);
+		}
+		// END KGU#1201 2025-09-24
 		try {
 			this.appendBlockHeading(_try, "try", _indent);
-			// START KGU#1201 2025-09-05: The recent mechanism could permanently change disabled state
+			// START KGU#1201 2025-09-05/24: Issue #1219 The recent mechanism could permanently change disabled state
 			//_try.setDisabled(isDisabled);
-			_try.setDisabled(meDisabled);
-			// END KGU#1201 2025-09-05
+			reenable(_try);
+			// END KGU#1201 2025-09-05/24
 
 			generateCode(_try.qTry, _indent + this.getIndent());
 
-			_try.setDisabled(isDisabled || trySupport == TryCatchSupportLevel.TC_NO_TRY);
+			// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+			//_try.setDisabled(isDisabled || trySupport == TryCatchSupportLevel.TC_NO_TRY);
+			if (trySupport == TryCatchSupportLevel.TC_NO_TRY) {
+				disable(_try);
+			}
+			// END KGU#1201 2025-09-24
 			this.appendBlockTail(_try, null, _indent);
 			String caught = this.caughtException;
 			this.appendCatchHeading(_try, _indent);
@@ -2574,25 +2608,35 @@ public class CGenerator extends Generator {
 			this.caughtException = caught;
 			this.appendBlockTail(_try, null, _indent);
 			if (_try.qFinally.getSize() > 0) {
-				_try.setDisabled(isDisabled || trySupport != TryCatchSupportLevel.TC_TRY_CATCH_FINALLY);
+				// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+				//_try.setDisabled(isDisabled || trySupport != TryCatchSupportLevel.TC_TRY_CATCH_FINALLY);
+				if (trySupport != TryCatchSupportLevel.TC_TRY_CATCH_FINALLY) {
+					disable(_try);
+				}
+				// END KGU#1201 2025-09-24
 				this.appendBlockHeading(_try, "finally", _indent);
-				// START KGU#1201 2025-09-05: The recent mechanism could permanently change disabled state
+				// START KGU#1201 2025-09-05/24: Bugfix #1219 The recent mechanism could permanently change disabled state
 				//_try.setDisabled(isDisabled);
-				_try.setDisabled(meDisabled);
-				// END KGU#1201 2025-09-05
+				reenable(_try);
+				// END KGU#1201 2025-09-05/24
 
 				generateCode(_try.qFinally, _indent + this.getIndent());
 
-				_try.setDisabled(isDisabled || trySupport != TryCatchSupportLevel.TC_TRY_CATCH_FINALLY);
+				// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+				//_try.setDisabled(isDisabled || trySupport != TryCatchSupportLevel.TC_TRY_CATCH_FINALLY);
+				if (trySupport != TryCatchSupportLevel.TC_TRY_CATCH_FINALLY) {
+					disable(_try);
+				}
+				// END KGU#1201 2025-09-24
 				this.appendBlockTail(_try, null, _indent);
 			}
 		}
 		finally {
 			// Restore the original disabled status
-			// START KGU#1201 2025-09-05: The recent mechanism could permanently change disabled state
+			// START KGU#1201 2025-09-05/24: Bugfix #1219 The recent mechanism could permanently change disabled state
 			//_try.setDisabled(isDisabled);
-			_try.setDisabled(meDisabled);
-			// END KGU#1201 2025-09-05
+			reenable(_try);
+			// END KGU#1201 2025-09-05/24
 		}
 	}
 
