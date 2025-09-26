@@ -82,6 +82,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig             2024-01-22      Issue #800: transfrOutput() adapted to internal keys
  *      Kay Gürtzig             2024-03-14      Bugfix #1139: Risk of NullPointerException in appendCatchHeading()
  *      Kay Gürtzig             2025-07-03      Missing Override annotations added
+ *      Kay Gürtzig             2025-09-24      Support for thread-safe version of bugfix #1219 (see CGenerator)
  *
  ******************************************************************************************************
  *
@@ -861,7 +862,10 @@ public class CSharpGenerator extends CGenerator
 	protected void generateCode(Parallel _para, String _indent)
 	{
 
-		boolean isDisabled = _para.isDisabled(false);
+		// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+		//boolean isDisabled = _para.isDisabled(false);
+		boolean isDisabled = isDisabled(_para);
+		// END KGU#1201 2025-09-24
 		Root root = Element.getRoot(_para);
 		String indentPlusOne = _indent + this.getIndent();
 		String suffix = Integer.toHexString(_para.hashCode());
@@ -941,7 +945,10 @@ public class CSharpGenerator extends CGenerator
 				appendComment("=========== START PARALLEL WORKER DEFINITIONS ============", _indent);
 			}
 			for (Parallel par: containedParallels) {
-				boolean isDisabled = par.isDisabled(false);
+				// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+				//boolean isDisabled = par.isDisabled(false);
+				boolean isDisabled = isDisabled(par);
+				// END KGU#1201 2025-09-24
 				String workerNameBase = "Worker" + Integer.toHexString(par.hashCode()) + "_";
 				Root root = Element.getRoot(par);
 				// START KGU#676 2019-03-30: Enh. #696 special pool in case of batch export
@@ -1066,7 +1073,10 @@ public class CSharpGenerator extends CGenerator
 	@Override
 	protected void appendCatchHeading(Try _try, String _indent) {
 		
-		boolean isDisabled = _try.isDisabled(false);
+		// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+		//boolean isDisabled = _try.isDisabled(false);
+		boolean isDisabled = isDisabled(_try);
+		// END KGU#1201 2025-09-24
 		String varName = _try.getExceptionVarName();
 		String head = "catch ()";
 		String exName = "ex" + Integer.toHexString(_try.hashCode());

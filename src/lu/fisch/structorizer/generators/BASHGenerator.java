@@ -113,6 +113,8 @@ import java.util.ArrayList;
  *                                          CALLs disabled in case suppressTransformation;
  *                                          bugfix #1222.1: Wrong indentation of non-default CASE branches.
  *      Kay Gürtzig         2025-09-07      Issue #1223: First approach to implement generateCode(Try, String)
+ *      Kay Gürtzig         2025-09-08      Issue #1223: generateCode(Try, String) accomplished (with finally
+ *                                          and throw.
  *
  ******************************************************************************************************
  *
@@ -349,6 +351,13 @@ public class BASHGenerator extends Generator {
 	private final Set<String> compOprs = new HashSet<String>(
 			Arrays.asList(new String[]{/*"==",*/ "<", ">", "<=", ">=", /*"!=", "<>"*/}));
 
+	// START KGU#1206 2025-09-08: Enh. #1223 Gather all Try elements
+	/** A collection of contained Try elements needed for code generation */
+	private HashSet<Try> tryElememts = new HashSet<Try>();
+	/** Retains whether a Jump element of flavour throw is contained in the export */
+	private boolean hasThrows = false;
+	// END KGU#1206 2025-09-08
+	
 	// START KGU#815 2020-03-27: Enh. #828 export of group modules
 	/**
 	 * Method converts some generic module name into a generator-specific include file name or
@@ -541,6 +550,14 @@ public class BASHGenerator extends Generator {
 				}
 			}
 		}
+		// START KGU#1206 2025-09-08: Issue #1223 Support error handling code
+		if (_ele instanceof Try) {
+			this.tryElememts.add((Try)_ele);
+		}
+		else if (_ele instanceof Jump && ((Jump)_ele).isThrow()) {
+			this.hasThrows = true;
+		}
+		// END KGU#1206 2025-09-08
 		
 		return super.checkElementInformation(_ele);
 	}
@@ -1204,6 +1221,21 @@ public class BASHGenerator extends Generator {
 	//	String intermed = super.transform(_input);
 	protected String transform(TokenList _tokens, boolean _doInputOutput)
 	{
+		// START KGU#1193 2025-09-26: Issue #2210 More precise suppression rules
+		if (!_tokens.isBlank()) {
+			String token0 = _tokens.get(0);
+			if (token0.equals(Syntax.key2token("preLeave"))) {
+				_tokens.set(0, "break");
+			}
+			else if (token0.equals(Syntax.key2token("preReturn"))) {
+				// KGU#803 2020-02-16: Issue #816 - should only be reached within a main or includable diagram now
+				_tokens.set(0, "return");
+			}
+			else if (token0.equals(Syntax.key2token("preExit"))) {
+				_tokens.set(0, "exit");
+			}
+		}
+		// END KGU#1193 2025-09-26
 		String intermed = super.transform(_tokens, _doInputOutput);
 	// END KGU#1190 2025-08-17
 		
@@ -1216,34 +1248,26 @@ public class BASHGenerator extends Generator {
 			intermed = intermed.replace(" div ", " / ");
 			// END KGU 2014-11-06
 
-			// START KGU#78 2015-12-19: Enh. #23: We only have to ensure the correct keywords
-			// START KGU#288 2016-11-06: Issue #279 - some JREs don't know method getOrDefault()
-			//String preLeave = CodeParser.keywordMap.getOrDefault("preLeave","").trim();
-			//String preReturn = CodeParser.keywordMap.getOrDefault("preReturn","").trim();
-			//String preExit = CodeParser.keywordMap.getOrDefault("preExit","").trim();
-			// START KGU#790 2025-08-16: Issue #800 Check for internal key tokens
-			//String preLeave = Syntax.getKeywordOrDefault("preLeave","leave").trim();
-			//String preReturn = Syntax.getKeywordOrDefault("preReturn","return").trim();
-			//String preExit = Syntax.getKeywordOrDefault("preExit","exit").trim();
-			String preLeave = Syntax.key2token("preLeave");
-			String preReturn = Syntax.key2token("preReturn");
-			String preExit = Syntax.key2token("preExit");
-			// END KGU#790 2025-08-16
-			// END KGU#288 2016-11-06
-			if (intermed.matches("^" + Matcher.quoteReplacement(preLeave) + "(\\W.*|$)"))
-			{
-				intermed = "break " + intermed.substring(preLeave.length());
-			}
-			else if (intermed.matches("^" + Matcher.quoteReplacement(preReturn) + "(\\W.*|$)"))
-			{
-				// FIXME KGU#803 2020-02-16: Issue #816 - should only be reached within a main or includable diagram now
-				intermed = "return " + intermed.substring(preReturn.length());
-			}
-			else if (intermed.matches("^" + Matcher.quoteReplacement(preExit) + "(\\W.*|$)"))
-			{
-				intermed = "exit " + intermed.substring(preExit.length());
-			} 
-			// END KGU#78 2015-12-19
+// START KGU#1193 2025-09-26: Issue #2210 More precise suppression rules
+//			// START KGU#78 2015-12-19: Enh. #23: We only have to ensure the correct keywords
+//			String preLeave = Syntax.key2token("preLeave");
+//			String preReturn = Syntax.key2token("preReturn");
+//			String preExit = Syntax.key2token("preExit");
+//			if (intermed.matches("^" + Matcher.quoteReplacement(preLeave) + "(\\W.*|$)"))
+//			{
+//				intermed = "break " + intermed.substring(preLeave.length());
+//			}
+//			else if (intermed.matches("^" + Matcher.quoteReplacement(preReturn) + "(\\W.*|$)"))
+//			{
+//				// FIXME KGU#803 2020-02-16: Issue #816 - should only be reached within a main or includable diagram now
+//				intermed = "return " + intermed.substring(preReturn.length());
+//			}
+//			else if (intermed.matches("^" + Matcher.quoteReplacement(preExit) + "(\\W.*|$)"))
+//			{
+//				intermed = "exit " + intermed.substring(preExit.length());
+//			} 
+//			// END KGU#78 2015-12-19
+// END KGU#1193 2025-09-26
 			
 		// START KGU#162 2016-03-31: Enh. #144
 		}
@@ -2018,11 +2042,10 @@ public class BASHGenerator extends Generator {
 			boolean disabled = _jump.isDisabled(false);
 			// END KGU#277 2016-10-14
 			ArrayList<TokenList> tokenLines = _jump.getUnbrokenTokenText();
-			for (int i=0; i < tokenLines.size(); i++)
+			for (int i = 0; i < tokenLines.size(); i++)
 			{
 				TokenList tokens = tokenLines.get(i);
-				// FIXME (KGU 2016-03-25): Handle the kinds of exiting jumps!
-				// START KGU#803 2020-02-16: Issue #816
+				// START KGU#803 2020-02-16: Issue #816 Handle the different flavours
 				if (root.isSubroutine() && Jump.isReturn(tokens)) {
 					String expr = tokens.subSequenceToEnd(1).getString().trim();
 					// START KGU#1205 2025-09-06: Issue #1210 no workaround with suppressTransformation!
@@ -2040,15 +2063,34 @@ public class BASHGenerator extends Generator {
 				}
 				// START KGU#1102 2023-11-07: Bugfix #1109 There is such thing as try/catch/throw in bash
 				else if (Jump.isThrow(tokens)) {
-					appendComment("throw " + transform(tokens.subSequenceToEnd(1).getString()) + " (FIXME!)", _indent);
+					// START KGU#1206 2025-09-08: Enh. #1223 We must either fail or return
+					//appendComment("throw " + transform(tokens.subSequenceToEnd(1).getString() + " (FIXME!)", _indent);
+					appendComment(tokens.getString(), _indent);
+					if (findEnclosingTry(_jump) != null) {
+						// The context will be &&-ed such that failing leads up to the catch
+						addCode("false", _indent, disabled);
+					}
+					else if (root.isSubroutine()) {
+						// In this case we just return an arbitrary non-zero value
+						addCode("return 42", _indent, disabled);
+					}
+					else {
+						// The only remaining opportunity is to exit
+						addCode("exit 42", _indent, disabled);						
+					}
+					// END KGU#1206 2025-09-08
 				}
 				// END KGU#1102 2023-11-07
-				else
+				else {
 				// END KGU#803 2020-02-16
-				// START KGU#277 2016-10-14: Enh. #270
-				//code.add(_indent+transform(_jump.getText().get(i)));
-				addCode(transform(tokens.getString()), _indent, disabled);
-				// END KGU#277 2016-10-14
+					// START KGU#277 2016-10-14: Enh. #270
+					//code.add(_indent+transform(_jump.getText().get(i)));
+					// START KGU#790 2025-09-26: 
+					addCode(transform(tokens.getString()), _indent, disabled);
+					// END KGU#277 2016-10-14
+				// START KGU#803 2020-02-16: Issue #816 Handle the different flavours
+				}
+				// END KGU#803 2020-02-16
 			}
 		}
 	}
@@ -2130,12 +2172,6 @@ public class BASHGenerator extends Generator {
 		//
 		// where finallyCode is a function that contains qFinally code
 		boolean disabled = _try.isDisabled(false);
-//		if (!_try.qFinally.isNoOp()) {
-//			String finallyName = "finally" + Integer.toHexString(_try.hashCode());
-//			// FIXME: Now we have to insert qFinally as function at this.subroutineInsertionLine
-//			//this.insertCode(???, this.subroutineInsertionLine);
-//			addCode("trap " + finallyName + " EXIT", _indent, disabled);
-//		}		
 		String exceptName = _try.getUnbrokenText().getLongString().trim();
 		String lineEnd = this.getLineEnd(_try);
 		String indent0 = _indent;
@@ -2145,31 +2181,80 @@ public class BASHGenerator extends Generator {
 			indent0 += this.getIndent();
 		}
 		String indent1 = indent0 + this.getIndent();
+		String suffix = Integer.toHexString(_try.hashCode());
+		String finallyName = "finally" + suffix;
+		String trapVar = "trap" + suffix;
+		if (!_try.qFinally.isNoOp()) {
+			// Cache the former state of trap EXIT
+			// trap -p EXIT either yields a string "trap -- command EXIT" or nothing
+			addCode(trapVar + "=$( trap -p EXIT )", _indent, disabled);
+			// Replace the empty string by "-" or extract the command
+			addCode("if [ -z \"$"+trapVar+"\" ] ; then " + trapVar + "=\"-\"; else "
+			+ trapVar + "=${"+trapVar+":8}; "+ trapVar + "=${" + trapVar + "% *}; fi",
+			_indent, disabled);
+			addCode("if [ \"${"+trapVar+":0:1}\" = \"'\" ] ; then "
+			+ trapVar + "=${" + trapVar + ":1} ; "
+			+ trapVar + "=${" + trapVar + "%\\'*}; fi",
+			_indent, disabled);
+			// Now establish the new EXIT trap for this Try
+			addCode("trap \"" + finallyName + " trapped\" EXIT", _indent, disabled);
+		}
+		// Generate the try section
 		addCode("{ " + this.commentSymbolLeft() + " try", indent0, disabled);
 		generateCode(_try.qTry, indent1);
+		// Connect the catch section
 		addCode("} || { " + this.commentSymbolLeft() +
 				" catch " + exceptName,
 				indent0, disabled);
 		if (!suppressTransformation) {
-			// Assign the exit code of the last failed try command
+			// Assign the result status to the exception variable
 			addCode(transform(exceptName) + "=$?", indent1, disabled);
 		}
+		// Generate the actual catch code
 		generateCode(_try.qCatch, indent1);
-		// START KGU#1206 FIXME: Temporary code
 		if (!_try.qFinally.isNoOp()) {
-			addCode("} { " + this.commentSymbolLeft() + " finally", indent0, disabled);
-			generateCode(_try.qFinally, indent1);
+			// Append the finally precautions
+			addCode("}", indent0, disabled);
+			if (!lineEnd.isEmpty()) {
+				// Cache the result status of try+catch
+				addCode("try"+suffix + "=$?" + lineEnd, indent0, disabled);
+			}
+			// Restore the previous trap situation
+			addCode("trap \"${" + trapVar + "}\" EXIT", indent0, disabled);
+			addCode("{ " + this.commentSymbolLeft() + " finally", indent0, disabled);
+			// Generate the actual finally function call
+			addCode(finallyName + " okay", indent1, disabled);
 		}
-		// END KGU#1206
 		addCode("}", indent0, disabled);
-//		if (!_try.qFinally.isNoOp()) {
-//			addCode("trap - EXIT", _indent, disabled);
-//		}
 		if (!lineEnd.isBlank()) {
-			addCode("}" + lineEnd, _indent, disabled);			
+			addCode("}" + lineEnd, _indent, disabled);
 		}
 	}
 
+	/**
+	 * Searches for a closest {@link Try} element such that the given element
+	 * {@code _ele} is statically part of the substructure of the try section
+	 * of which. (In case of nested Try structures the method will return the
+	 * innermost one. Will not return Try elements containing {@code _ele} in
+	 * the catch or finally section.
+	 * 
+	 * @param _ele - an element that is assumed to be part of the substructure
+	 *     of a try block.
+	 * @return ether the statically enclosing Try element or {@code null}.
+	 */
+	protected Try findEnclosingTry(Element _ele)
+	{
+		Element parent = _ele.parent;
+		while (parent != null && !(parent instanceof Try)) {
+			_ele = parent;
+			parent = _ele.parent;
+		}
+		if (parent instanceof Try && _ele == ((Try)parent).qTry) {
+			return (Try)parent;
+		}
+		return null;
+	}
+	
 	/**
 	 * Finds out whether the given _element is part of a try block and if so
 	 * returns an AND operator (between commands) as line end. Otherwise
@@ -2182,12 +2267,7 @@ public class BASHGenerator extends Generator {
 	protected String getLineEnd(Element _ele)
 	{
 		String lineEnd = "";
-		Element parent = _ele.parent;
-		while (parent != null && !(parent instanceof Try)) {
-			_ele = parent;
-			parent = _ele.parent;
-		}
-		if (parent instanceof Try && _ele == ((Try)parent).qTry) {
+		if (findEnclosingTry(_ele) != null) {
 			lineEnd = " &&";
 		}
 		return lineEnd;
@@ -2353,9 +2433,9 @@ public class BASHGenerator extends Generator {
 		}
 		// END KGU#311 2017-01-05
 		// START KGU#150/KGU#241 2017-01-05: Issue #234 - Provisional support for chr and ord functions
+		boolean builtInAdded = false;
 		if (!this.suppressTransformation)
 		{
-			boolean builtInAdded = false;
 			if (occurringFunctions.contains("chr"))
 			{
 				addSepaLine();
@@ -2392,9 +2472,31 @@ public class BASHGenerator extends Generator {
 				}
 			}
 			// END KGU#803/KGU#807 2020-02-24
-			if (builtInAdded) addSepaLine();
 		}
 		// END KGU#150/KGU#241 2017-01-05
+		// START KGU#1206 2025-09-08: Enh. #1223 Support for Try/Throw
+		// If a user employs finally then it is intended to be translated
+		for (Try _try: this.tryElememts) {
+			if (!_try.qFinally.isNoOp()) {
+				addSepaLine();
+				String fName = "finally" + Integer.toHexString(_try.hashCode());
+				boolean isDisabled = _try.isDisabled(false);
+				String indent1Plus1 = _indent+this.getIndent();
+				addCode("function " + fName + "()", _indent, isDisabled);
+				addCode("{", _indent, isDisabled);
+				addCode("exitCode=$?", indent1Plus1, isDisabled);
+				addCode("arg1=$1", indent1Plus1, isDisabled);
+				generateCode(_try.qFinally, indent1Plus1);
+				addCode("if [ \"$arg1\" = trapped ]", indent1Plus1, isDisabled);
+				addCode("then", indent1Plus1, isDisabled);
+				addCode("exit ${exitCode}", indent1Plus1+this.getIndent(), isDisabled);
+				addCode("fi", indent1Plus1, isDisabled);
+				addCode("}", _indent, isDisabled);
+				builtInAdded = true;
+			}
+		}
+		if (builtInAdded) addSepaLine();
+		// END KGU#1206 2025-09-08
 	}
 	
 	/**

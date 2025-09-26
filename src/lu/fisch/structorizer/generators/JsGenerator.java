@@ -49,6 +49,7 @@ import java.util.ArrayList;
  *      Kay Gürtzig     2025-07-03      Some missing Override annotation added
  *      Kay Gürtzig     2025-09-04      Bugfix #1216: Translation of random() function was deficient
  *      Kay Gürtzig     2025-09-05      Bugfix #1217: Undue copying of FileAPI.h/FileAPI.h averted
+ *      Kay Gürtzig     2025-09-24      Support for thread-safe version of bugfix #1219 (see CGenerator)
  *
  ******************************************************************************************************
  *
@@ -521,7 +522,10 @@ public class JsGenerator extends CGenerator {
 	 */
 	@Override
 	protected void appendCatchHeading(Try _try, String _indent) {
-		boolean isDisabled = _try.isDisabled(false);
+		// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+		//boolean isDisabled = _try.isDisabled(false);
+		boolean isDisabled = isDisabled(_try);
+		// END KGU#1201 2025-09-24
 		String varName = _try.getExceptionVarName();
 		String exName = "ex" + Integer.toHexString(_try.hashCode());;
 		String head = "catch (" + exName + ")";

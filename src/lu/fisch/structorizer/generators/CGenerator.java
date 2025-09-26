@@ -135,7 +135,8 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig             2025-08-15      Issue #800: getOperatorMap() implementation introduced
  *      Kay Gürtzig             2025-08-25/29   Bugfix #1210: suppressTransformation mode wasn't consistently observed
  *      Kay Gürtzig             2025-09-04      Issue #1123 slightly revised on occasion of bugfix #1216 (JsGenerator)
- *      Kay Gürtzig             2025-09-05      Bugfix #1219: Revision of generateCode(Try, String) to avoid sticky disabling of Try elements
+ *      Kay Gürtzig             2025-09-05      Bugfix #1219: generateCode(Try, String) must avoid sticky Try element disabling
+ *      Kay Gürtzig             2025-09-24      Bugfix #1219: Thread-safe version
  *
  ******************************************************************************************************
  *
@@ -1007,7 +1008,10 @@ public class CGenerator extends Generator {
 
 	protected void appendBlockHeading(Element elem, String _headingText, String _indent)
 	{
-		boolean isDisabled = elem.isDisabled(false);
+		// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+		//boolean isDisabled = elem.isDisabled(false);
+		boolean isDisabled = isDisabled(elem);
+		// END KGU#1201 2025-09-24
 		if (elem instanceof Loop && this.jumpTable.containsKey(elem) && this.isLabelAtLoopStart())  
 		{
 				_headingText = this.labelBaseName + this.jumpTable.get(elem) + ": " + _headingText;
@@ -1025,7 +1029,10 @@ public class CGenerator extends Generator {
 
 	protected void appendBlockTail(Element elem, String _tailText, String _indent)
 	{
-		boolean isDisabled = elem.isDisabled(false);
+		// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+		//boolean isDisabled = elem.isDisabled(false);
+		boolean isDisabled = isDisabled(elem);
+		// END KGU#1201 2025-09-24
 		if (_tailText == null) {
 			addCode("}", _indent, isDisabled);
 		}
@@ -1306,16 +1313,16 @@ public class CGenerator extends Generator {
 
 	// START KGU#730 2019-09-24: Bugfix #752 Outsourced from generateCode(Instruction, String) because also needed for Calls
 	/**
-	 * Generates the code for the given {@code Instruction} line {@code _line}.
+	 * Generates the code for the given {@code Instruction} line {@code _tokens}.
 	 * 
 	 * @param _inst - the Instruction (or Call) element
 	 * @param _indent - current indentation
 	 * @param _commentInserted - whether the element comment had already been inserted
-	 * @param _line - the current instruction line
-	 * @return {@code true} if the element comment will have been inserted when this
-	 *     routine is being left
+	 * @param _tokens - TokenList of the current instruction line
+	 * @return {@code true} if the element comment will have been inserted on leaving
+	 *     this routine.
 	 */
-	protected boolean generateInstructionLine(Instruction _inst, String _indent, boolean _commentInserted, TokenList tokens) {
+	protected boolean generateInstructionLine(Instruction _inst, String _indent, boolean _commentInserted, TokenList _tokens) {
 		// Cases to be distinguished and handled:
 		// 1. assignment
 		// 1.1 with declaration (mind record initializer!)
@@ -1330,24 +1337,27 @@ public class CGenerator extends Generator {
 		// 3. type definition
 		// 4. Input / output
 		// 5. tail return statement
-		boolean isDisabled = _inst.isDisabled(false);
-		boolean isTypeDef = Instruction.isTypeDefinition(tokens, this.typeMap);
+		// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+		//boolean isDisabled = _inst.isDisabled(false);
+		boolean isDisabled = isDisabled(_inst);
+		// END KGU#1201 2025-09-24
+		boolean isTypeDef = Instruction.isTypeDefinition(_tokens, this.typeMap);
 		// START KGU#796 2020-02-10: Bugfix #808
-		Syntax.unifyOperators(tokens, false);
+		Syntax.unifyOperators(_tokens, false);
 		// END KGU#796 2020-02-10
 		TokenList exprTokens = null;	// Tokens of the expression in case of an assignment
 		String expr = null;	// Original expression
-		int posAsgn = tokens.indexOf("<-");
+		int posAsgn = _tokens.indexOf("<-");
 		if (posAsgn < 0) {
-			posAsgn = tokens.size();
+			posAsgn = _tokens.size();
 		}
 		else {
-			exprTokens = tokens.subSequenceToEnd(posAsgn + 1);
+			exprTokens = _tokens.subSequenceToEnd(posAsgn + 1);
 		}
 		String codeLine = null;
 		// The varName result will only make sense in case of an assignment or declaration
-		String varName = Instruction.getAssignedVarname(tokens, false);
-		boolean isDecl = Instruction.isDeclaration(tokens);
+		String varName = Instruction.getAssignedVarname(_tokens, false);
+		boolean isDecl = Instruction.isDeclaration(_tokens);
 		//exprTokens.removeAll(" ");
 		if (!this.suppressTransformation && (isDecl || exprTokens != null)) {
 			// Cases 1 or 2
@@ -1364,7 +1374,7 @@ public class CGenerator extends Generator {
 			Root root = Element.getRoot(_inst);
 			StringList paramNames = root.getParameterNames();
 			// START KGU#375 2017-04-12: Enh. #388 special treatment of constants
-			if (tokens.get(0).equals("const")) {
+			if (_tokens.get(0).equals("const")) {
 				// Cases 1.1.1 or 2.1
 				if (!this.isInternalDeclarationAllowed()) {
 					return _commentInserted;
@@ -1379,15 +1389,15 @@ public class CGenerator extends Generator {
 			// END KGU#375 2017-04-12
 			if (isDecl && (this.isInternalDeclarationAllowed() || exprTokens != null)) {
 				// cases 1.1.2 or 2.2
-				if (tokens.get(0).equalsIgnoreCase("var") || tokens.get(0).equalsIgnoreCase("dim")) {
+				if (_tokens.get(0).equalsIgnoreCase("var") || _tokens.get(0).equalsIgnoreCase("dim")) {
 					// Case 1.1.2a/b or 2.2a/b (Pascal/BASIC declaration)
-					String separator = tokens.get(0).equalsIgnoreCase("dim") ? "as" : ":";
-					int posColon = tokens.indexOf(separator, 2, false);
+					String separator = _tokens.get(0).equalsIgnoreCase("dim") ? "as" : ":";
+					int posColon = _tokens.indexOf(separator, 2, false);
 					// Declaration well-formed?
 					if (posColon > 0) {
 						// Compose the lval without type
 						// FIXME convert transform to TokenList arg
-						codeLine = transform(tokens.subSequence(1, posColon).getString().trim());
+						codeLine = transform(_tokens.subSequence(1, posColon).getString().trim());
 						if (this.isInternalDeclarationAllowed()) {
 						// START KGU#1089 2023-10-12: Issue #980 Face a list of variables
 							//// START KGU#711 2019-10-01: Enh. #721 Precaution for Javascript
@@ -1402,8 +1412,8 @@ public class CGenerator extends Generator {
 							//type = transformType(type, "");
 							//codeLine = this.transformArrayDeclaration(type, codeLine);
 							//// END KGU#561 2018-07-21
-							String type = tokens.subSequence(posColon+1, posAsgn).getString().trim();
-							ArrayList<TokenList> declItems = Syntax.splitExpressionList(tokens.subSequence(1, posColon), ",");
+							String type = _tokens.subSequence(posColon+1, posAsgn).getString().trim();
+							ArrayList<TokenList> declItems = Syntax.splitExpressionList(_tokens.subSequence(1, posColon), ",");
 							for (int i = 0; i < declItems.size() - 1; i++) {
 								TokenList declItem = declItems.get(i);
 								// FIXME there could be asterisks and more!
@@ -1473,7 +1483,7 @@ public class CGenerator extends Generator {
 						}
 						else {
 							// Apparently many declared variables, ambiguous assignment
-							declVars = Instruction.getDeclaredVariables(tokens);
+							declVars = Instruction.getDeclaredVariables(_tokens);
 							if (declVars.count() > 1) {
 								exprTokens = null;
 							}
@@ -1499,12 +1509,12 @@ public class CGenerator extends Generator {
 								// START KGU#711 2019-09-30: Enh. #721: Consider Javascript
 								// Combine type and variable as is
 								//codeLine = transform(tokens.subSequence(0, posAsgn).concatenate().trim());
-								int posVar = tokens.indexOf(declVar);
+								int posVar = _tokens.indexOf(declVar);
 								if (i == 0) {
 									posVar0 = posVar;
-									declZones = Syntax.splitExpressionList(tokens.subSequence(posVar0, posAsgn), ",");
+									declZones = Syntax.splitExpressionList(_tokens.subSequence(posVar0, posAsgn), ",");
 								}
-								TokenList typeTokens = tokens.subSequence(0, posVar0);
+								TokenList typeTokens = _tokens.subSequence(0, posVar0);
 								int posLBrack = declZones.get(i).indexOf("[");
 								int posRBrack = declZones.get(i).lastIndexOf("]");
 								if (!typeTokens.isEmpty() && posLBrack > 0 && posRBrack > posLBrack) {
@@ -1537,15 +1547,15 @@ public class CGenerator extends Generator {
 					else if (exprTokens != null) {
 						// Case 1.1.2c (2.2c not allowed)
 						// Cut out leading type specification
-						int posVar = tokens.indexOf(varName);
+						int posVar = _tokens.indexOf(varName);
 						// START KGU#560 2018-07-21: Bugfix #564 In case of an array declaration we must wipe off the array stuff
 						//codeLine = transform(tokens.subSequence(posVar, posAsgn).concatenate().trim());
-						int posEnd = tokens.indexOf("[", posVar+1);
+						int posEnd = _tokens.indexOf("[", posVar+1);
 						if (!isDecl || posEnd < 0 || posEnd > posAsgn) {
 							posEnd = posAsgn;
 						}
 						// FIXME Don't descend to string here
-						codeLine = transform(tokens.subSequence(posVar, posEnd).getString().trim());
+						codeLine = transform(_tokens.subSequence(posVar, posEnd).getString().trim());
 						// END KGU#560 2018-07-21
 					}
 //							// START KGU#375 2017-04-13: Enh. #388
@@ -1566,7 +1576,7 @@ public class CGenerator extends Generator {
 			else if (!isDecl && exprTokens != null) {
 				// Case 1.2
 				// Combine variable access as is
-				codeLine = transform(tokens.subSequence(0, posAsgn).getString()).trim();
+				codeLine = transform(_tokens.subSequence(0, posAsgn).getString()).trim();
 				// START KGU#767 2019-11-30: Bugfix #782 maybe we must introduce a postponed declaration here
 				if (varName != null
 						&& Syntax.isIdentifier(varName, false, null)
@@ -1678,11 +1688,11 @@ public class CGenerator extends Generator {
 			if (this.isInternalDeclarationAllowed()) {
 				// START KGU#878 2020-10-16: Bugfix #873 - collateral damage of bugfix #808 mended
 				//int posEqu = tokens.indexOf("=");
-				int posEqu = tokens.indexOf("==");
+				int posEqu = _tokens.indexOf("==");
 				// END KGU#878 2020-10-16
 				String typeName = null;
 				if (posEqu == 2) {
-					typeName = tokens.get(1);
+					typeName = _tokens.get(1);
 				}
 				TypeMapEntry type = this.typeMap.get(":" + typeName);
 				Root root = Element.getRoot(_inst);
@@ -1694,16 +1704,16 @@ public class CGenerator extends Generator {
 				else {
 					// Hardly a recognizable type definition, just put it as is...
 					// FIXME Don't descend to String level
-					codeLine = "typedef " + transform(tokens.subSequenceToEnd(posEqu + 1).getString()) + " " + typeName;
+					codeLine = "typedef " + transform(_tokens.subSequenceToEnd(posEqu + 1).getString()) + " " + typeName;
 				}
 			}
 		}
 		// END KGU#388 2017-09-25
 		// START KGU#1177 2025-02-16: Bugfix #1192: Transform return keyword
-		else if (Jump.isReturn(tokens)) {
-			tokens.set(0, "return");
+		else if (Jump.isReturn(_tokens)) {
+			_tokens.set(0, "return");
 			if (!this.suppressTransformation) {
-				codeLine = transform(tokens.getString());
+				codeLine = transform(_tokens.getString());
 			}
 		}
 		// END KGU#1177 2025-02-16
@@ -1712,11 +1722,11 @@ public class CGenerator extends Generator {
 			// All other cases (e.g. input, output)
 			// START KGU#653 2019-02-14: Enh. #680 - care for multi-variable input lines
 			//codeLine = transform(line);
-			StringList inputItems = Instruction.getInputItems(tokens);
+			StringList inputItems = Instruction.getInputItems(_tokens);
 			if (inputItems == null
 					|| !generateMultipleInput(inputItems, _indent, isDisabled, _commentInserted ? null : _inst.getComment())) {
 				// FIXME Don't descend to String level
-				codeLine = transform(tokens.getString());
+				codeLine = transform(_tokens.getString());
 			}
 			else {
 				codeLine = null;
@@ -1726,7 +1736,7 @@ public class CGenerator extends Generator {
 		// Now append the codeLine in case it was composed and not already appended
 		if (codeLine != null) {
 			String lineEnd = ";";
-			if (Instruction.isTurtleizerMove(tokens)) {
+			if (Instruction.isTurtleizerMove(_tokens)) {
 				codeLine = this.enhanceWithColor(codeLine, _inst);
 				lineEnd = "";	// codeLine already contains a line end in this case
 			}
@@ -1924,7 +1934,10 @@ public class CGenerator extends Generator {
 	@Override
 	protected void generateCode(Case _case, String _indent) {
 		
-		boolean isDisabled = _case.isDisabled(false);
+		// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+		//boolean isDisabled = _case.isDisabled(false);
+		boolean isDisabled = isDisabled(_case);
+		// END KGU#1201 2025-09-24
 		appendComment(_case, _indent);
 		
 		// START KGU#453 2017-11-02: Issue #447
@@ -2063,7 +2076,10 @@ public class CGenerator extends Generator {
 		String indent = _indent + this.getIndent();
 		String startValStr = "0";
 		String endValStr = "???";
-		boolean isDisabled = _for.isDisabled(false);
+		// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+		//boolean isDisabled = _for.isDisabled(false);
+		boolean isDisabled = isDisabled(_for);
+		// END KGU#1201 2025-09-24
 		// START KGU#640 2019-01-21: Bugfix #669
 		boolean isLoopConverted = false;
 		// END KGU#640 2019-01-21
@@ -2334,7 +2350,10 @@ public class CGenerator extends Generator {
 
 			boolean commentInserted = false;
 
-			boolean isDisabled = _call.isDisabled(false);
+			// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+			//boolean isDisabled = _call.isDisabled(false);
+			boolean isDisabled = isDisabled(_call);
+			// END KGU#1201 2025-09-24
 
 			// START KGU#1065 2022-09-29: Bugfix #1073 Case comments occurred twice
 			//appendComment(_call, _indent);
@@ -2445,7 +2464,10 @@ public class CGenerator extends Generator {
 	{
 		if (!appendAsComment(_jump, _indent)) {
 			
-			boolean isDisabled = _jump.isDisabled(false);
+			// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+			//boolean isDisabled = _jump.isDisabled(false);
+			boolean isDisabled = isDisabled(_jump);
+			// END KGU#1201 2025-09-24
 
 			appendComment(_jump, _indent);
 
@@ -2546,7 +2568,10 @@ public class CGenerator extends Generator {
 	protected void generateCode(Parallel _para, String _indent)
 	{
 
-		boolean isDisabled = _para.isDisabled(false);
+		// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+		//boolean isDisabled = _para.isDisabled(false);
+		boolean isDisabled = isDisabled(_para);
+		// END KGU#1201 2025-09-24
 		appendComment(_para, _indent);
 
 		addCode("", "", isDisabled);
@@ -2582,10 +2607,10 @@ public class CGenerator extends Generator {
 	protected void generateCode(Try _try, String _indent)
 	{
 
-		boolean isDisabled = _try.isDisabled(false);
-		// START KGU#1201 2025-09-05: Bugfix #1219 We must restore the individual state!
-		boolean meDisabled = _try.isDisabled(true);
-		// END KGU#1201 2025-09-05
+		// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+		//boolean isDisabled = _try.isDisabled(false);
+		boolean isDisabled = isDisabled(_try);
+		// END KGU#1201 2025-09-24
 		appendComment(_try, _indent);
 	
 		TryCatchSupportLevel trySupport = this.getTryCatchLevel();
@@ -2593,18 +2618,27 @@ public class CGenerator extends Generator {
 			this.appendComment("TODO: Find an equivalent for this non-supported try / catch block!", _indent);
 		}
 		// We will temporarily modify the disabled status depending on the language capabilities
-		// FIXME: This is not actually thread-safe! Cf. ARMGenerator
-		_try.setDisabled(isDisabled || trySupport == TryCatchSupportLevel.TC_NO_TRY);
+		// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+		//_try.setDisabled(isDisabled || trySupport == TryCatchSupportLevel.TC_NO_TRY);
+		if (trySupport == TryCatchSupportLevel.TC_NO_TRY) {
+			disable(_try);
+		}
+		// END KGU#1201 2025-09-24
 		try {
 			this.appendBlockHeading(_try, "try", _indent);
-			// START KGU#1201 2025-09-05: The recent mechanism could permanently change disabled state
+			// START KGU#1201 2025-09-05/24: Issue #1219 The recent mechanism could permanently change disabled state
 			//_try.setDisabled(isDisabled);
-			_try.setDisabled(meDisabled);
-			// END KGU#1201 2025-09-05
+			reenable(_try);
+			// END KGU#1201 2025-09-05/24
 
 			generateCode(_try.qTry, _indent + this.getIndent());
 
-			_try.setDisabled(isDisabled || trySupport == TryCatchSupportLevel.TC_NO_TRY);
+			// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+			//_try.setDisabled(isDisabled || trySupport == TryCatchSupportLevel.TC_NO_TRY);
+			if (trySupport == TryCatchSupportLevel.TC_NO_TRY) {
+				disable(_try);
+			}
+			// END KGU#1201 2025-09-24
 			this.appendBlockTail(_try, null, _indent);
 			String caught = this.caughtException;
 			this.appendCatchHeading(_try, _indent);
@@ -2615,25 +2649,35 @@ public class CGenerator extends Generator {
 			this.caughtException = caught;
 			this.appendBlockTail(_try, null, _indent);
 			if (_try.qFinally.getSize() > 0) {
-				_try.setDisabled(isDisabled || trySupport != TryCatchSupportLevel.TC_TRY_CATCH_FINALLY);
+				// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+				//_try.setDisabled(isDisabled || trySupport != TryCatchSupportLevel.TC_TRY_CATCH_FINALLY);
+				if (trySupport != TryCatchSupportLevel.TC_TRY_CATCH_FINALLY) {
+					disable(_try);
+				}
+				// END KGU#1201 2025-09-24
 				this.appendBlockHeading(_try, "finally", _indent);
-				// START KGU#1201 2025-09-05: The recent mechanism could permanently change disabled state
+				// START KGU#1201 2025-09-05/24: Bugfix #1219 The recent mechanism could permanently change disabled state
 				//_try.setDisabled(isDisabled);
-				_try.setDisabled(meDisabled);
-				// END KGU#1201 2025-09-05
+				reenable(_try);
+				// END KGU#1201 2025-09-05/24
 
 				generateCode(_try.qFinally, _indent + this.getIndent());
 
-				_try.setDisabled(isDisabled || trySupport != TryCatchSupportLevel.TC_TRY_CATCH_FINALLY);
+				// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+				//_try.setDisabled(isDisabled || trySupport != TryCatchSupportLevel.TC_TRY_CATCH_FINALLY);
+				if (trySupport != TryCatchSupportLevel.TC_TRY_CATCH_FINALLY) {
+					disable(_try);
+				}
+				// END KGU#1201 2025-09-24
 				this.appendBlockTail(_try, null, _indent);
 			}
 		}
 		finally {
 			// Restore the original disabled status
-			// START KGU#1201 2025-09-05: The recent mechanism could permanently change disabled state
+			// START KGU#1201 2025-09-05/24: Bugfix #1219 The recent mechanism could permanently change disabled state
 			//_try.setDisabled(isDisabled);
-			_try.setDisabled(meDisabled);
-			// END KGU#1201 2025-09-05
+			reenable(_try);
+			// END KGU#1201 2025-09-05/24
 		}
 	}
 

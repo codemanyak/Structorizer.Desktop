@@ -66,6 +66,7 @@ import java.util.ArrayList;
  *      Kay Gürtzig     2020-03-23      Issue #840: Adaptations w.r.t. disabled elements using File API
  *      Kay Gürtzig     2020-08-12      Issue #800: CodeParser replaced by Syntax
  *      Kay Gürtzig     2021-10-03      Bugfix #990: Made-up result types on exported procedures
+ *      Kay Gürtzig     2025-09-24      Support for thread-safe version of bugfix #1219 (see CGenerator)
  *
  ******************************************************************************************************
  *
@@ -467,7 +468,10 @@ public class CPlusPlusGenerator extends CGenerator {
 	protected void generateCode(Parallel _para, String _indent)
 	{
 
-		boolean isDisabled = _para.isDisabled(false);
+		// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+		//boolean isDisabled = _para.isDisabled(false);
+		boolean isDisabled = isDisabled(_para);
+		// END KGU#1201 2025-09-24
 		Root root = Element.getRoot(_para);
 		String indentPlusOne = _indent + this.getIndent();
 		String suffix = Integer.toHexString(_para.hashCode());
@@ -528,7 +532,10 @@ public class CPlusPlusGenerator extends CGenerator {
 			}
 		});
 		for (Parallel par: containedParallels) {
-			boolean isDisabled = par.isDisabled(false);
+			// START KGU#1201 2025-09-24: Bugfix #1219 Thread-safe temporary disabling
+			//boolean isDisabled = par.isDisabled(false);
+			boolean isDisabled = isDisabled(par);
+			// END KGU#1201 2025-09-24
 			String functNameBase = "ThrFunc" + Integer.toHexString(par.hashCode()) + "_";
 			Root root = Element.getRoot(par);
 			// START KGU#676 2019-03-30: Enh. #696 special pool in case of batch export
