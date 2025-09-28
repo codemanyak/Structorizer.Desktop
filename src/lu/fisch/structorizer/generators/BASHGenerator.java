@@ -103,6 +103,13 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig         2025-08-17      Bugfix #1207: Wrong results on output instructions with expression list
  *      Kay Gürtzig         2025-08-19      Bugfix #1207: output in case of arrays etc. contained temporary auxiliary stuff
  *      Kay Gürtzig         2025-08-20/28   Bugfix #1210: Option suppressTransformation wasn't consequently respected
+ *      Kay Gürtzig         2025-09-06      Issue #1148: opportunity to use elif in IF chains now implemented;
+ *                                          bugfix #1210: any workaround for value return from functions and on
+ *                                          CALLs disabled in case suppressTransformation;
+ *                                          bugfix #1222.1: Wrong indentation of non-default CASE branches.
+ *      Kay Gürtzig         2025-09-07      Issue #1223: First approach to implement generateCode(Try, String)
+ *      Kay Gürtzig         2025-09-08      Issue #1223: generateCode(Try, String) accomplished (with finally
+ *                                          and throw.
  *
  ******************************************************************************************************
  *
@@ -185,6 +192,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.Stack;
 import java.util.Vector;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -201,6 +209,7 @@ import lu.fisch.structorizer.elements.Parallel;
 import lu.fisch.structorizer.elements.Repeat;
 import lu.fisch.structorizer.elements.Root;
 import lu.fisch.structorizer.elements.Subqueue;
+import lu.fisch.structorizer.elements.Try;
 import lu.fisch.structorizer.elements.TypeMapEntry;
 import lu.fisch.structorizer.elements.While;
 import lu.fisch.structorizer.executor.Executor;
@@ -233,7 +242,10 @@ public class BASHGenerator extends Generator {
 	@Override
 	protected String getIndent()
 	{
-		return " ";
+		// START KGU#1204 2025-09-06: Issue #1148 A more noticeable indentation would be helpful
+		//return " ";
+		return "    ";
+		// END KGU#1204 2025-09-06
 	}
 	
 	@Override
@@ -284,17 +296,12 @@ public class BASHGenerator extends Generator {
 	// END KGU#371 2019-03-07
 
 	// START KGU#686 2019-03-18: Enh. #56
-	/**
-	 * Subclassable method to specify the degree of availability of a try-catch-finally
-	 * construction in the target language.
-	 * @return either {@link TryCatchSupportLevel#TC_NO_TRY} or {@link TryCatchSupportLevel#TC_TRY_CATCH},
-	 * or {@link TryCatchSupportLevel#TC_TRY_CATCH_FINALLY}
-	 */
+	@Override
 	protected TryCatchSupportLevel getTryCatchLevel()
 	{
 		/* The only theoretical approach coming near an exception handling
 		 * would require to entangle the tried commands with && but this
-		 * doesn't work recursively. */
+		 * doesn't work recursively. FIXME */
 		return TryCatchSupportLevel.TC_NO_TRY;
 	}
 	// END KGU#686 2019-03-18
@@ -335,6 +342,13 @@ public class BASHGenerator extends Generator {
 	private final Set<String> compOprs = new HashSet<String>(
 			Arrays.asList(new String[]{/*"==",*/ "<", ">", "<=", ">=", /*"!=", "<>"*/}));
 
+	// START KGU#1206 2025-09-08: Enh. #1223 Gather all Try elements
+	/** A collection of contained Try elements needed for code generation */
+	private HashSet<Try> tryElememts = new HashSet<Try>();
+	/** Retains whether a Jump element of flavour throw is contained in the export */
+	private boolean hasThrows = false;
+	// END KGU#1206 2025-09-08
+	
 	// START KGU#815 2020-03-27: Enh. #828 export of group modules
 	/**
 	 * Method converts some generic module name into a generator-specific include file name or
@@ -527,11 +541,19 @@ public class BASHGenerator extends Generator {
 				}
 			}
 		}
+		// START KGU#1206 2025-09-08: Issue #1223 Support error handling code
+		if (_ele instanceof Try) {
+			this.tryElememts.add((Try)_ele);
+		}
+		else if (_ele instanceof Jump && ((Jump)_ele).isThrow()) {
+			this.hasThrows = true;
+		}
+		// END KGU#1206 2025-09-08
 		
 		return super.checkElementInformation(_ele);
 	}
 	// END KGU#150/KGU#241 2016-09-01
-
+	
 	/* (non-Javadoc)
 	 * @see lu.fisch.structorizer.generators.Generator#transformTokens(lu.fisch.utils.StringList)
 	 */
@@ -1119,7 +1141,8 @@ public class BASHGenerator extends Generator {
 	
 	// START KGU#1190 2025-08-19: Bugfix #1207 Shell-specific configuration
 	/**
-	 * @return a StingLIst of shell-specific assignment prefixes like "local", "typeset"
+	 * @return a StringList of shell-specific assignment prefixes like "local",
+	 *     "typeset"
 	 */
 	protected StringList getAssignmentPrefixes() {
 		return StringList.explode("local", ",");
@@ -1196,12 +1219,21 @@ public class BASHGenerator extends Generator {
 		if (_subqueue.isNoOp()) {
 			addCode(":", _indent, _subqueue.isDisabled(false));
 		}
+		// START KGU#1206 2025-09-07: Issue #1223 Ugly workaround
+		else if (!getLineEnd(_subqueue).isEmpty()) {
+			// If the sequence forms a conjunction we must add true to complete the syntax
+			addCode("true", _indent, _subqueue.isDisabled(false));
+		}
+		// END KGU#1206-09-07
 	}
 
 	@Override
 	protected void generateCode(Instruction _inst, String _indent) {
 		
 		if (!appendAsComment(_inst, _indent)) {
+			// START KGU#1206 2025-09-07: Issue #1223 Try mechanism
+			String lineEnd = this.getLineEnd(_inst);
+			// END KGU#1206 2025-09-07
 			// START KGU 2014-11-16
 			appendComment(_inst, _indent);
 			boolean disabled = _inst.isDisabled(false);
@@ -1231,13 +1263,19 @@ public class BASHGenerator extends Generator {
 							if (Function.testIdentifier(target.substring(cutPos), false, null)
 									&& !this.wasDefHandled(root, target, !disabled)
 									&& root.isSubroutine()) {
-								addCode(getLocalDeclarator(false, typeMap.get(target)) + target, _indent, disabled);
+								// START KGU#1206 2025-09-07: Issue #1223
+								//addCode(getLocalDeclarator(false, typeMap.get(target)) + target, _indent, disabled);
+								addCode(getLocalDeclarator(false, typeMap.get(target)) + target + lineEnd, _indent, disabled);
+								// END KGU#1206 2025-09-07
 							}
 						}
 						if (inputItems.count() > 2) {
 							String prompt = inputItems.get(0);
 							if (!prompt.isEmpty()) {
-								addCode(transform(CodeParser.getKeyword("output") + " " + prompt), _indent, disabled);
+								// START KGU#1206 2025-09-07: Issue #1223
+								//addCode(transform(CodeParser.getKeyword("output") + " " + prompt), _indent, disabled);
+								addCode(transform(CodeParser.getKeyword("output") + " " + prompt) + lineEnd, _indent, disabled);
+								// END KGU#1206 2025-09-07
 							}
 							for (int j = 1; j < inputItems.count(); j++) {
 								String item = transform(inputItems.get(j) + " <-");
@@ -1247,7 +1285,10 @@ public class BASHGenerator extends Generator {
 								}
 								inputItems.set(j, item);
 							}
-							addCode(this.getInputReplacer(false).replace("$1", inputItems.concatenate(" ", 1)), _indent, disabled);
+							// START KGU#1206 2025-09-07: Issue #1223
+							//addCode(this.getInputReplacer(false).replace("$1", inputItems.concatenate(" ", 1)), _indent, disabled);
+							addCode(this.getInputReplacer(false).replace("$1", inputItems.concatenate(" ", 1)) + lineEnd, _indent, disabled);
+							// END KGU#1206 2025-09-07
 							continue;
 						}
 					}
@@ -1262,7 +1303,26 @@ public class BASHGenerator extends Generator {
 					// START KGU#803 2020-02-16: Issue #816 A return has to be handled specifically
 					if (root.isSubroutine() && (line.matches("^" + Matcher.quoteReplacement(preReturn) + "(\\W.*|$)"))) {
 						String expr = line.substring(preReturn.length()).trim();
-						generateResultVariables(expr, _indent, disabled);
+						// START KGU#1205 2025-09-06: Issue #1210 no workaround with suppressTransformation!
+						if (suppressTransformation) {
+							addCode("return " + expr, _indent, disabled);
+							// Further lines are hardly interesting (not reachable)...
+							disabled = true;
+							continue;
+						}
+						// END KGU#1205 2025-09-05
+						// START KGU#1206 2025-09-07: Issue #1223 Ugly workaround
+						//generateResultVariables(expr, _indent, disabled);
+						String indent1 = _indent;
+						if (!lineEnd.isBlank()) {
+							addCode("{", _indent, disabled);
+							indent1 = _indent+this.getIndent();
+						}
+						generateResultVariables(expr, indent1, disabled);
+						if (!lineEnd.isBlank()) {
+							addCode("true }", _indent, disabled);
+						}
+						// END KGU#1206 2025-09-07
 						// In case of an endstanding return we don't need a formal return command
 						if (i < nLines-1 || root.children.getElement(root.children.getSize()-1) != _inst) {
 							addCode("return 0", _indent, disabled);
@@ -1274,7 +1334,10 @@ public class BASHGenerator extends Generator {
 					// START KGU#1190 2025-08-17: Bugfix #1207: We must handle output explicitly
 					if (unifyKeywords(Element.splitLexically(line, true)).indexOf(preOutput) == 0) {
 						String transf = this.transformOutput(line);
-						addCode(transf, _indent, disabled);
+						// START KGU#1206 2025-09-07: Issue #1223
+						//addCode(transf, _indent, disabled);
+						addCode(transf + lineEnd, _indent, disabled);
+						// END KGU#1206 2025-09-07
 						continue;
 					}
 					// END KGU#1190 2025-08-17
@@ -1282,6 +1345,11 @@ public class BASHGenerator extends Generator {
 				}
 				// END KGU#1193 2025-08-20
 				String codeLine = transform(line);
+				// START KGU#1206 2025-09-07: Issue #1223
+				if (!codeLine.isBlank()) {
+					codeLine += lineEnd;
+				}
+				// END KGU#1206 2025-09-07
 				/* FIXME KGU#803 2020-02-16: Issue #816 - we should mark local variables as local
 				 * This requires to check whether line is an assignment, that the target variable
 				 * is not a parameter or input variable (how to declare these?) and it hasn't been
@@ -1373,9 +1441,7 @@ public class BASHGenerator extends Generator {
 	protected void generateCode(Alternative _alt, String _indent) {
 		
 		boolean disabled = _alt.isDisabled(false);
-		if (code.count() > 0 && !code.get(code.count()-1).trim().isEmpty()) {
-			addCode("", "", disabled);
-		}
+		this.addSepaLine();
 		// START KGU 2014-11-16
 		appendComment(_alt, _indent);
 		// END KGU 2014-11-16
@@ -1407,16 +1473,48 @@ public class BASHGenerator extends Generator {
 		//code.add(_indent+"then");
 		addCode("then", _indent, disabled);
 		// END KGU#277 2016-10-13
-		generateCode(_alt.qTrue,_indent+this.getIndent());
+		generateCode(_alt.qTrue, _indent+this.getIndent());
 		
-		if(_alt.qFalse.getSize()!=0) {
+		// START KGU#1204 2025-09-06: Issue #1148 We ought to make use of the ELSIF if possible
+		Element ele = null;
+		// We must cater for the code mapping of the chained sub-alternatives
+		Stack<Element> processedAlts = new Stack<Element>();
+		Stack<Integer> storedLineNos = new Stack<Integer>();
+		while (_alt.qFalse.getSize() == 1 
+				&& (ele = _alt.qFalse.getElement(0)) instanceof Alternative) {
+			_alt = (Alternative)ele;
+			// We must care for the code mapping explicitly here since we circumvent generateCode()
+			markElementStart(_alt, _indent, processedAlts, storedLineNos);
+			appendComment(_alt, _indent);
+			condition = transform(_alt.getUnbrokenText().getLongString()).trim();
+			// START KGU#311 2017-01-05: Enh. #314: We should at least put some File API remarks
+			if (this.usesFileAPI && !disabled) {
+				for (int j = 0; j < Executor.fileAPI_names.length; j++) {
+					if (condition.contains(Executor.fileAPI_names[j] + "(")) {
+						appendComment("TODO File API: Replace the \"" + Executor.fileAPI_names[j] + "\" call by an appropriate shell construct", _indent);
+						break;
+					}
+				}
+			}
+			// END KGU#311 2017-01-05
+			addCode("elif "+ finishCondition(condition),
+					_indent, ele.isDisabled(false));
+			addCode("then",
+					_indent, ele.isDisabled(false));
+			generateCode(_alt.qTrue, _indent+this.getIndent());
+		}
+		// END KGU#1204 2025-09-06
+		
+		if (_alt.qFalse.getSize() != 0) {
 			
 			// START KGU#277 2016-10-13: Enh. #270
 			//code.add(_indent+"");
-			//code.add(_indent+"else");			
-			if (!code.get(code.count()-1).trim().isEmpty()) {
-				addCode("", "", disabled);
-			}
+			//code.add(_indent+"else");
+			// START KGU#1204 2025-09-06: Issue #1148 Unnecessary blank line dropped
+			//if (!code.get(code.count()-1).trim().isEmpty()) {
+			//	addCode("", "", disabled);
+			//}
+			// END KGU#1204 2025-09-06
 			addCode("else", _indent, disabled);			
 			// END KGU#277 2016-10-13
 			generateCode(_alt.qFalse,_indent+this.getIndent());
@@ -1426,19 +1524,24 @@ public class BASHGenerator extends Generator {
 		// START KGU#277 2016-10-13: Enh. #270
 		//code.add(_indent+"fi");
 		//addSepaLine();
-		addCode("fi", _indent, disabled);
+		// START KGU#1206 2025-09-07: Issue #1223 Try mechanism
+		//addCode("fi", _indent, disabled);
+		addCode("fi" + this.getLineEnd(_alt), _indent, disabled);
+		// END KGU#1206 2025-09-07
 		addCode("", "", disabled);
 		// END KGU#277 2016-10-13
-		
+
+		// START KGU#1204 2025-09-06: Issue #1148 Accomplish the code map for the processed child alternatives
+		markElementEnds(processedAlts, storedLineNos);
+		// END KGU#1204 2025-09-06
+	
 	}
 	
 	@Override
 	protected void generateCode(Case _case, String _indent) {
 		
 		boolean disabled = _case.isDisabled(false);
-		if (code.count() > 0 && !code.get(code.count()-1).trim().isEmpty()) {
-			addCode("", "", disabled);
-		}
+		addSepaLine();
 		// START KGU 2014-11-16
 		appendComment(_case, _indent);
 		// END KGU 2014-11-16
@@ -1462,18 +1565,20 @@ public class BASHGenerator extends Generator {
 			// START KGU#755 2019-11-08: Bugfix #769 - more precise splitting necessary
 			//addCode(this.getIndent() + unbrokenText.get(i+1).trim().replace(",", "|") + ")", _indent, disabled);
 			StringList items = Element.splitExpressionList(unbrokenText.get(i+1).trim(), ",");
-			addCode(this.getIndent() + items.concatenate("|") + ")", _indent, disabled);
+			addCode(items.concatenate("|") + ")", _indent+this.getIndent(), disabled);
 			// END KGU#755 2019-11-08
 			// END KGU#453 2017-11-02
 			// END KGU#277 2016-10-14
-			// START KGU#15 2015-11-02
-			generateCode((Subqueue) _case.qs.get(i),_indent+this.getIndent()+this.getIndent()+this.getIndent());
-			addCode(";;", _indent + this.getIndent(), disabled);
+			// START KGU#1207 2025-09-06: Bugfix #1222.1 Indentation was one level too deep
+			//generateCode((Subqueue) _case.qs.get(i), _indent+this.getIndent()+this.getIndent()+this.getIndent());
+			generateCode((Subqueue) _case.qs.get(i), _indent+this.getIndent()+this.getIndent());
+			// END KGU#1207 2025-09-06
+			addCode(";;", _indent+this.getIndent(), disabled);
 		}
 		
 		// START KGU#1178 2025-07-03: Bugfix #447 This might have gone wrong with broken lines...
 		//if(!_case.getText().get(_case.qs.size()).trim().equals("%"))
-		if(!unbrokenText.get(_case.qs.size()).trim().equals("%"))
+		if (!unbrokenText.get(_case.qs.size()).trim().equals("%"))
 		// END KGU#1178 2025-07-03
 		{
 			addCode("", "", disabled);
@@ -1481,7 +1586,10 @@ public class BASHGenerator extends Generator {
 			generateCode((Subqueue) _case.qs.get(_case.qs.size()-1),_indent+this.getIndent()+this.getIndent());
 			addCode(";;", _indent+this.getIndent(), disabled);
 		}
-		addCode("esac", _indent, disabled);
+		// START KGU#1206 2025-09-07: Issue #1223 Try mechanism
+		//addCode("esac", _indent, disabled);
+		addCode("esac" + this.getLineEnd(_case), _indent, disabled);
+		// END KGU#1206 2025-09-07
 		addCode("", "", disabled);
 	}
 	
@@ -1596,7 +1704,10 @@ public class BASHGenerator extends Generator {
 		//code.add("");
 		addCode("do", _indent, disabled);
 		generateCode(_for.getBody(),_indent+this.getIndent());
-		addCode("done", _indent, disabled);	
+		// START KGU#1206 2025-09-07: Issue #1223 Try mechanism
+		//addCode("done", _indent, disabled);
+		addCode("done" + this.getLineEnd(_for), _indent, disabled);
+		// END KGU#1206 2025-09-07
 		addCode("", "", disabled);
 		// END KGU#277 2016-10-14
 
@@ -1645,7 +1756,10 @@ public class BASHGenerator extends Generator {
 		//code.add("");
 		addCode("do", _indent, disabled);
 		generateCode(_while.getBody(),_indent+this.getIndent());
-		addCode("done", _indent, disabled);
+		// START KGU#1206 2025-09-07: Issue #1223 Try mechanism
+		//addCode("done", _indent, disabled);
+		addCode("done" + this.getLineEnd(_while), _indent, disabled);
+		// END KGU#1206 2025-09-07
 		addCode("", "", disabled);
 		// END KGU#277 2016-10-14
 		
@@ -1692,7 +1806,10 @@ public class BASHGenerator extends Generator {
 		// START KGU#811 2020-02-21: Bugfix #824
 		addCode(this.finishCondition(condition) + " || break", _indent + getIndent(), disabled);
 		// END KGU#811 2020-02-21
-		addCode("done", _indent, disabled);
+		// START KGU#1206 2025-09-07: Issue #1223 Try mechanism
+		//addCode("done", _indent, disabled);
+		addCode("done" + this.getLineEnd(_repeat), _indent, disabled);
+		// END KGU#1206 2025-09-07
 		addCode("", "", disabled);
 		
 	}
@@ -1719,7 +1836,10 @@ public class BASHGenerator extends Generator {
 		addCode("while :", _indent, disabled);
 		addCode("do", _indent, disabled);
 		generateCode(_forever.getBody(), _indent + this.getIndent());
-		addCode("done", _indent, disabled);
+		// START KGU#1206 2025-09-07: Issue #1223 Try mechanism
+		//addCode("done", _indent, disabled);
+		addCode("done" + this.getLineEnd(_forever), _indent, disabled);
+		// END KGU#1206 2025-09-07
 		addCode("", "", disabled);
 		// END KGU#277 2016-10-14
 		
@@ -1731,6 +1851,9 @@ public class BASHGenerator extends Generator {
 			// START KGU 2014-11-16
 			appendComment(_call, _indent);
 			// END KGU 2014-11-16
+			// START KGU#1206 2025-09-07: Issue #1223 Try mechanism
+			String lineEnd = this.getLineEnd(_call);
+			// END KGU#1206 2025-09-07
 			// START KGU#277 2016-10-14: Enh. #270
 			boolean disabled = _call.isDisabled(false);
 			// END KGU#277 2016-10-14
@@ -1740,8 +1863,17 @@ public class BASHGenerator extends Generator {
 				String line = callText.get(i);
 				// START KGU#277 2016-10-14: Enh. #270
 				//code.add(_indent+transform(_call.getText().get(i)));
-				addCode(transform(line), _indent, disabled);
+				// START KGU#1206 2025-09-07: Issue #1223 Try mechanism
+				//addCode(transform(line), _indent, disabled);
+				addCode(transform(line) + lineEnd, _indent, disabled);
+				// END KGU#1206 2025-09-07
 				// END KGU#277 2016-10-14
+				// START KGU#1205 2025-09-06: Bugfix #1210 Avoid all workarounds on suppressTransformation
+				if (suppressTransformation) {
+					// We assume the user wrote shell-compatible code, so it's all done...
+					continue;
+				}
+				// END KGU#1205 2025-09-06
 				// START KGU#803 2020-02-16: Issue #816
 				Function fct = _call.getCalledRoutine();
 				if (fct != null && fct.isFunction() && Instruction.isAssignment(line)) {
@@ -1775,24 +1907,39 @@ public class BASHGenerator extends Generator {
 									}
 								}
 								if (isArray) {
-									addCode(makeArrayCopyAssignment(target, resultName, false, root.constants.containsKey(target), false), _indent, disabled);
+									// START KGU#1206 2025-09-07: Issue #1223 Try mechanism
+									//addCode(makeArrayCopyAssignment(target, resultName, false, root.constants.containsKey(target), false), _indent, disabled);
+									addCode(makeArrayCopyAssignment(target, resultName, false, root.constants.containsKey(target), false) + lineEnd,
+											_indent, disabled);
+									// END KGU#1206 2025-09-07
 									wasDefHandled(root, target, true); 	// Set the handled flag
 									done = true;
 								}
 								else if (isRecord) {
 									if (!wasDefHandled(root, target, true)) {
 										// We must ignore if target is a constant, otherwise we couldn't fill it
-										addCode(this.getAssocDeclarator(false) + target, _indent, disabled);
+										// START KGU#1206 2025-09-07: Issue #1223 Try mechanism
+										//addCode(this.getAssocDeclarator(false) + target, _indent, disabled);
+										addCode(this.getAssocDeclarator(false) + target + lineEnd,
+												_indent, disabled);
+										// END KGU#1206 2025-09-07
 									}
 									addCode("for index" + routineId + " in \"${" + source + "keys[@]}\"; do", _indent, disabled);
 									addCode(target + "[${" + resultName + "keys[$index" + routineId + "]}]=${" + resultName + "values[$index" + routineId + "]}", _indent+this.getIndent(), disabled);
-									addCode("done", _indent, disabled);
+									// START KGU#1206 2025-09-07: Issue #1223 Try mechanism
+									//addCode("done", _indent, disabled);
+									addCode("done" + lineEnd, _indent, disabled);
+									// END KGU#1206 2025-09-07
 									done = true;
 								}
 							}
 							if (!done) {
-								addCode(transform(tokens.concatenate(null, 0, tokens.indexOf("<-")+1) + source),
+								// START KGU#1206 2025-09-07: Issue #1223 Try mechanism
+								//addCode(transform(tokens.concatenate(null, 0, tokens.indexOf("<-")+1) + source),
+								//		_indent, disabled);
+								addCode(transform(tokens.concatenate(null, 0, tokens.indexOf("<-")+1) + source) + lineEnd,
 										_indent, disabled);
+								// END KGU#1206 2025-09-07
 							}
 						}
 					}
@@ -1815,13 +1962,20 @@ public class BASHGenerator extends Generator {
 			String preReturn = CodeParser.getKeywordOrDefault("preReturn","return").trim();
 			// END KGU#803 2020-02-16
 			StringList jumpText = _jump.getUnbrokenText();
-			for (int i=0; i < jumpText.count(); i++)
+			for (int i = 0; i < jumpText.count(); i++)
 			{
 				String line = jumpText.get(i);
 				// FIXME (KGU 2016-03-25): Handle the kinds of exiting jumps!
 				// START KGU#803 2020-02-16: Issue #816
 				if (root.isSubroutine() && (line.matches("^" + Matcher.quoteReplacement(preReturn) + "(\\W.*|$)"))) {
 					String expr = line.substring(preReturn.length()).trim();
+					// START KGU#1205 2025-09-06: Issue #1210 no workaround with suppressTransformation!
+					if (suppressTransformation) {
+						addCode("return " + expr, _indent, disabled);
+						// Further lines are hardly interesting (not reachable)...
+						break;
+					}
+					// END KGU#1205 2025-09-05
 					generateResultVariables(expr, _indent, disabled);
 					// In case of an endstanding return we don't need a formal return command
 					if (i < jumpText.count()-1 || root.children.getElement(root.children.getSize()-1) != _jump) {
@@ -1830,7 +1984,22 @@ public class BASHGenerator extends Generator {
 				}
 				// START KGU#1102 2023-11-07: Bugfix #1109 There is such thing as try/catch/throw in bash
 				else if (Jump.isThrow(line)) {
-					appendComment(line + " (FIXME!)", _indent);
+					// START KGU#1206 2025-09-08: Enh. #1223 We must either fail or return
+					//appendComment(line + " (FIXME!)", _indent);
+					appendComment(line, _indent);
+					if (findEnclosingTry(_jump) != null) {
+						// The context will be &&-ed such that failing leads up to the catch
+						addCode("false", _indent, disabled);
+					}
+					else if (root.isSubroutine()) {
+						// In this case we just return an arbitrary non-zero value
+						addCode("return 42", _indent, disabled);
+					}
+					else {
+						// The only remaining opportunity is to exit
+						addCode("exit 42", _indent, disabled);						
+					}
+					// END KGU#1206 2025-09-08
 				}
 				// END KGU#1102 2023-11-07
 				else
@@ -1854,11 +2023,20 @@ public class BASHGenerator extends Generator {
 		appendComment("==========================================================", _indent);
 		appendComment("================= START PARALLEL SECTION =================", _indent);
 		appendComment("==========================================================", _indent);
-		String indent1 = _indent + this.getIndent();
+		// START KGU#1206 2025-09-07: Issue #1223  Approach to translate TRY elements
+		String lineEnd = this.getLineEnd(_para);
+		String indent0 = _indent;
+		if (!lineEnd.isBlank()) {
+			// This is a nested Try!
+			addCode("{", _indent, disabled);
+			indent0 += this.getIndent();
+		}
+		// END KGU#1206 2025-09-07
+		String indent1 = indent0 + this.getIndent();
 		String varName = "pids" + Integer.toHexString(_para.hashCode());
 		// START KGU#277 2016-10-14: Enh. #270
 		//code.add(_indent + varName + "=\"\"");
-		addCode(varName + "=\"\"", _indent , disabled);
+		addCode(varName + "=\"\"", indent0 , disabled);
 		// END KGU#277 2016-10-14
 		for (Subqueue q : _para.qs)
 		{
@@ -1867,34 +2045,151 @@ public class BASHGenerator extends Generator {
 			//generateCode(q, indent1);
 			//code.add(_indent + ") &");
 			//code.add(_indent + varName + "=\"${" + varName + "} $!\"");
-			addCode("(", _indent, disabled);
+			addCode("(", indent0, disabled);
 			generateCode(q, indent1);
-			addCode(") &", _indent, disabled);
-			addCode(varName + "=\"${" + varName + "} $!\"", _indent, disabled);
+			addCode(") &", indent0, disabled);
+			addCode(varName + "=\"${" + varName + "} $!\"", indent0, disabled);
 			// END KGU#277 2016-10-14
 		}
 		// START KGU#277 2016-10-14: Enh. #270
-		addCode("wait ${" + varName + "}", _indent, disabled);
+		addCode("wait ${" + varName + "}", indent0, disabled);
 		// END KGU#277 2016-10-14
+		// START KGU#1206 2025-09-07: Issue #1223 Approach to translate TRY elements
+		if (!lineEnd.isBlank()) {
+			addCode("}" + lineEnd, _indent, disabled);			
+		}
+		// END KGU#1206 2025-09-07
 		appendComment("==========================================================", _indent);
 		appendComment("================== END PARALLEL SECTION ==================", _indent);
 		appendComment("==========================================================", _indent);
 	}
 	// END KGU#174 2016-04-05
 	
-//	public void generateCode(Try _try, String _indent)
-//	{
-//		// TODO
-//		// That is what we might achieve (possibly with () instead of {})
-//		{ # try
-//
-//		    command1 &&
-//		    #save your output
-//
-//		} || { # catch
-//		    # save log for exception 
-//		}
-//	}
+	// START KGU#1206 2025-09-07: Issue #1223 Approach to translate TRY elements
+	@Override
+	public void generateCode(Try _try, String _indent)
+	{
+		// That is what we want to achieve:
+		//trap finallyCode EXIT
+		//{ # try
+		//
+		//    command_1 &&
+		//    command_2 &&
+		//    ...
+		//    command_n &&
+		//    # save your output &&
+		//    true
+		//} || { # catch
+		//    # save log for exception
+		//    command_x1
+		//    ...
+		//    command_xm
+		//}
+		//trap - EXIT
+		//
+		// where finallyCode is a function that contains qFinally code
+		boolean disabled = _try.isDisabled(false);
+		String exceptName = _try.getUnbrokenText().getLongString().trim();
+		String lineEnd = this.getLineEnd(_try);
+		String indent0 = _indent;
+		if (!lineEnd.isBlank()) {
+			// This is a nested Try!
+			addCode("{", _indent, disabled);
+			indent0 += this.getIndent();
+		}
+		String indent1 = indent0 + this.getIndent();
+		String suffix = Integer.toHexString(_try.hashCode());
+		String finallyName = "finally" + suffix;
+		String trapVar = "trap" + suffix;
+		if (!_try.qFinally.isNoOp()) {
+			// Cache the former state of trap EXIT
+			// trap -p EXIT either yields a string "trap -- command EXIT" or nothing
+			addCode(trapVar + "=$( trap -p EXIT )", _indent, disabled);
+			// Replace the empty string by "-" or extract the command
+			addCode("if [ -z \"$"+trapVar+"\" ] ; then " + trapVar + "=\"-\"; else "
+			+ trapVar + "=${"+trapVar+":8}; "+ trapVar + "=${" + trapVar + "% *}; fi",
+			_indent, disabled);
+			addCode("if [ \"${"+trapVar+":0:1}\" = \"'\" ] ; then "
+			+ trapVar + "=${" + trapVar + ":1} ; "
+			+ trapVar + "=${" + trapVar + "%\\'*}; fi",
+			_indent, disabled);
+			// Now establish the new EXIT trap for this Try
+			addCode("trap \"" + finallyName + " trapped\" EXIT", _indent, disabled);
+		}
+		// Generate the try section
+		addCode("{ " + this.commentSymbolLeft() + " try", indent0, disabled);
+		generateCode(_try.qTry, indent1);
+		// Connect the catch section
+		addCode("} || { " + this.commentSymbolLeft() +
+				" catch " + exceptName,
+				indent0, disabled);
+		if (!suppressTransformation) {
+			// Assign the result status to the exception variable
+			addCode(transform(exceptName) + "=$?", indent1, disabled);
+		}
+		// Generate the actual catch code
+		generateCode(_try.qCatch, indent1);
+		if (!_try.qFinally.isNoOp()) {
+			// Append the finally precautions
+			addCode("}", indent0, disabled);
+			if (!lineEnd.isEmpty()) {
+				// Cache the result status of try+catch
+				addCode("try"+suffix + "=$?" + lineEnd, indent0, disabled);
+			}
+			// Restore the previous trap situation
+			addCode("trap \"${" + trapVar + "}\" EXIT", indent0, disabled);
+			addCode("{ " + this.commentSymbolLeft() + " finally", indent0, disabled);
+			// Generate the actual finally function call
+			addCode(finallyName + " okay", indent1, disabled);
+		}
+		addCode("}", indent0, disabled);
+		if (!lineEnd.isBlank()) {
+			addCode("}" + lineEnd, _indent, disabled);
+		}
+	}
+
+	/**
+	 * Searches for a closest {@link Try} element such that the given element
+	 * {@code _ele} is statically part of the substructure of the try section
+	 * of which. (In case of nested Try structures the method will return the
+	 * innermost one. Will not return Try elements containing {@code _ele} in
+	 * the catch or finally section.
+	 * 
+	 * @param _ele - an element that is assumed to be part of the substructure
+	 *     of a try block.
+	 * @return ether the statically enclosing Try element or {@code null}.
+	 */
+	protected Try findEnclosingTry(Element _ele)
+	{
+		Element parent = _ele.parent;
+		while (parent != null && !(parent instanceof Try)) {
+			_ele = parent;
+			parent = _ele.parent;
+		}
+		if (parent instanceof Try && _ele == ((Try)parent).qTry) {
+			return (Try)parent;
+		}
+		return null;
+	}
+	
+	/**
+	 * Finds out whether the given _element is part of a try block and if so
+	 * returns an AND operator (between commands) as line end. Otherwise
+	 * returns an empty string.
+	 * 
+	 * @param _ele - an arbitrary element that might be part of the substructure
+	 *     of a try block.
+	 * @return either " &&" or "".
+	 */
+	protected String getLineEnd(Element _ele)
+	{
+		String lineEnd = "";
+		if (findEnclosingTry(_ele) != null) {
+			lineEnd = " &&";
+		}
+		return lineEnd;
+	}
+	// END KGU#1206 2025-09-07
 
 	// TODO: Decompose this - Result mechanism is missing!
 	@Override
@@ -2055,9 +2350,9 @@ public class BASHGenerator extends Generator {
 		}
 		// END KGU#311 2017-01-05
 		// START KGU#150/KGU#241 2017-01-05: Issue #234 - Provisional support for chr and ord functions
+		boolean builtInAdded = false;
 		if (!this.suppressTransformation)
 		{
-			boolean builtInAdded = false;
 			if (occurringFunctions.contains("chr"))
 			{
 				addSepaLine();
@@ -2094,9 +2389,31 @@ public class BASHGenerator extends Generator {
 				}
 			}
 			// END KGU#803/KGU#807 2020-02-24
-			if (builtInAdded) addSepaLine();
 		}
 		// END KGU#150/KGU#241 2017-01-05
+		// START KGU#1206 2025-09-08: Enh. #1223 Support for Try/Throw
+		// If a user employs finally then it is intended to be translated
+		for (Try _try: this.tryElememts) {
+			if (!_try.qFinally.isNoOp()) {
+				addSepaLine();
+				String fName = "finally" + Integer.toHexString(_try.hashCode());
+				boolean isDisabled = _try.isDisabled(false);
+				String indent1Plus1 = _indent+this.getIndent();
+				addCode("function " + fName + "()", _indent, isDisabled);
+				addCode("{", _indent, isDisabled);
+				addCode("exitCode=$?", indent1Plus1, isDisabled);
+				addCode("arg1=$1", indent1Plus1, isDisabled);
+				generateCode(_try.qFinally, indent1Plus1);
+				addCode("if [ \"$arg1\" = trapped ]", indent1Plus1, isDisabled);
+				addCode("then", indent1Plus1, isDisabled);
+				addCode("exit ${exitCode}", indent1Plus1+this.getIndent(), isDisabled);
+				addCode("fi", indent1Plus1, isDisabled);
+				addCode("}", _indent, isDisabled);
+				builtInAdded = true;
+			}
+		}
+		if (builtInAdded) addSepaLine();
+		// END KGU#1206 2025-09-08
 	}
 	
 	/**
