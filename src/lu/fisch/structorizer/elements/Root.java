@@ -7808,6 +7808,7 @@ public class Root extends Element {
 					args.remove(i);
 				}
 			}
+			// If a subroutine variable still occurs in the outer diagram it be be needed as result
 			for (int i = 0; i < subVars.count(); i++) {
 				String varName = subVars.get(i);
 				if (vars.contains(varName) || uninitializedVars1.contains(varName)) {
@@ -7916,16 +7917,19 @@ public class Root extends Element {
 		return typeDecl;
 	}
 	/**
-	 * This is practically a very lean version of the {@link #analyse(StringList)} method. We simply don't create
-	 * Analyser warnings but collect variable names which are somewhere used without (unconditioned)
-	 * initialization. These are candidates for parameters.
+	 * This is practically a very lean version of the {@link #analyse(StringList)}
+	 * method. We simply don't create Analyser warnings but collect variable names
+	 * which are somewhere used without (unconditioned) initialization. These are
+	 * candidates for parameters.
 	 * @param _node - The Subqueue recursively to be scrutinized for variables
-	 * @param _vars - Names of variables, which had been introduced before (will be enhanced here)
-	 * @param _args - collects the names of not always initialized variables (potential arguments) 
+	 * @param _vars - Names of variables, which had been introduced before (will
+	 *    be enhanced here)
+	 * @param _args - collects the names of not always initialized variables
+	 *    (potential arguments)
 	 */
 	private void getUninitializedVars(Subqueue _node, StringList _vars, StringList _args) {
 		
-		for (int i=0; i<_node.getSize(); i++)
+		for (int i = 0; i < _node.getSize(); i++)
 		{
 			Element ele = _node.getElement(i);
 			if (ele.isDisabled(true)) continue;
@@ -7939,7 +7943,7 @@ public class Root extends Element {
 
 			if (!eleClassName.equals("Repeat"))
 			{
-				for (int j=0; j<myUsedVars.count(); j++)
+				for (int j = 0; j < myUsedVars.count(); j++)
 				{
 					String myUsed = myUsedVars.get(j);
 					// START KGU#343 2017-02-07: Ignore pseudo-variables (markers)
@@ -7989,7 +7993,7 @@ public class Root extends Element {
 					if (fVars.contains(varName)) { _vars.addIfNew(varName); }
 				}
 			}
-			else if(eleClassName.equals("Case"))
+			else if (eleClassName.equals("Case"))
 			{
 				Case caseEle = ((Case) ele);
 				int nBranches = caseEle.qs.size();	// Number of branches
