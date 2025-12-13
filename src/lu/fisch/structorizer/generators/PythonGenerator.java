@@ -1145,6 +1145,7 @@ public class PythonGenerator extends Generator
 				}
 			}
 			String args = used.concatenate(",");
+			// Force a list even for a single argument
 			if (used.count() == 1) {
 				args += ",";
 			}
