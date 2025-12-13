@@ -26,8 +26,6 @@
 
 package lu.fisch.structorizer.generators;
 
-import java.util.ArrayList;
-
 /******************************************************************************************************
  *
  *      Author:         Jan Peter Klippel
@@ -95,6 +93,7 @@ import java.util.ArrayList;
  *      Kay Gürtzig         2025-07-03  Some missing Override annotations added
  *      Kay Gürtzig         2025-08-28  Bugfix #1210: suppressTransformation wasn't consistently considered
  *      Kay Gürtzig         2025-09-02  Issue #1215: Coding of loop exits (leave) revised (goto eliminated)
+ *      Kay Gürtzig         2025-12-12  Issue #800: JUMP export converted to TokenLists.
  *
  ******************************************************************************************************
  *
@@ -117,6 +116,7 @@ import java.util.ArrayList;
  *
  ******************************************************************************************************///
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Stack;
 import java.util.Map.Entry;
@@ -969,9 +969,10 @@ public class PerlGenerator extends Generator {
 			//code.add(_indent+this.getIndent()+"case ("+_case.getText().get(i+1).trim()+") {");
 			// START KGU#453 2017-11-02: Issue #447
 			//String selectors = _case.getText().get(i+1).trim();
+			// FIXME Should the selector lists be transformed?
 			String selectors = unbrokenText.get(i+1).trim();
 			// END KGU#453 2017-11-02
-			if (Syntax.splitExpressionList(selectors, ",").count() > 1)	// Is it an enumeration of values? 
+			if (Syntax.splitExpressionList(selectors, ",").count() > 2)	// Is it an enumeration of values? 
 			{
 				selectors = "[" + selectors + "]";
 			}
@@ -1238,35 +1239,35 @@ public class PerlGenerator extends Generator {
 			// In case of an empty text generate a break instruction by default.
 			boolean isEmpty = true;
 			
-			StringList lines = _jump.getUnbrokenText();
-			String preReturn = Syntax.getKeywordOrDefault("preReturn", "return");
-			String preExit   = Syntax.getKeywordOrDefault("preExit", "exit");
-			String preLeave  = Syntax.getKeywordOrDefault("preLeave", "leave");
+			ArrayList<TokenList> lines = _jump.getUnbrokenTokenText();
+			//String preReturn = Syntax.getKeywordOrDefault("preReturn", "return");
+			//String preExit   = Syntax.getKeywordOrDefault("preExit", "exit");
+			//String preLeave  = Syntax.getKeywordOrDefault("preLeave", "leave");
 			// START KGU#686 2019-03-21: Enh. #56
-			String preThrow  = Syntax.getKeywordOrDefault("preThrow", "throw");
+			//String preThrow  = Syntax.getKeywordOrDefault("preThrow", "throw");
 			// END KGU#686 2019-03-21
-			for (int i = 0; isEmpty && i < lines.count(); i++) {
-				String line = transform(lines.get(i)).trim();
-				if (!line.isEmpty())
+			for (int i = 0; isEmpty && i < lines.size(); i++) {
+				TokenList tokens = lines.get(i);
+				if (!tokens.isBlank())
 				{
 					isEmpty = false;
 				}
 				// START KGU#74/KGU#78 2015-11-30: More sophisticated jump handling
 				//code.add(_indent + line + ";");
-				if (Jump.isReturn(line))
+				if (Jump.isReturn(tokens))
 				{
-					addCode("return " + line.substring(preReturn.length()).trim() + ";",
+					addCode(("return " + transform(tokens.subSequenceToEnd(1))).trim() + ";",
 							_indent, isDisabled);
 				}
-				else if (Jump.isExit(line))
+				else if (Jump.isExit(tokens))
 				{
-					addCode("exit(" + line.substring(preExit.length()).trim() + ");",
+					addCode("exit(" + transform(tokens.subSequenceToEnd(1)).trim() + ");",
 							_indent, isDisabled);
 				}
 				// START KGU#686 2019-03-21: Enh. #56
-				else if (Jump.isThrow(line))
+				else if (Jump.isThrow(tokens))
 				{
-					addCode("die " + line.substring(preThrow.length()).trim() + ";",
+					addCode(("die " + transform(tokens.subSequenceToEnd(1))).trim() + ";",
 					_indent, isDisabled);
 				}
 				// END KGU#686 2019-03-21
@@ -1278,7 +1279,7 @@ public class PerlGenerator extends Generator {
 					if (ref.intValue() < 0)
 					{
 						appendComment("FIXME: Structorizer detected this illegal jump attempt:", _indent);
-						appendComment(line, _indent);
+						appendComment(Syntax.decodeLine(tokens).getString(), _indent);
 						label = "__ERROR__";
 					}
 					// START KGU#1196 2025-09-02: Bugfix #1215 We may use "last" instead
@@ -1286,7 +1287,10 @@ public class PerlGenerator extends Generator {
 					addCode("last " + label + ";", _indent, isDisabled);
 					// END KGU#1196 2025-09-02
 				}
-				else if (line.matches(Matcher.quoteReplacement(preLeave)+"([\\W].*|$)"))
+				// START KGU#790 2025-12-12: Issue #800 token-related mechanism
+				//else if (line.matches(Matcher.quoteReplacement(preLeave)+"([\\W].*|$)"))
+				else if (Jump.isLeave(tokens))
+				// END KGU#790 2025-12-12
 				{
 					// Strange case: neither matched nor rejected - how can this happen?
 					// Try with an ordinary break instruction and a funny comment
@@ -1296,7 +1300,7 @@ public class PerlGenerator extends Generator {
 				else if (!isEmpty)
 				{
 					appendComment("FIXME: jump/exit instruction of unrecognised kind!", _indent);
-					appendComment(line, _indent);
+					appendComment(Syntax.decodeLine(tokens).getString(), _indent);
 				}
 				// END KGU#74/KGU#78 2015-11-30
 			}

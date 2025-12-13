@@ -137,6 +137,7 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig             2025-09-04      Issue #1123 slightly revised on occasion of bugfix #1216 (JsGenerator)
  *      Kay Gürtzig             2025-09-05      Bugfix #1219: generateCode(Try, String) must avoid sticky Try element disabling
  *      Kay Gürtzig             2025-09-24      Bugfix #1219: Thread-safe version
+ *      Kay Gürtzig             2025-12-12      Issue #800: Generation of Jumps with unresolved internal keywords fixed
  *
  ******************************************************************************************************
  *
@@ -1343,7 +1344,7 @@ public class CGenerator extends Generator {
 		// END KGU#1201 2025-09-24
 		boolean isTypeDef = Instruction.isTypeDefinition(_tokens, this.typeMap);
 		// START KGU#796 2020-02-10: Bugfix #808
-		Syntax.unifyOperators(_tokens, false);
+		Syntax.unifyOperators(_tokens, this.suppressTransformation);
 		// END KGU#796 2020-02-10
 		TokenList exprTokens = null;	// Tokens of the expression in case of an assignment
 		String expr = null;	// Original expression
@@ -1713,7 +1714,10 @@ public class CGenerator extends Generator {
 		else if (Jump.isReturn(_tokens)) {
 			_tokens.set(0, "return");
 			if (!this.suppressTransformation) {
-				codeLine = transform(_tokens.getString());
+				codeLine = transform(_tokens);
+			}
+			else {
+				codeLine = _tokens.getString();
 			}
 		}
 		// END KGU#1177 2025-02-16
@@ -2473,6 +2477,7 @@ public class CGenerator extends Generator {
 
 			ArrayList<TokenList> tokenLines = _jump.getUnbrokenTokenText();
 			TokenList tokens = null;
+			// Skip empty lines
 			for (int i = 0; (tokens == null || tokens.isBlank()) && i < tokenLines.size(); i++) {
 				tokens = tokenLines.get(i);
 			}
@@ -2499,6 +2504,9 @@ public class CGenerator extends Generator {
 			{
 				Integer ref = this.jumpTable.get(_jump);
 				String label = this.labelBaseName + ref;
+				// START KGU#790 2025-12-12: Issue #800 decode internal keywords
+				tokens = Syntax.decodeLine(tokens);
+				// END KGU#790 2025-12-12
 				// START KGU#1193 2025-08-29: Issue #1210 Respect suppressTransformation
 				if (suppressTransformation && !_jump.isLeave()) {
 					if (!tokens.get(tokens.size()-1).equals(";")) {
@@ -2511,7 +2519,7 @@ public class CGenerator extends Generator {
 					if (ref.intValue() < 0)
 					{
 						appendComment("FIXME: Structorizer detected this illegal jump attempt:", _indent);
-						appendComment("throw " + tokens.subSequenceToEnd(1).getString(), _indent);
+						appendComment(tokens.getString(), _indent);
 						label = "__ERROR__";
 					}
 					addCode(this.getMultiLevelLeaveInstr() + " " + label + ";", _indent, isDisabled);
@@ -2530,6 +2538,9 @@ public class CGenerator extends Generator {
 			}
 			else if (!isEmpty)
 			{
+				// START KGU#790 2025-12-12: Issue #800 decode internal keywords
+				tokens = Syntax.decodeLine(tokens);
+				// END KGU#790 2025-12-12
 				// START KGU#1193 2025-08-29: Issue #1210 Respect suppressTransformation
 				if (suppressTransformation) {
 					if (!tokens.get(tokens.size()-1).equals(";")) {

@@ -2494,6 +2494,7 @@ public class OberonGenerator extends Generator {
 		// FIXME: An include diagram should be handled in yet another way (separate file)...
 		// START KGU#790 2025-08-16: Issue #800
 		//else if (!_root.isProgram() /*&& this.optionExportSubroutines()*/)
+		else
 		{
 			if (needsBitOr) {
 				for (String line: BIT_OR) {

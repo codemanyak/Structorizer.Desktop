@@ -20,8 +20,6 @@
 
 package lu.fisch.structorizer.generators;
 
-import java.util.ArrayList;
-
 /******************************************************************************************************
  *
  *      Author:         Daniel Spittank
@@ -98,6 +96,8 @@ import java.util.ArrayList;
  *      Kay Gürtzig         2025-02-06      Bugfix #1188: The transformation of C-style array initialisations was wrong
  *      Kay Gürtzig         2025-02-16      Bugfix #1192: Translation of tail return instruction keywords
  *      Kay Gürtzig         2025-07-03      Several missing Override annotations added.
+ *      Kay Gürtzig         2025-12-13      Issue #800: JUMP generation converted to work on TokenLists,
+ *                                          Instruction export reorganised with respect to bugfix #1063
  *
  ******************************************************************************************************
  *
@@ -137,6 +137,7 @@ import java.util.ArrayList;
  * 
  ******************************************************************************************************///
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -670,10 +671,12 @@ public class PythonGenerator extends Generator
 				String codeLine = transform(tokens.getString());
 				boolean done = false;
 
-				// START KGU#1053 2022-08-14: Bugfix #1061 - hands off in "no conversion" mode!
-				if (!this.suppressTransformation)
-				{
-				// END KGU#1053 2022-08-14
+				// START KGU#1177 2025-02-16: Bugfix #1192: Transform return keyword
+				if (Jump.isReturn(tokens)) {
+					codeLine = "return " + transform(tokens.subSequenceToEnd(1));
+				}
+				else {
+				// END KGU#1177 2025-02-16
 					// START KGU#653 2019-02-14: Enh. #680 - face input instructions with multiple variables
 					StringList inputItems = Instruction.getInputItems(tokens);
 					// START KGU#799 2020-02-13: Bugfix #812
@@ -690,10 +693,10 @@ public class PythonGenerator extends Generator
 					}
 					// END KGU#799 2020-02-13
 					if (inputItems != null && inputItems.count() > 2) {
-						String inputKey = Syntax.getKeyword("input") + " ";
+						String inputKey = Syntax.key2token("input") + " ";
 						String prompt = inputItems.get(0);
 						if (!prompt.isEmpty()) {
-							addCode(transform(Syntax.getKeyword("output") + " " + prompt), _indent, isDisabled);
+							addCode(transform(Syntax.key2token("output") + " " + prompt), _indent, isDisabled);
 						}
 						for (int j = 1; j < inputItems.count(); j++) {
 							String item = inputItems.get(j);
@@ -716,33 +719,34 @@ public class PythonGenerator extends Generator
 						// END KGU#599 2018-10-17
 					}
 					// START KGU#388 2017-10-02: Enh. #423 translate record types into mutable recordtype
-					else if (Instruction.isTypeDefinition(tokens, null)) {
-						mtchTypename.reset(tokens.getString()).matches();
-						String typeName = mtchTypename.group(1);
-						done = this.generateTypeDef(root, typeName, null, _indent, isDisabled);
-					}
-					// END KGU#388 2017-10-02
-					// START KGU#767 2019-11-24: Bugfix #782 We must handle variable declarations as unspecified initialisations
-					else if (Instruction.isMereDeclaration(tokens)) {
-						done = generateDeclaration(tokens, root, _indent, isDisabled);
-					}
-					// END KGU#767 2019-11-24
-					// START KGU#799 2020-02-13: Bugfix #812
-					else if (Instruction.isAssignment(tokens) && root.isInclude()) {
-						String var = this.getAssignedVarname(tokens, true);
-						if (var != null) {
-							this.wasDefHandled(root, var, true, true);	// mark var as defined if it isn't
+					// START KGU#1053 2022-08-14: Bugfix #1061 - hands off in "no conversion" mode!
+					//else if (Instruction.isTypeDefinition(tokens, null)) {
+					else if (!this.suppressTransformation)
+					{
+						if (Instruction.isTypeDefinition(tokens, null)) {
+					// END KGU#1053 2022-08-14
+							mtchTypename.reset(tokens.getString()).matches();
+							String typeName = mtchTypename.group(1);
+							done = this.generateTypeDef(root, typeName, null, _indent, isDisabled);
 						}
+						// END KGU#388 2017-10-02
+						// START KGU#767 2019-11-24: Bugfix #782 We must handle variable declarations as unspecified initialisations
+						else if (Instruction.isMereDeclaration(tokens)) {
+							done = generateDeclaration(tokens, root, _indent, isDisabled);
+						}
+						// END KGU#767 2019-11-24
+						// START KGU#799 2020-02-13: Bugfix #812
+						else if (Instruction.isAssignment(tokens) && root.isInclude()) {
+							String var = this.getAssignedVarname(tokens, true);
+							if (var != null) {
+								this.wasDefHandled(root, var, true, true);	// mark var as defined if it isn't
+							}
+						}
+						// END KGUU#799 2020-02-13
+					// START KGU#1053 2022-08-14: Bugfix #1061 - hands off in "no conversion" mode!
 					}
-					// END KGUU#799 2020-02-13
-					// START KGU#1177 2025-02-16: Bugfix #1192: Transform return keyword
-					else if (Jump.isReturn(tokens)) {
-						codeLine = "return " + transform(tokens.subSequenceToEnd(1).getString());
-					}
-					// END KGU#1177 2025-02-16
-							// START KGU#1053 2022-08-14: Bugfix #1061 - hands off in "no conversion" mode!
+					// END KGU#1053 2022-08-14
 				}
-				// END KGU#1053 2022-08-14
 				// START KGU#1089 2023-10-18: Issue #980 Reject a multi-var declaration
 				if (!done && (Instruction.isAssignment(tokens))
 						&& this.getAssignedVarname(tokens, false) == null) {
@@ -837,7 +841,7 @@ public class PythonGenerator extends Generator
 			//StringList constants = StringList.explode(lines.get(i+1), ",");
 			StringList constants = Syntax.splitExpressionList(lines.get(i + 1), ",");
 			// END KGU#755 2019-11-08
-			for (int j = 0; j < constants.count(); j++)
+			for (int j = 0; j < constants.count()-1; j++)
 			{
 				if (j > 0) caseline = caseline + " or ";
 				caseline = caseline + "(" + condition + ") == " + constants.get(j).trim();
@@ -1029,29 +1033,30 @@ public class PythonGenerator extends Generator
 			// In case of an empty text generate a break instruction by default.
 			boolean isEmpty = true;
 
-			StringList lines = _jump.getUnbrokenText();
-			String preReturn = Syntax.getKeywordOrDefault("preReturn", "return");
-			String preLeave  = Syntax.getKeywordOrDefault("preLeave", "leave");
-			String preThrow  = Syntax.getKeywordOrDefault("preThrow", "throw");
-			for (int i = 0; isEmpty && i < lines.count(); i++) {
-				String line = transform(lines.get(i)).trim();
-				if (!line.isEmpty())
+			ArrayList<TokenList> lines = _jump.getUnbrokenTokenText();
+			//String preReturn = Syntax.getKeywordOrDefault("preReturn", "return");
+			//String preLeave  = Syntax.getKeywordOrDefault("preLeave", "leave");
+			//String preThrow  = Syntax.getKeywordOrDefault("preThrow", "throw");
+			for (int i = 0; isEmpty && i < lines.size(); i++) {
+				//String line = transform(lines.get(i)).trim();
+				TokenList tokens = lines.get(i);
+				if (!tokens.isBlank())
 				{
 					isEmpty = false;
 				}
-				if (Jump.isReturn(line))
+				if (Jump.isReturn(tokens))
 				{
-					addCode("return " + line.substring(preReturn.length()).trim(),
+					addCode(("return " + transform(tokens.subSequenceToEnd(1))).trim(),
 							_indent, isDisabled);
 				}
-				else if (Jump.isLeave(line))
+				else if (Jump.isLeave(tokens))
 				{
 					// We may only allow one-level breaks, i. e. there must not be an argument
 					// or the argument must be 1 and a legal label must be associated.
-					String arg = line.substring(preLeave.length()).trim();
+					TokenList argTokens = tokens.subSequenceToEnd(1);
 					Integer label = this.jumpTable.get(_jump);
 					if (label != null && label.intValue() >= 0 &&
-							(arg.isEmpty() || Integer.parseInt(arg) == 1))
+							(argTokens.isBlank() || Integer.parseInt(transform(argTokens).trim()) == 1))
 					{
 						addCode("break", _indent, isDisabled);		
 					}
@@ -1062,11 +1067,12 @@ public class PythonGenerator extends Generator
 					}
 				}
 				// START KGU#686 2019-03-21: Enh. #56
-				else if (Jump.isThrow(line)) {
+				else if (Jump.isThrow(tokens)) {
 					// START KGU#1102 2023-11-08: Bugfix #1109
 					//this.addCode("raise Exception(" + line.substring(preThrow.length()) + ")", _indent, isDisabled);
-					String arg = line.substring(preThrow.length()).trim();
-					if (arg.isEmpty()) {
+					TokenList argTokens = tokens.subSequenceToEnd(1);
+					String arg = transform(argTokens);
+					if (argTokens.isBlank()) {
 						// Could be a rethrow - look for a catch context
 						if (Try.findEnclosingTry(_jump, true) == null) {
 							arg = "Exception(\"FIXME - missing argument!\")";
@@ -1082,7 +1088,7 @@ public class PythonGenerator extends Generator
 				else if (!isEmpty)
 				{
 					appendComment("FIXME: unsupported jump/exit instruction!", _indent);
-					appendComment(line, _indent);
+					appendComment(Syntax.decodeLine(tokens).getString(), _indent);
 				}
 			}
 			if (isEmpty) {
@@ -1130,6 +1136,8 @@ public class PythonGenerator extends Generator
 					// START KGU#819 2020-03-08: Bugfix #831 - In case of a call we can (and must) simply copy the arg list.
 					String line = ((Call)el).getUnbrokenText().get(0);
 					used = Syntax.splitExpressionList(line.substring(line.indexOf("(")+1), ",");
+					// Drop tail
+					used.remove(used.count()-1);
 					for (int j = 0; j < used.count(); j++) {
 						used.set(j, transform(used.get(j)));
 					}

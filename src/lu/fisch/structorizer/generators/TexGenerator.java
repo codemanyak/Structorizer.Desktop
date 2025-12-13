@@ -287,7 +287,7 @@ public class TexGenerator extends Generator {
 		//_input=BString.replace(_input,"<-","\\gets");
 		// START KGU#483 2017-12-30: Bugfix #497 - now done by transformTokens()
 		//_input = transformAssignment(_input);
-		_input = super.transform(_input, false);
+		_input = super.transform(new TokenList(_input), false);
 		_input = _input.replace("_", "\\_");
 		// END KGU#483 2017-12-30
 		

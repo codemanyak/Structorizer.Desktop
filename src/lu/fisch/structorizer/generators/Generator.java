@@ -1905,7 +1905,7 @@ public abstract class Generator extends javax.swing.filechooser.FileFilter imple
 	 */
 	protected String transform(String _input)
 	{
-		return transform(_input, true);
+		return transform(new TokenList(_input), true);
 	}
 
 	/**

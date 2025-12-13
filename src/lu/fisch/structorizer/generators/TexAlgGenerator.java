@@ -738,7 +738,7 @@ public class TexAlgGenerator extends Generator {
 	@Override
 	protected String transform(String _input)
 	{
-		_input = super.transform(_input, true);
+		_input = super.transform(_input);
 		// Escape underscores and blanks
 		_input = _input.replace("_", "\\_");
 		_input = _input.replace(" ","\\ ");

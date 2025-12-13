@@ -26,8 +26,6 @@
 
 package lu.fisch.structorizer.generators;
 
-import java.util.ArrayList;
-
 /******************************************************************************************************
  *
  *      Author:         Markus Grundner
@@ -115,6 +113,7 @@ import java.util.ArrayList;
  *      Kay Gürtzig         2025-09-07      Issue #1223: First approach to implement generateCode(Try, String)
  *      Kay Gürtzig         2025-09-08      Issue #1223: generateCode(Try, String) accomplished (with finally
  *                                          and throw.
+ *      Kay Gürtzig         2025-12-12      Issue #800: Decoding of internal keywords on Jump export
  *
  ******************************************************************************************************
  *
@@ -192,6 +191,7 @@ import java.util.ArrayList;
  *
  ******************************************************************************************************///
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -2065,7 +2065,10 @@ public class BASHGenerator extends Generator {
 				else if (Jump.isThrow(tokens)) {
 					// START KGU#1206 2025-09-08: Enh. #1223 We must either fail or return
 					//appendComment("throw " + transform(tokens.subSequenceToEnd(1).getString() + " (FIXME!)", _indent);
-					appendComment(tokens.getString(), _indent);
+					// START KGU#790 2025-12-12: Issue #800 We must decode internal keywords
+					//appendComment(tokens.getString(), _indent);
+					appendComment(Syntax.decodeLine(tokens).getString(), _indent);
+					// END KGU#790 2025-12-12
 					if (findEnclosingTry(_jump) != null) {
 						// The context will be &&-ed such that failing leads up to the catch
 						addCode("false", _indent, disabled);

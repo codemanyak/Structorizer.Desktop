@@ -88,7 +88,9 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig             2025-07-03      Some missing Override annotations added
  *      Kay Gürtzig             2025-09-02      Bugfix #1210: Free-text FOR loops caused errors in suppressTransition mode,
  *                                              bugfix #1215: The translation of loop exits was totally wrong
- *      Kay Gürtzig             2025-09-05      Issue #882 slightly revised on occasion of bugfix #1216
+ *      Kay Gürtzig             2025-09-05      Issue #882: slightly revised on occasion of bugfix #1216
+ *      Kay Gürtzig             2025-12-12      Issue #800: Code generation for CASE adapted to TokenLists,
+ *                                              getInputReplacer() modified to correspond with new matching mechanism
  *
  ******************************************************************************************************
  *
@@ -300,10 +302,10 @@ public class PHPGenerator extends Generator
 	protected String getInputReplacer(boolean withPrompt)
 	{
 		if (withPrompt) {
-			return "$2 = \\$_REQUEST[$1];	// TODO form a sensible input opportunity";
+			return "$2 = $_REQUEST[$1];	// TODO form a sensible input opportunity";
 		}
 		// This is rather nonsense but ought to help to sort this out somehow
-		return "$1 = \\$_REQUEST['$1'];	// TODO form a sensible input opportunity";
+		return "$1 = $_REQUEST['$1'];	// TODO form a sensible input opportunity";
 	}
 	// END KGU#281 2016-10-15
 
@@ -585,7 +587,7 @@ public class PHPGenerator extends Generator
 					for (int j = 1; j < inputItems.count(); j++) {
 						// Let the variable name be used as default key for the retrieval
 						String key = prompt == null ? "'" + inputItems.get(j) + "'" : prompt;
-						String subLine = Syntax.getKeyword("input") + " " + key + " " + inputItems.get(j);
+						String subLine = Syntax.key2token("input") + " " + key + " " + inputItems.get(j);
 						addCode(transform(subLine) + ";", _indent, isDisabled);
 					}
 				}
@@ -816,15 +818,15 @@ public class PHPGenerator extends Generator
 
 		// START KGU#453 2017-11-02: Issue #447
 		//StringList lines = _case.getText();
-		StringList lines = _case.getUnbrokenText();
+		ArrayList<TokenList> lines = _case.getUnbrokenTokenText();
 		// END KGU#453 2017-11-02
-		String condition = transform(_case.getText().get(0));
+		String condition = transform(lines.get(0));
 		// START KGU#301 2016-12-01: Bugfix #301
 		//if (!condition.startsWith("(") || !condition.endsWith(")")) condition="("+condition+")";
 		if (!isParenthesized(condition)) condition = "(" + condition + ")";
 		// END KGU#301 2016-12-01
 
-		addCode("switch "+condition+" ", _indent, isDisabled);
+		addCode("switch " + condition + " ", _indent, isDisabled);
 		addCode("{", _indent, isDisabled);
 
 		for (int i = 0; i < _case.qs.size() - 1; i++)
@@ -833,11 +835,14 @@ public class PHPGenerator extends Generator
 			//code.add(_indent+this.getIndent()+"case "+_case.getText().get(i+1).trim()+":");
 			// START KGU#755 2019-11-08: Bugfix #769 - more precise splitting necessary
 			//StringList constants = StringList.explode(lines.get(i+1), ",");
-			StringList constants = Syntax.splitExpressionList(lines.get(i + 1), ",");
+			ArrayList<TokenList> constants = Syntax.splitExpressionList(lines.get(i + 1), ",");
 			// END KGU#755 2019-11-08
-			for (int j = 0; j < constants.count(); j++)
+			for (int j = 0; j < constants.size(); j++)
 			{
-				addCode("case " + constants.get(j).trim() + ":", _indent + this.getIndent(), isDisabled);
+				TokenList selector = constants.get(j);
+				if (!selector.isBlank()) {
+					addCode("case " + selector.getString().trim() + ":", _indent + this.getIndent(), isDisabled);
+				}
 			}
 			// END KGU#15 2015-11-02
 			Subqueue branch = (Subqueue) _case.qs.get(i);
@@ -861,7 +866,7 @@ public class PHPGenerator extends Generator
 
 		// START KGU#453 2017-11-02: Issue #447
 		//if(!_case.getText().get(_case.qs.size()).trim().equals("%"))
-		if(!lines.get(_case.qs.size()).trim().equals("%"))
+		if(!lines.get(_case.qs.size()).getString().trim().equals("%"))
 		// END KGU#453 2017-11-02
 		{
 			addCode("default:", _indent+this.getIndent(), isDisabled);
@@ -895,11 +900,11 @@ public class PHPGenerator extends Generator
 			ArrayList<TokenList> items = _for.getValueListItems();
 			if (items != null)
 			{
-				valueList = "array(" + transform(TokenList.concatenate(items, ", ").getString(), false) + ")";
+				valueList = "array(" + transform(TokenList.concatenate(items, ", "), false) + ")";
 			}
 			else
 			{
-				valueList = transform(valueList, false);
+				valueList = transform(new TokenList(valueList), false);
 			}
 			// START KGU#162 2016-04-01: Enh. #144 - var syntax already handled
 			//code.add(_indent + "foreach (" + valueList + " as $" + var + ")");
@@ -926,8 +931,8 @@ public class PHPGenerator extends Generator
 //					")");
 			String increment = var + " += (" + step + ")";
 			addCode("for (" +
-					var + " = " + transform(_for.getStartValue(), false) + "; " +
-					var + compOp + transform(_for.getEndValue(), false) + "; " +
+					var + " = " + transform(new TokenList(_for.getStartValue()), false) + "; " +
+					var + compOp + transform(new TokenList(_for.getEndValue()), false) + "; " +
 					increment +
 					")", _indent, isDisabled);
 			// END KGU#162 2016-04-01
@@ -937,7 +942,7 @@ public class PHPGenerator extends Generator
 		{
 			String text = _for.getUnbrokenText().getLongString().trim();
 			if (!suppressTransformation) {
-				text = transform(text, false);
+				text = transform(new TokenList(text), false);
 			}
 			appendComment("FIXME: Unrecognized FOR loop header - requires manual translation", _indent);
 			addCode(text, _indent, isDisabled);
@@ -964,7 +969,7 @@ public class PHPGenerator extends Generator
 		if (!isParenthesized(condition)) condition = "(" + condition + ")";
 		// END KGU#301 2016-12-01
 
-		addCode("while "+condition+" ", _indent, isDisabled);
+		addCode("while " + condition + " ", _indent, isDisabled);
 		addCode("{", _indent, isDisabled);
 		generateCode(_while.getBody(),_indent+this.getIndent());
 		addCode("}", _indent, isDisabled);
@@ -1054,25 +1059,22 @@ public class PHPGenerator extends Generator
 		// In case of an empty text generate a continue instruction by default.
 		boolean isEmpty = true;
 		
-		StringList lines = _jump.getUnbrokenText();
-		String preReturn = Syntax.getKeywordOrDefault("preReturn", "return");
-		String preExit   = Syntax.getKeywordOrDefault("preExit", "exit");
-		//String preLeave  = CodeParser.getKeywordOrDefault("preLeave", "leave");
-		String preThrow  = Syntax.getKeywordOrDefault("preThrow", "throw");
-		for (int i = 0; isEmpty && i < lines.count(); i++) {
-			// FIXME: That the line is transformed prior to the detection is a potential risk
-			String line = transform(lines.get(i)).trim();
-			if (!line.isEmpty())
+		ArrayList<TokenList> lines = _jump.getUnbrokenTokenText();
+		for (int i = 0; isEmpty && i < lines.size(); i++) {
+			TokenList tokens = lines.get(i);
+			if (!tokens.isBlank())
 			{
 				isEmpty = false;
 			}
-			if (Jump.isReturn(line))
+			if (Jump.isReturn(tokens))
 			{
-				addCode("return " + line.substring(preReturn.length()).trim() + ";", _indent, isDisabled);
+				// FIXME is this safe against suppressTransform?
+				addCode("return " + transform(tokens.subSequenceToEnd(1)).trim() + ";", _indent, isDisabled);
 			}
-			else if (Jump.isExit(line))
+			else if (Jump.isExit(tokens))
 			{
-				addCode("exit(" + line.substring(preExit.length()).trim() + ");", _indent, isDisabled);
+				// FIXME is this safe against suppressTransform?
+				addCode("exit(" + transform(tokens.subSequenceToEnd(1)).trim() + ");", _indent, isDisabled);
 			}
 			// Has it already been matched with a loop? Then syntax must have been okay...
 			else if (this.jumpTable.containsKey(_jump))
@@ -1082,7 +1084,7 @@ public class PHPGenerator extends Generator
 				if (ref.intValue() < 0)
 				{
 					appendComment("FIXME: Structorizer detected this illegal jump attempt:", _indent);
-					appendComment(line, _indent);
+					appendComment(Syntax.decodeLine(tokens).getString(), _indent);
 					label = "__ERROR__";
 				}
 				// START KGU#1196 2025-09-02 PHP allows break n - but switch constructs add to the level)
@@ -1099,11 +1101,12 @@ public class PHPGenerator extends Generator
 				// END KGU#1196 2025-09-02
 			}
 			// START KGU#686 2019-03-21: Enh. #56
-			else if (Jump.isThrow(line)) {
+			else if (Jump.isThrow(tokens)) {
 				// START KGU#1102 2023-11-08: Bugfix #1109 Rethrow was wrong
 				//addCode("throw new Exception(" + line.substring(preThrow.length()).trim() + ");", _indent, isDisabled);
-				String arg = line.substring(preThrow.length()).trim();
-				if (arg.isEmpty()) {
+				// FIXME is this safe against suppressTransform?
+				String arg = transform(tokens.subSequenceToEnd(1));
+				if (arg.isBlank()) {
 					Try parentTry = Try.findEnclosingTry(_jump, true);
 					if (parentTry != null) {
 						arg = "$ex" + Integer.toHexString(parentTry.hashCode());
@@ -1119,7 +1122,7 @@ public class PHPGenerator extends Generator
 				// END KGU#1102 2023-11-08
 			}
 			// END KGU#686 2019-03-21
-			else if (Jump.isLeave(line))
+			else if (Jump.isLeave(tokens))
 			{
 				// Strange case: neither matched nor rejected - how can this happen?
 				// Try with an ordinary break instruction and a funny comment
@@ -1129,7 +1132,7 @@ public class PHPGenerator extends Generator
 			else if (!isEmpty)
 			{
 				appendComment("FIXME: jump/exit instruction of unrecognised kind!", _indent);
-				appendComment(line, _indent);
+				appendComment(Syntax.decodeLine(tokens).getString(), _indent);
 			}
 			// END KGU#74/KGU#78 2015-11-30
 		}

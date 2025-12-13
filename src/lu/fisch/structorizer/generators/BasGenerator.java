@@ -82,6 +82,7 @@ package lu.fisch.structorizer.generators;
  *                                          fundamentally revised, record and array inits now recursive.
  *      Kay Gürtzig         2025-02-16      Bugfix #1192: Return keywords in Instruction elements weren't transformed
  *      Kay Gürtzig         2025-08-30      Bugfix #1210: Free-text FOR loops caused errors in suppressTransition mode
+ *      Kay Gürtzig         2025-09-26      Issue #800: Code generation for OUTPUT instructions repaired
  *
  ******************************************************************************************************
  *
@@ -472,43 +473,34 @@ public class BasGenerator extends Generator
 	// START KGU#18/KGU#23 2015-11-02: Method properly sub-classed
 	//    private String transform(String _input)
 	@Override
-	protected String transform(String _input)
+	protected String transform(TokenList tokens)
 	{
 		// START KGU#101 2015-12-19: Enh. #54 - support lists of output expressions
 		// FIXME: Fails if there is no gap between then keyword and the first expression.
 		String outputToken = Syntax.key2token("output");
-		TokenList tokens = new TokenList(_input);
+		boolean isInput = !tokens.isBlank() && tokens.get(0).equals(Syntax.key2token("input"));
 		if (!tokens.isBlank() && tokens.get(0).equals(outputToken))
 		{
 			// Replace commas by semicolons to avoid tabulation
 			ArrayList<TokenList> expressions = 
 					Syntax.splitExpressionList(tokens.subSequenceToEnd(1), ",");
-			String tail = expressions.remove(expressions.size()-1).getString();	// Get rid of line tail
-			_input = outputToken + " " + TokenList.concatenate(expressions, ";").getString() + tail;
+			TokenList tail = expressions.remove(expressions.size()-1);	// Get rid of line tail
+			tokens = TokenList.concatenate(expressions, ";");
+			tokens.add(0, outputToken);
+			tokens.addAll(tail);
 		}
 		// END KGU#101 2015-12-19
 
-		String interm = super.transform(_input);
+		String interm = super.transform(tokens);
 		
 		// START KGU#993 2021-10-04: Issue #993
-		if (interm.startsWith("const ")) {
+		if (!this.suppressTransformation && interm.startsWith("const ")) {
 			interm = this.transformKeyword("CONST") + interm.substring("const".length());
 		}
 		// END KGU#993 2021-10-04
 		
-		// Operator translations; KGU#93: now in transformTokens() 
-//		interm = interm.replace(" == ", " = ");
-//		interm = interm.replace(" != ", " <> ");
-//		interm = interm.replace(" && ", " AND ");
-//		interm = interm.replace(" || ", " OR ");
-//		interm = interm.replace(" ! ", " NOT ");
-//		// START KGU 2015-12-19: In BASIC, array indices are usually encöosed by parentheses rather than brackets
-//		interm = interm.replace("[", "(");
-//		interm = interm.replace("]", ")");
-		// END KGU 2015-12-19
-
 		// START KGU#108 2015-12-19: Bugfix #51/Enh. #271: Cope with empty input
-		if (interm.trim().equals("INPUT") || interm.endsWith(": INPUT"))
+		if (isInput && (interm.trim().equals("INPUT") || interm.endsWith(": INPUT")))
 		{
 			interm = interm.replace("INPUT", transformKeyword("SLEEP"));	// waits for key hit (according to https://en.wikibooks.org/wiki/BASIC_Programming/Beginning_BASIC/User_Input)
 		}
@@ -607,13 +599,13 @@ public class BasGenerator extends Generator
 				TokenList tokens = lines.get(i);
 				// FIXME: Could we provide the typemap or isn't it worth the trouble?
 				boolean isTypeDef = Instruction.isTypeDefinition(lines.get(i), null);
-				Syntax.unifyOperators(tokens, false);
 				boolean done = false;
 				// END KGU#779 2019-12-01
 				//if (this.optionBasicLineNumbering())
 				if (!this.suppressTransformation /*&& this.optionCodeLineNumbering()*/)
 				// END KGU#171 2016-03-31 / KGU#779 2019-12-01
 				{
+					Syntax.unifyOperators(tokens, false);
 					// START KGU#779 2019-12-01
 					if (isTypeDef) {
 						// In most cases this won't do anything because it's already generated
@@ -688,7 +680,7 @@ public class BasGenerator extends Generator
 				// END KGU#100 2016-01-22
 					// START KGU#277/KGU#284 2016-10-13/16: Enh. #270 + Enh. #274
 					//code.add(this.getLineNumber() + _indent + transform(_inst.getText().get(i)));
-					String codeLine = transform(tokens.getString());
+					String codeLine = transform(tokens);
 					if (Instruction.isTurtleizerMove(tokens)) {
 						codeLine += " : " + this.commentSymbolLeft() + " color = " + _inst.getHexColor();
 					}
