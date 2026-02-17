@@ -97,7 +97,8 @@ package lu.fisch.structorizer.generators;
  *      Kay Gürtzig         2025-02-16      Bugfix #1192: Translation of tail return instruction keywords
  *      Kay Gürtzig         2025-07-03      Several missing Override annotations added.
  *      Kay Gürtzig         2025-12-13      Issue #800: JUMP generation converted to work on TokenLists,
- *                                          Instruction export reorganised with respect to bugfix #1063
+ *                                          Instruction export reorganised with respect to bugfix #1061
+ *      Kay Gürtzig         2026-02-17      Bugfix #1061: Further export modification for turtle pen colour
  *
  ******************************************************************************************************
  *
@@ -714,7 +715,8 @@ public class PythonGenerator extends Generator
 							String hexCol = _inst.getHexColor();
 							// White elements induce black pen colour
 							if (hexCol.equals("ffffff")) hexCol = "000000";
-							addCode(tmpCol + " = turtle.pencolor(); turtle.pencolor(\"#" + hexCol + "\")", _indent, isDisabled);
+							addCode(tmpCol + " = turtle.pencolor(); turtle.pencolor(\"#" + hexCol + "\")", _indent,
+									isDisabled || this.suppressTransformation);
 						}
 						// END KGU#599 2018-10-17
 					}
@@ -761,7 +763,8 @@ public class PythonGenerator extends Generator
 			}
 			// START KGU#599 2018-10-17: Bugfix #623 make color effective
 			if (tmpCol != null) {
-				addCode("turtle.pencolor(" + tmpCol + ")", _indent, isDisabled);
+				addCode("turtle.pencolor(" + tmpCol + ")", _indent,
+						isDisabled || this.suppressTransformation);
 			}
 			// END KGU#599 2018-10-17
 		}
