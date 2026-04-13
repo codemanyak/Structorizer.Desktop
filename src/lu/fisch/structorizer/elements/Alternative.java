@@ -647,7 +647,7 @@ public class Alternative extends Element implements IFork {
 	@Override
 	public ImageIcon getIcon()
 	{
-		return IconLoader.getIcon(60);
+		return IconLoader.getMultiIcon(60);
 	}
 	// END KGU#122 2016-01-03
 	
@@ -660,7 +660,7 @@ public class Alternative extends Element implements IFork {
 	@Override
 	public ImageIcon getMiniIcon()
 	{
-		return IconLoader.getIcon(13);
+		return IconLoader.getMultiIcon(13);
 	}
 	// END KGU 2018-06-28
 	

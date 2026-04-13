@@ -238,7 +238,7 @@ public class Jump extends Instruction {
 	@Override
 	public ImageIcon getIcon()
 	{
-		return IconLoader.getIcon(59);
+		return IconLoader.getMultiIcon(59);
 	}
 	// END KGU#122 2016-01-03
 	
@@ -251,7 +251,7 @@ public class Jump extends Instruction {
 	@Override
 	public ImageIcon getMiniIcon()
 	{
-		return IconLoader.getIcon(12);
+		return IconLoader.getMultiIcon(12);
 	}
 	// END KGU#535 2018-06-28
 

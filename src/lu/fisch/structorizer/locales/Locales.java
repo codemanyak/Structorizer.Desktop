@@ -638,7 +638,7 @@ public class Locales {
                         // END KGU#484 2018-04-05
                     }
                 }
-                if (field!=null)
+                if (field != null)
                 {
                     try
                     {
@@ -1034,7 +1034,7 @@ public class Locales {
      */
     public String getLoadedLocaleName()
     {
-        if (loadedLocaleName==null) return DEFAULT_LOCALE;
+        if (loadedLocaleName == null) return DEFAULT_LOCALE;
         else return loadedLocaleName;
     }
     
@@ -1044,7 +1044,7 @@ public class Locales {
      */
     public String getLoadedLocaleFilename()
     {
-        if(loadedLocaleFilename==null) return DEFAULT_LOCALE + ".txt";
+        if (loadedLocaleFilename == null) return DEFAULT_LOCALE + ".txt";
         else return loadedLocaleFilename;
     }
     

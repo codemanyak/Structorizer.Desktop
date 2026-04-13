@@ -19,6 +19,7 @@ set -e
 #      Bob Fisch                     2018-09-05    get correct dir if symlinked
 #      Kay Gürtzig                   2018-09-19    Bugfix #604: Condition in jar test (line 31) corrected (#586)
 #      Kay Gürtzig                   2021-06-13    Issue #944: Now requires Java 11 at least
+#      JoshiCodes                    2026-03-20    Fix #1229 for non-reparenting window managers
 #
 ################################################################################
 
@@ -52,6 +53,21 @@ then
   echo "Your Java version is $VERSION, but version $REQVERSION is required. Please update."
   exit 1
 fi
+
+# Optional Script Arguments
+while [ "$#" -gt 0 ]; do
+  arg=$1
+  shift
+  case "$arg" in
+    --non-reparenting|-nrp)
+      # Fix for some Linux Window Managers, e.g. sway
+      export _JAVA_AWT_WM_NONREPARENTING=1
+      ;;
+     *)
+      set -- "$@" "$arg"
+      ;;
+  esac
+done
 
 # actual start
 #echo "Your Java version is $VERSION, all fine."

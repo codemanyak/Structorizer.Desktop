@@ -198,7 +198,7 @@ public class While extends Loop {
 	@Override
 	public ImageIcon getIcon()
 	{
-		return IconLoader.getIcon(62);
+		return IconLoader.getMultiIcon(62);
 	}
 	// END KGU#122 2016-01-03
 
@@ -211,7 +211,7 @@ public class While extends Loop {
 	@Override
 	public ImageIcon getMiniIcon()
 	{
-		return IconLoader.getIcon(15);
+		return IconLoader.getMultiIcon(15);
 	}
 	// END KGU#535 2018-06-28
 	

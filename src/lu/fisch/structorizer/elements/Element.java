@@ -149,6 +149,7 @@ package lu.fisch.structorizer.elements;
  *                                      Enh. #1198: Case editor choice option changed from boolean to enum
  *      Kay Gürtzig     2025-08-13      Enh. #1198: Defective initial preference for useInputBoxCase mended
  *      Kay Gürtzig     2025-09-06      Issue #1221: Comment lines should neither be trimmed nor skipped
+ *      Kay Gürtzig     2026-04-10      Issue #81: Element-specific icons realised as multi-resolution icons
  *
  ******************************************************************************************************
  *
@@ -4630,7 +4631,7 @@ public abstract class Element {
      */
     public ImageIcon getIcon()
     {
-    	return IconLoader.getIcon(57);
+    	return IconLoader.getMultiIcon(57);
     }
     // END KGU#122 2016-01-03
     
@@ -4642,7 +4643,7 @@ public abstract class Element {
      */
     public ImageIcon getMiniIcon()
     {
-    	return IconLoader.getIcon(10);
+    	return IconLoader.getMultiIcon(10);
     }
     // END KGU#535 2018-06-28
 
